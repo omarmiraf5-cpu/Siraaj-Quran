@@ -198,7 +198,7 @@ function MushafPage({
   const juz = getJuzForPage(pageNum);
 
   return (
-    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-1 flex flex-col h-[78vh] md:h-[82vh]">
+    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-1 flex flex-col h-[80vh] md:h-[86vh]">
       {/* Ornamental frame */}
       <div className="absolute inset-0 border-[3px] border-[#a8894a]/60 dark:border-[#8b7d56]/30 rounded-[3px] pointer-events-none" />
       <div className="absolute inset-[5px] border border-[#a8894a]/35 dark:border-[#8b7d56]/20 rounded-[2px] pointer-events-none" />
@@ -444,7 +444,7 @@ export function TajweedMushaf({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1.5">
       {/* Reciter Picker Modal */}
       {showReciterPicker && (
         <ReciterPicker
@@ -454,11 +454,11 @@ export function TajweedMushaf({
       )}
 
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <select
           onChange={(e) => handleSurahJump(e.target.value)}
           defaultValue=""
-          className="flex-1 min-w-[160px] bg-surface-card border border-surface-border rounded-lg px-2.5 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+          className="flex-1 min-w-0 bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
         >
           <option value="">Jump to Surah...</option>
           {QURAN.map((s) => (
@@ -468,23 +468,22 @@ export function TajweedMushaf({
           ))}
         </select>
 
-        <form onSubmit={handlePageSubmit} className="flex items-center gap-1">
-          <span className="text-[10px] text-ink-muted">Pg</span>
+        <form onSubmit={handlePageSubmit} className="flex items-center gap-1 flex-shrink-0">
           <input
             type="number"
             min={1}
             max={TOTAL_PAGES}
             value={pageInput}
             onChange={(e) => setPageInput(e.target.value)}
-            className="w-14 bg-surface-card border border-surface-border rounded-md px-1.5 py-1.5 text-xs text-ink text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/50 tabular-nums"
+            className="w-11 bg-surface-card border border-surface-border rounded-md px-1 py-1 text-[11px] text-ink text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/50 tabular-nums"
           />
-          <span className="text-[10px] text-ink-muted">/ {TOTAL_PAGES}</span>
+          <span className="text-[9px] text-ink-muted">/{TOTAL_PAGES}</span>
         </form>
 
         {showTajweed && (
           <button
             onClick={() => setShowLegend(!showLegend)}
-            className={`text-[10px] px-2 py-1.5 rounded-md border transition ${
+            className={`text-[10px] px-1.5 py-1 rounded-md border transition flex-shrink-0 ${
               showLegend
                 ? "bg-emerald-100 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200"
                 : "bg-surface-card border-surface-border text-ink-muted"
