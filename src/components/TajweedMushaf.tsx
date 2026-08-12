@@ -54,6 +54,28 @@ function getAudioUrl(reciter: Reciter, surah: number, ayah: number): string {
   return `https://cdn.islamic.network/quran/audio/128/${reciter.cdnId}/${n}.mp3`;
 }
 
+const JUZ_START_PAGES = [
+  1, 22, 42, 62, 82, 102, 121, 142, 162, 182, 201, 222, 242, 262, 282,
+  302, 322, 342, 362, 382, 402, 422, 442, 462, 482, 502, 522, 542, 562, 582,
+];
+
+function getJuzForPage(page: number): number {
+  let juz = 1;
+  for (let i = 0; i < JUZ_START_PAGES.length; i++) {
+    if (page >= JUZ_START_PAGES[i]) juz = i + 1;
+  }
+  return juz;
+}
+
+const ARABIC_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+
+function toArabicNumerals(n: number): string {
+  return String(n)
+    .split("")
+    .map((d) => ARABIC_DIGITS[Number(d)] ?? d)
+    .join("");
+}
+
 function TajweedTooltip({ rules, children }: { rules: TajweedRule[]; children: React.ReactNode }) {
   const [show, setShow] = useState(false);
   if (rules.length === 0) return <>{children}</>;
@@ -172,50 +194,62 @@ function MushafPage({
     groups[groups.length - 1].ayahs.push(item.ayah);
   }
 
-  return (
-    <div className="mushaf-page relative bg-[#fdf8ec] dark:bg-[#1c1a14] flex-1 flex flex-col min-h-[70vh] md:min-h-[80vh]">
-      <div className="absolute inset-0 border-2 border-[#8b7d56]/40 dark:border-[#8b7d56]/25 rounded-sm pointer-events-none" />
-      <div className="absolute inset-[6px] border border-[#8b7d56]/25 dark:border-[#8b7d56]/15 rounded-sm pointer-events-none" />
-      <div className="absolute inset-[10px] border border-[#c4a95a]/20 dark:border-[#c4a95a]/10 rounded-sm pointer-events-none" />
+  const headerSurah = groups.length > 0 ? groups[0].surah : null;
+  const juz = getJuzForPage(pageNum);
 
-      <div className="relative px-5 md:px-8 py-4 md:py-5 flex flex-col flex-1" dir="rtl" lang="ar">
-        <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-[#8b7d56]/20" dir="ltr">
-          <span className="text-[10px] text-[#8b7d56]/60 dark:text-[#c4a95a]/40 tabular-nums">
-            {pageNum}
+  return (
+    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-1 flex flex-col h-[78vh] md:h-[82vh]">
+      {/* Ornamental frame */}
+      <div className="absolute inset-0 border-[3px] border-[#a8894a]/60 dark:border-[#8b7d56]/30 rounded-[3px] pointer-events-none" />
+      <div className="absolute inset-[5px] border border-[#a8894a]/35 dark:border-[#8b7d56]/20 rounded-[2px] pointer-events-none" />
+      <div className="absolute inset-[9px] border-[2px] border-[#c4a95a]/25 dark:border-[#c4a95a]/12 rounded-[2px] pointer-events-none" />
+      {/* Corner ornaments */}
+      <span className="absolute top-[9px] right-[9px] w-4 h-4 border-t-2 border-r-2 border-[#a8894a]/50 pointer-events-none" />
+      <span className="absolute top-[9px] left-[9px] w-4 h-4 border-t-2 border-l-2 border-[#a8894a]/50 pointer-events-none" />
+      <span className="absolute bottom-[9px] right-[9px] w-4 h-4 border-b-2 border-r-2 border-[#a8894a]/50 pointer-events-none" />
+      <span className="absolute bottom-[9px] left-[9px] w-4 h-4 border-b-2 border-l-2 border-[#a8894a]/50 pointer-events-none" />
+
+      <div className="relative px-4 md:px-7 pt-4 md:pt-5 pb-2 flex flex-col flex-1 min-h-0" dir="rtl" lang="ar">
+        {/* Running header: surah name (right) / juz (left) */}
+        <div className="flex justify-between items-baseline mb-1.5 pb-1 border-b border-[#a8894a]/25 flex-shrink-0">
+          <span className="font-arabic text-[13px] md:text-[15px] text-[#8b6f35] dark:text-[#c4a95a]/60">
+            سورة {headerSurah ? headerSurah.name : ""}
           </span>
-          <span className="text-[10px] text-[#8b7d56]/60 dark:text-[#c4a95a]/40">
-            {groups.length > 0 ? groups[0].surah.englishName : ""}
+          <span className="font-arabic text-[13px] md:text-[15px] text-[#8b6f35] dark:text-[#c4a95a]/60">
+            الجزء {toArabicNumerals(juz)}
           </span>
         </div>
 
-        <div className="flex-1">
+        {/* Text body — fills available height */}
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center">
           {groups.map((group, gi) => {
             const startsHere = group.ayahs[0].n === 1;
             return (
               <div key={`${group.surah.id}-${gi}`}>
                 {startsHere && (
-                  <div className="my-3 mx-auto max-w-[85%]">
-                    <div className="relative bg-gradient-to-r from-[#c4a95a]/10 via-[#c4a95a]/20 to-[#c4a95a]/10 dark:from-[#c4a95a]/5 dark:via-[#c4a95a]/10 dark:to-[#c4a95a]/5 border border-[#c4a95a]/30 dark:border-[#c4a95a]/15 rounded-md py-2.5 px-4 text-center">
-                      <span className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#c4a95a]/50 rounded-tr-md" />
-                      <span className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#c4a95a]/50 rounded-tl-md" />
-                      <span className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#c4a95a]/50 rounded-br-md" />
-                      <span className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#c4a95a]/50 rounded-bl-md" />
-                      <p className="font-arabic text-xl md:text-2xl text-[#5a4520] dark:text-[#c4a95a]">
+                  <div className="my-2 mx-auto max-w-[92%]">
+                    <div className="relative bg-gradient-to-r from-[#c4a95a]/12 via-[#c4a95a]/25 to-[#c4a95a]/12 dark:from-[#c4a95a]/5 dark:via-[#c4a95a]/12 dark:to-[#c4a95a]/5 border-y-2 border-[#a8894a]/45 dark:border-[#c4a95a]/20 py-2 px-4 text-center">
+                      <p className="font-arabic text-xl md:text-2xl text-[#5a4520] dark:text-[#c4a95a] leading-tight">
                         سُورَةُ {group.surah.name}
-                      </p>
-                      <p className="text-[9px] text-[#8b7d56]/70 dark:text-[#c4a95a]/50 mt-0.5" dir="ltr">
-                        {group.surah.translation} — {group.surah.ayahs.length} Ayahs
                       </p>
                     </div>
                     {group.surah.id !== 1 && group.surah.id !== 9 && (
-                      <p className="text-center font-arabic text-lg md:text-xl text-[#5a4520]/70 dark:text-[#c4a95a]/50 mt-2.5 mb-1.5">
+                      <p className="text-center font-arabic text-lg md:text-[22px] text-[#2c1f0e]/80 dark:text-[#c4a95a]/50 mt-2 mb-1">
                         بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ
                       </p>
                     )}
                   </div>
                 )}
 
-                <p className="font-arabic text-[22px] md:text-[28px] leading-[2.0] md:leading-[2.1] text-[#2c1f0e] dark:text-[#e8dcc8] text-justify">
+                <p
+                  className="font-arabic text-[20px] md:text-[26px] text-[#1a1206] dark:text-[#e8dcc8]"
+                  style={{
+                    textAlign: "justify",
+                    textAlignLast: "justify",
+                    lineHeight: 2.15,
+                    wordSpacing: "0.05em",
+                  }}
+                >
                   {group.ayahs.map((ayah) => {
                     const hl = isHighlighted(group.surah.id, ayah.n);
                     const playing = isPlaying(group.surah.id, ayah.n);
@@ -243,15 +277,15 @@ function MushafPage({
                           tabIndex={0}
                           onClick={() => onAyahClick(group.surah.id, ayah.n, group.surah.englishName)}
                           onKeyDown={(e) => { if (e.key === "Enter") onAyahClick(group.surah.id, ayah.n, group.surah.englishName); }}
-                          className={`inline-flex items-center justify-center w-[26px] h-[26px] md:w-[30px] md:h-[30px] mx-[2px] rounded-full text-[9px] md:text-[10px] font-bold tabular-nums align-middle cursor-pointer transition-colors ${
+                          className={`inline-flex items-center justify-center w-[24px] h-[24px] md:w-[28px] md:h-[28px] mx-[3px] rounded-full font-arabic text-[11px] md:text-[13px] align-middle cursor-pointer transition-colors border ${
                             playing
-                              ? "bg-emerald-400/60 dark:bg-emerald-700/50 text-emerald-900 dark:text-emerald-100 ring-1 ring-emerald-500/50"
+                              ? "bg-emerald-400/60 dark:bg-emerald-700/50 text-emerald-900 dark:text-emerald-100 border-emerald-600/50"
                               : hl
-                                ? "bg-red-300/60 dark:bg-red-800/40 text-red-900 dark:text-red-200 hover:bg-red-400/60"
-                                : "bg-[#c4a95a]/20 dark:bg-[#c4a95a]/10 text-[#8b7d56] dark:text-[#c4a95a]/70 hover:bg-[#c4a95a]/40"
+                                ? "bg-red-300/60 dark:bg-red-800/40 text-red-900 dark:text-red-200 border-red-500/40 hover:bg-red-400/60"
+                                : "bg-transparent text-[#8b6f35] dark:text-[#c4a95a]/70 border-[#a8894a]/45 hover:bg-[#c4a95a]/25"
                           }`}
                         >
-                          {ayah.n}
+                          {toArabicNumerals(ayah.n)}
                         </span>{" "}
                       </span>
                     );
@@ -260,6 +294,13 @@ function MushafPage({
               </div>
             );
           })}
+        </div>
+
+        {/* Page number — bottom center, framed like the Mushaf */}
+        <div className="flex-shrink-0 flex justify-center pt-1.5 mt-1 border-t border-[#a8894a]/25">
+          <span className="inline-flex items-center justify-center min-w-[30px] h-[22px] px-2 rounded-full border border-[#a8894a]/45 font-arabic text-[12px] md:text-[14px] text-[#8b6f35] dark:text-[#c4a95a]/60">
+            {toArabicNumerals(pageNum)}
+          </span>
         </div>
       </div>
     </div>
