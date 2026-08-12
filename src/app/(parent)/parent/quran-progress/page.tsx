@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getSurahById } from "@/data/quran-text";
-import { TajweedMushaf } from "@/components/TajweedMushaf";
+import { getSurahById } from "@/data/mushaf-index";
+import { Mushaf } from "@/components/Mushaf";
 
 interface Child {
   id: string;
@@ -324,8 +324,8 @@ export default function ParentQuranProgressPage() {
                       Close
                     </button>
                   </div>
-                  <TajweedMushaf
-                    initialPage={getSurahById(assignment.surah)?.ayahs[0]?.p ?? 1}
+                  <Mushaf
+                    initialPage={getSurahById(assignment.surah)?.startPage ?? 1}
                     highlightedRange={{
                       surah: assignment.surah,
                       start: assignment.ayah_start,

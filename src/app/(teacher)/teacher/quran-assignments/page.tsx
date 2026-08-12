@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { QURAN, getSurahById } from "@/data/quran-text";
-import { TajweedMushaf } from "@/components/TajweedMushaf";
+import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
+import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -99,7 +99,7 @@ export default function QuranAssignmentsPage() {
   };
 
   const selectedSurahData = getSurahById(parseInt(selectedSurah) || 0);
-  const maxAyahs = selectedSurahData?.ayahs.length || 0;
+  const maxAyahs = selectedSurahData?.ayahs ?? 0;
 
   const canPreview = selectedSurah && ayahStart && ayahEnd;
 
@@ -146,7 +146,7 @@ export default function QuranAssignmentsPage() {
               <option value="">Select a Surah</option>
               {surahs.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.id}. {s.englishName} ({s.ayahs.length} Ayahs)
+                  {s.id}. {s.englishName} ({s.ayahs} Ayahs)
                 </option>
               ))}
             </select>
@@ -265,8 +265,8 @@ export default function QuranAssignmentsPage() {
                   Close
                 </button>
               </div>
-              <TajweedMushaf
-                initialPage={selectedSurahData?.ayahs[0]?.p ?? 1}
+              <Mushaf
+                initialPage={selectedSurahData?.startPage ?? 1}
                 highlightedRange={{
                   surah: parseInt(selectedSurah),
                   start: parseInt(ayahStart),
