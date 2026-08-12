@@ -3,6 +3,9 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { QURAN, getPageAyahs, getSurahById, TOTAL_PAGES, SurahData } from "@/data/quran-text";
 import { getLetterRules, TajweedRule, TAJWEED_RULES } from "@/lib/tajweed-rules";
+import { QcfMushafPage, usePageLayout } from "./QcfMushafPage";
+
+type ViewMode = "mushaf" | "tajweed";
 
 interface HighlightRange {
   surah: number;
@@ -150,16 +153,19 @@ function MushafPage({
   pageNum,
   highlightedRange,
   showTajweed,
+  mode,
   playingAyah,
   onAyahClick,
 }: {
   pageNum: number;
   highlightedRange?: HighlightRange;
   showTajweed: boolean;
+  mode: ViewMode;
   playingAyah: PlayingAyah | null;
   onAyahClick: (surah: number, ayah: number, surahName: string) => void;
 }) {
   const pageAyahs = useMemo(() => getPageAyahs(pageNum), [pageNum]);
+  const layout = usePageLayout(pageNum);
 
   const isHighlighted = (surahId: number, ayahNum: number) => {
     if (!highlightedRange) return false;
@@ -221,6 +227,18 @@ function MushafPage({
         </div>
 
         {/* Text body — fills available height */}
+        {mode === "mushaf" ? (
+          <QcfMushafPage
+            pageNum={pageNum}
+            layout={layout}
+            highlightedRange={highlightedRange}
+            playingKey={playingAyah ? `${playingAyah.surah}:${playingAyah.ayah}` : null}
+            onAyahClick={(s, a) => {
+              const surah = getSurahById(s);
+              onAyahClick(s, a, surah ? surah.englishName : "");
+            }}
+          />
+        ) : (
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center">
           {groups.map((group, gi) => {
             const startsHere = group.ayahs[0].n === 1;
@@ -295,6 +313,7 @@ function MushafPage({
             );
           })}
         </div>
+        )}
 
         {/* Page number — bottom center, framed like the Mushaf */}
         <div className="flex-shrink-0 flex justify-center pt-1.5 mt-1 border-t border-[#a8894a]/25">
@@ -318,6 +337,7 @@ export function TajweedMushaf({
   });
   const [pageInput, setPageInput] = useState(String(initialPage));
   const [showLegend, setShowLegend] = useState(false);
+  const [mode, setMode] = useState<ViewMode>("mushaf");
 
   const [playingAyah, setPlayingAyah] = useState<PlayingAyah | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
@@ -480,7 +500,31 @@ export function TajweedMushaf({
           <span className="text-[9px] text-ink-muted">/{TOTAL_PAGES}</span>
         </form>
 
-        {showTajweed && (
+        {/* View mode: exact Mushaf glyphs vs Tajweed colouring */}
+        <div className="flex items-center rounded-md border border-surface-border overflow-hidden flex-shrink-0">
+          <button
+            onClick={() => setMode("mushaf")}
+            className={`text-[10px] px-2 py-1 transition ${
+              mode === "mushaf"
+                ? "bg-[#c4a95a]/25 text-[#8b6f35] dark:text-[#c4a95a] font-semibold"
+                : "bg-surface-card text-ink-muted"
+            }`}
+          >
+            Mushaf
+          </button>
+          <button
+            onClick={() => setMode("tajweed")}
+            className={`text-[10px] px-2 py-1 border-r border-surface-border transition ${
+              mode === "tajweed"
+                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 font-semibold"
+                : "bg-surface-card text-ink-muted"
+            }`}
+          >
+            Tajweed
+          </button>
+        </div>
+
+        {showTajweed && mode === "tajweed" && (
           <button
             onClick={() => setShowLegend(!showLegend)}
             className={`text-[10px] px-1.5 py-1 rounded-md border transition flex-shrink-0 ${
@@ -489,7 +533,7 @@ export function TajweedMushaf({
                 : "bg-surface-card border-surface-border text-ink-muted"
             }`}
           >
-            Tajweed
+            Key
           </button>
         )}
       </div>
@@ -518,6 +562,7 @@ export function TajweedMushaf({
             pageNum={rightPage}
             highlightedRange={highlightedRange}
             showTajweed={showTajweed}
+            mode={mode}
             playingAyah={playingAyah}
             onAyahClick={handleAyahClick}
           />
@@ -528,6 +573,7 @@ export function TajweedMushaf({
                 pageNum={leftPageNum}
                 highlightedRange={highlightedRange}
                 showTajweed={showTajweed}
+                mode={mode}
                 playingAyah={playingAyah}
                 onAyahClick={handleAyahClick}
               />

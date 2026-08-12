@@ -1,0 +1,150 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+// Segment: [kind, key, glyphChars]
+//   kind 0=word 1=ayah-end 2=surah-header 3=bismillah 4=quarter-marker
+//   key  "surah:ayah" for kinds 0/1/4, surah number for kinds 2/3
+type Segment = [number, string | number, string];
+type PageLayout = { f: number; l: Segment[][] };
+
+const KIND_WORD = 0;
+const KIND_END = 1;
+const KIND_HEADER = 2;
+const KIND_BISMILLAH = 3;
+
+const cache = new Map<number, PageLayout>();
+
+export function usePageLayout(pageNum: number) {
+  const [layout, setLayout] = useState<PageLayout | null>(
+    () => cache.get(pageNum) ?? null
+  );
+
+  useEffect(() => {
+    const cached = cache.get(pageNum);
+    if (cached) {
+      setLayout(cached);
+      return;
+    }
+    let cancelled = false;
+    setLayout(null);
+    fetch(`/mushaf/${pageNum}.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: PageLayout | null) => {
+        if (cancelled || !data) return;
+        cache.set(pageNum, data);
+        setLayout(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pageNum]);
+
+  return layout;
+}
+
+export function QcfMushafPage({
+  pageNum,
+  layout,
+  highlightedRange,
+  playingKey,
+  onAyahClick,
+}: {
+  pageNum: number;
+  layout: PageLayout | null;
+  highlightedRange?: { surah: number; start: number; end: number };
+  playingKey: string | null;
+  onAyahClick: (surah: number, ayah: number) => void;
+}) {
+  if (!layout) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="w-5 h-5 rounded-full border-2 border-[#a8894a]/25 border-t-[#a8894a]/70 animate-spin" />
+      </div>
+    );
+  }
+
+  const pageFont = `QCF4_${String(layout.f).padStart(2, "0")}`;
+
+  const isHighlighted = (key: string | number) => {
+    if (!highlightedRange || typeof key !== "string") return false;
+    const [s, a] = key.split(":").map(Number);
+    return (
+      s === highlightedRange.surah &&
+      a >= highlightedRange.start &&
+      a <= highlightedRange.end
+    );
+  };
+
+  return (
+    <div
+      className="flex-1 min-h-0 flex flex-col justify-evenly"
+      style={{ containerType: "inline-size" }}
+      dir="rtl"
+    >
+      {layout.l.map((line, li) => {
+        const centered =
+          line.length > 0 &&
+          (line[0][0] === KIND_HEADER || line[0][0] === KIND_BISMILLAH);
+
+        return (
+          <div
+            key={li}
+            className={`flex items-center w-full ${
+              centered ? "justify-center" : "justify-between"
+            }`}
+            style={{ lineHeight: 1.7 }}
+          >
+            {line.map((seg, si) => {
+              const [kind, key, chars] = seg;
+              const isHeader = kind === KIND_HEADER;
+              const playing = typeof key === "string" && key === playingKey;
+              const hl = isHighlighted(key);
+              const clickable = kind !== KIND_HEADER && kind !== KIND_BISMILLAH;
+
+              const handle = () => {
+                if (!clickable || typeof key !== "string") return;
+                const [s, a] = key.split(":").map(Number);
+                onAyahClick(s, a);
+              };
+
+              // Each glyph is one whole word — render individually so the
+              // flex row can stretch the line edge to edge like the print.
+              return Array.from(chars).map((ch, ci) => (
+                <span
+                  key={`${si}-${ci}`}
+                  role={clickable ? "button" : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onClick={handle}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handle();
+                  }}
+                  className={`${clickable ? "cursor-pointer" : ""} ${
+                    playing
+                      ? "bg-emerald-200/70 dark:bg-emerald-900/50 rounded"
+                      : hl
+                        ? "bg-red-200/70 dark:bg-red-900/50 rounded"
+                        : clickable
+                          ? "hover:bg-[#c4a95a]/20 rounded"
+                          : ""
+                  }`}
+                  style={{
+                    fontFamily: isHeader
+                      ? "'QCF4_BSML', serif"
+                      : `'${pageFont}', serif`,
+                    fontSize: isHeader ? "9.5cqw" : "5.6cqw",
+                    color: isHeader ? "#6b5220" : undefined,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {ch}
+                </span>
+              ));
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
