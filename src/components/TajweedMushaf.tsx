@@ -22,6 +22,25 @@ interface PlayingAyah {
   surahName: string;
 }
 
+interface PendingAyah {
+  surah: number;
+  ayah: number;
+  surahName: string;
+}
+
+interface Reciter {
+  id: string;
+  name: string;
+  cdnId: string;
+}
+
+const RECITERS: Reciter[] = [
+  { id: "sufi", name: "Abdirashid Ali Sufi", cdnId: "ar.abdurashidsufi" },
+  { id: "minshawi", name: "Al-Minshawi", cdnId: "ar.minshawi" },
+  { id: "husary", name: "Khalil Al-Husary", cdnId: "ar.husary" },
+  { id: "ayyub", name: "Muhammad Ayyub", cdnId: "ar.ayyub" },
+];
+
 function getAbsoluteAyahNumber(surah: number, ayah: number): number {
   let total = 0;
   for (let i = 0; i < surah - 1 && i < QURAN.length; i++) {
@@ -30,17 +49,10 @@ function getAbsoluteAyahNumber(surah: number, ayah: number): number {
   return total + ayah;
 }
 
-const AUDIO_SOURCES = [
-  (surah: number, ayah: number) => {
-    const n = getAbsoluteAyahNumber(surah, ayah);
-    return `https://cdn.islamic.network/quran/audio/128/ar.minshawi/${n}.mp3`;
-  },
-  (surah: number, ayah: number) => {
-    const s = surah.toString().padStart(3, "0");
-    const a = ayah.toString().padStart(3, "0");
-    return `https://everyayah.com/data/Minshawi_Murattal_128kbps/${s}${a}.mp3`;
-  },
-];
+function getAudioUrl(reciter: Reciter, surah: number, ayah: number): string {
+  const n = getAbsoluteAyahNumber(surah, ayah);
+  return `https://cdn.islamic.network/quran/audio/128/${reciter.cdnId}/${n}.mp3`;
+}
 
 function TajweedTooltip({ rules, children }: { rules: TajweedRule[]; children: React.ReactNode }) {
   const [show, setShow] = useState(false);
@@ -63,6 +75,52 @@ function TajweedTooltip({ rules, children }: { rules: TajweedRule[]; children: R
         </span>
       )}
     </span>
+  );
+}
+
+function ReciterPicker({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (reciter: Reciter) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative bg-[#fdf8ec] dark:bg-[#1c1a14] border-2 border-[#c4a95a]/40 rounded-xl p-4 shadow-2xl w-[260px]"
+        onClick={(e) => e.stopPropagation()}
+        dir="ltr"
+      >
+        <p className="text-xs font-bold text-[#5a4520] dark:text-[#c4a95a] mb-3 text-center">
+          Choose Reciter
+        </p>
+        <div className="space-y-1.5">
+          {RECITERS.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => onSelect(r)}
+              className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-[#2c1f0e] dark:text-[#e8dcc8] hover:bg-[#c4a95a]/20 dark:hover:bg-[#c4a95a]/10 transition active:scale-[.98]"
+            >
+              {r.name}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full mt-2 text-[10px] text-[#8b7d56]/60 dark:text-[#c4a95a]/40 hover:text-[#8b7d56] py-1"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -180,9 +238,11 @@ function MushafPage({
                             ? ayah.t.split("").map((c, i) => renderChar(c, i))
                             : ayah.t}
                         </span>
-                        <button
-                          type="button"
+                        <span
+                          role="button"
+                          tabIndex={0}
                           onClick={() => onAyahClick(group.surah.id, ayah.n, group.surah.englishName)}
+                          onKeyDown={(e) => { if (e.key === "Enter") onAyahClick(group.surah.id, ayah.n, group.surah.englishName); }}
                           className={`inline-flex items-center justify-center w-[22px] h-[22px] md:w-[26px] md:h-[26px] mx-[2px] rounded-full text-[8px] md:text-[9px] font-bold tabular-nums align-middle cursor-pointer transition-colors ${
                             playing
                               ? "bg-emerald-400/60 dark:bg-emerald-700/50 text-emerald-900 dark:text-emerald-100 ring-1 ring-emerald-500/50"
@@ -192,7 +252,7 @@ function MushafPage({
                           }`}
                         >
                           {ayah.n}
-                        </button>{" "}
+                        </span>{" "}
                       </span>
                     );
                   })}
@@ -222,6 +282,9 @@ export function TajweedMushaf({
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioPaused, setAudioPaused] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [activeReciter, setActiveReciter] = useState<Reciter | null>(null);
+  const [pendingAyah, setPendingAyah] = useState<PendingAyah | null>(null);
+  const [showReciterPicker, setShowReciterPicker] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -244,17 +307,19 @@ export function TajweedMushaf({
     setAudioError(null);
   }, []);
 
-  const tryAudioSource = useCallback((surah: number, ayah: number, surahName: string, sourceIdx: number) => {
-    if (sourceIdx >= AUDIO_SOURCES.length) {
-      setAudioError("Could not load audio");
-      setAudioLoading(false);
-      setPlayingAyah(null);
+  const startPlayback = useCallback((reciter: Reciter, surah: number, ayah: number, surahName: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
       audioRef.current = null;
-      setTimeout(() => setAudioError(null), 3000);
-      return;
     }
 
-    const url = AUDIO_SOURCES[sourceIdx](surah, ayah);
+    setPlayingAyah({ surah, ayah, surahName });
+    setActiveReciter(reciter);
+    setAudioLoading(true);
+    setAudioPaused(false);
+    setAudioError(null);
+
+    const url = getAudioUrl(reciter, surah, ayah);
     const audio = new Audio(url);
     audioRef.current = audio;
 
@@ -270,15 +335,23 @@ export function TajweedMushaf({
     });
 
     audio.addEventListener("error", () => {
-      tryAudioSource(surah, ayah, surahName, sourceIdx + 1);
+      setAudioError("Could not load audio");
+      setAudioLoading(false);
+      setPlayingAyah(null);
+      audioRef.current = null;
+      setTimeout(() => setAudioError(null), 3000);
     }, { once: true });
 
     audio.play().catch(() => {
-      tryAudioSource(surah, ayah, surahName, sourceIdx + 1);
+      setAudioError("Could not play audio");
+      setAudioLoading(false);
+      setPlayingAyah(null);
+      audioRef.current = null;
+      setTimeout(() => setAudioError(null), 3000);
     });
   }, []);
 
-  const playAyah = useCallback((surah: number, ayah: number, surahName: string) => {
+  const handleAyahClick = useCallback((surah: number, ayah: number, surahName: string) => {
     if (playingAyah && playingAyah.surah === surah && playingAyah.ayah === ayah) {
       if (audioRef.current) {
         if (audioRef.current.paused) {
@@ -292,18 +365,17 @@ export function TajweedMushaf({
       return;
     }
 
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
+    setPendingAyah({ surah, ayah, surahName });
+    setShowReciterPicker(true);
+  }, [playingAyah]);
+
+  const handleReciterSelect = useCallback((reciter: Reciter) => {
+    setShowReciterPicker(false);
+    if (pendingAyah) {
+      startPlayback(reciter, pendingAyah.surah, pendingAyah.ayah, pendingAyah.surahName);
+      setPendingAyah(null);
     }
-
-    setPlayingAyah({ surah, ayah, surahName });
-    setAudioLoading(true);
-    setAudioPaused(false);
-    setAudioError(null);
-
-    tryAudioSource(surah, ayah, surahName, 0);
-  }, [playingAyah, tryAudioSource]);
+  }, [pendingAyah, startPlayback]);
 
   const rightPage = leftPage;
   const leftPageNum = leftPage + 1;
@@ -332,6 +404,14 @@ export function TajweedMushaf({
 
   return (
     <div className="space-y-3">
+      {/* Reciter Picker Modal */}
+      {showReciterPicker && (
+        <ReciterPicker
+          onSelect={handleReciterSelect}
+          onClose={() => { setShowReciterPicker(false); setPendingAyah(null); }}
+        />
+      )}
+
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-2">
         <select
@@ -399,7 +479,7 @@ export function TajweedMushaf({
             highlightedRange={highlightedRange}
             showTajweed={showTajweed}
             playingAyah={playingAyah}
-            onAyahClick={playAyah}
+            onAyahClick={handleAyahClick}
           />
 
           {leftPageNum <= TOTAL_PAGES && (
@@ -409,7 +489,7 @@ export function TajweedMushaf({
                 highlightedRange={highlightedRange}
                 showTajweed={showTajweed}
                 playingAyah={playingAyah}
-                onAyahClick={playAyah}
+                onAyahClick={handleAyahClick}
               />
             </div>
           )}
@@ -423,7 +503,7 @@ export function TajweedMushaf({
         )}
 
         {/* Audio Player Bar */}
-        {playingAyah && (
+        {playingAyah && activeReciter && (
           <div className="mt-1.5 bg-[#2a2520] dark:bg-[#0f0d0a] rounded-lg px-3 py-2 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {audioLoading ? (
@@ -440,11 +520,11 @@ export function TajweedMushaf({
               <span className="text-[11px] text-[#c4a95a] font-semibold truncate">
                 {playingAyah.surahName} — Ayah {playingAyah.ayah}
               </span>
-              <span className="text-[9px] text-[#8b7d56]/60 flex-shrink-0">Al-Minshawi</span>
+              <span className="text-[9px] text-[#8b7d56]/60 flex-shrink-0">{activeReciter.name}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => playAyah(playingAyah.surah, playingAyah.ayah, playingAyah.surahName)}
+                onClick={() => handleAyahClick(playingAyah.surah, playingAyah.ayah, playingAyah.surahName)}
                 className="text-[#c4a95a]/70 hover:text-[#c4a95a] transition p-1"
               >
                 {audioPaused ? (
