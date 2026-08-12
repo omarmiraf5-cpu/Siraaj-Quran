@@ -4,6 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:ital,wght@0,500;0,600;1,500;1,600&display=swap');
 
 /* ── Light mode tokens ── */
 :root {
@@ -168,4 +169,49 @@
 @keyframes pulseSoft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+
+/* ── Mushaf spread ──────────────────────────────────────────────────
+   One page by default; the two-page spread appears only when the Mushaf's
+   own column is wide enough to hold it at a readable size.
+
+   Keyed to the container rather than the viewport, because this component
+   renders into columns far narrower than the screen: the teacher pages sit
+   beside a fixed 224px sidebar, the student body is capped at max-w-3xl,
+   and previews render at half width. A viewport breakpoint cannot see any
+   of that, so a tall tablet would report itself "large" and get two cramped
+   pages using a third of the screen, while one page would have filled it. */
+.mushaf-root {
+  container-type: inline-size;
+  container-name: mushaf;
+}
+
+.mushaf-second-page,
+.mushaf-gutter {
+  display: none;
+}
+
+/* Width-bound: the page is as tall as its locked proportion allows, capped
+   so it still fits a short viewport. */
+.mushaf-page {
+  height: min(86vh, 142cqw);
+}
+
+@container mushaf (min-width: 820px) {
+  .mushaf-spread-row {
+    flex-direction: row-reverse;
+  }
+  .mushaf-second-page {
+    display: flex;
+  }
+  .mushaf-gutter {
+    display: block;
+  }
+  /* Two pages side by side, so each gets roughly half the width. */
+  .mushaf-page {
+    height: min(86vh, 72cqw);
+  }
+  .mushaf-page-range {
+    display: inline;
+  }
 }

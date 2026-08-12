@@ -317,12 +317,11 @@ function MushafPage({
   // text inside is sized off a `container-type: size` query container (see
   // QcfMushafPage), which requires its ancestor chain to resolve to a real
   // size — an unconstrained aspect-ratio box (width capped but no height) can
-  // leave that indefinite and the glyphs collapse to invisible.
-  // cqw here reads off the book-spread wrapper's actual rendered width
-  // (containerType: inline-size below), not the viewport, so this never
-  // overflows a narrower column the way the old vw-based version did.
+  // leave that indefinite and the glyphs collapse to invisible. That height,
+  // and whether a second page shows at all, live in globals.css under
+  // .mushaf-page, driven by a container query on .mushaf-root.
   return (
-    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-none flex flex-col aspect-[1/1.545] h-[min(80vh,142cqw)] md:h-[min(86vh,72cqw)] overflow-hidden">
+    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-none flex flex-col aspect-[1/1.545] overflow-hidden">
       {/* Ornamental frame */}
       <div className="absolute inset-0 border-[3px] border-[#a8894a]/60 dark:border-[#8b7d56]/30 rounded-[3px] pointer-events-none" />
       <div className="absolute inset-[5px] border border-[#a8894a]/35 dark:border-[#8b7d56]/20 rounded-[2px] pointer-events-none" />
@@ -647,7 +646,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
   const sectionDefaultSurah = getSurahsOnPage(rightPage)[0]?.id ?? 1;
 
   return (
-    <div className="space-y-1.5">
+    <div className="mushaf-root space-y-1.5">
       {showReciterPicker && (
         <ReciterPicker
           onSelect={handleReciterSelect}
@@ -751,16 +750,13 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         />
       )}
 
-      {/* Book spread — lower page number sits on the right (RTL).
-          containerType: inline-size makes the pages' cqw units measure this
-          wrapper's actual rendered width instead of the viewport. */}
-      <div
-        className="relative bg-[#3a3228] dark:bg-[#1a1610] rounded-xl p-1.5 md:p-2 shadow-2xl"
-        style={{ containerType: "inline-size" }}
-      >
-        <div className="hidden md:block absolute left-1/2 top-2 bottom-2 w-[3px] -translate-x-1/2 bg-gradient-to-r from-black/20 via-black/5 to-black/20 z-10" />
+      {/* Book spread — lower page number sits on the right (RTL). Whether the
+          second page shows, and the row direction, are container-query driven
+          (see .mushaf-* rules in globals.css). */}
+      <div className="relative bg-[#3a3228] dark:bg-[#1a1610] rounded-xl p-1.5 lg:p-2 shadow-2xl">
+        <div className="mushaf-gutter absolute left-1/2 top-2 bottom-2 w-[3px] -translate-x-1/2 bg-gradient-to-r from-black/20 via-black/5 to-black/20 z-10" />
 
-        <div className="flex flex-col md:flex-row-reverse items-center justify-center gap-1.5 md:gap-[3px]">
+        <div className="mushaf-spread-row flex flex-col items-center justify-center gap-1.5 lg:gap-[3px]">
           <MushafPage
             pageNum={rightPage}
             highlightedRange={highlightedRange}
@@ -771,7 +767,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           />
 
           {leftPageNum <= TOTAL_PAGES && (
-            <div className="hidden md:flex">
+            <div className="mushaf-second-page">
               <MushafPage
                 pageNum={leftPageNum}
                 highlightedRange={highlightedRange}
@@ -857,7 +853,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
 
         <span className="text-xs font-bold text-ink tabular-nums">
           {rightPage}
-          <span className="hidden md:inline"> – {Math.min(leftPageNum, TOTAL_PAGES)}</span>
+          <span className="mushaf-page-range hidden"> – {Math.min(leftPageNum, TOTAL_PAGES)}</span>
         </span>
 
         <button
