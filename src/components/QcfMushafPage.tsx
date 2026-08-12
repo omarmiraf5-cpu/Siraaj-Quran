@@ -108,7 +108,11 @@ export function QcfMushafPage({
           >
             {line.map((seg, si) => {
               const [kind, key, chars] = seg;
-              const isHeader = kind === KIND_HEADER;
+              // Both the surah-name banner and the Bismillah line are glyphs
+              // from the QCF4_BSML font, not the page's per-surah Hafs font —
+              // rendering the Bismillah with the wrong font left it blank,
+              // since its PUA codepoint has no mapping there.
+              const isBsml = kind === KIND_HEADER || kind === KIND_BISMILLAH;
               const playing = typeof key === "string" && key === playingKey;
               const hl = isHighlighted(key);
               const clickable = kind !== KIND_HEADER && kind !== KIND_BISMILLAH;
@@ -140,11 +144,11 @@ export function QcfMushafPage({
                           : ""
                   }`}
                   style={{
-                    fontFamily: isHeader
+                    fontFamily: isBsml
                       ? "'QCF4_BSML', serif"
                       : `'${pageFont}', serif`,
-                    fontSize: isHeader ? headerSize : wordSize,
-                    color: isHeader ? "#6b5220" : undefined,
+                    fontSize: isBsml ? headerSize : wordSize,
+                    color: isBsml ? "#6b5220" : undefined,
                     whiteSpace: "nowrap",
                   }}
                 >
