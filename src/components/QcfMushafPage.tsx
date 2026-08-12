@@ -72,20 +72,15 @@ export function QcfMushafPage({
   // from overrunning the width. With the page box locked to the Mushaf's
   // proportion the two land together, so justification adds no visible gaps.
   //
-  // Header/bismillah lines render 1.5x the font-size of a normal line (see
-  // headerSize below) but share the same line-height multiplier, so each one
-  // actually occupies 1.5 "line slots", not 1. A surah-opening page has two
-  // of them (banner + bismillah); dividing height by the raw line count alone
-  // under-budgets for that extra 1 line's worth of height, and the real ayah
-  // text at the bottom gets pushed past the container and clipped. Counting
-  // them as 1.5 slots each keeps the total at exactly 100% of the height.
+  // The surah-name banner renders 1.5x a normal line's font-size (headerSize)
+  // while sharing the same line-height multiplier, so it occupies 1.5 "line
+  // slots", not 1. Budgeting it as 1 slot over-fills the page and the last
+  // line of ayah text gets clipped by the container's overflow: hidden.
   const LINE_H = 1.7;
   const HEADER_SCALE = 1.5;
   const rawLineCount = Math.max(layout.l.length, 1);
   const headerLineCount = layout.l.filter(
-    (line) =>
-      line.length > 0 &&
-      (line[0][0] === KIND_HEADER || line[0][0] === KIND_BISMILLAH)
+    (line) => line.length > 0 && line[0][0] === KIND_HEADER
   ).length;
   const effectiveLineCount =
     rawLineCount - headerLineCount + headerLineCount * HEADER_SCALE;
@@ -124,11 +119,8 @@ export function QcfMushafPage({
           >
             {line.map((seg, si) => {
               const [kind, key, chars] = seg;
-              // Both the surah-name banner and the Bismillah line are glyphs
-              // from the QCF4_BSML font, not the page's per-surah Hafs font —
-              // rendering the Bismillah with the wrong font left it blank,
-              // since its PUA codepoint has no mapping there.
-              const isBsml = kind === KIND_HEADER || kind === KIND_BISMILLAH;
+              const isHeader = kind === KIND_HEADER;
+              const isBismillah = kind === KIND_BISMILLAH;
               const playing = typeof key === "string" && key === playingKey;
               const hl = isHighlighted(key);
               const clickable = kind !== KIND_HEADER && kind !== KIND_BISMILLAH;
@@ -160,11 +152,20 @@ export function QcfMushafPage({
                           : ""
                   }`}
                   style={{
-                    fontFamily: isBsml
+                    // Three different fonts are in play. The surah-name banner
+                    // comes from QCF4_BSML. The Bismillah glyph lives only in
+                    // Hafs_01 — the upstream layout data names QCF4_Hafs_01 for
+                    // every one of the 112 Bismillah lines, whatever page font
+                    // the page itself uses; in any other face that codepoint
+                    // maps to an empty glyph, which is why it rendered blank.
+                    // Everything else uses the page's own Hafs face.
+                    fontFamily: isHeader
                       ? "'QCF4_BSML', serif"
-                      : `'${pageFont}', serif`,
-                    fontSize: isBsml ? headerSize : wordSize,
-                    color: isBsml ? "#6b5220" : undefined,
+                      : isBismillah
+                        ? "'QCF4_01', serif"
+                        : `'${pageFont}', serif`,
+                    fontSize: isHeader ? headerSize : wordSize,
+                    color: isHeader ? "#6b5220" : undefined,
                     whiteSpace: "nowrap",
                   }}
                 >
