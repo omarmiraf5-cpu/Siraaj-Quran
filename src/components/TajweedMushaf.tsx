@@ -163,13 +163,19 @@ function MushafPage({
                     const playing = isPlaying(group.surah.id, ayah.n);
                     return (
                       <span key={ayah.n} className="inline">
-                        <span className={
-                          playing
-                            ? "bg-emerald-200/70 dark:bg-emerald-900/40 rounded-sm px-0.5"
-                            : hl
-                              ? "bg-red-200/70 dark:bg-red-900/40 rounded-sm px-0.5"
-                              : ""
-                        }>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => onAyahClick(group.surah.id, ayah.n, group.surah.englishName)}
+                          onKeyDown={(e) => { if (e.key === "Enter") onAyahClick(group.surah.id, ayah.n, group.surah.englishName); }}
+                          className={`cursor-pointer ${
+                            playing
+                              ? "bg-emerald-200/70 dark:bg-emerald-900/40 rounded-sm px-0.5"
+                              : hl
+                                ? "bg-red-200/70 dark:bg-red-900/40 rounded-sm px-0.5"
+                                : "hover:bg-[#c4a95a]/15 dark:hover:bg-[#c4a95a]/10 rounded-sm"
+                          }`}
+                        >
                           {showTajweed
                             ? ayah.t.split("").map((c, i) => renderChar(c, i))
                             : ayah.t}
