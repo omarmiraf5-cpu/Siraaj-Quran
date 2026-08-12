@@ -149,7 +149,6 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
           Sign out
         </button>
 
-        {/* Portal switcher (admin only) */}
         {portalLinks && portalLinks.length > 0 && (
           <div className="flex-1 border-t border-white/10 pt-3 mt-2">
             <p className="text-xs text-white/30 uppercase tracking-wider px-3 mb-1.5">Switch portal</p>

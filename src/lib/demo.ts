@@ -1,10 +1,4 @@
 export const DEMO_ACCOUNTS = {
-  admin: {
-    email: "admin@mydiiwaan.com",
-    password: "admin123",
-    name: "School Admin",
-    role: "admin" as const,
-  },
   teacher: {
     email: "teacher@mydiiwaan.com",
     password: "teacher123",

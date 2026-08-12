@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "The assistant isn't set up yet — an admin needs to add ANTHROPIC_API_KEY in the Vercel project settings." },
+      { error: "The assistant isn't set up yet — ANTHROPIC_API_KEY needs to be added in the Vercel project settings." },
       { status: 503 }
     );
   }
