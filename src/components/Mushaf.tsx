@@ -44,13 +44,24 @@ interface Reciter {
 
 const RECITERS: Reciter[] = [
   {
-    // Not carried by the Islamic Network CDN under any bitrate, which is why
-    // this reciter never played — served from EveryAyah instead.
+    // Not carried by the Islamic Network CDN at any bitrate. EveryAyah has
+    // him, but his folder is spelled inconsistently across Quran apps (they
+    // render the name "Abdur-Rashid Sufi", "Abdurrashid Sufi" and
+    // "Abdul Rashid Sufi"), and the exact directory name could not be
+    // confirmed from here — everyayah.com is blocked by the build sandbox's
+    // egress proxy. The player walks candidates and caches the one that
+    // works, so listing the plausible spellings costs a few one-time 404s
+    // and then settles on the right one.
     id: "sufi",
     name: "Abdirashid Ali Sufi",
     sources: [
       { host: "everyayah", folder: "Abdurrashid_Sufi_192kbps" },
+      { host: "everyayah", folder: "Abdurrashid_Sufi_128kbps" },
       { host: "everyayah", folder: "Abdurrashid_Sufi_64kbps" },
+      { host: "everyayah", folder: "Abdur-Rashid_Sufi_192kbps" },
+      { host: "everyayah", folder: "Abdur-Rashid_Sufi_128kbps" },
+      { host: "everyayah", folder: "AbdurRashid_Sufi_192kbps" },
+      { host: "everyayah", folder: "Abdul_Rashid_Sufi_192kbps" },
     ],
   },
   {
