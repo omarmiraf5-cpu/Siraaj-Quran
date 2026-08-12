@@ -81,14 +81,14 @@ function MushafPage({
   }
 
   return (
-    <div className="mushaf-page relative bg-[#fdf8ec] dark:bg-[#1c1a14] flex-1 min-h-[500px] md:min-h-[620px] flex flex-col">
+    <div className="mushaf-page relative bg-[#fdf8ec] dark:bg-[#1c1a14] flex-1">
       {/* Ornate border */}
       <div className="absolute inset-0 border-2 border-[#8b7d56]/40 dark:border-[#8b7d56]/25 rounded-sm pointer-events-none" />
       <div className="absolute inset-[6px] border border-[#8b7d56]/25 dark:border-[#8b7d56]/15 rounded-sm pointer-events-none" />
       <div className="absolute inset-[10px] border border-[#c4a95a]/20 dark:border-[#c4a95a]/10 rounded-sm pointer-events-none" />
 
       {/* Content area */}
-      <div className="relative flex-1 px-4 md:px-6 py-4 md:py-5 flex flex-col" dir="rtl" lang="ar">
+      <div className="relative px-4 md:px-6 py-4 md:py-5" dir="rtl" lang="ar">
         {/* Header line - Juz/Surah info */}
         <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-[#8b7d56]/20" dir="ltr">
           <span className="text-[10px] text-[#8b7d56]/60 dark:text-[#c4a95a]/40 tabular-nums">
@@ -100,7 +100,7 @@ function MushafPage({
         </div>
 
         {/* Flowing Quran text */}
-        <div className="flex-1">
+        <div>
           {groups.map((group, gi) => {
             const startsHere = group.ayahs[0].n === 1;
             return (
