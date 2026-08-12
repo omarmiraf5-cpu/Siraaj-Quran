@@ -27,41 +27,57 @@ interface PlayingAyah {
   surahName: string;
 }
 
+// Two independent hosts serve per-ayah recitation, and they do not carry the
+// same reciters: the Islamic Network CDN indexes by a running ayah number
+// 1-6236, while EveryAyah indexes by zero-padded surah+ayah. Reciters missing
+// from one are usually present on the other, so a reciter lists sources from
+// whichever hosts carry it and the player falls through them in order.
+type AudioSource =
+  | { host: "islamic"; edition: string; bitrate: number }
+  | { host: "everyayah"; folder: string };
+
 interface Reciter {
   id: string;
   name: string;
-  // Ordered fallback candidates. The CDN does not publish every reciter at
-  // every bitrate, and a couple are filed under a different edition id than
-  // the obvious one — a single hard-coded URL is why some reciters silently
-  // failed to play. Each candidate is tried in turn until one loads.
-  editions: string[];
-  bitrates: number[];
+  sources: AudioSource[];
 }
 
 const RECITERS: Reciter[] = [
   {
+    // Not carried by the Islamic Network CDN under any bitrate, which is why
+    // this reciter never played — served from EveryAyah instead.
     id: "sufi",
     name: "Abdirashid Ali Sufi",
-    editions: ["ar.abdurashidsufi"],
-    bitrates: [128, 64, 192],
+    sources: [
+      { host: "everyayah", folder: "Abdurrashid_Sufi_192kbps" },
+      { host: "everyayah", folder: "Abdurrashid_Sufi_64kbps" },
+    ],
   },
   {
     id: "minshawi",
     name: "Al-Minshawi",
-    editions: ["ar.minshawi", "ar.minshawimujawwad"],
-    bitrates: [128, 64],
+    sources: [
+      { host: "islamic", edition: "ar.minshawi", bitrate: 128 },
+      { host: "everyayah", folder: "Minshawi_Murattal_128kbps" },
+    ],
   },
   {
     id: "husary",
     name: "Khalil Al-Husary",
-    editions: ["ar.husary", "ar.husarymujawwad"],
-    bitrates: [128, 64],
+    sources: [
+      { host: "islamic", edition: "ar.husary", bitrate: 128 },
+      { host: "everyayah", folder: "Husary_128kbps" },
+    ],
   },
   {
+    // Same story as Sufi — EveryAyah carries him, the Islamic Network CDN
+    // does not.
     id: "ayyub",
     name: "Muhammad Ayyub",
-    editions: ["ar.muhammadayyoub", "ar.ayyub"],
-    bitrates: [128, 64],
+    sources: [
+      { host: "everyayah", folder: "Muhammad_Ayyoub_128kbps" },
+      { host: "everyayah", folder: "Muhammad_Ayyoub_64kbps" },
+    ],
   },
 ];
 
@@ -78,14 +94,15 @@ function getAbsoluteAyahNumber(surah: number, ayah: number): number {
 
 // Every candidate URL for one ayah, most-preferred first.
 function getAudioSources(reciter: Reciter, surah: number, ayah: number): string[] {
-  const n = getAbsoluteAyahNumber(surah, ayah);
-  const urls: string[] = [];
-  for (const edition of reciter.editions) {
-    for (const bitrate of reciter.bitrates) {
-      urls.push(`https://cdn.islamic.network/quran/audio/${bitrate}/${edition}/${n}.mp3`);
+  return reciter.sources.map((src) => {
+    if (src.host === "islamic") {
+      const n = getAbsoluteAyahNumber(surah, ayah);
+      return `https://cdn.islamic.network/quran/audio/${src.bitrate}/${src.edition}/${n}.mp3`;
     }
-  }
-  return urls;
+    const s = String(surah).padStart(3, "0");
+    const a = String(ayah).padStart(3, "0");
+    return `https://everyayah.com/data/${src.folder}/${s}${a}.mp3`;
+  });
 }
 
 const ARABIC_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
@@ -446,7 +463,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     ].filter((i) => i < sources.length);
 
     const fail = () => {
-      setAudioError("Could not load this reciter's audio");
+      setAudioError(`${session.reciter.name}'s audio is unavailable right now`);
       setAudioLoading(false);
       setPlayingAyah(null);
       setProgress(null);
