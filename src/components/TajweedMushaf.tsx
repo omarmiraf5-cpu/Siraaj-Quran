@@ -204,7 +204,7 @@ function MushafPage({
   const juz = getJuzForPage(pageNum);
 
   return (
-    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-1 flex flex-col h-[80vh] md:h-[86vh]">
+    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-1 flex flex-col h-[80vh] md:h-[86vh] overflow-hidden">
       {/* Ornamental frame */}
       <div className="absolute inset-0 border-[3px] border-[#a8894a]/60 dark:border-[#8b7d56]/30 rounded-[3px] pointer-events-none" />
       <div className="absolute inset-[5px] border border-[#a8894a]/35 dark:border-[#8b7d56]/20 rounded-[2px] pointer-events-none" />

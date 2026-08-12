@@ -67,6 +67,16 @@ export function QcfMushafPage({
 
   const pageFont = `QCF4_${String(layout.f).padStart(2, "0")}`;
 
+  // Glyphs must fit the page box in BOTH axes: cqw keeps a line from
+  // overrunning the width, the vh term keeps all lines inside the height.
+  // ~70vh is the line area once the running header and page number are taken
+  // off the page box, and LINE_H is the leading each line is set at.
+  const LINE_H = 1.7;
+  const lineCount = Math.max(layout.l.length, 1);
+  const heightCap = (70 / (lineCount * LINE_H)).toFixed(2);
+  const wordSize = `min(5.6cqw, ${heightCap}vh)`;
+  const headerSize = `min(9.5cqw, ${(Number(heightCap) * 1.6).toFixed(2)}vh)`;
+
   const isHighlighted = (key: string | number) => {
     if (!highlightedRange || typeof key !== "string") return false;
     const [s, a] = key.split(":").map(Number);
@@ -79,7 +89,7 @@ export function QcfMushafPage({
 
   return (
     <div
-      className="flex-1 min-h-0 flex flex-col justify-evenly"
+      className="flex-1 min-h-0 overflow-hidden flex flex-col justify-evenly"
       style={{ containerType: "inline-size" }}
       dir="rtl"
     >
@@ -133,7 +143,7 @@ export function QcfMushafPage({
                     fontFamily: isHeader
                       ? "'QCF4_BSML', serif"
                       : `'${pageFont}', serif`,
-                    fontSize: isHeader ? "9.5cqw" : "5.6cqw",
+                    fontSize: isHeader ? headerSize : wordSize,
                     color: isHeader ? "#6b5220" : undefined,
                     whiteSpace: "nowrap",
                   }}
