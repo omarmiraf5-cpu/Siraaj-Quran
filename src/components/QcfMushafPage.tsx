@@ -71,11 +71,27 @@ export function QcfMushafPage({
   // page's line count exactly fill the height, and the cqw term stops a line
   // from overrunning the width. With the page box locked to the Mushaf's
   // proportion the two land together, so justification adds no visible gaps.
+  //
+  // Header/bismillah lines render 1.5x the font-size of a normal line (see
+  // headerSize below) but share the same line-height multiplier, so each one
+  // actually occupies 1.5 "line slots", not 1. A surah-opening page has two
+  // of them (banner + bismillah); dividing height by the raw line count alone
+  // under-budgets for that extra 1 line's worth of height, and the real ayah
+  // text at the bottom gets pushed past the container and clipped. Counting
+  // them as 1.5 slots each keeps the total at exactly 100% of the height.
   const LINE_H = 1.7;
-  const lineCount = Math.max(layout.l.length, 1);
-  const fitHeight = (100 / (lineCount * LINE_H)).toFixed(2);
+  const HEADER_SCALE = 1.5;
+  const rawLineCount = Math.max(layout.l.length, 1);
+  const headerLineCount = layout.l.filter(
+    (line) =>
+      line.length > 0 &&
+      (line[0][0] === KIND_HEADER || line[0][0] === KIND_BISMILLAH)
+  ).length;
+  const effectiveLineCount =
+    rawLineCount - headerLineCount + headerLineCount * HEADER_SCALE;
+  const fitHeight = (100 / (effectiveLineCount * LINE_H)).toFixed(2);
   const wordSize = `min(6.2cqw, ${fitHeight}cqh)`;
-  const headerSize = `min(10cqw, ${(Number(fitHeight) * 1.5).toFixed(2)}cqh)`;
+  const headerSize = `min(10cqw, ${(Number(fitHeight) * HEADER_SCALE).toFixed(2)}cqh)`;
 
   const isHighlighted = (key: string | number) => {
     if (!highlightedRange || typeof key !== "string") return false;
