@@ -263,15 +263,15 @@ export function TajweedMushaf({
         {/* Book spine shadow */}
         <div className="hidden md:block absolute left-1/2 top-2 bottom-2 w-[3px] -translate-x-1/2 bg-gradient-to-r from-black/20 via-black/5 to-black/20 z-10" />
 
-        <div className="flex flex-col md:flex-row gap-1.5 md:gap-[3px]">
-          {/* Right page (odd) - shown first in RTL Mushaf */}
+        <div className="flex flex-col md:flex-row-reverse gap-1.5 md:gap-[3px]">
+          {/* Right page (lower number) - first in RTL Mushaf */}
           <MushafPage
             pageNum={rightPage}
             highlightedRange={highlightedRange}
             showTajweed={showTajweed}
           />
 
-          {/* Left page (even) - only on desktop */}
+          {/* Left page (higher number) - only on desktop */}
           {leftPageNum <= TOTAL_PAGES && (
             <div className="hidden md:flex flex-1">
               <MushafPage
