@@ -126,13 +126,16 @@ function MushafPage({
   const surahsHere = getSurahsOnPage(pageNum);
   const juz = getJuzForPage(pageNum);
 
-  // The page box maintains the printed Mushaf's 1:1.545 proportion.
-  // Sized directly on the flex container with explicit width limits to prevent
-  // overflow in narrower containers (max-w-3xl layout, teacher preview half-width, etc).
-  // On mobile: one page fills available width with padding room (max-w-[90%])
-  // On desktop: two pages fit side-by-side (max-w-[48%] each, accounting for gap)
+  // The page box needs a DEFINITE height, not just a max-width cap: the Quran
+  // text inside is sized off a `container-type: size` query container (see
+  // QcfMushafPage), which requires its ancestor chain to resolve to a real
+  // size — an unconstrained aspect-ratio box (width capped but no height) can
+  // leave that indefinite and the glyphs collapse to invisible.
+  // cqw here reads off the book-spread wrapper's actual rendered width
+  // (containerType: inline-size below), not the viewport, so this never
+  // overflows a narrower column the way the old vw-based version did.
   return (
-    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-none flex flex-col aspect-[1/1.545] max-w-[90%] md:max-w-[48%] overflow-hidden">
+    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-none flex flex-col aspect-[1/1.545] h-[min(80vh,142cqw)] md:h-[min(86vh,72cqw)] overflow-hidden">
       {/* Ornamental frame */}
       <div className="absolute inset-0 border-[3px] border-[#a8894a]/60 dark:border-[#8b7d56]/30 rounded-[3px] pointer-events-none" />
       <div className="absolute inset-[5px] border border-[#a8894a]/35 dark:border-[#8b7d56]/20 rounded-[2px] pointer-events-none" />
