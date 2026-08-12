@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Role = "parent" | "teacher" | "student" | "admin";
+type Role = "parent" | "teacher" | "student";
 
 interface Message {
   role: "user" | "assistant";
@@ -10,10 +10,9 @@ interface Message {
 }
 
 const ROLE_GREETING: Record<Role, string> = {
-  parent: "Hi! I'm your MyDiiwaan Assistant. Ask me about your child's grades, attendance, fees, or how to use the portal.",
-  teacher: "Hi! I'm your MyDiiwaan Assistant. Ask me about lesson planning, the Alberta curriculum, grading, or the portal.",
-  student: "Hi! I'm your MyDiiwaan Assistant. Ask me for help with homework, a lesson topic, or anything you're stuck on!",
-  admin: "Hi! I'm your MyDiiwaan Assistant. Ask me about staff, students, fees, or how to use the portal.",
+  parent: "Asalamu alaykum! I'm the Siraaj Quran Assistant. Ask me about your child's Quranic progress, assignments, or memorization.",
+  teacher: "Asalamu alaykum! I'm the Siraaj Quran Assistant. Ask me about creating assignments, Tajweed rules, or managing your students.",
+  student: "Asalamu alaykum! I'm the Siraaj Quran Assistant. Ask me for help with Quran memorization, Tajweed rules, or your assignments!",
 };
 
 function ChatIcon() {
@@ -83,7 +82,7 @@ export function ChatWidget({ role }: { role: Role }) {
             <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-brand-gold flex-shrink-0">
               <ChatIcon />
             </div>
-            <p className="text-white text-sm font-semibold">MyDiiwaan Assistant</p>
+            <p className="text-white text-sm font-semibold">Siraaj Quran Assistant</p>
           </div>
 
           {/* Messages */}

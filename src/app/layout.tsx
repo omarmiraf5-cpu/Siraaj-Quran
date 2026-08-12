@@ -26,9 +26,9 @@ const arefRuqaa = Aref_Ruqaa({
 });
 
 export const metadata: Metadata = {
-  title: "MyDiiwaan — School Portal",
+  title: "Siraaj Quran — Quranic School Portal",
   description:
-    "MyDiiwaan is a school management portal for Alberta curriculum schools serving the international and diaspora community.",
+    "Siraaj Quran is a Quranic school management portal featuring Tajweed color coding, assignments, and progress tracking.",
   icons: { icon: "/crest.jpg" },
 };
 

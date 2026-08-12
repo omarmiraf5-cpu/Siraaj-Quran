@@ -11,7 +11,6 @@ import type { Role } from "@/lib/types";
 const ROLES: { key: Role; label: string; portal: string }[] = [
   { key: "parent",  label: "Parent",  portal: "Parent Portal"  },
   { key: "teacher", label: "Teacher", portal: "Teacher Portal" },
-  { key: "admin",   label: "Admin",   portal: "Admin Portal"   },
   { key: "student", label: "Student", portal: "Student Portal" },
 ];
 
@@ -337,7 +336,7 @@ export default function LoginPage() {
               <div className="mt-4 bg-white/5 border border-white/10 rounded-card px-4 py-3">
                 <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-2">Demo — tap to auto-fill</p>
                 <div className="space-y-1.5 text-xs">
-                  {(["admin", "teacher", "parent"] as const).map((key) => {
+                  {(["teacher", "parent"] as const).map((key) => {
                     const acct = DEMO_ACCOUNTS[key];
                     return (
                       <button

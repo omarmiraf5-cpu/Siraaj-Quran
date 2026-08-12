@@ -23,7 +23,7 @@ export default function ParentDashboard() {
 
       <div className="bg-blue-50 dark:bg-blue-950/25 rounded-2xl border border-blue-200 dark:border-blue-800/40 p-4">
         <p className="text-sm text-blue-700 dark:text-blue-300">
-          💡 View all your child&apos;s Quranic assignments, track their progress, and see teacher feedback in one place.
+          View all your child&apos;s Quranic assignments, track their progress, and see teacher feedback in one place.
         </p>
       </div>
     </div>
