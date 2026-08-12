@@ -111,7 +111,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen gradient-navy flex items-center justify-center overflow-hidden">
+    <div className="relative min-h-screen gradient-navy flex items-center justify-center overflow-hidden w-full max-w-[100vw]">
       {/* Ambient texture */}
       <div className="absolute inset-0 pattern-lattice pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/25 pointer-events-none" />
@@ -121,10 +121,10 @@ export default function LoginPage() {
         <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
       </div>
 
-      <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center md:items-stretch gap-4 md:gap-0 px-6 py-10 md:py-14">
+      <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center md:items-stretch gap-4 md:gap-0 px-6 py-10 md:py-14 overflow-hidden">
 
       {/* ── LEFT PANEL — hidden on mobile ── */}
-      <div className="hidden md:flex flex-col items-center justify-center md:w-1/2 px-4 md:pr-10 py-6">
+      <div className="hidden md:flex flex-col items-center justify-center md:w-1/2 px-4 md:pr-10 py-6 overflow-hidden">
 
         {/* Logo */}
         <div className="w-32 h-32 rounded-2xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark mb-4 flex-shrink-0">
@@ -163,8 +163,8 @@ export default function LoginPage() {
         </div>
 
         {/* Abu Hayyan Quote */}
-        <div className="w-full max-w-sm mt-5 backdrop-blur-md bg-white/[0.06] border border-white/15 rounded-card-lg px-5 py-4 space-y-2.5 shadow-dark">
-          <p className="font-arabic text-[15px] text-white/85 leading-loose text-right" dir="rtl" lang="ar">
+        <div className="w-full max-w-sm mt-5 backdrop-blur-md bg-white/[0.06] border border-white/15 rounded-card-lg px-5 py-4 space-y-2.5 shadow-dark overflow-hidden">
+          <p className="font-arabic text-[15px] text-white/85 leading-loose text-right break-words" dir="rtl" lang="ar">
             قَالَ أَبُو حَيَّانَ الأَنْدَلُسِيُّ فِي البَحْرِ المُحِيطِ:
             «وَلَيْسَ وَرَاءَ التَّكَرُّمِ بِإِفَادَةِ الْفَوَائِدِ الْعِلْمِيَّةِ تَكَرُّمٌ، حَيْثُ قَالَ: ﴿الأَكْرَمُ الَّذِي عَلَّمَ بِالْقَلَمِ عَلَّمَ الإِنْسَانَ مَا لَمْ يَعْلَمْ﴾، فَدَلَّ عَلَى كَمَالِ كَرَمِهِ بِأَنَّ عَلَّمَ عِبَادَهُ مَا لَمْ يَعْلَمُوا، وَنَقَلَهُمْ مِنْ ظُلْمَةِ الْجَهْلِ إِلَى نُورِ الْعِلْمِ»
           </p>
