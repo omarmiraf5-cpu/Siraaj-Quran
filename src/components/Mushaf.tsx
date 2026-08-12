@@ -30,15 +30,42 @@ interface PlayingAyah {
 interface Reciter {
   id: string;
   name: string;
-  cdnId: string;
+  // Ordered fallback candidates. The CDN does not publish every reciter at
+  // every bitrate, and a couple are filed under a different edition id than
+  // the obvious one — a single hard-coded URL is why some reciters silently
+  // failed to play. Each candidate is tried in turn until one loads.
+  editions: string[];
+  bitrates: number[];
 }
 
 const RECITERS: Reciter[] = [
-  { id: "sufi", name: "Abdirashid Ali Sufi", cdnId: "ar.abdurashidsufi" },
-  { id: "minshawi", name: "Al-Minshawi", cdnId: "ar.minshawi" },
-  { id: "husary", name: "Khalil Al-Husary", cdnId: "ar.husary" },
-  { id: "ayyub", name: "Muhammad Ayyub", cdnId: "ar.ayyub" },
+  {
+    id: "sufi",
+    name: "Abdirashid Ali Sufi",
+    editions: ["ar.abdurashidsufi"],
+    bitrates: [128, 64, 192],
+  },
+  {
+    id: "minshawi",
+    name: "Al-Minshawi",
+    editions: ["ar.minshawi", "ar.minshawimujawwad"],
+    bitrates: [128, 64],
+  },
+  {
+    id: "husary",
+    name: "Khalil Al-Husary",
+    editions: ["ar.husary", "ar.husarymujawwad"],
+    bitrates: [128, 64],
+  },
+  {
+    id: "ayyub",
+    name: "Muhammad Ayyub",
+    editions: ["ar.muhammadayyoub", "ar.ayyub"],
+    bitrates: [128, 64],
+  },
 ];
+
+const REPEAT_OPTIONS = [1, 2, 3, 4, 5];
 
 function getAbsoluteAyahNumber(surah: number, ayah: number): number {
   let total = 0;
@@ -49,9 +76,16 @@ function getAbsoluteAyahNumber(surah: number, ayah: number): number {
   return total + ayah;
 }
 
-function getAudioUrl(reciter: Reciter, surah: number, ayah: number): string {
+// Every candidate URL for one ayah, most-preferred first.
+function getAudioSources(reciter: Reciter, surah: number, ayah: number): string[] {
   const n = getAbsoluteAyahNumber(surah, ayah);
-  return `https://cdn.islamic.network/quran/audio/128/${reciter.cdnId}/${n}.mp3`;
+  const urls: string[] = [];
+  for (const edition of reciter.editions) {
+    for (const bitrate of reciter.bitrates) {
+      urls.push(`https://cdn.islamic.network/quran/audio/${bitrate}/${edition}/${n}.mp3`);
+    }
+  }
+  return urls;
 }
 
 const ARABIC_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
@@ -108,6 +142,103 @@ function ReciterPicker({
         </button>
       </div>
     </div>
+  );
+}
+
+function SectionRepeatPanel({
+  defaultSurahId,
+  onPlay,
+  onClose,
+}: {
+  defaultSurahId: number;
+  onPlay: (surahId: number, from: number, to: number) => void;
+  onClose: () => void;
+}) {
+  const [surahId, setSurahId] = useState(defaultSurahId);
+  const [from, setFrom] = useState("1");
+  const [to, setTo] = useState("");
+
+  const surah = getSurahById(surahId);
+  const maxAyah = surah?.ayahs ?? 1;
+
+  // Keep the range inside the chosen surah when it changes.
+  const pickSurah = (id: number) => {
+    setSurahId(id);
+    setFrom("1");
+    setTo("");
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const f = Math.min(Math.max(parseInt(from) || 1, 1), maxAyah);
+    const t = Math.min(Math.max(parseInt(to) || maxAyah, 1), maxAyah);
+    onPlay(surahId, f, t);
+  };
+
+  return (
+    <form
+      onSubmit={submit}
+      className="bg-surface-card border border-surface-border rounded-lg p-2 space-y-2"
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold text-ink">Repeat a section</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[10px] text-ink-muted hover:text-ink px-1"
+        >
+          Close
+        </button>
+      </div>
+
+      <select
+        value={surahId}
+        onChange={(e) => pickSurah(parseInt(e.target.value))}
+        className="w-full bg-surface-bg border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+      >
+        {SURAHS.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.id}. {s.englishName}
+          </option>
+        ))}
+      </select>
+
+      <div className="flex items-end gap-2">
+        <label className="flex-1 min-w-0">
+          <span className="block text-[9px] text-ink-muted mb-0.5">From ayah</span>
+          <input
+            type="number"
+            min={1}
+            max={maxAyah}
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            placeholder="1"
+            className="w-full bg-surface-bg border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+          />
+        </label>
+        <label className="flex-1 min-w-0">
+          <span className="block text-[9px] text-ink-muted mb-0.5">To ayah</span>
+          <input
+            type="number"
+            min={1}
+            max={maxAyah}
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            placeholder={String(maxAyah)}
+            className="w-full bg-surface-bg border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+          />
+        </label>
+        <button
+          type="submit"
+          className="flex-shrink-0 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition active:scale-95"
+        >
+          Play
+        </button>
+      </div>
+      <p className="text-[9px] text-ink-muted">
+        {surah?.englishName} has {maxAyah} ayahs. Leave &quot;to&quot; empty for the whole surah.
+      </p>
+    </form>
   );
 }
 
@@ -190,9 +321,33 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
   const [audioPaused, setAudioPaused] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [activeReciter, setActiveReciter] = useState<Reciter | null>(null);
-  const [pendingAyah, setPendingAyah] = useState<PlayingAyah | null>(null);
+  const [pendingQueue, setPendingQueue] = useState<PlayingAyah[] | null>(null);
   const [showReciterPicker, setShowReciterPicker] = useState(false);
+  const [showSectionPanel, setShowSectionPanel] = useState(false);
+  const [repeatCount, setRepeatCount] = useState(1);
+  // Progress through the current repeat session, for the now-playing bar.
+  const [progress, setProgress] = useState<{
+    pass: number;
+    total: number;
+    index: number;
+    length: number;
+  } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // One playback session: a list of ayahs played in order, `total` times over.
+  // A single tapped ayah is just a session with a one-entry queue, so repeats
+  // and section-repeats share the same engine.
+  const sessionRef = useRef<{
+    queue: PlayingAyah[];
+    index: number;
+    pass: number;
+    total: number;
+    reciter: Reciter;
+  } | null>(null);
+  // Which candidate URL actually worked for a reciter, so later ayahs skip
+  // straight to it instead of re-walking the dead ones every time.
+  const goodSourceRef = useRef<Record<string, number>>({});
+  const playCurrentRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     return () => {
@@ -200,6 +355,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      sessionRef.current = null;
     };
   }, []);
 
@@ -208,31 +364,66 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    sessionRef.current = null;
     setPlayingAyah(null);
     setAudioLoading(false);
     setAudioPaused(false);
     setAudioError(null);
+    setProgress(null);
   }, []);
 
-  const startPlayback = useCallback(
-    (reciter: Reciter, surah: number, ayah: number, surahName: string) => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+  const playCurrent = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    const item = session.queue[session.index];
+    setPlayingAyah(item);
+    setAudioLoading(true);
+    setAudioPaused(false);
+    setAudioError(null);
+    setProgress({
+      pass: session.pass + 1,
+      total: session.total,
+      index: session.index + 1,
+      length: session.queue.length,
+    });
+
+    const sources = getAudioSources(session.reciter, item.surah, item.ayah);
+    // Try the known-good candidate first, then everything else in order.
+    const preferred = goodSourceRef.current[session.reciter.id] ?? 0;
+    const order = [
+      preferred,
+      ...sources.map((_, i) => i).filter((i) => i !== preferred),
+    ].filter((i) => i < sources.length);
+
+    const fail = () => {
+      setAudioError("Could not load this reciter's audio");
+      setAudioLoading(false);
+      setPlayingAyah(null);
+      setProgress(null);
+      sessionRef.current = null;
+      audioRef.current = null;
+      setTimeout(() => setAudioError(null), 4000);
+    };
+
+    const attempt = (n: number) => {
+      if (n >= order.length) {
+        fail();
+        return;
       }
-
-      setPlayingAyah({ surah, ayah, surahName });
-      setActiveReciter(reciter);
-      setAudioLoading(true);
-      setAudioPaused(false);
-      setAudioError(null);
-
-      const audio = new Audio(getAudioUrl(reciter, surah, ayah));
+      const sourceIdx = order[n];
+      const audio = new Audio(sources[sourceIdx]);
       audioRef.current = audio;
 
       audio.addEventListener(
         "canplaythrough",
         () => {
+          goodSourceRef.current[session.reciter.id] = sourceIdx;
           setAudioLoading(false);
           setAudioError(null);
         },
@@ -240,23 +431,54 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
       );
 
       audio.addEventListener("ended", () => {
-        setPlayingAyah(null);
-        setAudioPaused(false);
-        audioRef.current = null;
+        const s = sessionRef.current;
+        if (!s) return;
+        if (s.index < s.queue.length - 1) {
+          s.index += 1;
+        } else if (s.pass < s.total - 1) {
+          s.pass += 1;
+          s.index = 0;
+        } else {
+          stopAudio();
+          return;
+        }
+        playCurrentRef.current();
       });
 
-      const fail = (msg: string) => {
-        setAudioError(msg);
-        setAudioLoading(false);
-        setPlayingAyah(null);
-        audioRef.current = null;
-        setTimeout(() => setAudioError(null), 3000);
-      };
+      // A dead candidate (missing bitrate or wrong edition id) 404s here —
+      // fall through to the next one rather than giving up on the reciter.
+      audio.addEventListener("error", () => attempt(n + 1), { once: true });
+      audio.play().catch(() => attempt(n + 1));
+    };
 
-      audio.addEventListener("error", () => fail("Could not load audio"), { once: true });
-      audio.play().catch(() => fail("Could not play audio"));
+    attempt(0);
+  }, [stopAudio]);
+
+  useEffect(() => {
+    playCurrentRef.current = playCurrent;
+  }, [playCurrent]);
+
+  const startSession = useCallback(
+    (reciter: Reciter, queue: PlayingAyah[], total: number) => {
+      if (queue.length === 0) return;
+      sessionRef.current = { queue, index: 0, pass: 0, total, reciter };
+      setActiveReciter(reciter);
+      playCurrentRef.current();
     },
     []
+  );
+
+  // Queue an ayah list, asking for a reciter only the first time.
+  const requestPlayback = useCallback(
+    (queue: PlayingAyah[]) => {
+      if (activeReciter) {
+        startSession(activeReciter, queue, repeatCount);
+      } else {
+        setPendingQueue(queue);
+        setShowReciterPicker(true);
+      }
+    },
+    [activeReciter, repeatCount, startSession]
   );
 
   const handleAyahClick = useCallback(
@@ -273,21 +495,46 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         }
         return;
       }
-      setPendingAyah({ surah, ayah, surahName });
-      setShowReciterPicker(true);
+      requestPlayback([{ surah, ayah, surahName }]);
     },
-    [playingAyah]
+    [playingAyah, requestPlayback]
+  );
+
+  const playSection = useCallback(
+    (surahId: number, from: number, to: number) => {
+      const surah = getSurahById(surahId);
+      if (!surah) return;
+      const lo = Math.max(1, Math.min(from, to));
+      const hi = Math.min(surah.ayahs, Math.max(from, to));
+      const queue: PlayingAyah[] = [];
+      for (let a = lo; a <= hi; a++) {
+        queue.push({ surah: surahId, ayah: a, surahName: surah.englishName });
+      }
+      requestPlayback(queue);
+    },
+    [requestPlayback]
   );
 
   const handleReciterSelect = useCallback(
     (reciter: Reciter) => {
       setShowReciterPicker(false);
-      if (pendingAyah) {
-        startPlayback(reciter, pendingAyah.surah, pendingAyah.ayah, pendingAyah.surahName);
-        setPendingAyah(null);
+      if (pendingQueue) {
+        startSession(reciter, pendingQueue, repeatCount);
+        setPendingQueue(null);
+        return;
       }
+      // Picked from the now-playing bar: swap the voice and re-play the ayah
+      // we are on, keeping the queue and repeat progress intact.
+      const session = sessionRef.current;
+      if (session) {
+        session.reciter = reciter;
+        setActiveReciter(reciter);
+        playCurrentRef.current();
+        return;
+      }
+      setActiveReciter(reciter);
     },
-    [pendingAyah, startPlayback]
+    [pendingQueue, repeatCount, startSession]
   );
 
   const rightPage = leftPage;
@@ -315,6 +562,9 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     if (s) goTo(s.startPage);
   };
 
+  // Open the section panel on whatever surah the reader is looking at.
+  const sectionDefaultSurah = getSurahsOnPage(rightPage)[0]?.id ?? 1;
+
   return (
     <div className="space-y-1.5">
       {showReciterPicker && (
@@ -322,7 +572,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           onSelect={handleReciterSelect}
           onClose={() => {
             setShowReciterPicker(false);
-            setPendingAyah(null);
+            setPendingQueue(null);
           }}
         />
       )}
@@ -354,6 +604,50 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           <span className="text-[9px] text-ink-muted">/{TOTAL_PAGES}</span>
         </form>
       </div>
+
+      {/* Repeat controls — applies to a tapped ayah or a chosen section */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[10px] font-semibold text-ink-muted">Repeat</span>
+        <div className="flex items-center gap-0.5">
+          {REPEAT_OPTIONS.map((n) => (
+            <button
+              key={n}
+              onClick={() => setRepeatCount(n)}
+              aria-pressed={repeatCount === n}
+              className={`px-2 py-1 rounded-md text-[11px] font-semibold tabular-nums transition active:scale-95 ${
+                repeatCount === n
+                  ? "bg-emerald-600 text-white"
+                  : "bg-surface-card border border-surface-border text-ink hover:bg-surface-bg"
+              }`}
+            >
+              {n}×
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setShowSectionPanel((v) => !v)}
+          aria-expanded={showSectionPanel}
+          className={`ml-auto px-2 py-1 rounded-md text-[11px] font-semibold transition active:scale-95 ${
+            showSectionPanel
+              ? "bg-emerald-600 text-white"
+              : "bg-surface-card border border-surface-border text-ink hover:bg-surface-bg"
+          }`}
+        >
+          Section…
+        </button>
+      </div>
+
+      {showSectionPanel && (
+        <SectionRepeatPanel
+          key={sectionDefaultSurah}
+          defaultSurahId={sectionDefaultSurah}
+          onPlay={(s, f, t) => {
+            setShowSectionPanel(false);
+            playSection(s, f, t);
+          }}
+          onClose={() => setShowSectionPanel(false)}
+        />
+      )}
 
       {/* Book spread — lower page number sits on the right (RTL).
           containerType: inline-size makes the pages' cqw units measure this
@@ -407,7 +701,23 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
               <span className="text-[11px] text-[#c4a95a] font-semibold truncate">
                 {playingAyah.surahName} — Ayah {playingAyah.ayah}
               </span>
-              <span className="text-[9px] text-[#8b7d56]/60 flex-shrink-0">{activeReciter.name}</span>
+              {progress && progress.length > 1 && (
+                <span className="text-[9px] text-[#8b7d56]/60 flex-shrink-0 tabular-nums">
+                  {progress.index}/{progress.length}
+                </span>
+              )}
+              {progress && progress.total > 1 && (
+                <span className="text-[9px] text-emerald-400/80 flex-shrink-0 tabular-nums font-semibold">
+                  pass {progress.pass}/{progress.total}
+                </span>
+              )}
+              <button
+                onClick={() => setShowReciterPicker(true)}
+                title="Change reciter"
+                className="text-[9px] text-[#8b7d56]/60 hover:text-[#c4a95a] flex-shrink-0 underline decoration-dotted underline-offset-2 transition"
+              >
+                {activeReciter.name}
+              </button>
             </div>
             <div className="flex items-center gap-1.5">
               <button
