@@ -173,12 +173,12 @@ function MushafPage({
   }
 
   return (
-    <div className="mushaf-page relative bg-[#fdf8ec] dark:bg-[#1c1a14] flex-1">
+    <div className="mushaf-page relative bg-[#fdf8ec] dark:bg-[#1c1a14] flex-1 flex flex-col min-h-[70vh] md:min-h-[80vh]">
       <div className="absolute inset-0 border-2 border-[#8b7d56]/40 dark:border-[#8b7d56]/25 rounded-sm pointer-events-none" />
       <div className="absolute inset-[6px] border border-[#8b7d56]/25 dark:border-[#8b7d56]/15 rounded-sm pointer-events-none" />
       <div className="absolute inset-[10px] border border-[#c4a95a]/20 dark:border-[#c4a95a]/10 rounded-sm pointer-events-none" />
 
-      <div className="relative px-4 md:px-6 py-4 md:py-5" dir="rtl" lang="ar">
+      <div className="relative px-5 md:px-8 py-4 md:py-5 flex flex-col flex-1" dir="rtl" lang="ar">
         <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-[#8b7d56]/20" dir="ltr">
           <span className="text-[10px] text-[#8b7d56]/60 dark:text-[#c4a95a]/40 tabular-nums">
             {pageNum}
@@ -188,19 +188,19 @@ function MushafPage({
           </span>
         </div>
 
-        <div>
+        <div className="flex-1">
           {groups.map((group, gi) => {
             const startsHere = group.ayahs[0].n === 1;
             return (
               <div key={`${group.surah.id}-${gi}`}>
                 {startsHere && (
                   <div className="my-3 mx-auto max-w-[85%]">
-                    <div className="relative bg-gradient-to-r from-[#c4a95a]/10 via-[#c4a95a]/20 to-[#c4a95a]/10 dark:from-[#c4a95a]/5 dark:via-[#c4a95a]/10 dark:to-[#c4a95a]/5 border border-[#c4a95a]/30 dark:border-[#c4a95a]/15 rounded-md py-2 px-4 text-center">
+                    <div className="relative bg-gradient-to-r from-[#c4a95a]/10 via-[#c4a95a]/20 to-[#c4a95a]/10 dark:from-[#c4a95a]/5 dark:via-[#c4a95a]/10 dark:to-[#c4a95a]/5 border border-[#c4a95a]/30 dark:border-[#c4a95a]/15 rounded-md py-2.5 px-4 text-center">
                       <span className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#c4a95a]/50 rounded-tr-md" />
                       <span className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#c4a95a]/50 rounded-tl-md" />
                       <span className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#c4a95a]/50 rounded-br-md" />
                       <span className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#c4a95a]/50 rounded-bl-md" />
-                      <p className="font-arabic text-lg md:text-xl text-[#5a4520] dark:text-[#c4a95a]">
+                      <p className="font-arabic text-xl md:text-2xl text-[#5a4520] dark:text-[#c4a95a]">
                         سُورَةُ {group.surah.name}
                       </p>
                       <p className="text-[9px] text-[#8b7d56]/70 dark:text-[#c4a95a]/50 mt-0.5" dir="ltr">
@@ -208,14 +208,14 @@ function MushafPage({
                       </p>
                     </div>
                     {group.surah.id !== 1 && group.surah.id !== 9 && (
-                      <p className="text-center font-arabic text-base md:text-lg text-[#5a4520]/70 dark:text-[#c4a95a]/50 mt-2 mb-1">
+                      <p className="text-center font-arabic text-lg md:text-xl text-[#5a4520]/70 dark:text-[#c4a95a]/50 mt-2.5 mb-1.5">
                         بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ
                       </p>
                     )}
                   </div>
                 )}
 
-                <p className="font-arabic text-[17px] md:text-[20px] leading-[2.6] md:leading-[2.8] text-[#2c1f0e] dark:text-[#e8dcc8] text-justify">
+                <p className="font-arabic text-[22px] md:text-[28px] leading-[2.0] md:leading-[2.1] text-[#2c1f0e] dark:text-[#e8dcc8] text-justify">
                   {group.ayahs.map((ayah) => {
                     const hl = isHighlighted(group.surah.id, ayah.n);
                     const playing = isPlaying(group.surah.id, ayah.n);
@@ -243,7 +243,7 @@ function MushafPage({
                           tabIndex={0}
                           onClick={() => onAyahClick(group.surah.id, ayah.n, group.surah.englishName)}
                           onKeyDown={(e) => { if (e.key === "Enter") onAyahClick(group.surah.id, ayah.n, group.surah.englishName); }}
-                          className={`inline-flex items-center justify-center w-[22px] h-[22px] md:w-[26px] md:h-[26px] mx-[2px] rounded-full text-[8px] md:text-[9px] font-bold tabular-nums align-middle cursor-pointer transition-colors ${
+                          className={`inline-flex items-center justify-center w-[26px] h-[26px] md:w-[30px] md:h-[30px] mx-[2px] rounded-full text-[9px] md:text-[10px] font-bold tabular-nums align-middle cursor-pointer transition-colors ${
                             playing
                               ? "bg-emerald-400/60 dark:bg-emerald-700/50 text-emerald-900 dark:text-emerald-100 ring-1 ring-emerald-500/50"
                               : hl
