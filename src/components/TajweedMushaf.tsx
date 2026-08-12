@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { QURAN, getPageAyahs, getSurahById, TOTAL_PAGES, SurahData } from "@/data/quran-text";
 import { getLetterRules, TajweedRule, TAJWEED_RULES } from "@/lib/tajweed-rules";
 
@@ -14,6 +14,18 @@ interface TajweedMushafProps {
   initialPage?: number;
   highlightedRange?: HighlightRange;
   showTajweed?: boolean;
+}
+
+interface PlayingAyah {
+  surah: number;
+  ayah: number;
+  surahName: string;
+}
+
+function getAudioUrl(surah: number, ayah: number): string {
+  const s = surah.toString().padStart(3, "0");
+  const a = ayah.toString().padStart(3, "0");
+  return `https://everyayah.com/data/Minshawi_Murattal_128kbps/${s}${a}.mp3`;
 }
 
 function TajweedTooltip({ rules, children }: { rules: TajweedRule[]; children: React.ReactNode }) {
@@ -44,10 +56,14 @@ function MushafPage({
   pageNum,
   highlightedRange,
   showTajweed,
+  playingAyah,
+  onAyahClick,
 }: {
   pageNum: number;
   highlightedRange?: HighlightRange;
   showTajweed: boolean;
+  playingAyah: PlayingAyah | null;
+  onAyahClick: (surah: number, ayah: number, surahName: string) => void;
 }) {
   const pageAyahs = useMemo(() => getPageAyahs(pageNum), [pageNum]);
 
@@ -56,6 +72,11 @@ function MushafPage({
     return surahId === highlightedRange.surah &&
       ayahNum >= highlightedRange.start &&
       ayahNum <= highlightedRange.end;
+  };
+
+  const isPlaying = (surahId: number, ayahNum: number) => {
+    if (!playingAyah) return false;
+    return playingAyah.surah === surahId && playingAyah.ayah === ayahNum;
   };
 
   const renderChar = (char: string, idx: number) => {
@@ -69,7 +90,6 @@ function MushafPage({
     );
   };
 
-  // Group by surah
   const groups: { surah: SurahData; ayahs: { n: number; t: string; p: number }[] }[] = [];
   let curId = -1;
   for (const item of pageAyahs) {
@@ -82,14 +102,11 @@ function MushafPage({
 
   return (
     <div className="mushaf-page relative bg-[#fdf8ec] dark:bg-[#1c1a14] flex-1">
-      {/* Ornate border */}
       <div className="absolute inset-0 border-2 border-[#8b7d56]/40 dark:border-[#8b7d56]/25 rounded-sm pointer-events-none" />
       <div className="absolute inset-[6px] border border-[#8b7d56]/25 dark:border-[#8b7d56]/15 rounded-sm pointer-events-none" />
       <div className="absolute inset-[10px] border border-[#c4a95a]/20 dark:border-[#c4a95a]/10 rounded-sm pointer-events-none" />
 
-      {/* Content area */}
       <div className="relative px-4 md:px-6 py-4 md:py-5" dir="rtl" lang="ar">
-        {/* Header line - Juz/Surah info */}
         <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-[#8b7d56]/20" dir="ltr">
           <span className="text-[10px] text-[#8b7d56]/60 dark:text-[#c4a95a]/40 tabular-nums">
             {pageNum}
@@ -99,22 +116,18 @@ function MushafPage({
           </span>
         </div>
 
-        {/* Flowing Quran text */}
         <div>
           {groups.map((group, gi) => {
             const startsHere = group.ayahs[0].n === 1;
             return (
               <div key={`${group.surah.id}-${gi}`}>
-                {/* Surah header banner */}
                 {startsHere && (
                   <div className="my-3 mx-auto max-w-[85%]">
                     <div className="relative bg-gradient-to-r from-[#c4a95a]/10 via-[#c4a95a]/20 to-[#c4a95a]/10 dark:from-[#c4a95a]/5 dark:via-[#c4a95a]/10 dark:to-[#c4a95a]/5 border border-[#c4a95a]/30 dark:border-[#c4a95a]/15 rounded-md py-2 px-4 text-center">
-                      {/* Corner ornaments */}
                       <span className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#c4a95a]/50 rounded-tr-md" />
                       <span className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#c4a95a]/50 rounded-tl-md" />
                       <span className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#c4a95a]/50 rounded-br-md" />
                       <span className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#c4a95a]/50 rounded-bl-md" />
-
                       <p className="font-arabic text-lg md:text-xl text-[#5a4520] dark:text-[#c4a95a]">
                         سُورَةُ {group.surah.name}
                       </p>
@@ -122,7 +135,6 @@ function MushafPage({
                         {group.surah.translation} — {group.surah.ayahs.length} Ayahs
                       </p>
                     </div>
-                    {/* Bismillah */}
                     {group.surah.id !== 1 && group.surah.id !== 9 && (
                       <p className="text-center font-arabic text-base md:text-lg text-[#5a4520]/70 dark:text-[#c4a95a]/50 mt-2 mb-1">
                         بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ
@@ -131,25 +143,36 @@ function MushafPage({
                   </div>
                 )}
 
-                {/* Ayahs flowing as continuous text */}
                 <p className="font-arabic text-[17px] md:text-[20px] leading-[2.6] md:leading-[2.8] text-[#2c1f0e] dark:text-[#e8dcc8] text-justify">
                   {group.ayahs.map((ayah) => {
                     const hl = isHighlighted(group.surah.id, ayah.n);
+                    const playing = isPlaying(group.surah.id, ayah.n);
                     return (
                       <span key={ayah.n} className="inline">
-                        <span className={hl ? "bg-red-200/70 dark:bg-red-900/40 rounded-sm px-0.5" : ""}>
+                        <span className={
+                          playing
+                            ? "bg-emerald-200/70 dark:bg-emerald-900/40 rounded-sm px-0.5"
+                            : hl
+                              ? "bg-red-200/70 dark:bg-red-900/40 rounded-sm px-0.5"
+                              : ""
+                        }>
                           {showTajweed
                             ? ayah.t.split("").map((c, i) => renderChar(c, i))
                             : ayah.t}
                         </span>
-                        {/* Ayah end marker */}
-                        <span className={`inline-flex items-center justify-center w-[22px] h-[22px] md:w-[26px] md:h-[26px] mx-[2px] rounded-full text-[8px] md:text-[9px] font-bold tabular-nums align-middle ${
-                          hl
-                            ? "bg-red-300/60 dark:bg-red-800/40 text-red-900 dark:text-red-200"
-                            : "bg-[#c4a95a]/20 dark:bg-[#c4a95a]/10 text-[#8b7d56] dark:text-[#c4a95a]/70"
-                        }`}>
+                        <button
+                          type="button"
+                          onClick={() => onAyahClick(group.surah.id, ayah.n, group.surah.englishName)}
+                          className={`inline-flex items-center justify-center w-[22px] h-[22px] md:w-[26px] md:h-[26px] mx-[2px] rounded-full text-[8px] md:text-[9px] font-bold tabular-nums align-middle cursor-pointer transition-colors ${
+                            playing
+                              ? "bg-emerald-400/60 dark:bg-emerald-700/50 text-emerald-900 dark:text-emerald-100 ring-1 ring-emerald-500/50"
+                              : hl
+                                ? "bg-red-300/60 dark:bg-red-800/40 text-red-900 dark:text-red-200 hover:bg-red-400/60"
+                                : "bg-[#c4a95a]/20 dark:bg-[#c4a95a]/10 text-[#8b7d56] dark:text-[#c4a95a]/70 hover:bg-[#c4a95a]/40"
+                          }`}
+                        >
                           {ayah.n}
-                        </span>{" "}
+                        </button>{" "}
                       </span>
                     );
                   })}
@@ -174,6 +197,79 @@ export function TajweedMushaf({
   });
   const [pageInput, setPageInput] = useState(String(initialPage));
   const [showLegend, setShowLegend] = useState(false);
+
+  const [playingAyah, setPlayingAyah] = useState<PlayingAyah | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioPaused, setAudioPaused] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setPlayingAyah(null);
+    setAudioLoading(false);
+    setAudioPaused(false);
+  }, []);
+
+  const playAyah = useCallback((surah: number, ayah: number, surahName: string) => {
+    if (playingAyah && playingAyah.surah === surah && playingAyah.ayah === ayah) {
+      if (audioRef.current) {
+        if (audioRef.current.paused) {
+          audioRef.current.play();
+          setAudioPaused(false);
+        } else {
+          audioRef.current.pause();
+          setAudioPaused(true);
+        }
+      }
+      return;
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    setPlayingAyah({ surah, ayah, surahName });
+    setAudioLoading(true);
+    setAudioPaused(false);
+
+    const audio = new Audio(getAudioUrl(surah, ayah));
+    audioRef.current = audio;
+
+    audio.addEventListener("canplaythrough", () => {
+      setAudioLoading(false);
+    }, { once: true });
+
+    audio.addEventListener("ended", () => {
+      setPlayingAyah(null);
+      setAudioPaused(false);
+      audioRef.current = null;
+    });
+
+    audio.addEventListener("error", () => {
+      setPlayingAyah(null);
+      setAudioLoading(false);
+      audioRef.current = null;
+    });
+
+    audio.play().catch(() => {
+      setPlayingAyah(null);
+      setAudioLoading(false);
+      audioRef.current = null;
+    });
+  }, [playingAyah]);
 
   const rightPage = leftPage;
   const leftPageNum = leftPage + 1;
@@ -264,27 +360,70 @@ export function TajweedMushaf({
         <div className="hidden md:block absolute left-1/2 top-2 bottom-2 w-[3px] -translate-x-1/2 bg-gradient-to-r from-black/20 via-black/5 to-black/20 z-10" />
 
         <div className="flex flex-col md:flex-row-reverse gap-1.5 md:gap-[3px]">
-          {/* Right page (lower number) - first in RTL Mushaf */}
           <MushafPage
             pageNum={rightPage}
             highlightedRange={highlightedRange}
             showTajweed={showTajweed}
+            playingAyah={playingAyah}
+            onAyahClick={playAyah}
           />
 
-          {/* Left page (higher number) - only on desktop */}
           {leftPageNum <= TOTAL_PAGES && (
             <div className="hidden md:flex flex-1">
               <MushafPage
                 pageNum={leftPageNum}
                 highlightedRange={highlightedRange}
                 showTajweed={showTajweed}
+                playingAyah={playingAyah}
+                onAyahClick={playAyah}
               />
             </div>
           )}
         </div>
+
+        {/* Audio Player Bar */}
+        {playingAyah && (
+          <div className="mt-1.5 bg-[#2a2520] dark:bg-[#0f0d0a] rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              {audioLoading ? (
+                <div className="w-4 h-4 rounded-full border-2 border-emerald-400/30 border-t-emerald-400 animate-spin flex-shrink-0" />
+              ) : (
+                <span className="text-emerald-400 flex-shrink-0">
+                  {audioPaused ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  )}
+                </span>
+              )}
+              <span className="text-[11px] text-[#c4a95a] font-semibold truncate">
+                {playingAyah.surahName} — Ayah {playingAyah.ayah}
+              </span>
+              <span className="text-[9px] text-[#8b7d56]/60 flex-shrink-0">Al-Minshawi</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => playAyah(playingAyah.surah, playingAyah.ayah, playingAyah.surahName)}
+                className="text-[#c4a95a]/70 hover:text-[#c4a95a] transition p-1"
+              >
+                {audioPaused ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                )}
+              </button>
+              <button
+                onClick={stopAudio}
+                className="text-[#c4a95a]/70 hover:text-red-400 transition p-1"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Navigation — RTL: Next is left, Previous is right */}
+      {/* Navigation */}
       <div className="flex items-center justify-between">
         <button
           onClick={nextSpread}
