@@ -686,9 +686,30 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         </form>
       </div>
 
-      {/* Repeat controls — applies to a tapped ayah or a chosen section */}
+      {/* Playback controls — apply to a tapped ayah, a page, a surah name or
+          a chosen section. Picking a qari here means playback never has to
+          stop and ask, and switching mid-recitation swaps the voice in place. */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-[10px] font-semibold text-ink-muted">Repeat</span>
+        <span className="text-[10px] font-semibold text-ink-muted">Qari</span>
+        <select
+          value={activeReciter?.id ?? ""}
+          onChange={(e) => {
+            const r = RECITERS.find((x) => x.id === e.target.value);
+            if (r) handleReciterSelect(r);
+          }}
+          className="bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+        >
+          <option value="" disabled>
+            Choose…
+          </option>
+          {RECITERS.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+
+        <span className="text-[10px] font-semibold text-ink-muted ml-1">Repeat</span>
         <div className="flex items-center gap-0.5">
           {REPEAT_OPTIONS.map((n) => (
             <button
