@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getSurahByNumber, QuranSurah } from "@/lib/quran-api";
+import { getSurahById } from "@/data/quran-text";
 import { TajweedMushaf } from "@/components/TajweedMushaf";
 
 interface Child {
@@ -28,7 +28,7 @@ export default function ParentQuranProgressPage() {
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [assignments, setAssignments] = useState<QuranicAssignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [surahs, setSurahs] = useState<Record<number, QuranSurah>>({});
+  const [surahNames, setSurahNames] = useState<Record<number, string>>({});
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,16 +100,14 @@ export default function ParentQuranProgressPage() {
 
         setAssignments(mockAssignments);
 
-        const surahMap: Record<number, QuranSurah> = {};
+        const nameMap: Record<number, string> = {};
         for (const assignment of mockAssignments) {
-          if (!surahMap[assignment.surah]) {
-            const surahData = await getSurahByNumber(assignment.surah);
-            if (surahData) {
-              surahMap[assignment.surah] = surahData;
-            }
+          if (!nameMap[assignment.surah]) {
+            const s = getSurahById(assignment.surah);
+            if (s) nameMap[assignment.surah] = s.englishName;
           }
         }
-        setSurahs(surahMap);
+        setSurahNames(nameMap);
       } catch (err) {
         console.error("Error loading assignments:", err);
       } finally {
@@ -240,7 +238,7 @@ export default function ParentQuranProgressPage() {
         <h2 className="font-bold text-ink">Assignments</h2>
         <p className="text-xs text-ink-muted">Tap an assignment to view the Mushaf with highlighted Ayahs</p>
         {assignments.map((assignment) => {
-          const surah = surahs[assignment.surah];
+          const surahName = surahNames[assignment.surah];
           const isOverdue =
             assignment.due_date &&
             new Date(assignment.due_date) < new Date() &&
@@ -263,7 +261,7 @@ export default function ParentQuranProgressPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-lg font-bold text-ink">
-                        {surah?.englishName || `Surah ${assignment.surah}`}
+                        {surahName || `Surah ${assignment.surah}`}
                       </span>
                       <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getStatusColor(assignment.status)}`}>
                         {getStatusEmoji(assignment.status)} {assignment.status.replace("_", " ")}
@@ -314,7 +312,7 @@ export default function ParentQuranProgressPage() {
                 <div className="bg-surface-card rounded-b-3xl border border-t-0 border-subject-blue p-6 -mt-2">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-ink">
-                      📖 {surah?.englishName || `Surah ${assignment.surah}`} — Ayahs {assignment.ayah_start}-{assignment.ayah_end}
+                      📖 {surahName || `Surah ${assignment.surah}`} — Ayahs {assignment.ayah_start}-{assignment.ayah_end}
                     </h3>
                     <button
                       onClick={(e) => {
@@ -327,8 +325,9 @@ export default function ParentQuranProgressPage() {
                     </button>
                   </div>
                   <TajweedMushaf
-                    surahNumber={assignment.surah}
-                    highlightedAyahs={{
+                    initialPage={getSurahById(assignment.surah)?.ayahs[0]?.p ?? 1}
+                    highlightedRange={{
+                      surah: assignment.surah,
                       start: assignment.ayah_start,
                       end: assignment.ayah_end,
                     }}

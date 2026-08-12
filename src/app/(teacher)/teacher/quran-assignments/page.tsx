@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSurahs, QuranSurah } from "@/lib/quran-api";
+import { QURAN, getSurahById } from "@/data/quran-text";
 import { TajweedMushaf } from "@/components/TajweedMushaf";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ interface Student {
 export default function QuranAssignmentsPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [surahs, setSurahs] = useState<QuranSurah[]>([]);
+  const surahs = QURAN;
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedSurah, setSelectedSurah] = useState("");
@@ -28,11 +28,8 @@ export default function QuranAssignmentsPage() {
   const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadStudents = async () => {
       try {
-        const surahList = await getSurahs();
-        setSurahs(surahList);
-
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           router.push("/login");
@@ -49,11 +46,10 @@ export default function QuranAssignmentsPage() {
         }
       } catch (err) {
         console.error("Error loading data:", err);
-        setError("Failed to load form data");
       }
     };
 
-    loadData();
+    loadStudents();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,10 +98,8 @@ export default function QuranAssignmentsPage() {
     }
   };
 
-  const selectedSurahData = surahs.find(
-    (s) => s.number === parseInt(selectedSurah)
-  );
-  const maxAyahs = selectedSurahData?.numberOfAyahs || 0;
+  const selectedSurahData = getSurahById(parseInt(selectedSurah) || 0);
+  const maxAyahs = selectedSurahData?.ayahs.length || 0;
 
   const canPreview = selectedSurah && ayahStart && ayahEnd;
 
@@ -151,8 +145,8 @@ export default function QuranAssignmentsPage() {
             >
               <option value="">Select a Surah</option>
               {surahs.map((s) => (
-                <option key={s.number} value={s.number}>
-                  {s.number}. {s.englishName} ({s.numberOfAyahs} Ayahs)
+                <option key={s.id} value={s.id}>
+                  {s.id}. {s.englishName} ({s.ayahs.length} Ayahs)
                 </option>
               ))}
             </select>
@@ -272,8 +266,9 @@ export default function QuranAssignmentsPage() {
                 </button>
               </div>
               <TajweedMushaf
-                surahNumber={parseInt(selectedSurah)}
-                highlightedAyahs={{
+                initialPage={selectedSurahData?.ayahs[0]?.p ?? 1}
+                highlightedRange={{
+                  surah: parseInt(selectedSurah),
                   start: parseInt(ayahStart),
                   end: parseInt(ayahEnd),
                 }}
