@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   SURAHS,
   TOTAL_PAGES,
@@ -247,15 +247,43 @@ function MushafPage({
   highlightedRange,
   playingAyah,
   onAyahClick,
+  onPlaySurah,
+  onPlayAyahs,
 }: {
   pageNum: number;
   highlightedRange?: HighlightRange;
   playingAyah: PlayingAyah | null;
   onAyahClick: (surah: number, ayah: number, surahName: string) => void;
+  onPlaySurah: (surahId: number) => void;
+  onPlayAyahs: (ayahs: PlayingAyah[]) => void;
 }) {
   const layout = usePageLayout(pageNum);
   const surahsHere = getSurahsOnPage(pageNum);
   const juz = getJuzForPage(pageNum);
+
+  // Every ayah that appears on this page, in reading order. Taken from the
+  // layout the page already fetched, so playing a page costs no extra request.
+  // Word, ayah-end and quarter-marker segments all carry a "surah:ayah" key;
+  // the surah banner and Bismillah carry a plain surah number, so they drop
+  // out here and are not queued.
+  const pageAyahs = useMemo<PlayingAyah[]>(() => {
+    if (!layout) return [];
+    const seen = new Set<string>();
+    const out: PlayingAyah[] = [];
+    for (const line of layout.l) {
+      for (const [, key] of line) {
+        if (typeof key !== "string" || seen.has(key)) continue;
+        seen.add(key);
+        const [s, a] = key.split(":").map(Number);
+        out.push({
+          surah: s,
+          ayah: a,
+          surahName: getSurahById(s)?.englishName ?? "",
+        });
+      }
+    }
+    return out;
+  }, [layout]);
 
   // The page box needs a DEFINITE height, not just a max-width cap: the Quran
   // text inside is sized off a `container-type: size` query container (see
@@ -280,7 +308,18 @@ function MushafPage({
         {/* Running header: surah name(s) right, juz left */}
         <div className="flex justify-between items-baseline mb-1.5 pb-1 border-b border-[#a8894a]/25 flex-shrink-0">
           <span className="font-arabic text-[13px] md:text-[15px] text-[#8b6f35] dark:text-[#c4a95a]/60 truncate">
-            {surahsHere.map((s) => s.name).join(" · ")}
+            {surahsHere.map((s, i) => (
+              <span key={s.id}>
+                {i > 0 && <span className="opacity-50"> · </span>}
+                <button
+                  onClick={() => onPlaySurah(s.id)}
+                  title={`Play all of ${s.englishName}`}
+                  className="hover:text-[#c4a95a] hover:underline decoration-dotted underline-offset-2 transition"
+                >
+                  {s.name}
+                </button>
+              </span>
+            ))}
           </span>
           <span className="font-arabic text-[13px] md:text-[15px] text-[#8b6f35] dark:text-[#c4a95a]/60 flex-shrink-0 pr-2">
             الجزء {toArabicNumerals(juz)}
@@ -300,9 +339,14 @@ function MushafPage({
 
         {/* Page number — bottom centre */}
         <div className="flex-shrink-0 flex justify-center pt-1.5 mt-1 border-t border-[#a8894a]/25">
-          <span className="inline-flex items-center justify-center min-w-[30px] h-[22px] px-2 rounded-full border border-[#a8894a]/45 font-arabic text-[12px] md:text-[14px] text-[#8b6f35] dark:text-[#c4a95a]/60">
+          <button
+            onClick={() => onPlayAyahs(pageAyahs)}
+            disabled={pageAyahs.length === 0}
+            title={`Play page ${pageNum}`}
+            className="inline-flex items-center justify-center min-w-[30px] h-[22px] px-2 rounded-full border border-[#a8894a]/45 font-arabic text-[12px] md:text-[14px] text-[#8b6f35] dark:text-[#c4a95a]/60 hover:border-[#c4a95a] hover:text-[#c4a95a] disabled:opacity-50 transition"
+          >
             {toArabicNumerals(pageNum)}
-          </span>
+          </button>
         </div>
       </div>
     </div>
@@ -515,6 +559,15 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     [requestPlayback]
   );
 
+  // Whole surah, from the tapped name in the running header.
+  const playSurah = useCallback(
+    (surahId: number) => {
+      const surah = getSurahById(surahId);
+      if (surah) playSection(surahId, 1, surah.ayahs);
+    },
+    [playSection]
+  );
+
   const handleReciterSelect = useCallback(
     (reciter: Reciter) => {
       setShowReciterPicker(false);
@@ -664,6 +717,8 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
             highlightedRange={highlightedRange}
             playingAyah={playingAyah}
             onAyahClick={handleAyahClick}
+            onPlaySurah={playSurah}
+            onPlayAyahs={requestPlayback}
           />
 
           {leftPageNum <= TOTAL_PAGES && (
@@ -673,6 +728,8 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
                 highlightedRange={highlightedRange}
                 playingAyah={playingAyah}
                 onAyahClick={handleAyahClick}
+                onPlaySurah={playSurah}
+                onPlayAyahs={requestPlayback}
               />
             </div>
           )}
