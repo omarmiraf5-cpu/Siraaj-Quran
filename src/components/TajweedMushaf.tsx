@@ -284,15 +284,15 @@ export function TajweedMushaf({
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation — RTL: Next is left, Previous is right */}
       <div className="flex items-center justify-between">
         <button
-          onClick={prevSpread}
-          disabled={rightPage <= 1}
+          onClick={nextSpread}
+          disabled={leftPageNum >= TOTAL_PAGES}
           className="flex items-center gap-1 px-3 py-2 rounded-lg bg-surface-card border border-surface-border text-xs font-semibold text-ink hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-          Previous
+          Next
         </button>
 
         <span className="text-xs font-bold text-ink tabular-nums">
@@ -301,11 +301,11 @@ export function TajweedMushaf({
         </span>
 
         <button
-          onClick={nextSpread}
-          disabled={leftPageNum >= TOTAL_PAGES}
+          onClick={prevSpread}
+          disabled={rightPage <= 1}
           className="flex items-center gap-1 px-3 py-2 rounded-lg bg-surface-card border border-surface-border text-xs font-semibold text-ink hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
         >
-          Next
+          Previous
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
         </button>
       </div>
