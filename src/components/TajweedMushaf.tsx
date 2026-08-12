@@ -22,11 +22,25 @@ interface PlayingAyah {
   surahName: string;
 }
 
-function getAudioUrl(surah: number, ayah: number): string {
-  const s = surah.toString().padStart(3, "0");
-  const a = ayah.toString().padStart(3, "0");
-  return `https://everyayah.com/data/Minshawi_Murattal_128kbps/${s}${a}.mp3`;
+function getAbsoluteAyahNumber(surah: number, ayah: number): number {
+  let total = 0;
+  for (let i = 0; i < surah - 1 && i < QURAN.length; i++) {
+    total += QURAN[i].ayahs.length;
+  }
+  return total + ayah;
 }
+
+const AUDIO_SOURCES = [
+  (surah: number, ayah: number) => {
+    const n = getAbsoluteAyahNumber(surah, ayah);
+    return `https://cdn.islamic.network/quran/audio/128/ar.minshawi/${n}.mp3`;
+  },
+  (surah: number, ayah: number) => {
+    const s = surah.toString().padStart(3, "0");
+    const a = ayah.toString().padStart(3, "0");
+    return `https://everyayah.com/data/Minshawi_Murattal_128kbps/${s}${a}.mp3`;
+  },
+];
 
 function TajweedTooltip({ rules, children }: { rules: TajweedRule[]; children: React.ReactNode }) {
   const [show, setShow] = useState(false);
@@ -201,6 +215,7 @@ export function TajweedMushaf({
   const [playingAyah, setPlayingAyah] = useState<PlayingAyah | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioPaused, setAudioPaused] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -220,6 +235,41 @@ export function TajweedMushaf({
     setPlayingAyah(null);
     setAudioLoading(false);
     setAudioPaused(false);
+    setAudioError(null);
+  }, []);
+
+  const tryAudioSource = useCallback((surah: number, ayah: number, surahName: string, sourceIdx: number) => {
+    if (sourceIdx >= AUDIO_SOURCES.length) {
+      setAudioError("Could not load audio");
+      setAudioLoading(false);
+      setPlayingAyah(null);
+      audioRef.current = null;
+      setTimeout(() => setAudioError(null), 3000);
+      return;
+    }
+
+    const url = AUDIO_SOURCES[sourceIdx](surah, ayah);
+    const audio = new Audio(url);
+    audioRef.current = audio;
+
+    audio.addEventListener("canplaythrough", () => {
+      setAudioLoading(false);
+      setAudioError(null);
+    }, { once: true });
+
+    audio.addEventListener("ended", () => {
+      setPlayingAyah(null);
+      setAudioPaused(false);
+      audioRef.current = null;
+    });
+
+    audio.addEventListener("error", () => {
+      tryAudioSource(surah, ayah, surahName, sourceIdx + 1);
+    }, { once: true });
+
+    audio.play().catch(() => {
+      tryAudioSource(surah, ayah, surahName, sourceIdx + 1);
+    });
   }, []);
 
   const playAyah = useCallback((surah: number, ayah: number, surahName: string) => {
@@ -244,32 +294,10 @@ export function TajweedMushaf({
     setPlayingAyah({ surah, ayah, surahName });
     setAudioLoading(true);
     setAudioPaused(false);
+    setAudioError(null);
 
-    const audio = new Audio(getAudioUrl(surah, ayah));
-    audioRef.current = audio;
-
-    audio.addEventListener("canplaythrough", () => {
-      setAudioLoading(false);
-    }, { once: true });
-
-    audio.addEventListener("ended", () => {
-      setPlayingAyah(null);
-      setAudioPaused(false);
-      audioRef.current = null;
-    });
-
-    audio.addEventListener("error", () => {
-      setPlayingAyah(null);
-      setAudioLoading(false);
-      audioRef.current = null;
-    });
-
-    audio.play().catch(() => {
-      setPlayingAyah(null);
-      setAudioLoading(false);
-      audioRef.current = null;
-    });
-  }, [playingAyah]);
+    tryAudioSource(surah, ayah, surahName, 0);
+  }, [playingAyah, tryAudioSource]);
 
   const rightPage = leftPage;
   const leftPageNum = leftPage + 1;
@@ -380,6 +408,13 @@ export function TajweedMushaf({
             </div>
           )}
         </div>
+
+        {/* Audio Error */}
+        {audioError && !playingAyah && (
+          <div className="mt-1.5 bg-red-900/80 rounded-lg px-3 py-2 text-center">
+            <span className="text-[11px] text-red-200">{audioError}</span>
+          </div>
+        )}
 
         {/* Audio Player Bar */}
         {playingAyah && (
