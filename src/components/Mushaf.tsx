@@ -126,11 +126,13 @@ function MushafPage({
   const surahsHere = getSurahsOnPage(pageNum);
   const juz = getJuzForPage(pageNum);
 
-  // The page box is locked to the printed Mushaf's proportion so the glyphs
-  // fill the width and the 15 lines fill the height at the same size. Without
-  // it one axis shrinks the text and justification opens gaps between words.
+  // The page box maintains the printed Mushaf's 1:1.545 proportion.
+  // Sized directly on the flex container with explicit width limits to prevent
+  // overflow in narrower containers (max-w-3xl layout, teacher preview half-width, etc).
+  // On mobile: one page fills available width with padding room (max-w-[90%])
+  // On desktop: two pages fit side-by-side (max-w-[48%] each, accounting for gap)
   return (
-    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-none flex flex-col aspect-[1/1.545] h-[min(80vh,142vw)] md:h-[min(86vh,72vw)] overflow-hidden">
+    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-none flex flex-col aspect-[1/1.545] max-w-[90%] md:max-w-[48%] overflow-hidden">
       {/* Ornamental frame */}
       <div className="absolute inset-0 border-[3px] border-[#a8894a]/60 dark:border-[#8b7d56]/30 rounded-[3px] pointer-events-none" />
       <div className="absolute inset-[5px] border border-[#a8894a]/35 dark:border-[#8b7d56]/20 rounded-[2px] pointer-events-none" />
@@ -350,8 +352,13 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         </form>
       </div>
 
-      {/* Book spread — lower page number sits on the right (RTL) */}
-      <div className="relative bg-[#3a3228] dark:bg-[#1a1610] rounded-xl p-1.5 md:p-2 shadow-2xl">
+      {/* Book spread — lower page number sits on the right (RTL).
+          containerType: inline-size makes the pages' cqw units measure this
+          wrapper's actual rendered width instead of the viewport. */}
+      <div
+        className="relative bg-[#3a3228] dark:bg-[#1a1610] rounded-xl p-1.5 md:p-2 shadow-2xl"
+        style={{ containerType: "inline-size" }}
+      >
         <div className="hidden md:block absolute left-1/2 top-2 bottom-2 w-[3px] -translate-x-1/2 bg-gradient-to-r from-black/20 via-black/5 to-black/20 z-10" />
 
         <div className="flex flex-col md:flex-row-reverse items-center justify-center gap-1.5 md:gap-[3px]">
