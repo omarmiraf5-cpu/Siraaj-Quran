@@ -47,11 +47,11 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
-        serif: ["Newsreader", "Georgia", "serif"],
-        display: ["var(--font-playfair)", "Georgia", "serif"],
-        arabic: ["var(--font-amiri)", "serif"],
-        calligraphy: ["var(--font-ruqaa)", "var(--font-amiri)", "serif"],
+        sans: ["system-ui", "-apple-system", "sans-serif"],
+        serif: ["Georgia", "Times New Roman", "serif"],
+        display: ["Georgia", "Times New Roman", "serif"],
+        arabic: ["'Traditional Arabic'", "'Simplified Arabic'", "'Noto Naskh Arabic'", "serif"],
+        calligraphy: ["'Traditional Arabic'", "'Simplified Arabic'", "'Noto Naskh Arabic'", "serif"],
       },
       borderRadius: {
         card: "16px",
