@@ -43,27 +43,11 @@ interface Reciter {
 }
 
 const RECITERS: Reciter[] = [
-  {
-    // Not carried by the Islamic Network CDN at any bitrate. EveryAyah has
-    // him, but his folder is spelled inconsistently across Quran apps (they
-    // render the name "Abdur-Rashid Sufi", "Abdurrashid Sufi" and
-    // "Abdul Rashid Sufi"), and the exact directory name could not be
-    // confirmed from here — everyayah.com is blocked by the build sandbox's
-    // egress proxy. The player walks candidates and caches the one that
-    // works, so listing the plausible spellings costs a few one-time 404s
-    // and then settles on the right one.
-    id: "sufi",
-    name: "Abdirashid Ali Sufi",
-    sources: [
-      { host: "everyayah", folder: "Abdurrashid_Sufi_192kbps" },
-      { host: "everyayah", folder: "Abdurrashid_Sufi_128kbps" },
-      { host: "everyayah", folder: "Abdurrashid_Sufi_64kbps" },
-      { host: "everyayah", folder: "Abdur-Rashid_Sufi_192kbps" },
-      { host: "everyayah", folder: "Abdur-Rashid_Sufi_128kbps" },
-      { host: "everyayah", folder: "AbdurRashid_Sufi_192kbps" },
-      { host: "everyayah", folder: "Abdul_Rashid_Sufi_192kbps" },
-    ],
-  },
+  // Abdirashid Ali Sufi was listed here but never played. He is published as
+  // whole-surah recordings rather than one file per ayah, so none of the
+  // per-ayah URLs a reciter needs here exist for him — every candidate 404'd.
+  // Adding him back needs either a per-ayah source, or gapless support:
+  // surah-length audio plus ayah timings to seek within it.
   {
     id: "minshawi",
     name: "Al-Minshawi",
@@ -81,8 +65,8 @@ const RECITERS: Reciter[] = [
     ],
   },
   {
-    // Same story as Sufi — EveryAyah carries him, the Islamic Network CDN
-    // does not.
+    // EveryAyah carries him, the Islamic Network CDN does not, so there is
+    // no point listing an edition there.
     id: "ayyub",
     name: "Muhammad Ayyub",
     sources: [
