@@ -94,6 +94,10 @@ const RECITERS: Reciter[] = [
 
 const REPEAT_OPTIONS = [1, 2, 3, 4, 5];
 
+// Keep in sync with the `@container mushaf (min-width: ...)` rule in
+// globals.css, which performs the same switch for the layout itself.
+const SPREAD_MIN_WIDTH = 820;
+
 function getAbsoluteAyahNumber(surah: number, ayah: number): number {
   let total = 0;
   for (const s of SURAHS) {
@@ -381,11 +385,20 @@ function MushafPage({
 }
 
 export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
-  const [leftPage, setLeftPage] = useState(() => {
-    const p = initialPage;
-    return p % 2 === 0 ? p : p > 1 ? p - 1 : p;
-  });
+  // The exact page asked for, never rounded. Rounding it to an even page to
+  // form a book opening is a presentation detail of the two-page spread, so
+  // it happens at render time below — storing the rounded value made a jump
+  // to an odd-numbered page (most surah starts) show the page before it.
+  const [currentPage, setCurrentPage] = useState(() =>
+    Math.max(1, Math.min(TOTAL_PAGES, initialPage))
+  );
   const [pageInput, setPageInput] = useState(String(initialPage));
+  // Mirrors the container query in globals.css that decides one page vs two.
+  // Kept in JS as well because paging and the page label have to agree with
+  // what is actually on screen; the CSS still drives the layout itself so
+  // there is no flash of the wrong arrangement on load.
+  const [isSpread, setIsSpread] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const [playingAyah, setPlayingAyah] = useState<PlayingAyah | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
@@ -617,18 +630,39 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     [pendingQueue, repeatCount, startSession]
   );
 
-  const rightPage = leftPage;
-  const leftPageNum = leftPage + 1;
+  // Track the Mushaf's own width so paging matches the arrangement on screen.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setIsSpread(entry.contentRect.width >= SPREAD_MIN_WIDTH);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // A bound Mushaf opens on an even/odd pair, so the spread shows the pair
+  // containing the current page — landing on 177 displays 176-177, with 177
+  // still on screen. On a single page there is no pair: show it exactly.
+  const rightPage =
+    isSpread && currentPage > 1 && currentPage % 2 !== 0
+      ? currentPage - 1
+      : currentPage;
+  const leftPageNum = rightPage + 1;
 
   const goTo = useCallback((p: number) => {
     const clamped = Math.max(1, Math.min(TOTAL_PAGES, p));
-    const even = clamped % 2 === 0 ? clamped : clamped > 1 ? clamped - 1 : clamped;
-    setLeftPage(even);
+    setCurrentPage(clamped);
     setPageInput(String(clamped));
   }, []);
 
-  const prevSpread = () => goTo(rightPage - 2);
-  const nextSpread = () => goTo(leftPageNum + 1);
+  // Turning a leaf moves two pages in a spread but only one on a single page,
+  // where stepping by two used to skip a page entirely.
+  const step = isSpread ? 2 : 1;
+  const goPrev = () => goTo((isSpread ? rightPage : currentPage) - step);
+  const goNext = () => goTo((isSpread ? leftPageNum : currentPage) + 1);
+  const atStart = (isSpread ? rightPage : currentPage) <= 1;
+  const atEnd = (isSpread ? leftPageNum : currentPage) >= TOTAL_PAGES;
 
   const handlePageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -646,7 +680,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
   const sectionDefaultSurah = getSurahsOnPage(rightPage)[0]?.id ?? 1;
 
   return (
-    <div className="mushaf-root space-y-1.5">
+    <div ref={rootRef} className="mushaf-root space-y-1.5">
       {showReciterPicker && (
         <ReciterPicker
           onSelect={handleReciterSelect}
@@ -843,8 +877,8 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
       {/* Navigation — Next advances (leftward, RTL) */}
       <div className="flex items-center justify-between">
         <button
-          onClick={nextSpread}
-          disabled={leftPageNum >= TOTAL_PAGES}
+          onClick={goNext}
+          disabled={atEnd}
           className="flex items-center gap-1 px-3 py-2 rounded-lg bg-surface-card border border-surface-border text-xs font-semibold text-ink hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
@@ -852,13 +886,12 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         </button>
 
         <span className="text-xs font-bold text-ink tabular-nums">
-          {rightPage}
-          <span className="mushaf-page-range hidden"> – {Math.min(leftPageNum, TOTAL_PAGES)}</span>
+          {isSpread ? `${rightPage} – ${Math.min(leftPageNum, TOTAL_PAGES)}` : currentPage}
         </span>
 
         <button
-          onClick={prevSpread}
-          disabled={rightPage <= 1}
+          onClick={goPrev}
+          disabled={atStart}
           className="flex items-center gap-1 px-3 py-2 rounded-lg bg-surface-card border border-surface-border text-xs font-semibold text-ink hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
         >
           Previous

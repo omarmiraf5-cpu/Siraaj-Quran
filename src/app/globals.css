@@ -211,7 +211,4 @@
   .mushaf-page {
     height: min(86vh, 72cqw);
   }
-  .mushaf-page-range {
-    display: inline;
-  }
 }
