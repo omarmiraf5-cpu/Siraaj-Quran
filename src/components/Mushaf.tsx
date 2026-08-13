@@ -90,6 +90,19 @@ const RECITERS: Reciter[] = [
       { host: "everyayah", folder: "Muhammad_Ayyoub_64kbps" },
     ],
   },
+  {
+    // Hafs, and published as per-ayah files rather than whole-surah ones, so
+    // he works with tapping and repeat. Listed on both hosts; whichever
+    // answers first is kept for the rest of the session.
+    id: "muaiqly",
+    name: "Maher Al-Muaiqly",
+    sources: [
+      { host: "islamic", edition: "ar.mahermuaiqly", bitrate: 128 },
+      { host: "islamic", edition: "ar.mahermuaiqly", bitrate: 64 },
+      { host: "everyayah", folder: "Maher_AlMuaiqly_64kbps" },
+      { host: "everyayah", folder: "Maher_AlMuaiqly_128kbps" },
+    ],
+  },
 ];
 
 const REPEAT_OPTIONS = [1, 2, 3, 4, 5];
