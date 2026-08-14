@@ -152,7 +152,7 @@ export default function LoginPage() {
 
         {/* Quranic Verse */}
         <div className="w-full max-w-sm text-center space-y-2">
-          <p className="font-arabic text-xl text-brand-gold-light leading-loose" dir="rtl" lang="ar">
+          <p className="font-calligraphy text-[26px] text-brand-gold-light leading-[2.1]" dir="rtl" lang="ar">
             ﴿اقْرَأْ وَرَبُّكَ الْأَكْرَمُ ۝ الَّذِي عَلَّمَ بِالْقَلَمِ ۝ عَلَّمَ الْإِنْسَانَ مَا لَمْ يَعْلَمْ﴾
           </p>
           <p className="text-white/45 text-xs font-arabic" dir="rtl" lang="ar">[العلق: ٣–٥]</p>
@@ -205,7 +205,7 @@ export default function LoginPage() {
                 Daily Reflection
               </p>
               <p
-                className="font-arabic text-2xl text-brand-gold-light leading-loose"
+                className="font-calligraphy text-[30px] text-brand-gold-light leading-[2.1]"
                 dir="rtl" lang="ar"
               >
                 {r.arabic}
