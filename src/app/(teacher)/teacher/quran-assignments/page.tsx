@@ -122,7 +122,7 @@ export default function QuranAssignmentsPage() {
   return (
     <div className="px-4 pt-4 pb-20 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-ink mb-1">📖 Quranic Assignment</h1>
+        <h1 className="page-title text-3xl mb-1">Assignments</h1>
         <p className="text-ink-muted">Assign Surah and Ayahs to students</p>
       </div>
 
@@ -136,7 +136,7 @@ export default function QuranAssignmentsPage() {
             <select
               value={selectedStudent}
               onChange={(e) => setSelectedStudent(e.target.value)}
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-subject-blue focus:ring-1 focus:ring-subject-blue transition"
+              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
               <option value="">Select a student</option>
               {students.map((s) => (
@@ -157,7 +157,7 @@ export default function QuranAssignmentsPage() {
                 setSelectedSurah(e.target.value);
                 setShowPreview(false);
               }}
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-subject-blue focus:ring-1 focus:ring-subject-blue transition"
+              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
               <option value="">Select a Surah</option>
               {surahs.map((s) => (
@@ -183,7 +183,7 @@ export default function QuranAssignmentsPage() {
                   setShowPreview(false);
                 }}
                 placeholder="1"
-                className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-subject-blue focus:ring-1 focus:ring-subject-blue transition"
+                className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
               />
             </div>
             <div>
@@ -200,7 +200,7 @@ export default function QuranAssignmentsPage() {
                   setShowPreview(false);
                 }}
                 placeholder={maxAyahs.toString()}
-                className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-subject-blue focus:ring-1 focus:ring-subject-blue transition"
+                className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
               />
             </div>
           </div>
@@ -228,7 +228,7 @@ export default function QuranAssignmentsPage() {
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-subject-blue focus:ring-1 focus:ring-subject-blue transition"
+              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
 
@@ -241,7 +241,7 @@ export default function QuranAssignmentsPage() {
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Add any instructions or tips..."
               rows={4}
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-subject-blue focus:ring-1 focus:ring-subject-blue transition resize-none"
+              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition resize-none"
             />
           </div>
 
@@ -254,7 +254,7 @@ export default function QuranAssignmentsPage() {
           {success && (
             <div className="bg-green-50 dark:bg-green-950/25 border border-green-200 dark:border-green-800/40 rounded-2xl p-4">
               <p className="text-sm text-green-700 dark:text-green-300">
-                ✅ Assignment created successfully!
+                Assignment created.
               </p>
             </div>
           )}
@@ -262,7 +262,7 @@ export default function QuranAssignmentsPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-subject-blue hover:bg-subject-blue/90 disabled:opacity-50 text-white font-semibold py-3 rounded-2xl transition-all active:scale-95"
+            className="w-full gradient-emerald hover:opacity-90 disabled:opacity-50 text-white font-semibold py-3 rounded-2xl transition-all active:scale-95"
           >
             {loading ? "Creating..." : "Create Assignment"}
           </button>
@@ -292,8 +292,10 @@ export default function QuranAssignmentsPage() {
             </div>
           ) : (
             <div className="bg-surface-card rounded-3xl border border-surface-border p-8 text-center">
-              <p className="text-5xl mb-4">📖</p>
-              <h3 className="text-lg font-bold text-ink mb-2">Mushaf Preview</h3>
+              <span className="icon-tile mx-auto mb-4">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+              </span>
+              <h3 className="page-title text-lg mb-2">Mushaf Preview</h3>
               <p className="text-sm text-ink-muted">
                 Select a Surah and Ayah range, then tap &ldquo;Preview Mushaf&rdquo; to see the Tajweed-highlighted text your student will study.
               </p>
@@ -306,7 +308,7 @@ export default function QuranAssignmentsPage() {
           records; the create form above writes real ones. */}
       <div className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="font-bold text-ink">Current assignments</h2>
+          <h2 className="page-title text-lg">Current assignments</h2>
           <span className="text-[11px] text-ink-muted">{DEMO_ASSIGNMENTS.length} across all students</span>
         </div>
 

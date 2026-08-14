@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   DEMO_STUDENTS,
   DEMO_ATTENDANCE,
-  ATTENDANCE_STYLES,
   ATTENDANCE_LABELS,
   summariseAttendance,
   initials,
@@ -14,11 +13,18 @@ import {
 
 const TODAY = "2026-08-13";
 
-const MARKS: { status: AttendanceStatus; letter: string; on: string; off: string }[] = [
-  { status: "present", letter: "P", on: "bg-green-600 border-green-600 text-white", off: "hover:border-green-600 hover:text-green-700" },
-  { status: "late", letter: "L", on: "bg-amber-500 border-amber-500 text-white", off: "hover:border-amber-500 hover:text-amber-600" },
-  { status: "absent", letter: "A", on: "bg-red-600 border-red-600 text-white", off: "hover:border-red-600 hover:text-red-700" },
-  { status: "excused", letter: "E", on: "bg-blue-600 border-blue-600 text-white", off: "hover:border-blue-600 hover:text-blue-700" },
+const MARKS: {
+  status: AttendanceStatus;
+  letter: string;
+  on: string;
+  off: string;
+  dot: string;
+  num: string;
+}[] = [
+  { status: "present", letter: "P", on: "bg-green-700 border-green-700 text-white", off: "hover:border-green-700 hover:text-green-800", dot: "bg-green-700", num: "text-green-800 dark:text-green-300" },
+  { status: "late", letter: "L", on: "bg-amber-600 border-amber-600 text-white", off: "hover:border-amber-600 hover:text-amber-700", dot: "bg-amber-600", num: "text-amber-700 dark:text-amber-300" },
+  { status: "absent", letter: "A", on: "bg-red-700 border-red-700 text-white", off: "hover:border-red-700 hover:text-red-800", dot: "bg-red-700", num: "text-red-800 dark:text-red-300" },
+  { status: "excused", letter: "E", on: "bg-slate-600 border-slate-600 text-white", off: "hover:border-slate-600 hover:text-slate-700", dot: "bg-slate-500", num: "text-slate-700 dark:text-slate-300" },
 ];
 
 export default function TeacherAttendancePage() {
@@ -49,16 +55,21 @@ export default function TeacherAttendancePage() {
   return (
     <div className="max-w-2xl mx-auto pb-28 space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-ink mb-1">Attendance</h1>
+        <h1 className="page-title text-3xl mb-1">Attendance</h1>
         <p className="text-sm text-ink-muted">{formatDay(TODAY)} · {DEMO_STUDENTS.length} students</p>
       </div>
 
       {/* Today's tally */}
       <div className="grid grid-cols-4 gap-2">
         {MARKS.map((m) => (
-          <div key={m.status} className={`rounded-2xl px-2 py-3 text-center ${ATTENDANCE_STYLES[m.status]}`}>
-            <p className="text-2xl font-bold tabular-nums">{count(m.status)}</p>
-            <p className="text-[11px] font-semibold mt-0.5">{ATTENDANCE_LABELS[m.status]}</p>
+          <div key={m.status} className="card-quiet px-3 py-3">
+            <p className={`text-2xl font-bold tabular-nums leading-none ${m.num}`}>
+              {count(m.status)}
+            </p>
+            <p className="eyebrow mt-2 flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+              {ATTENDANCE_LABELS[m.status]}
+            </p>
           </div>
         ))}
       </div>
@@ -76,7 +87,7 @@ export default function TeacherAttendancePage() {
       </div>
 
       {/* Roster */}
-      <div className="bg-surface-card rounded-2xl border border-surface-border divide-y divide-surface-border overflow-hidden">
+      <div className="card-quiet divide-y divide-surface-border overflow-hidden">
         {DEMO_STUDENTS.map((s) => {
           const history = summariseAttendance(DEMO_ATTENDANCE[s.id]);
           return (
