@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // Segment: [kind, key, glyphChars]
 //   kind 0=word 1=ayah-end 2=surah-header 3=bismillah 4=quarter-marker
@@ -57,15 +57,66 @@ export function QcfMushafPage({
   playingKey: string | null;
   onAyahClick: (surah: number, ayah: number) => void;
 }) {
-  if (!layout) {
+  const pageFont = layout ? `QCF4_${String(layout.f).padStart(2, "0")}` : "";
+
+  // Every face this page draws with, paired with a real glyph taken from it.
+  // Memoised on the layout so that playing an ayah, which re-renders this
+  // component, does not re-run the probe below and blink the page away.
+  const facesNeeded = useMemo(() => {
+    if (!layout) return [] as [string, string][];
+    const sample = new Map<string, string>();
+    for (const line of layout.l) {
+      for (const [kind, , glyphs] of line) {
+        if (!glyphs) continue;
+        const face =
+          kind === KIND_HEADER
+            ? "QCF4_BSML"
+            : kind === KIND_BISMILLAH
+              ? "QCF4_01"
+              : pageFont;
+        if (!sample.has(face)) sample.set(face, glyphs);
+      }
+    }
+    return [...sample];
+  }, [layout, pageFont]);
+
+  // Hold the spinner until those faces are actually drawable. Without this the
+  // layout JSON arrives well before the woff2 and the page paints a screenful
+  // of Private Use Area codepoints that no fallback font can render.
+  const [facesReady, setFacesReady] = useState(false);
+  useEffect(() => {
+    if (facesNeeded.length === 0) return;
+    let cancelled = false;
+    setFacesReady(false);
+    const reveal = () => {
+      if (!cancelled) setFacesReady(true);
+    };
+    if (typeof document === "undefined" || !document.fonts) {
+      reveal();
+      return;
+    }
+    // Probe with real glyphs. document.fonts.load tests a space by default,
+    // and these faces carry no space, so the default probe would report the
+    // font ready without ever fetching it.
+    const timer = setTimeout(reveal, 4000); // never strand the reader
+    Promise.all(
+      facesNeeded.map(([face, glyphs]) =>
+        document.fonts.load(`1em '${face}'`, glyphs).catch(() => {})
+      )
+    ).then(reveal);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [facesNeeded]);
+
+  if (!layout || !facesReady) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="w-5 h-5 rounded-full border-2 border-[#a8894a]/25 border-t-[#a8894a]/70 animate-spin" />
       </div>
     );
   }
-
-  const pageFont = `QCF4_${String(layout.f).padStart(2, "0")}`;
 
   // Size the glyphs against the line area itself: the cqh term makes this
   // page's line count exactly fill the height, and the cqw term stops a line
