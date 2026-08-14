@@ -136,7 +136,7 @@ export default function LoginPage() {
           <span className="text-white">My</span>
           <span className="gold-foil">Diiwaan</span>
         </h1>
-        <p className="font-calligraphy text-3xl text-brand-gold-light leading-none mt-2" dir="rtl" lang="ar">
+        <p className="font-calligraphy font-bold text-3xl text-brand-gold leading-none mt-2" dir="rtl" lang="ar">
           ديواني
         </p>
         <p className="font-serif text-white/70 text-[13px] tracking-wide mt-3 text-center">
@@ -193,7 +193,7 @@ export default function LoginPage() {
             <span className="text-white">My</span>
             <span className="gold-foil">Diiwaan</span>
           </h1>
-          <p className="font-calligraphy text-2xl text-brand-gold-light leading-none mt-1.5" dir="rtl" lang="ar">ديواني</p>
+          <p className="font-calligraphy font-bold text-2xl text-brand-gold leading-none mt-1.5" dir="rtl" lang="ar">ديواني</p>
         </div>
 
         {/* Daily reflection */}
