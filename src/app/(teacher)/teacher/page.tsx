@@ -123,7 +123,7 @@ export default function TeacherDashboard() {
       <section className="card-quiet px-6 py-8 text-center">
         <p className="eyebrow">Daily reflection</p>
         <p
-          className="font-calligraphy font-bold text-2xl md:text-[28px] text-ink mt-4 leading-[2]"
+          className="font-arabic text-2xl md:text-[28px] text-ink mt-4 leading-[2]"
           dir="rtl"
           lang="ar"
         >

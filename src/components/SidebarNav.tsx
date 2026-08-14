@@ -95,7 +95,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
               <span className="text-white">My</span>
               <span className="gold-foil">Diiwaan</span>
             </span>
-            <span className="font-calligraphy font-bold text-2xl text-brand-gold leading-none" dir="rtl" lang="ar">
+            <span className="font-calligraphy font-bold text-2xl text-brand-gold-light leading-none" dir="rtl" lang="ar">
               ديواني
             </span>
           </div>

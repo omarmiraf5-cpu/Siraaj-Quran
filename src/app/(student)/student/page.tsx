@@ -9,7 +9,7 @@ export default function StudentDashboard() {
       </div>
 
       <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl p-6 text-white text-center space-y-3">
-        <p className="font-calligraphy font-bold text-2xl leading-loose" dir="rtl" lang="ar">
+        <p className="font-arabic text-2xl leading-loose" dir="rtl" lang="ar">
           اللَّهُمَّ لَا سَهْلَ إِلَّا مَا جَعَلْتَهُ سَهْلًا
         </p>
         <p className="text-sm opacity-90">

@@ -136,7 +136,7 @@ export default function LoginPage() {
           <span className="text-white">My</span>
           <span className="gold-foil">Diiwaan</span>
         </h1>
-        <p className="font-calligraphy font-bold text-3xl text-brand-gold leading-none mt-2" dir="rtl" lang="ar">
+        <p className="font-calligraphy text-3xl text-brand-gold-light leading-none mt-2" dir="rtl" lang="ar">
           ديواني
         </p>
         <p className="font-serif text-white/70 text-[13px] tracking-wide mt-3 text-center">
@@ -152,10 +152,10 @@ export default function LoginPage() {
 
         {/* Quranic Verse */}
         <div className="w-full max-w-sm text-center space-y-2">
-          <p className="font-calligraphy font-bold text-2xl text-brand-gold leading-loose" dir="rtl" lang="ar">
+          <p className="font-arabic text-xl text-brand-gold-light leading-loose" dir="rtl" lang="ar">
             ﴿اقْرَأْ وَرَبُّكَ الْأَكْرَمُ ۝ الَّذِي عَلَّمَ بِالْقَلَمِ ۝ عَلَّمَ الْإِنْسَانَ مَا لَمْ يَعْلَمْ﴾
           </p>
-          <p className="text-white/45 text-xs font-calligraphy font-bold" dir="rtl" lang="ar">[العلق: ٣–٥]</p>
+          <p className="text-white/45 text-xs font-arabic" dir="rtl" lang="ar">[العلق: ٣–٥]</p>
           <p className="font-serif text-white/80 text-[15px] leading-relaxed pt-1">
             &ldquo;Read, and your Lord is the Most Generous — Who taught by the pen —
             taught man what he knew not.&rdquo;
@@ -164,7 +164,7 @@ export default function LoginPage() {
 
         {/* Abu Hayyan Quote */}
         <div className="w-full max-w-sm mt-5 backdrop-blur-md bg-white/[0.06] border border-white/15 rounded-card-lg px-5 py-4 space-y-2.5 shadow-dark">
-          <p className="font-calligraphy font-bold text-lg text-white/85 leading-loose text-right" dir="rtl" lang="ar">
+          <p className="font-arabic text-[15px] text-white/85 leading-loose text-right" dir="rtl" lang="ar">
             قَالَ أَبُو حَيَّانَ الأَنْدَلُسِيُّ فِي البَحْرِ المُحِيطِ:
             «وَلَيْسَ وَرَاءَ التَّكَرُّمِ بِإِفَادَةِ الْفَوَائِدِ الْعِلْمِيَّةِ تَكَرُّمٌ، حَيْثُ قَالَ: ﴿الأَكْرَمُ الَّذِي عَلَّمَ بِالْقَلَمِ عَلَّمَ الإِنْسَانَ مَا لَمْ يَعْلَمْ﴾، فَدَلَّ عَلَى كَمَالِ كَرَمِهِ بِأَنَّ عَلَّمَ عِبَادَهُ مَا لَمْ يَعْلَمُوا، وَنَقَلَهُمْ مِنْ ظُلْمَةِ الْجَهْلِ إِلَى نُورِ الْعِلْمِ»
           </p>
@@ -193,7 +193,7 @@ export default function LoginPage() {
             <span className="text-white">My</span>
             <span className="gold-foil">Diiwaan</span>
           </h1>
-          <p className="font-calligraphy font-bold text-2xl text-brand-gold leading-none mt-1.5" dir="rtl" lang="ar">ديواني</p>
+          <p className="font-calligraphy text-2xl text-brand-gold-light leading-none mt-1.5" dir="rtl" lang="ar">ديواني</p>
         </div>
 
         {/* Daily reflection */}
@@ -205,7 +205,7 @@ export default function LoginPage() {
                 Daily Reflection
               </p>
               <p
-                className="font-calligraphy font-bold text-2xl text-brand-gold leading-loose"
+                className="font-arabic text-2xl text-brand-gold-light leading-loose"
                 dir="rtl" lang="ar"
               >
                 {r.arabic}
