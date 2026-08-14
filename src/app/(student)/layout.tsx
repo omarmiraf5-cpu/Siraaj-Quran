@@ -8,7 +8,9 @@ import { useStudentTheme } from "@/hooks/useStudentTheme";
 const TABS = [
   { href: "/student", label: "Home", emoji: "🏠" },
   { href: "/student/quran", label: "Quran", emoji: "📖" },
+  { href: "/student/assignments", label: "Work", emoji: "📝" },
   { href: "/student/tajweed", label: "Tajweed", emoji: "🎨" },
+  { href: "/student/attendance", label: "Attendance", emoji: "✅" },
 ];
 
 function StudentTabBar({ accent }: { accent: string }) {

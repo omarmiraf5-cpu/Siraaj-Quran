@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
+import { DEMO_ASSIGNMENTS, DEMO_STUDENTS, studentName, initials } from "@/data/demo";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -30,9 +31,24 @@ export default function QuranAssignmentsPage() {
   useEffect(() => {
     const loadStudents = async () => {
       try {
+        // Signing in as a demo account stores a local user rather than a
+        // Supabase session, so checking Supabase alone bounced demo teachers
+        // straight back to the login page and made this screen unreachable.
+        // Read it here rather than through useDemoUser: that hook fills in
+        // from an effect, so it is still null on the first run and would
+        // redirect before the demo account was seen.
+        const isDemo =
+          typeof window !== "undefined" && !!localStorage.getItem("demo_user");
+
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        if (!user && !isDemo) {
           router.push("/login");
+          return;
+        }
+
+        if (!user) {
+          // Demo mode: no database to read, so use the sample roster.
+          setStudents(DEMO_STUDENTS.map((s) => ({ id: s.id, full_name: s.name })));
           return;
         }
 
@@ -283,6 +299,60 @@ export default function QuranAssignmentsPage() {
               </p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* What has already been set. Sample data until the school has its own
+          records; the create form above writes real ones. */}
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-bold text-ink">Current assignments</h2>
+          <span className="text-[11px] text-ink-muted">{DEMO_ASSIGNMENTS.length} across all students</span>
+        </div>
+
+        <div className="bg-surface-card rounded-2xl border border-surface-border divide-y divide-surface-border overflow-hidden">
+          {DEMO_ASSIGNMENTS.map((a) => {
+            const surah = getSurahById(a.surah);
+            const name = studentName(a.student_id);
+            const chip = {
+              assigned: "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300",
+              in_progress: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300",
+              completed: "bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300",
+              needs_review: "bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300",
+            }[a.status];
+
+            return (
+              <div key={a.id} className="flex items-center gap-3 px-3 py-3">
+                <div className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-xs flex-shrink-0">
+                  {initials(name)}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-ink truncate">{name}</p>
+                  <p className="text-[11px] text-ink-muted truncate">
+                    {surah ? surah.englishName : `Surah ${a.surah}`} · ayahs {a.ayah_start}–{a.ayah_end}
+                    {a.due_date ? ` · due ${a.due_date}` : ""}
+                  </p>
+                </div>
+
+                <div className="w-16 flex-shrink-0 hidden sm:block">
+                  <div className="h-1.5 bg-surface-bg rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-600 rounded-full"
+                      style={{ width: `${a.memorization_level}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-ink-muted text-right mt-0.5 tabular-nums">
+                    {a.memorization_level}%
+                  </p>
+                </div>
+
+                <span className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 ${chip}`}>
+                  {a.status.replace("_", " ")}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
