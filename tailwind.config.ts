@@ -51,7 +51,7 @@ const config: Config = {
         serif: ["Georgia", "Times New Roman", "serif"],
         display: ["Georgia", "Times New Roman", "serif"],
         arabic: ["'Traditional Arabic'", "'Simplified Arabic'", "'Noto Naskh Arabic'", "serif"],
-        calligraphy: ["'Traditional Arabic'", "'Simplified Arabic'", "'Noto Naskh Arabic'", "serif"],
+        calligraphy: ["'Aref Ruqaa'", "'Traditional Arabic'", "'Simplified Arabic'", "'Noto Naskh Arabic'", "serif"],
       },
       borderRadius: {
         card: "16px",
