@@ -4,8 +4,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:ital,wght@0,500;0,600;1,500;1,600&family=Amiri:ital,wght@0,400;0,700;1,400&family=Aref+Ruqaa:wght@400;700&display=swap');
-
 /* ── Light mode tokens ──
    Warm paper rather than cold blue-grey. The identity on the sign-in screen
    and inside the Mushaf is navy, gold and cream; the portals used to drop
@@ -25,14 +23,10 @@
   --c-gold-soft: rgba(198, 162, 83, 0.28);
 }
 
-/* The Tailwind font aliases pointed at variables nothing ever defined, so
-   font-display, font-arabic and font-calligraphy all silently fell back to
-   Georgia — including every line of Arabic in the app. */
-:root {
-  --font-playfair: "Newsreader";
-  --font-amiri: "Amiri";
-  --font-ruqaa: "Aref Ruqaa";
-}
+/* --font-jakarta, --font-newsreader, --font-amiri and --font-ruqaa are set by
+   next/font in layout.tsx, on the <html> element. Do not redeclare them here:
+   :root and next/font's generated class have the same specificity, so whichever
+   lands later would win and the result would turn on stylesheet order. */
 
 /* ── Dark mode tokens ── */
 .dark {
@@ -50,7 +44,7 @@
 
 @layer base {
   body {
-    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    font-family: var(--font-jakarta), system-ui, sans-serif;
     background-color: var(--c-surface-bg);
     color: var(--c-ink);
     -webkit-font-smoothing: antialiased;
@@ -252,7 +246,7 @@ body {
   /* Page title: serif, because everything being one bold sans is most of
      why the portals read as a template. */
   .page-title {
-    font-family: "Newsreader", Georgia, serif;
+    font-family: var(--font-newsreader), Georgia, serif;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--c-ink);

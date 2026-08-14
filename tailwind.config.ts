@@ -47,9 +47,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
-        serif: ["Newsreader", "Georgia", "serif"],
-        display: ["var(--font-playfair)", "Georgia", "serif"],
+        sans: ["var(--font-jakarta)", "system-ui", "sans-serif"],
+        serif: ["var(--font-newsreader)", "Georgia", "serif"],
+        display: ["var(--font-newsreader)", "Georgia", "serif"],
         arabic: ["var(--font-amiri)", "serif"],
         calligraphy: ["var(--font-ruqaa)", "var(--font-amiri)", "serif"],
       },
