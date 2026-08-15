@@ -2,32 +2,14 @@
 
 import { useState } from "react";
 import { getSurahById } from "@/data/mushaf-index";
-import { DEMO_CURRENT_STUDENT, demoAssignmentsFor } from "@/data/demo";
-import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
-
-const STATUS: Record<
-  QuranicAssignment["status"],
-  { label: string; emoji: string; chip: string }
-> = {
-  assigned: { label: "To start", emoji: "📤", chip: "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300" },
-  in_progress: { label: "In progress", emoji: "🔄", chip: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300" },
-  completed: { label: "Completed", emoji: "✅", chip: "bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300" },
-  needs_review: { label: "Needs review", emoji: "👀", chip: "bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300" },
-};
-
-// Fixed so the server and client agree; real data would use today's date.
-const TODAY = "2026-08-13";
-
-function dueLabel(due: string | null): { text: string; urgent: boolean } | null {
-  if (!due) return null;
-  const days = Math.round(
-    (Date.parse(due + "T00:00:00Z") - Date.parse(TODAY + "T00:00:00Z")) / 86400000
-  );
-  if (days < 0) return { text: `${Math.abs(days)} days overdue`, urgent: true };
-  if (days === 0) return { text: "Due today", urgent: true };
-  if (days === 1) return { text: "Due tomorrow", urgent: true };
-  return { text: `Due in ${days} days`, urgent: days <= 3 };
-}
+import {
+  DEMO_CURRENT_STUDENT,
+  demoAssignmentsFor,
+  dueLabel,
+  ASSIGNMENT_LABELS,
+  ASSIGNMENT_STYLES,
+} from "@/data/demo";
+import { ProgressBar, TeacherNote, EmptyNote } from "@/components/portal-ui";
 
 export default function StudentAssignmentsPage() {
   const all = demoAssignmentsFor(DEMO_CURRENT_STUDENT.id);
@@ -36,54 +18,74 @@ export default function StudentAssignmentsPage() {
   );
 
   const done = all.filter((a) => a.status === "completed").length;
+  const overall = all.length
+    ? Math.round(Object.values(levels).reduce((s, v) => s + v, 0) / all.length)
+    : 0;
 
   return (
-    <div className="px-4 pt-4 pb-24 space-y-5">
-      <div>
-        <h1 className="text-3xl font-bold text-ink mb-1">📝 My Assignments</h1>
-        <p className="text-ink-muted">
-          {done} of {all.length} finished
-        </p>
-      </div>
+    <div className="px-4 pt-4 pb-4 space-y-4">
+      <header className="gradient-navy rounded-[18px] px-6 py-6 relative overflow-hidden">
+        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
+        <div className="relative">
+          <p className="eyebrow text-white/45">Your work</p>
+          <h1 className="page-title text-white text-3xl mt-1.5">Assignments</h1>
+          <p className="text-[13px] text-white/55 mt-2.5">
+            {done} of {all.length} finished
+            <span className="text-white/25 mx-2">·</span>
+            {overall}% memorised overall
+          </p>
+        </div>
+      </header>
+
+      {all.length === 0 && (
+        <div className="card-quiet p-5">
+          <EmptyNote>Nothing has been set for you yet.</EmptyNote>
+        </div>
+      )}
 
       {all.map((a) => {
         const surah = getSurahById(a.surah);
-        const st = STATUS[a.status];
         // Nothing is overdue once it is finished.
         const due = a.status === "completed" ? null : dueLabel(a.due_date);
         const level = levels[a.id];
 
         return (
-          <div
-            key={a.id}
-            className="bg-surface-card rounded-3xl border border-surface-border p-5 space-y-4"
-          >
+          <article key={a.id} className="card-quiet p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-bold text-ink text-lg truncate">
-                  {surah ? `${surah.id}. ${surah.englishName}` : `Surah ${a.surah}`}
-                </p>
-                <p className="text-sm text-ink-muted">
+                <h2 className="page-title text-[17px] truncate">
+                  {surah ? surah.englishName : `Surah ${a.surah}`}
+                </h2>
+                <p className="text-[12px] text-ink-muted mt-0.5">
                   Ayahs {a.ayah_start}–{a.ayah_end}
                   {surah ? ` · page ${surah.startPage}` : ""}
                 </p>
               </div>
-              <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${st.chip}`}>
-                {st.emoji} {st.label}
+              <span
+                className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${ASSIGNMENT_STYLES[a.status]}`}
+              >
+                {ASSIGNMENT_LABELS[a.status]}
               </span>
             </div>
 
             {due && (
-              <p className={`text-xs font-semibold ${due.urgent ? "text-red-600 dark:text-red-400" : "text-ink-muted"}`}>
-                📅 {due.text}
+              <p
+                className={`text-[12px] mt-2 font-semibold ${
+                  due.urgent ? "text-red-700 dark:text-red-300" : "text-ink-muted"
+                }`}
+              >
+                {due.text}
               </p>
             )}
 
+            <div className="gold-rule my-4" />
+
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-ink-muted">Memorisation</span>
-                <span className="text-xs font-bold text-ink tabular-nums">{level}%</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="eyebrow">How much you know</span>
+                <span className="text-[13px] font-bold text-ink tabular-nums">{level}%</span>
               </div>
+              <ProgressBar value={level} />
               <input
                 type="range"
                 min={0}
@@ -94,19 +96,12 @@ export default function StudentAssignmentsPage() {
                   setLevels((l) => ({ ...l, [a.id]: Number(e.target.value) }))
                 }
                 aria-label={`Memorisation progress for ${surah?.englishName ?? "surah"}`}
-                className="w-full h-2 bg-surface-bg rounded-full appearance-none cursor-pointer accent-emerald-600"
+                className="w-full mt-3 h-1.5 bg-surface-bg rounded-full appearance-none cursor-pointer accent-brand-gold"
               />
             </div>
 
-            {a.teacher_notes && (
-              <div className="bg-blue-50 dark:bg-blue-950/25 border border-blue-200 dark:border-blue-800/40 rounded-2xl p-3">
-                <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 mb-1">
-                  📝 Teacher&apos;s note
-                </p>
-                <p className="text-sm text-blue-900 dark:text-blue-100">{a.teacher_notes}</p>
-              </div>
-            )}
-          </div>
+            {a.teacher_notes && <TeacherNote>{a.teacher_notes}</TeacherNote>}
+          </article>
         );
       })}
     </div>

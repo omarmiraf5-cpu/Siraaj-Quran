@@ -110,11 +110,15 @@
   .student-gradient-pink {
     background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f472b6 100%);
   }
+  /* The student hero. These were a saturated blue→cyan and purple→fuchsia,
+     which read as a different product from the navy the rest of the app opens
+     with. Both now start from the brand navy and travel only far enough to be
+     personal. */
   .student-hero-boy {
-    background: linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 55%, #22d3ee 100%);
+    background: linear-gradient(160deg, #17456e 0%, #12385c 50%, #0d2b47 100%);
   }
   .student-hero-girl {
-    background: linear-gradient(135deg, #7c3aed 0%, #c026d3 55%, #ec4899 100%);
+    background: linear-gradient(160deg, #4a2350 0%, #3c1c46 50%, #2b1435 100%);
   }
   .animate-gentle-spin {
     animation: gentleSpin 8s linear infinite;

@@ -4,14 +4,15 @@ import { useState } from "react";
 import {
   DEMO_STUDENTS,
   DEMO_ATTENDANCE,
+  DEMO_TODAY,
   ATTENDANCE_LABELS,
   summariseAttendance,
   initials,
   formatDay,
   type AttendanceStatus,
 } from "@/data/demo";
-
-const TODAY = "2026-08-13";
+import { PortalHero } from "@/components/PortalHero";
+import { IconCheck } from "@/components/icons";
 
 const MARKS: {
   status: AttendanceStatus;
@@ -53,11 +54,16 @@ export default function TeacherAttendancePage() {
   const remaining = DEMO_STUDENTS.length - marked;
 
   return (
-    <div className="max-w-2xl mx-auto pb-28 space-y-5">
-      <div>
-        <h1 className="page-title text-3xl mb-1">Attendance</h1>
-        <p className="text-sm text-ink-muted">{formatDay(TODAY)} · {DEMO_STUDENTS.length} students</p>
-      </div>
+    <div className="max-w-2xl mx-auto pb-28 space-y-4 pt-2">
+      <PortalHero
+        eyebrow="Today's register"
+        title="Attendance"
+        meta={[
+          formatDay(DEMO_TODAY),
+          `${DEMO_STUDENTS.length} students`,
+          remaining > 0 ? `${remaining} still to mark` : "everyone marked",
+        ]}
+      />
 
       {/* Today's tally */}
       <div className="grid grid-cols-4 gap-2">
@@ -129,10 +135,11 @@ export default function TeacherAttendancePage() {
         <button
           onClick={() => setSaved(true)}
           disabled={marked === 0}
-          className="w-full max-w-2xl mx-auto block gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
+          className="w-full max-w-2xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
         >
+          {saved && <IconCheck size={16} />}
           {saved
-            ? "✓ Attendance saved"
+            ? "Attendance saved"
             : marked === 0
               ? "Mark a student to save"
               : `Save attendance · ${count("present")} present`}

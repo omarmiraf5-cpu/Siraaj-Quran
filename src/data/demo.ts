@@ -97,6 +97,14 @@ export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
   excused: "Excused",
 };
 
+// Solid fills for dots and the day strip, where a tinted chip would disappear.
+export const ATTENDANCE_DOT: Record<AttendanceStatus, string> = {
+  present: "bg-green-700",
+  late: "bg-amber-600",
+  absent: "bg-red-700",
+  excused: "bg-slate-500",
+};
+
 // Tailwind classes per status, shared so the three portals agree on colour.
 export const ATTENDANCE_STYLES: Record<AttendanceStatus, string> = {
   present: "bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300",
@@ -161,6 +169,59 @@ export const DEMO_ASSIGNMENTS: QuranicAssignment[] = [
 export function demoAssignmentsFor(studentId: string): QuranicAssignment[] {
   return DEMO_ASSIGNMENTS.filter((a) => a.student_id === studentId);
 }
+
+// The date every portal treats as "today": the most recent day in the register.
+// Fixed rather than read from the clock, for the same hydration reason as the
+// dates above — and shared, because the portals used to disagree by a day, so
+// the same assignment read "due tomorrow" to a student and "due today" to a
+// parent.
+export const DEMO_TODAY = DAYS[0];
+
+const DAY_MS = 86_400_000;
+
+/** Days from today to an ISO date; negative is in the past. */
+export function daysFromToday(iso: string): number {
+  return Math.round(
+    (Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${DEMO_TODAY}T00:00:00Z`)) / DAY_MS
+  );
+}
+
+export interface DueLabel {
+  text: string;
+  /** Due within three days, or already past. */
+  urgent: boolean;
+  overdue: boolean;
+}
+
+export function dueLabel(due: string | null): DueLabel | null {
+  if (!due) return null;
+  const days = daysFromToday(due);
+  if (days < 0) {
+    const n = Math.abs(days);
+    return { text: `${n} day${n === 1 ? "" : "s"} overdue`, urgent: true, overdue: true };
+  }
+  if (days === 0) return { text: "Due today", urgent: true, overdue: false };
+  if (days === 1) return { text: "Due tomorrow", urgent: true, overdue: false };
+  return { text: `Due in ${days} days`, urgent: days <= 3, overdue: false };
+}
+
+export const ASSIGNMENT_LABELS: Record<QuranicAssignment["status"], string> = {
+  assigned: "To start",
+  in_progress: "In progress",
+  completed: "Completed",
+  needs_review: "Needs review",
+};
+
+// Status chips, shared so an assignment looks the same in every portal.
+export const ASSIGNMENT_STYLES: Record<QuranicAssignment["status"], string> = {
+  assigned: "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300",
+  in_progress: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300",
+  completed: "bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300",
+  needs_review: "bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300",
+};
+
+/** The children a signed-in parent can see. Two, so the switcher is visible. */
+export const DEMO_CHILDREN = DEMO_STUDENTS.slice(0, 2);
 
 export function studentName(id: string): string {
   return DEMO_STUDENTS.find((s) => s.id === id)?.name ?? "Student";

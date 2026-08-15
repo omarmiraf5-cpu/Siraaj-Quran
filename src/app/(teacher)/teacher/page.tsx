@@ -1,53 +1,30 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
   DEMO_STUDENTS,
   DEMO_ASSIGNMENTS,
   DEMO_ATTENDANCE,
+  DEMO_TODAY,
   summariseAttendance,
   formatDay,
+  daysFromToday,
   initials,
   type AttendanceStatus,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import { StudentDetailPanel } from "@/components/StudentDetailPanel";
-
-const IconBook = (
-  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
-  </svg>
-);
-
-const IconRegister = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2" />
-    <path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" />
-  </svg>
-);
-
-const IconPen = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-  </svg>
-);
-
-const IconArrow = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 12h14M13 6l6 6-6 6" />
-  </svg>
-);
-
-const STATUS_DOT: Record<AttendanceStatus, string> = {
-  present: "bg-green-700",
-  late: "bg-amber-600",
-  absent: "bg-red-700",
-  excused: "bg-slate-500",
-};
+import { TeacherDrilldown, type DrilldownView } from "@/components/TeacherDrilldown";
+import { PortalHero, HeroButtonPrimary, HeroButtonGhost } from "@/components/PortalHero";
+import {
+  SectionCard,
+  StatTile,
+  AttendanceLegend,
+  EmptyNote,
+} from "@/components/portal-ui";
+import { IconBook, IconCalendar, IconPen, IconArrow } from "@/components/icons";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
@@ -56,43 +33,36 @@ const STATUS_TEXT: Record<AttendanceStatus, string> = {
   excused: "text-slate-600 dark:text-slate-300",
 };
 
-const DAY_MS = 86_400_000;
-const utc = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
-
 export default function TeacherDashboard() {
   const demoUser = useDemoUser();
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const registerRef = useRef<HTMLElement>(null);
-  const reviewRef = useRef<HTMLElement>(null);
-
-  const scrollToSection = (ref: React.RefObject<HTMLElement | null>) => {
-    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  // "Today" is the most recent day in the register, not the real date. These
-  // pages prerender, so a value that differs between server and client is a
-  // hydration mismatch — which is why the demo data is fixed-date too.
-  const today = DEMO_ATTENDANCE[DEMO_STUDENTS[0].id][0].date;
-  const todayMs = utc(today);
+  const [drilldown, setDrilldown] = useState<DrilldownView | null>(null);
 
   const register = DEMO_STUDENTS.map((s) => ({
     student: s,
     status: DEMO_ATTENDANCE[s.id][0].status,
   }));
-  const tally = (s: AttendanceStatus) =>
-    register.filter((r) => r.status === s).length;
+  const tally = (s: AttendanceStatus) => register.filter((r) => r.status === s).length;
   const inToday = tally("present") + tally("late");
   // Everyone the teacher may need to do something about; present needs nothing.
   const exceptions = register.filter((r) => r.status !== "present");
 
+  const todayCounts = {
+    present: tally("present"),
+    late: tally("late"),
+    absent: tally("absent"),
+    excused: tally("excused"),
+    total: DEMO_STUDENTS.length,
+    rate: 0,
+  };
+
   const review = DEMO_ASSIGNMENTS.filter((a) => a.status === "needs_review");
   const active = DEMO_ASSIGNMENTS.filter((a) => a.status !== "completed");
-  const dueThisWeek = active.filter(
-    (a) =>
-      a.due_date &&
-      utc(a.due_date) >= todayMs &&
-      utc(a.due_date) - todayMs <= 7 * DAY_MS
-  ).length;
+  const dueThisWeek = active.filter((a) => {
+    if (!a.due_date) return false;
+    const d = daysFromToday(a.due_date);
+    return d >= 0 && d <= 7;
+  }).length;
 
   const reviewDue = review
     .map((a) => a.due_date)
@@ -108,124 +78,74 @@ export default function TeacherDashboard() {
 
   const halaqas = [...new Set(DEMO_STUDENTS.map((s) => s.halaqa))];
 
-  const stats = [
-    {
-      value: DEMO_STUDENTS.length,
-      label: "Students",
-      sub: halaqas
-        .map(
-          (h) =>
-            `${DEMO_STUDENTS.filter((s) => s.halaqa === h).length} in ${h.replace("Halaqa ", "")}`
-        )
-        .join(" · "),
-    },
-    {
-      value: active.length,
-      label: "Active work",
-      sub: dueThisWeek > 0 ? `${dueThisWeek} due this week` : "nothing due this week",
-    },
-    {
-      value: review.length,
-      label: "To review",
-      sub: reviewDue ? `oldest due ${formatDay(reviewDue)}` : "all clear",
-    },
-    {
-      value: `${avgAttendance}%`,
-      label: "Attendance",
-      sub: `${inToday} of ${DEMO_STUDENTS.length} in today`,
-    },
-  ];
-
   return (
     <div className="max-w-4xl mx-auto space-y-4 pt-2">
       {/* Greeting — carries the day's actual state and the two things a
           teacher opens this page to do, rather than standing empty. */}
-      <header className="gradient-navy rounded-[18px] px-7 py-6 relative overflow-hidden">
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="eyebrow text-white/45">Asalaamu alaykum</p>
-            <h1 className="page-title text-white text-3xl mt-1.5">
-              {demoUser?.name ?? "Teacher"}
-            </h1>
-            <p className="text-[13px] text-white/55 mt-2.5">
-              {formatDay(today)}
-              <span className="text-white/25 mx-2">·</span>
-              {inToday} of {DEMO_STUDENTS.length} in today
-              <span className="text-white/25 mx-2">·</span>
-              {review.length} to review
-            </p>
-          </div>
-          <div className="flex gap-2.5 flex-shrink-0">
-            <Link
-              href="/teacher/attendance"
-              className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition"
-            >
-              {IconRegister}
+      <PortalHero
+        eyebrow="Asalaamu alaykum"
+        title={demoUser?.name ?? "Teacher"}
+        meta={[
+          formatDay(DEMO_TODAY),
+          `${inToday} of ${DEMO_STUDENTS.length} in today`,
+          `${review.length} to review`,
+        ]}
+        actions={
+          <>
+            <HeroButtonPrimary href="/teacher/attendance" icon={<IconCalendar />}>
               Register
-            </Link>
-            <Link
-              href="/teacher/quran-assignments"
-              className="inline-flex items-center gap-2 rounded-full border border-white/25 px-4 py-2.5 text-[13px] font-semibold text-white/85 hover:bg-white/10 active:scale-[.98] transition"
-            >
-              {IconPen}
+            </HeroButtonPrimary>
+            <HeroButtonGhost href="/teacher/quran-assignments" icon={<IconPen />}>
               Assign
-            </Link>
-          </div>
-        </div>
-      </header>
+            </HeroButtonGhost>
+          </>
+        }
+      />
 
       {/* At a glance — each number carries the context that makes it mean
-          something, instead of standing on its own. */}
+          something, and opens the list it is counting. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {stats.map((s, idx) => (
-          <button
-            key={s.label}
-            type="button"
-            onClick={() => {
-              if (idx === 0) scrollToSection(registerRef); // Students
-              if (idx === 1) scrollToSection(reviewRef); // Active work
-              if (idx === 2) scrollToSection(reviewRef); // To review
-              if (idx === 3) scrollToSection(registerRef); // Attendance
-            }}
-            className="card-quiet px-4 py-4 text-left hover:bg-surface-bg-warm transition-colors active:scale-[.98] cursor-pointer"
-          >
-            <p className="text-[26px] font-bold text-ink tabular-nums leading-none">
-              {s.value}
-            </p>
-            <p className="eyebrow mt-2 whitespace-nowrap">{s.label}</p>
-            <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{s.sub}</p>
-          </button>
-        ))}
+        <StatTile
+          value={DEMO_STUDENTS.length}
+          label="Students"
+          sub={halaqas
+            .map(
+              (h) =>
+                `${DEMO_STUDENTS.filter((s) => s.halaqa === h).length} in ${h.replace("Halaqa ", "")}`
+            )
+            .join(" · ")}
+          onClick={() => setDrilldown("students")}
+        />
+        <StatTile
+          value={active.length}
+          label="Active work"
+          sub={dueThisWeek > 0 ? `${dueThisWeek} due this week` : "nothing due this week"}
+          onClick={() => setDrilldown("active")}
+        />
+        <StatTile
+          value={review.length}
+          label="To review"
+          sub={reviewDue ? `oldest due ${formatDay(reviewDue)}` : "all clear"}
+          onClick={() => setDrilldown("review")}
+        />
+        <StatTile
+          value={`${avgAttendance}%`}
+          label="Attendance"
+          sub={`${inToday} of ${DEMO_STUDENTS.length} in today`}
+          onClick={() => setDrilldown("attendance")}
+        />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
         {/* Today's register — the outcome and the exceptions, so the teacher
             can see who needs chasing without opening the page. */}
-        <section ref={registerRef} className="card-quiet p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="page-title text-lg">Today&apos;s register</h2>
-            <span className="eyebrow flex-shrink-0">{formatDay(today)}</span>
+        <SectionCard title="Today's register" note={formatDay(DEMO_TODAY)}>
+          <div className="-mt-1 mb-4">
+            <AttendanceLegend counts={todayCounts} />
           </div>
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3">
-            {(["present", "late", "absent", "excused"] as AttendanceStatus[])
-              .filter((s) => tally(s) > 0)
-              .map((s) => (
-                <span key={s} className="inline-flex items-center gap-1.5 text-[12px]">
-                  <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[s]}`} />
-                  <span className="tabular-nums font-semibold text-ink">{tally(s)}</span>
-                  <span className="text-ink-muted">{s}</span>
-                </span>
-              ))}
-          </div>
-
-          <div className="gold-rule my-4" />
 
           {exceptions.length === 0 ? (
-            <p className="text-[13px] text-ink-muted py-2">
-              Everyone was present today.
-            </p>
+            <EmptyNote>Everyone was present today.</EmptyNote>
           ) : (
             <ul className="space-y-1">
               {exceptions.map(({ student, status }) => (
@@ -263,26 +183,15 @@ export default function TeacherDashboard() {
           >
             Open register
             <span className="group-hover:translate-x-0.5 transition-transform">
-              {IconArrow}
+              <IconArrow size={14} />
             </span>
           </Link>
-        </section>
+        </SectionCard>
 
         {/* The review queue itself, not a link to where it lives. */}
-        <section ref={reviewRef} className="card-quiet p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="page-title text-lg">Needs review</h2>
-            <span className="eyebrow flex-shrink-0 tabular-nums">
-              {review.length} waiting
-            </span>
-          </div>
-
-          <div className="gold-rule my-4" />
-
+        <SectionCard title="Needs review" note={`${review.length} waiting`}>
           {review.length === 0 ? (
-            <p className="text-[13px] text-ink-muted py-2">
-              Nothing waiting on you.
-            </p>
+            <EmptyNote>Nothing waiting on you.</EmptyNote>
           ) : (
             <ul className="space-y-1">
               {review.map((a) => {
@@ -333,10 +242,10 @@ export default function TeacherDashboard() {
           >
             Open assignments
             <span className="group-hover:translate-x-0.5 transition-transform">
-              {IconArrow}
+              <IconArrow size={14} />
             </span>
           </Link>
-        </section>
+        </SectionCard>
       </div>
 
       {/* The Mushaf has no state to summarise, so it stays a link — but a
@@ -345,7 +254,9 @@ export default function TeacherDashboard() {
         href="/teacher/mushaf"
         className="card-quiet card-feature group flex items-center gap-3.5 px-5 py-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
       >
-        <span className="icon-tile flex-shrink-0">{IconBook}</span>
+        <span className="icon-tile flex-shrink-0">
+          <IconBook size={19} />
+        </span>
         <span className="flex-1 min-w-0">
           <span className="block page-title text-[15px]">Mushaf</span>
           <span className="block text-[12px] text-ink-muted">
@@ -353,7 +264,7 @@ export default function TeacherDashboard() {
           </span>
         </span>
         <span className="text-ink-muted group-hover:translate-x-0.5 group-hover:text-ink transition-all flex-shrink-0">
-          {IconArrow}
+          <IconArrow size={14} />
         </span>
       </Link>
 
@@ -373,6 +284,15 @@ export default function TeacherDashboard() {
         </p>
         <p className="text-[11px] text-ink-muted mt-2">Prophet Muhammad &#xFDFA;</p>
       </section>
+
+      {/* A stat opens its list; a name in that list opens the student. */}
+      {drilldown && !selectedStudentId && (
+        <TeacherDrilldown
+          view={drilldown}
+          onClose={() => setDrilldown(null)}
+          onSelectStudent={(id) => setSelectedStudentId(id)}
+        />
+      )}
 
       {selectedStudentId && (
         <StudentDetailPanel

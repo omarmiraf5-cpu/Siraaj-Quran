@@ -6,87 +6,86 @@ export default function TajweedReferencePage() {
   const rules = getAllTajweedRules();
 
   return (
-    <div className="px-4 pt-4 pb-20 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-ink mb-1">🎨 Tajweed Rules</h1>
-        <p className="text-ink-muted">Learn the rules of Quranic recitation</p>
-      </div>
-
-      {/* Introduction */}
-      <div className="bg-surface-card rounded-3xl border border-surface-border p-6">
-        <p className="text-ink leading-relaxed mb-4">
-          Tajweed is the art of reciting the Quran with proper pronunciation and rules.
-          These colors help you identify important recitation rules as you study.
-        </p>
-        <div className="bg-blue-50 dark:bg-blue-950/25 rounded-2xl border border-blue-200 dark:border-blue-800/40 p-4">
-          <p className="text-sm text-blue-700 dark:text-blue-300">
-            💡 <strong>Tip:</strong> Hover over colored letters in the Quran to see which rule applies!
+    <div className="px-4 pt-4 pb-4 space-y-4">
+      <header className="gradient-navy rounded-[18px] px-6 py-6 relative overflow-hidden">
+        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
+        <div className="relative">
+          <p className="eyebrow text-white/45">Reference</p>
+          <h1 className="page-title text-white text-3xl mt-1.5">Tajweed</h1>
+          <p className="text-[13px] text-white/55 mt-2.5">
+            {rules.length} rules
+            <span className="text-white/25 mx-2">·</span>
+            the colours in your Mushaf and what each one means
           </p>
         </div>
-      </div>
+      </header>
 
-      {/* Rules Grid */}
-      <div className="space-y-4">
+      <section className="card-quiet p-5">
+        <p className="text-[14px] text-ink-body leading-relaxed">
+          Tajweed is the art of reciting the Qur&apos;an with the pronunciation it
+          was revealed with. Every coloured letter in your Mushaf is one of these
+          rules — tap or hover it while you read to see which.
+        </p>
+      </section>
+
+      <div className="space-y-3">
         {rules.map((rule) => (
-          <div
-            key={rule.id}
-            className="bg-surface-card rounded-3xl border border-surface-border p-6 space-y-3"
-          >
-            {/* Rule Header with Color */}
+          <article key={rule.id} className="card-quiet p-5">
             <div className="flex items-start gap-3">
-              <div
-                className="w-4 h-4 rounded-full flex-shrink-0 mt-1"
-                style={{ backgroundColor: rule.color }}
+              {/* rule.color is a Tailwind text-* class, not a hex value — it
+                  was being handed to style={{backgroundColor}}, which is not
+                  valid CSS, so every dot rendered hollow. bg-current picks the
+                  colour up from the class instead. */}
+              <span
+                className={`w-3.5 h-3.5 rounded-full flex-shrink-0 mt-1.5 bg-current ${rule.color}`}
+                aria-hidden="true"
               />
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-ink">
-                  {rule.name}
-                </h3>
-                <p className="text-sm text-ink-muted font-arabic" dir="rtl">
-                  {rule.arabicName}
-                </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="page-title text-[17px]">{rule.name}</h2>
+                  <p
+                    className="font-arabic text-[17px] text-ink-muted flex-shrink-0"
+                    dir="rtl"
+                    lang="ar"
+                  >
+                    {rule.arabicName}
+                  </p>
+                </div>
+                <p className="text-[12px] text-ink-muted mt-0.5">{rule.description}</p>
               </div>
             </div>
 
-            {/* Rule Description */}
-            <p className="text-sm text-ink-body">
-              <strong>What it is:</strong> {rule.description}
-            </p>
+            <div className="gold-rule my-4" />
 
-            {/* Rule Details */}
-            <p className="text-sm text-ink leading-relaxed">
-              {rule.details}
-            </p>
+            <p className="text-[13px] text-ink-body leading-relaxed">{rule.details}</p>
 
-            {/* Examples */}
-            <div>
-              <p className="text-xs font-semibold text-ink-muted mb-2">
-                EXAMPLE LETTERS
-              </p>
+            <div className="mt-4">
+              <p className="eyebrow mb-2">Example letters</p>
               <div className="flex flex-wrap gap-2">
                 {rule.examples.map((example) => (
                   <span
                     key={example}
-                    className={`px-3 py-1.5 rounded-full text-sm font-bold font-arabic ${rule.bgColor}`}
+                    className={`px-3 py-1.5 rounded-full text-[15px] font-bold font-arabic ${rule.bgColor}`}
+                    dir="rtl"
+                    lang="ar"
                   >
                     {example}
                   </span>
                 ))}
               </div>
             </div>
-          </div>
+          </article>
         ))}
       </div>
 
-      {/* Practice Tip */}
-      <div className="bg-gradient-to-r from-subject-blue to-subject-blue/70 rounded-3xl p-6 text-white text-center">
-        <p className="text-lg font-bold mb-2">🎯 Practice Tip</p>
-        <p className="text-sm opacity-90">
-          As you read each Ayah, focus on one Tajweed rule at a time.
-          Gradually, proper recitation will become natural!
+      <section className="card-quiet px-6 py-7 text-center">
+        <p className="eyebrow">How to practise</p>
+        <p className="font-serif text-[15px] text-ink-body italic mt-3 max-w-md mx-auto leading-relaxed">
+          Take one rule at a time. Read a single ayah looking only for that
+          colour, then move on. Recitation becomes natural far faster this way
+          than trying to hold every rule at once.
         </p>
-      </div>
+      </section>
     </div>
   );
 }

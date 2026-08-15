@@ -2,96 +2,97 @@
 
 import { useState } from "react";
 import {
-  DEMO_STUDENTS,
+  DEMO_CHILDREN,
   DEMO_ATTENDANCE,
   ATTENDANCE_STYLES,
   ATTENDANCE_LABELS,
   summariseAttendance,
   formatDay,
 } from "@/data/demo";
-
-// A parent normally sees only their own children; two are shown here so the
-// switcher is visible.
-const CHILDREN = DEMO_STUDENTS.slice(0, 2);
+import { PortalHero } from "@/components/PortalHero";
+import {
+  SectionCard,
+  AttendanceStrip,
+  AttendanceLegend,
+  SegmentedSwitch,
+} from "@/components/portal-ui";
 
 export default function ParentAttendancePage() {
-  const [childId, setChildId] = useState(CHILDREN[0].id);
-  const child = CHILDREN.find((c) => c.id === childId)!;
-  const days = DEMO_ATTENDANCE[childId];
+  const [childId, setChildId] = useState(DEMO_CHILDREN[0].id);
+  const child = DEMO_CHILDREN.find((c) => c.id === childId) ?? DEMO_CHILDREN[0];
+  const days = DEMO_ATTENDANCE[childId] ?? [];
   const s = summariseAttendance(days);
 
-  return (
-    <div className="max-w-2xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-ink mb-1">Attendance</h1>
-        <p className="text-sm text-ink-muted">Last {s.total} school days</p>
-      </div>
+  const firstName = child.name.split(" ")[0];
 
-      {CHILDREN.length > 1 && (
-        <div className="grid grid-cols-2 gap-2">
-          {CHILDREN.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setChildId(c.id)}
-              className={`p-3 rounded-2xl text-sm font-semibold transition-all active:scale-[.98] ${
-                childId === c.id
-                  ? "bg-brand-navy text-white"
-                  : "bg-surface-card border border-surface-border text-ink hover:bg-surface-bg"
-              }`}
-            >
-              {c.name}
-            </button>
-          ))}
+  return (
+    <div className="max-w-4xl mx-auto space-y-4 pt-2">
+      <PortalHero
+        eyebrow="Attendance"
+        title={firstName}
+        meta={[child.halaqa, `last ${s.total} school days`, `${s.rate}% present`]}
+      />
+
+      {DEMO_CHILDREN.length > 1 && (
+        <div className="flex items-center gap-3">
+          <span className="eyebrow">Viewing</span>
+          <SegmentedSwitch
+            label="Select child"
+            value={childId}
+            onChange={setChildId}
+            options={DEMO_CHILDREN.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+          />
         </div>
       )}
 
-      {/* Headline rate */}
-      <div className="bg-surface-card rounded-2xl border border-surface-border p-5">
-        <div className="flex items-baseline justify-between mb-3">
-          <span className="text-sm font-semibold text-ink">{child.name}&apos;s attendance</span>
-          <span className="text-3xl font-bold text-ink tabular-nums">{s.rate}%</span>
+      <SectionCard title="Overall" note={`${s.total} days`}>
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-[40px] font-bold text-ink tabular-nums leading-none">{s.rate}%</p>
+            <p className="text-[12px] text-ink-muted mt-2 max-w-xs">
+              {s.rate >= 95
+                ? "Excellent attendance — thank you for your support."
+                : s.rate >= 85
+                  ? "Good, with a little room to improve."
+                  : "Below the school's target of 85%. Please contact the teacher."}
+            </p>
+          </div>
         </div>
-        <div className="h-3 bg-surface-bg rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              s.rate >= 95 ? "bg-green-600" : s.rate >= 85 ? "bg-amber-500" : "bg-red-600"
-            }`}
-            style={{ width: `${s.rate}%` }}
-          />
-        </div>
-        <p className="text-xs text-ink-muted mt-2">
-          {s.rate >= 95
-            ? "Excellent attendance — thank you for your support."
-            : s.rate >= 85
-              ? "Good, with a little room to improve."
-              : "Below the school's target of 85%. Please contact the teacher."}
-        </p>
-      </div>
 
-      {/* Breakdown */}
+        <div className="mt-5">
+          <AttendanceStrip days={days} />
+        </div>
+
+        <div className="mt-4">
+          <AttendanceLegend counts={s} />
+        </div>
+      </SectionCard>
+
       <div className="grid grid-cols-4 gap-2">
         {(["present", "late", "absent", "excused"] as const).map((k) => (
-          <div key={k} className={`rounded-2xl px-2 py-3 text-center ${ATTENDANCE_STYLES[k]}`}>
-            <p className="text-2xl font-bold tabular-nums">{s[k]}</p>
-            <p className="text-[11px] font-semibold mt-0.5">{ATTENDANCE_LABELS[k]}</p>
+          <div key={k} className={`rounded-2xl px-2 py-3.5 text-center ${ATTENDANCE_STYLES[k]}`}>
+            <p className="text-[22px] font-bold tabular-nums leading-none">{s[k]}</p>
+            <p className="text-[10px] font-semibold mt-1.5 uppercase tracking-wider">
+              {ATTENDANCE_LABELS[k]}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Day by day */}
-      <div>
-        <h2 className="font-bold text-ink mb-2 text-sm">Recent days</h2>
-        <div className="bg-surface-card rounded-2xl border border-surface-border divide-y divide-surface-border overflow-hidden">
+      <SectionCard title="Day by day" note={`${s.total} days`}>
+        <ul className="divide-y divide-surface-border -my-1">
           {days.map((d) => (
-            <div key={d.date} className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-sm text-ink">{formatDay(d.date)}</span>
-              <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ATTENDANCE_STYLES[d.status]}`}>
+            <li key={d.date} className="flex items-center justify-between py-2.5">
+              <span className="text-[13px] text-ink">{formatDay(d.date)}</span>
+              <span
+                className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${ATTENDANCE_STYLES[d.status]}`}
+              >
                 {ATTENDANCE_LABELS[d.status]}
               </span>
-            </div>
+            </li>
           ))}
-        </div>
-      </div>
+        </ul>
+      </SectionCard>
     </div>
   );
 }

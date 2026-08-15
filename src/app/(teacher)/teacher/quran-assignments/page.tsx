@@ -2,9 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
-import { DEMO_ASSIGNMENTS, DEMO_STUDENTS, studentName, initials } from "@/data/demo";
+import {
+  DEMO_ASSIGNMENTS,
+  DEMO_STUDENTS,
+  studentName,
+  initials,
+  formatDay,
+  ASSIGNMENT_LABELS,
+  ASSIGNMENT_STYLES,
+} from "@/data/demo";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
+import { PortalHero } from "@/components/PortalHero";
+import { SectionCard, ProgressBar } from "@/components/portal-ui";
+import { IconBook } from "@/components/icons";
 
 interface Student {
   id: string;
@@ -105,15 +116,19 @@ export default function QuranAssignmentsPage() {
   const canPreview = selectedSurah && ayahStart && ayahEnd;
 
   return (
-    <div className="px-4 pt-4 pb-20 space-y-6">
-      <div>
-        <h1 className="page-title text-3xl mb-1">Assignments</h1>
-        <p className="text-ink-muted">Assign Surah and Ayahs to students</p>
-      </div>
+    <div className="max-w-4xl mx-auto pb-20 space-y-4 pt-2">
+      <PortalHero
+        eyebrow="Set work"
+        title="Assignments"
+        meta={[
+          `${students.length} students`,
+          `${DEMO_ASSIGNMENTS.length} set this term`,
+        ]}
+      />
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="card-quiet p-5 space-y-5">
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
               Student *
@@ -199,9 +214,10 @@ export default function QuranAssignmentsPage() {
             <button
               type="button"
               onClick={() => setShowPreview(true)}
-              className="w-full bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 font-semibold py-3 rounded-2xl transition-all hover:bg-amber-200 dark:hover:bg-amber-900/50 active:scale-[.98]"
+              className="w-full inline-flex items-center justify-center gap-2 border border-brand-gold/45 bg-brand-gold/12 text-[#6f5518] dark:text-brand-gold font-semibold py-3 rounded-2xl transition-all hover:bg-brand-gold/20 active:scale-[.98]"
             >
-              👁 Preview Mushaf
+              <IconBook size={16} />
+              Preview in the Mushaf
             </button>
           )}
 
@@ -256,16 +272,19 @@ export default function QuranAssignmentsPage() {
         {/* Mushaf Preview Panel */}
         <div className="lg:sticky lg:top-10 lg:self-start">
           {showPreview && canPreview ? (
-            <div className="bg-surface-card rounded-3xl border border-surface-border p-6 overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-ink">Mushaf Preview</h2>
+            <div className="card-quiet p-5 overflow-hidden">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="page-title text-lg">
+                  {selectedSurahData?.englishName ?? "Preview"}
+                </h2>
                 <button
                   onClick={() => setShowPreview(false)}
-                  className="text-xs text-ink-muted hover:text-ink transition"
+                  className="text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors flex-shrink-0"
                 >
                   Close
                 </button>
               </div>
+              <div className="gold-rule my-4" />
               <Mushaf
                 initialPage={selectedSurahData?.startPage ?? 1}
                 highlightedRange={{
@@ -276,13 +295,14 @@ export default function QuranAssignmentsPage() {
               />
             </div>
           ) : (
-            <div className="bg-surface-card rounded-3xl border border-surface-border p-8 text-center">
+            <div className="card-quiet card-feature p-8 text-center">
               <span className="icon-tile mx-auto mb-4">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+                <IconBook size={19} />
               </span>
-              <h3 className="page-title text-lg mb-2">Mushaf Preview</h3>
-              <p className="text-sm text-ink-muted">
-                Select a Surah and Ayah range, then tap &ldquo;Preview Mushaf&rdquo; to see the Tajweed-highlighted text your student will study.
+              <h3 className="page-title text-lg mb-2">Mushaf preview</h3>
+              <p className="text-[13px] text-ink-muted leading-relaxed max-w-xs mx-auto">
+                Pick a surah and an ayah range, then preview it to see exactly
+                the Tajweed-highlighted text your student will study.
               </p>
             </div>
           )}
@@ -291,57 +311,47 @@ export default function QuranAssignmentsPage() {
 
       {/* What has already been set. Sample data until the school has its own
           records; the create form above writes real ones. */}
-      <div className="space-y-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="page-title text-lg">Current assignments</h2>
-          <span className="text-[11px] text-ink-muted">{DEMO_ASSIGNMENTS.length} across all students</span>
-        </div>
-
-        <div className="bg-surface-card rounded-2xl border border-surface-border divide-y divide-surface-border overflow-hidden">
+      <SectionCard
+        title="Current assignments"
+        note={`${DEMO_ASSIGNMENTS.length} across all students`}
+      >
+        <ul className="divide-y divide-surface-border -my-1">
           {DEMO_ASSIGNMENTS.map((a) => {
             const surah = getSurahById(a.surah);
             const name = studentName(a.student_id);
-            const chip = {
-              assigned: "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300",
-              in_progress: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300",
-              completed: "bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300",
-              needs_review: "bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300",
-            }[a.status];
 
             return (
-              <div key={a.id} className="flex items-center gap-3 px-3 py-3">
-                <div className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-xs flex-shrink-0">
+              <li key={a.id} className="flex items-center gap-3 py-3">
+                <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
                   {initials(name)}
-                </div>
+                </span>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-ink truncate">{name}</p>
+                  <p className="text-[13px] font-semibold text-ink truncate">{name}</p>
                   <p className="text-[11px] text-ink-muted truncate">
-                    {surah ? surah.englishName : `Surah ${a.surah}`} · ayahs {a.ayah_start}–{a.ayah_end}
-                    {a.due_date ? ` · due ${a.due_date}` : ""}
+                    {surah ? surah.englishName : `Surah ${a.surah}`} · ayahs{" "}
+                    {a.ayah_start}–{a.ayah_end}
+                    {a.due_date ? ` · due ${formatDay(a.due_date)}` : ""}
                   </p>
                 </div>
 
                 <div className="w-16 flex-shrink-0 hidden sm:block">
-                  <div className="h-1.5 bg-surface-bg rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-600 rounded-full"
-                      style={{ width: `${a.memorization_level}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-ink-muted text-right mt-0.5 tabular-nums">
+                  <ProgressBar value={a.memorization_level} />
+                  <p className="text-[10px] text-ink-muted text-right mt-1 tabular-nums">
                     {a.memorization_level}%
                   </p>
                 </div>
 
-                <span className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 ${chip}`}>
-                  {a.status.replace("_", " ")}
+                <span
+                  className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${ASSIGNMENT_STYLES[a.status]}`}
+                >
+                  {ASSIGNMENT_LABELS[a.status]}
                 </span>
-              </div>
+              </li>
             );
           })}
-        </div>
-      </div>
+        </ul>
+      </SectionCard>
     </div>
   );
 }
