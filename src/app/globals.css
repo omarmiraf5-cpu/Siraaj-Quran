@@ -415,6 +415,17 @@ body {
   .dark .illum-vermilion { --tint-ink: #e5967f; }
   .dark .illum-aubergine { --tint-ink: #cf95bd; }
 
+  /* ── Illumination gradients ───────────────────────────────────────────
+     The full-strength version of the palette, for tiles that are meant to
+     be the brightest thing on the page. The tinted .illum-* tiles above
+     are for small marks; these are for the big ones. */
+  .grad-lapis { background: linear-gradient(145deg, #4a7fd0 0%, #2f5ea8 55%, #23477e 100%); }
+  .grad-turquoise { background: linear-gradient(145deg, #2fadbf 0%, #1f8b9b 55%, #176a76 100%); }
+  .grad-verdigris { background: linear-gradient(145deg, #2fae8a 0%, #1f8a6d 55%, #176954 100%); }
+  .grad-saffron { background: linear-gradient(145deg, #e8b043 0%, #d2941f 55%, #a37317 100%); }
+  .grad-vermilion { background: linear-gradient(145deg, #d97258 0%, #c4553c 55%, #9b432f 100%); }
+  .grad-aubergine { background: linear-gradient(145deg, #a4568f 0%, #834272 55%, #66335a 100%); }
+
   /* ── Student slider ───────────────────────────────────────────────────
      The one control a child actually drags, so the thumb is a target you
      can hit with a thumb rather than the 12px default. Both vendor

@@ -121,6 +121,21 @@ export const IconPalette = icon(
   </>
 );
 
+export const IconPlay = icon(
+  <>
+    <path d="M8 5.5v13l11-6.5Z" fill="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+  </>
+);
+
+// An open book, for the student tiles — the closed spine of IconBook reads
+// as "a book" but an open one reads as "reading", which is the action.
+export const IconBookOpen = icon(
+  <>
+    <path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z" />
+    <path d="M12 6.5v13.2" />
+  </>
+);
+
 export const IconX = icon(
   <>
     <path d="M18 6 6 18M6 6l12 12" />
