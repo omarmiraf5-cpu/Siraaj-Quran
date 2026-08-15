@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
@@ -62,6 +62,12 @@ const utc = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
 export default function TeacherDashboard() {
   const demoUser = useDemoUser();
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const registerRef = useRef<HTMLElement>(null);
+  const reviewRef = useRef<HTMLElement>(null);
+
+  const scrollToSection = (ref: React.RefObject<HTMLElement>) => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   // "Today" is the most recent day in the register, not the real date. These
   // pages prerender, so a value that differs between server and client is a
@@ -172,21 +178,29 @@ export default function TeacherDashboard() {
       {/* At a glance — each number carries the context that makes it mean
           something, instead of standing on its own. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {stats.map((s) => (
-          <div key={s.label} className="card-quiet px-4 py-4">
+        {stats.map((s, idx) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => {
+              if (idx === 3) scrollToSection(registerRef); // Attendance
+              if (idx === 2) scrollToSection(reviewRef); // To review
+            }}
+            className="card-quiet px-4 py-4 text-left hover:bg-surface-bg-warm transition-colors active:scale-[.98]"
+          >
             <p className="text-[26px] font-bold text-ink tabular-nums leading-none">
               {s.value}
             </p>
             <p className="eyebrow mt-2 whitespace-nowrap">{s.label}</p>
             <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{s.sub}</p>
-          </div>
+          </button>
         ))}
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
         {/* Today's register — the outcome and the exceptions, so the teacher
             can see who needs chasing without opening the page. */}
-        <section className="card-quiet p-5">
+        <section ref={registerRef} className="card-quiet p-5">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="page-title text-lg">Today&apos;s register</h2>
             <span className="eyebrow flex-shrink-0">{formatDay(today)}</span>
@@ -253,7 +267,7 @@ export default function TeacherDashboard() {
         </section>
 
         {/* The review queue itself, not a link to where it lives. */}
-        <section className="card-quiet p-5">
+        <section ref={reviewRef} className="card-quiet p-5">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="page-title text-lg">Needs review</h2>
             <span className="eyebrow flex-shrink-0 tabular-nums">
