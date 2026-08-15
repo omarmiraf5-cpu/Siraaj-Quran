@@ -5,7 +5,6 @@ import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
 import { DEMO_ASSIGNMENTS, DEMO_STUDENTS, studentName, initials } from "@/data/demo";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 
 interface Student {
   id: string;
@@ -13,7 +12,6 @@ interface Student {
 }
 
 export default function QuranAssignmentsPage() {
-  const router = useRouter();
   const supabase = createClient();
   const surahs = QURAN;
   const [students, setStudents] = useState<Student[]>([]);
@@ -31,23 +29,10 @@ export default function QuranAssignmentsPage() {
   useEffect(() => {
     const loadStudents = async () => {
       try {
-        // Signing in as a demo account stores a local user rather than a
-        // Supabase session, so checking Supabase alone bounced demo teachers
-        // straight back to the login page and made this screen unreachable.
-        // Read it here rather than through useDemoUser: that hook fills in
-        // from an effect, so it is still null on the first run and would
-        // redirect before the demo account was seen.
-        const isDemo =
-          typeof window !== "undefined" && !!localStorage.getItem("demo_user");
-
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user && !isDemo) {
-          router.push("/login");
-          return;
-        }
 
         if (!user) {
-          // Demo mode: no database to read, so use the sample roster.
+          // Demo mode or no auth: use the sample roster.
           setStudents(DEMO_STUDENTS.map((s) => ({ id: s.id, full_name: s.name })));
           return;
         }

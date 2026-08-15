@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
@@ -12,6 +13,7 @@ import {
   type AttendanceStatus,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
+import { StudentDetailPanel } from "@/components/StudentDetailPanel";
 
 const IconBook = (
   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -59,6 +61,7 @@ const utc = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
 
 export default function TeacherDashboard() {
   const demoUser = useDemoUser();
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // "Today" is the most recent day in the register, not the real date. These
   // pages prerender, so a value that differs between server and client is a
@@ -208,25 +211,31 @@ export default function TeacherDashboard() {
               Everyone was present today.
             </p>
           ) : (
-            <ul className="space-y-2.5">
+            <ul className="space-y-1">
               {exceptions.map(({ student, status }) => (
-                <li key={student.id} className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
-                    {initials(student.name)}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-semibold text-ink truncate">
-                      {student.name}
-                    </span>
-                    <span className="block text-[11px] text-ink-muted">
-                      {student.halaqa}
-                    </span>
-                  </span>
-                  <span
-                    className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}
+                <li key={student.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudentId(student.id)}
+                    className="w-full flex items-center gap-3 text-left rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
                   >
-                    {status}
-                  </span>
+                    <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
+                      {initials(student.name)}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[13px] font-semibold text-ink truncate">
+                        {student.name}
+                      </span>
+                      <span className="block text-[11px] text-ink-muted">
+                        {student.halaqa}
+                      </span>
+                    </span>
+                    <span
+                      className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}
+                    >
+                      {status}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -259,37 +268,43 @@ export default function TeacherDashboard() {
               Nothing waiting on you.
             </p>
           ) : (
-            <ul className="space-y-3.5">
+            <ul className="space-y-1">
               {review.map((a) => {
                 const surah = getSurahById(a.surah);
                 const student = DEMO_STUDENTS.find((s) => s.id === a.student_id);
                 return (
-                  <li key={a.id} className="flex gap-3">
-                    <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
-                      {initials(student?.name ?? "?")}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">
-                        {student?.name ?? "Student"}
-                      </p>
-                      <p className="text-[12px] text-ink-body">
-                        {surah ? surah.englishName : `Surah ${a.surah}`}
-                        <span className="text-ink-muted">
-                          {" "}
-                          · ayahs {a.ayah_start}–{a.ayah_end}
-                        </span>
-                      </p>
-                      {a.teacher_notes && (
-                        <p className="text-[11px] text-ink-muted mt-1 line-clamp-2 leading-snug">
-                          {a.teacher_notes}
-                        </p>
-                      )}
-                    </div>
-                    {a.due_date && (
-                      <span className="text-[11px] text-ink-muted flex-shrink-0 whitespace-nowrap">
-                        {formatDay(a.due_date)}
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      onClick={() => student && setSelectedStudentId(student.id)}
+                      className="w-full flex gap-3 text-left rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
+                    >
+                      <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
+                        {initials(student?.name ?? "?")}
                       </span>
-                    )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-ink truncate">
+                          {student?.name ?? "Student"}
+                        </p>
+                        <p className="text-[12px] text-ink-body">
+                          {surah ? surah.englishName : `Surah ${a.surah}`}
+                          <span className="text-ink-muted">
+                            {" "}
+                            · ayahs {a.ayah_start}–{a.ayah_end}
+                          </span>
+                        </p>
+                        {a.teacher_notes && (
+                          <p className="text-[11px] text-ink-muted mt-1 line-clamp-2 leading-snug">
+                            {a.teacher_notes}
+                          </p>
+                        )}
+                      </div>
+                      {a.due_date && (
+                        <span className="text-[11px] text-ink-muted flex-shrink-0 whitespace-nowrap">
+                          {formatDay(a.due_date)}
+                        </span>
+                      )}
+                    </button>
                   </li>
                 );
               })}
@@ -342,6 +357,13 @@ export default function TeacherDashboard() {
         </p>
         <p className="text-[11px] text-ink-muted mt-2">Prophet Muhammad &#xFDFA;</p>
       </section>
+
+      {selectedStudentId && (
+        <StudentDetailPanel
+          studentId={selectedStudentId}
+          onClose={() => setSelectedStudentId(null)}
+        />
+      )}
     </div>
   );
 }
