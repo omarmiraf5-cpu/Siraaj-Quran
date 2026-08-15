@@ -183,10 +183,12 @@ export default function TeacherDashboard() {
             key={s.label}
             type="button"
             onClick={() => {
-              if (idx === 3) scrollToSection(registerRef); // Attendance
+              if (idx === 0) scrollToSection(registerRef); // Students
+              if (idx === 1) scrollToSection(reviewRef); // Active work
               if (idx === 2) scrollToSection(reviewRef); // To review
+              if (idx === 3) scrollToSection(registerRef); // Attendance
             }}
-            className="card-quiet px-4 py-4 text-left hover:bg-surface-bg-warm transition-colors active:scale-[.98]"
+            className="card-quiet px-4 py-4 text-left hover:bg-surface-bg-warm transition-colors active:scale-[.98] cursor-pointer"
           >
             <p className="text-[26px] font-bold text-ink tabular-nums leading-none">
               {s.value}
