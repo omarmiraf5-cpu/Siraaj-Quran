@@ -7,7 +7,7 @@ export default function TajweedReferencePage() {
 
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
-      <header className="gradient-navy rounded-[18px] px-6 py-6 relative overflow-hidden">
+      <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
         <div className="relative">
           <p className="eyebrow text-white/45">Reference</p>
@@ -29,8 +29,12 @@ export default function TajweedReferencePage() {
       </section>
 
       <div className="space-y-3">
-        {rules.map((rule) => (
-          <article key={rule.id} className="card-quiet p-5">
+        {rules.map((rule, i) => (
+          <article
+            key={rule.id}
+            className="card-quiet p-5 animate-rise"
+            style={{ animationDelay: `${60 + i * 55}ms` }}
+          >
             <div className="flex items-start gap-3">
               {/* rule.color is a Tailwind text-* class, not a hex value — it
                   was being handed to style={{backgroundColor}}, which is not

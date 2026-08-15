@@ -120,6 +120,30 @@
   .student-hero-girl {
     background: linear-gradient(160deg, #4a2350 0%, #3c1c46 50%, #2b1435 100%);
   }
+  /* Cards arrive in sequence rather than all at once. The delay is set
+     per-card inline, so the page assembles itself in the order you read it. */
+  .animate-rise {
+    animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  /* A slow gold sweep across the streak badge — the one piece of the student
+     portal that is purely a reward, so it is the one piece that shines. */
+  .shine {
+    position: relative;
+    overflow: hidden;
+  }
+  .shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      110deg,
+      transparent 25%,
+      rgba(255, 255, 255, 0.42) 48%,
+      transparent 62%
+    );
+    transform: translateX(-100%);
+    animation: sweep 3.6s ease-in-out infinite;
+  }
   .animate-gentle-spin {
     animation: gentleSpin 8s linear infinite;
   }
@@ -131,6 +155,33 @@
   }
   .animate-drift {
     animation: drift 4s ease-in-out infinite;
+  }
+}
+
+@keyframes rise {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes sweep {
+  0%, 55% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Everything above is decoration. Anyone who has asked their system to stop
+   moving things gets the layout without the motion. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .shine::after,
+  .animate-float,
+  .animate-gentle-spin,
+  .animate-gentle-wobble,
+  .animate-drift,
+  .animate-pulse-soft {
+    animation: none;
+  }
+  .animate-rise {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -303,6 +354,106 @@ body {
   .gold-rule {
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--c-gold-soft), transparent);
+  }
+
+  /* ── Illumination tiles ───────────────────────────────────────────────
+     The student portal's colour. Each is a tinted tile with a matching
+     stroke, in the manner of an illuminated border rather than a flat
+     block of primary. One class sets fill, edge and icon colour together
+     so a caller cannot pair a tint with the wrong text. */
+  .illum {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    background: linear-gradient(140deg, var(--tint-strong), var(--tint-soft));
+    border: 1px solid var(--tint-edge);
+    color: var(--tint-ink);
+  }
+  .illum-lapis {
+    --tint-strong: rgba(47, 94, 168, 0.30);
+    --tint-soft: rgba(47, 94, 168, 0.16);
+    --tint-edge: rgba(47, 94, 168, 0.46);
+    --tint-ink: #24487f;
+  }
+  .illum-turquoise {
+    --tint-strong: rgba(31, 139, 155, 0.30);
+    --tint-soft: rgba(31, 139, 155, 0.16);
+    --tint-edge: rgba(31, 139, 155, 0.46);
+    --tint-ink: #176a76;
+  }
+  .illum-verdigris {
+    --tint-strong: rgba(31, 138, 109, 0.30);
+    --tint-soft: rgba(31, 138, 109, 0.16);
+    --tint-edge: rgba(31, 138, 109, 0.46);
+    --tint-ink: #176954;
+  }
+  .illum-saffron {
+    --tint-strong: rgba(210, 148, 31, 0.34);
+    --tint-soft: rgba(210, 148, 31, 0.18);
+    --tint-edge: rgba(210, 148, 31, 0.50);
+    --tint-ink: #8a6014;
+  }
+  .illum-vermilion {
+    --tint-strong: rgba(196, 85, 60, 0.30);
+    --tint-soft: rgba(196, 85, 60, 0.16);
+    --tint-edge: rgba(196, 85, 60, 0.46);
+    --tint-ink: #93402d;
+  }
+  .illum-aubergine {
+    --tint-strong: rgba(131, 66, 114, 0.30);
+    --tint-soft: rgba(131, 66, 114, 0.16);
+    --tint-edge: rgba(131, 66, 114, 0.46);
+    --tint-ink: #663355;
+  }
+  /* On the dark ground the tints need to lift rather than sink, and the ink
+     has to come back up to the light end of each hue. */
+  .dark .illum-lapis { --tint-ink: #8fb4e8; }
+  .dark .illum-turquoise { --tint-ink: #79cbd8; }
+  .dark .illum-verdigris { --tint-ink: #74ccae; }
+  .dark .illum-saffron { --tint-ink: #e6bc6b; }
+  .dark .illum-vermilion { --tint-ink: #e5967f; }
+  .dark .illum-aubergine { --tint-ink: #cf95bd; }
+
+  /* ── Student slider ───────────────────────────────────────────────────
+     The one control a child actually drags, so the thumb is a target you
+     can hit with a thumb rather than the 12px default. Both vendor
+     prefixes are needed; they cannot be combined into one rule, because a
+     selector any browser fails to parse invalidates the whole block. */
+  .student-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--c-surface-bg);
+    border: 1px solid var(--c-surface-border);
+    outline: none;
+    cursor: pointer;
+  }
+  .student-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: linear-gradient(140deg, #d9bd74, #c6a253);
+    border: 2px solid var(--c-surface-card);
+    box-shadow: 0 2px 6px rgba(60, 48, 28, 0.3);
+    transition: transform 0.15s ease;
+  }
+  .student-range::-webkit-slider-thumb:active {
+    transform: scale(1.15);
+  }
+  .student-range::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: linear-gradient(140deg, #d9bd74, #c6a253);
+    border: 2px solid var(--c-surface-card);
+    box-shadow: 0 2px 6px rgba(60, 48, 28, 0.3);
+  }
+  .student-range:focus-visible {
+    box-shadow: 0 0 0 3px var(--c-gold-soft);
   }
 
   /* Icon tile replacing the emoji that were doing this job. The gold sat so

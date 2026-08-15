@@ -45,6 +45,19 @@ const config: Config = {
           blue: "#3d9dff",
           pink: "#ff5e8a",
         },
+        // Illumination palette — the colours a Qur'anic manuscript is
+        // decorated with: lapis, verdigris, saffron, vermilion, aubergine.
+        // The student portal wants to be colourful, and these are bright
+        // without being the default Tailwind primaries, so they sit on the
+        // cream ground and beside the gold instead of shouting over them.
+        illum: {
+          lapis: "#2f5ea8",
+          turquoise: "#1f8b9b",
+          verdigris: "#1f8a6d",
+          saffron: "#d2941f",
+          vermilion: "#c4553c",
+          aubergine: "#834272",
+        },
       },
       fontFamily: {
         sans: ["var(--font-jakarta)", "system-ui", "sans-serif"],

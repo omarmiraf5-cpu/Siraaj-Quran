@@ -121,6 +121,18 @@ export const IconPalette = icon(
   </>
 );
 
+export const IconX = icon(
+  <>
+    <path d="M18 6 6 18M6 6l12 12" />
+  </>
+);
+
+export const IconStar = icon(
+  <>
+    <path d="M12 3.2l2.5 5.2 5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4 5.7-.8Z" />
+  </>
+);
+
 export const IconNote = icon(
   <>
     <path d="M4 4a2 2 0 0 1 2-2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />

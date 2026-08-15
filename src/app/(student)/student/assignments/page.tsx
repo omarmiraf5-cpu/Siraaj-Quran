@@ -7,9 +7,15 @@ import {
   demoAssignmentsFor,
   dueLabel,
   ASSIGNMENT_LABELS,
-  ASSIGNMENT_STYLES,
 } from "@/data/demo";
-import { ProgressBar, TeacherNote, EmptyNote } from "@/components/portal-ui";
+import { TeacherNote, EmptyNote } from "@/components/portal-ui";
+import {
+  ProgressRing,
+  ILLUM_CLASS,
+  STATUS_COLOUR,
+  surahColour,
+} from "@/components/student-ui";
+import { IconCheck } from "@/components/icons";
 
 export default function StudentAssignmentsPage() {
   const all = demoAssignmentsFor(DEMO_CURRENT_STUDENT.id);
@@ -24,16 +30,21 @@ export default function StudentAssignmentsPage() {
 
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
-      <header className="gradient-navy rounded-[18px] px-6 py-6 relative overflow-hidden">
+      <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="relative">
-          <p className="eyebrow text-white/45">Your work</p>
-          <h1 className="page-title text-white text-3xl mt-1.5">Assignments</h1>
-          <p className="text-[13px] text-white/55 mt-2.5">
-            {done} of {all.length} finished
-            <span className="text-white/25 mx-2">·</span>
-            {overall}% memorised overall
-          </p>
+        <div className="relative flex items-center gap-5">
+          <div className="min-w-0 flex-1">
+            <p className="eyebrow text-white/45">Your work</p>
+            <h1 className="page-title text-white text-[30px] mt-1 leading-tight">Assignments</h1>
+            <p className="text-[13px] text-white/55 mt-1.5">
+              {done} of {all.length} finished
+            </p>
+          </div>
+          <div className="flex-shrink-0 rounded-full bg-white/10 p-2 backdrop-blur-sm">
+            <div className="rounded-full bg-surface-card p-1.5">
+              <ProgressRing value={overall} colour="saffron" size={72} label="learnt" />
+            </div>
+          </div>
         </div>
       </header>
 
@@ -43,49 +54,69 @@ export default function StudentAssignmentsPage() {
         </div>
       )}
 
-      {all.map((a) => {
+      {all.map((a, i) => {
         const surah = getSurahById(a.surah);
         // Nothing is overdue once it is finished.
         const due = a.status === "completed" ? null : dueLabel(a.due_date);
         const level = levels[a.id];
+        const colour = surahColour(a.surah);
+        const isDone = a.status === "completed";
 
         return (
-          <article key={a.id} className="card-quiet p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="page-title text-[17px] truncate">
-                  {surah ? surah.englishName : `Surah ${a.surah}`}
-                </h2>
+          <article
+            key={a.id}
+            className="card-quiet p-5 animate-rise"
+            style={{ animationDelay: `${60 + i * 70}ms` }}
+          >
+            <div className="flex items-center gap-4">
+              <ProgressRing value={level} colour={colour} size={70} />
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="page-title text-[19px] truncate">
+                    {surah ? surah.englishName : `Surah ${a.surah}`}
+                  </h2>
+                  {isDone && (
+                    <span
+                      className={`${ILLUM_CLASS.verdigris} w-6 h-6 rounded-full flex-shrink-0`}
+                      title="Finished"
+                    >
+                      <IconCheck size={13} />
+                    </span>
+                  )}
+                </div>
                 <p className="text-[12px] text-ink-muted mt-0.5">
                   Ayahs {a.ayah_start}–{a.ayah_end}
                   {surah ? ` · page ${surah.startPage}` : ""}
                 </p>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span
+                    className={`${ILLUM_CLASS[STATUS_COLOUR[a.status]]} inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide`}
+                  >
+                    {ASSIGNMENT_LABELS[a.status]}
+                  </span>
+                  {due && (
+                    <span
+                      className={`text-[11px] font-bold ${
+                        due.urgent ? "text-illum-vermilion" : "text-ink-muted"
+                      }`}
+                    >
+                      {due.text}
+                    </span>
+                  )}
+                </div>
               </div>
-              <span
-                className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${ASSIGNMENT_STYLES[a.status]}`}
-              >
-                {ASSIGNMENT_LABELS[a.status]}
-              </span>
             </div>
-
-            {due && (
-              <p
-                className={`text-[12px] mt-2 font-semibold ${
-                  due.urgent ? "text-red-700 dark:text-red-300" : "text-ink-muted"
-                }`}
-              >
-                {due.text}
-              </p>
-            )}
 
             <div className="gold-rule my-4" />
 
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2.5">
                 <span className="eyebrow">How much you know</span>
                 <span className="text-[13px] font-bold text-ink tabular-nums">{level}%</span>
               </div>
-              <ProgressBar value={level} />
+              {/* Dragging this is the one thing on the page a child changes,
+                  so it gets a thumb big enough to grab. */}
               <input
                 type="range"
                 min={0}
@@ -95,8 +126,8 @@ export default function StudentAssignmentsPage() {
                 onChange={(e) =>
                   setLevels((l) => ({ ...l, [a.id]: Number(e.target.value) }))
                 }
-                aria-label={`Memorisation progress for ${surah?.englishName ?? "surah"}`}
-                className="w-full mt-3 h-1.5 bg-surface-bg rounded-full appearance-none cursor-pointer accent-brand-gold"
+                aria-label={`How much of ${surah?.englishName ?? "this surah"} you know`}
+                className="student-range w-full"
               />
             </div>
 
