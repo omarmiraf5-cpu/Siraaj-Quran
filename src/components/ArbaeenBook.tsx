@@ -132,24 +132,27 @@ function HadithCard({
         <div className="px-4 pb-5">
           <div className="gold-rule mb-4" />
 
-          {/* Arabic first — it is the hadith; the English is a rendering of it. */}
-          <p
-            className="font-arabic text-[21px] md:text-[23px] text-ink leading-[2.15] text-right"
-            dir="rtl"
-            lang="ar"
-          >
-            {hadith.arabic}
-          </p>
+          {/* Arabic first — it is the hadith; the English is a rendering of
+              it. The isnad runs into the matn the way it does in print, so
+              they sit in one block; the matn is darker and larger, because
+              that is the part being memorised. */}
+          <div dir="rtl" lang="ar" className="text-right">
+            <p className="font-arabic text-[17px] md:text-[18px] text-ink-muted leading-[2.1]">
+              {hadith.isnad}
+            </p>
+            <p className="font-arabic text-[21px] md:text-[23px] text-ink leading-[2.15] mt-1">
+              {hadith.arabic}
+            </p>
+          </div>
 
           <div className="gold-rule my-4" />
 
-          <p className="font-serif text-[14px] text-ink-body leading-relaxed italic">
+          <p className="text-[12px] text-ink-muted leading-relaxed">{hadith.isnadEn}</p>
+          <p className="font-serif text-[14px] text-ink-body leading-relaxed italic mt-1.5">
             {hadith.english}
           </p>
 
-          <p className="text-[11px] text-ink-muted mt-3.5">
-            Narrated by {hadith.narrator}
-            <span className="mx-1.5">·</span>
+          <p className="text-[11px] text-ink-muted mt-3.5 pt-3 border-t border-surface-border">
             {hadith.source}
           </p>
         </div>
