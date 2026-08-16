@@ -448,8 +448,9 @@ export function SectionLabel({
 }
 
 /* ── Big friendly tile ─────────────────────────────────────────────────
-   The two navigation cards on the home screen. Bigger tap target and a
-   colour of its own, because a child is aiming with a thumb. */
+   The two navigation cards on the home screen. These are destinations, the
+   same as the surah tiles, so they are painted the same way — they were
+   the one part of the page still reading as a pale chip on white. */
 export function BigTile({
   href,
   colour,
@@ -468,12 +469,50 @@ export function BigTile({
   return (
     <a
       href={href}
-      className="card-quiet card-feature group px-5 py-5 animate-rise transition-all hover:-translate-y-1 hover:shadow-lg active:scale-[.97]"
+      className={`${GRAD_CLASS[colour]} relative overflow-hidden rounded-[20px] px-5 py-5 animate-rise transition-transform hover:-translate-y-1 active:scale-[.97]`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <span className={`${ILLUM_CLASS[colour]} w-12 h-12 mb-3`}>{icon}</span>
-      <span className="block page-title text-[16px]">{title}</span>
-      <span className="block text-[12px] text-ink-muted mt-0.5 leading-snug">{sub}</span>
+      <span className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
+      <span className="relative block w-12 h-12 rounded-2xl bg-white/20 border border-white/25 flex items-center justify-center text-white mb-3">
+        {icon}
+      </span>
+      <span className="relative block page-title text-white text-[16px]">{title}</span>
+      <span className="relative block text-[12px] text-white/70 mt-0.5 leading-snug">{sub}</span>
     </a>
+  );
+}
+
+/* ── XP tile ───────────────────────────────────────────────────────────
+   One source of points. Small and three across, so a solid colour block
+   works where another bordered card would just be more white. */
+export function XpTile({
+  colour,
+  icon,
+  value,
+  label,
+  delay = 0,
+}: {
+  colour: IllumColour;
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+  delay?: number;
+}) {
+  return (
+    <div
+      className={`${GRAD_CLASS[colour]} relative overflow-hidden rounded-[18px] px-3 py-3.5 text-center animate-rise`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <span className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
+      <span className="relative w-8 h-8 rounded-xl bg-white/20 border border-white/25 flex items-center justify-center text-white mx-auto mb-2">
+        {icon}
+      </span>
+      <p className="relative text-[20px] font-bold text-white tabular-nums leading-none">
+        {value}
+      </p>
+      <p className="relative text-[10px] font-bold text-white/70 uppercase tracking-wide mt-1.5">
+        {label}
+      </p>
+    </div>
   );
 }

@@ -24,6 +24,8 @@ import {
   SurahGridTile,
   SectionLabel,
   BigTile,
+  XpTile,
+  ProgressRing,
   ILLUM_CLASS,
   STATUS_COLOUR,
   surahColour,
@@ -188,32 +190,42 @@ export default function StudentDashboard() {
             icon={<IconBookOpen size={15} />}
             value={xp.memorising}
             label="Memorising"
+            delay={300}
           />
           <XpTile
             colour="verdigris"
             icon={<IconCheck size={15} />}
             value={xp.finishing}
             label="Finishing"
+            delay={340}
           />
           <XpTile
             colour="turquoise"
             icon={<IconStar size={15} />}
             value={xp.attending}
             label="Turning up"
+            delay={380}
           />
         </div>
       </div>
 
-      {/* Register */}
+      {/* Register — a ring and a full-height strip, rather than the hairline
+          it was. Kept as a white card so the run of colour above it has
+          somewhere to land. */}
       <div className="space-y-2.5 animate-rise" style={{ animationDelay: "360ms" }}>
-        <SectionCard title="Your register" note={`${summary.rate}%`}>
-          <AttendanceStrip days={attendance} />
-          <p className="text-[12px] text-ink-muted mt-3">
-            {streak > 1
-              ? `You have been in ${streak} days in a row — that is ${streak * 25} XP.`
-              : "Every day you show up is 25 XP."}
-          </p>
-          <p className="text-[11px] text-ink-muted mt-3 pt-3 border-t border-surface-border">
+        <SectionCard title="Your register" note={`last ${Math.min(14, attendance.length)} days`}>
+          <div className="flex items-center gap-4">
+            <ProgressRing value={summary.rate} colour="turquoise" size={64} label="here" />
+            <div className="min-w-0 flex-1">
+              <AttendanceStrip days={attendance} size="lg" />
+              <p className="text-[12px] text-ink-muted mt-2.5">
+                {streak > 1
+                  ? `${streak} days in a row — that is ${streak * 25} XP.`
+                  : "Every day you show up is 25 XP."}
+              </p>
+            </div>
+          </div>
+          <p className="text-[11px] text-ink-muted mt-4 pt-3 border-t border-surface-border">
             {formatDay(DEMO_TODAY)}
             <span className="mx-1.5">·</span>
             {done.length} finished
@@ -252,29 +264,6 @@ export default function StudentDashboard() {
           <IconArrow size={14} />
         </span>
       </Link>
-    </div>
-  );
-}
-
-/* One source of points. */
-function XpTile({
-  colour,
-  icon,
-  value,
-  label,
-}: {
-  colour: keyof typeof ILLUM_CLASS;
-  icon: React.ReactNode;
-  value: number;
-  label: string;
-}) {
-  return (
-    <div className="card-quiet px-3 py-3.5 text-center">
-      <span className={`${ILLUM_CLASS[colour]} w-8 h-8 rounded-xl mx-auto mb-2`}>{icon}</span>
-      <p className="text-[19px] font-bold text-ink tabular-nums leading-none">{value}</p>
-      <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide mt-1.5">
-        {label}
-      </p>
     </div>
   );
 }

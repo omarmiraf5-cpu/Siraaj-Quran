@@ -188,18 +188,27 @@ export function ProgressBar({
 export function AttendanceStrip({
   days,
   limit = 14,
+  size = "sm",
 }: {
   days: AttendanceDay[];
   limit?: number;
+  /** "lg" is for the student portal, where the strip is a feature rather
+      than a footnote and wants to be seen across a room. */
+  size?: "sm" | "lg";
 }) {
   const recent = days.slice(0, limit).slice().reverse();
+  const bar = size === "lg" ? "h-7 rounded-lg" : "h-1.5 rounded-full";
   return (
-    <div className="flex gap-1" role="img" aria-label={`Attendance for the last ${recent.length} days`}>
+    <div
+      className={`flex ${size === "lg" ? "gap-1.5" : "gap-1"}`}
+      role="img"
+      aria-label={`Attendance for the last ${recent.length} days`}
+    >
       {recent.map((d) => (
         <span
           key={d.date}
           title={`${formatDay(d.date)} · ${ATTENDANCE_LABELS[d.status]}`}
-          className={`flex-1 h-1.5 rounded-full ${ATTENDANCE_DOT[d.status]}`}
+          className={`flex-1 ${bar} ${ATTENDANCE_DOT[d.status]}`}
         />
       ))}
     </div>
