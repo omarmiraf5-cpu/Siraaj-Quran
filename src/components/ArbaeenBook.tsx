@@ -143,17 +143,22 @@ function HadithCard({
             <p className="font-arabic text-[21px] md:text-[23px] text-ink leading-[2.15] mt-1">
               {hadith.arabic}
             </p>
+            {/* رَوَاهُ… closes the hadith, set apart from the matn the way it is
+                in print. Hadith 1 runs long here — it names both imams down
+                their full lineage — so it wraps rather than truncating. */}
+            <p className="font-arabic text-[16px] md:text-[17px] text-ink-muted leading-[2.1] mt-2">
+              {hadith.attribution}
+            </p>
           </div>
 
           <div className="gold-rule my-4" />
 
           <p className="text-[12px] text-ink-muted leading-relaxed">{hadith.isnadEn}</p>
-          <p className="font-serif text-[14px] text-ink-body leading-relaxed italic mt-1.5">
+          <p className="font-serif text-[15px] text-ink-body leading-relaxed mt-1.5">
             {hadith.english}
           </p>
-
-          <p className="text-[11px] text-ink-muted mt-3.5 pt-3 border-t border-surface-border">
-            {hadith.source}
+          <p className="text-[12px] text-ink-muted leading-relaxed mt-2">
+            {hadith.attributionEn}
           </p>
         </div>
       )}
