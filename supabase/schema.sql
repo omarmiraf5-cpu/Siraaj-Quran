@@ -262,7 +262,7 @@ create table if not exists quranic_assignments (
   ayah_end             int not null check (ayah_end >= ayah_start),
   -- Which of the three daily portions this is. A hifz student is set all
   -- three each day: the new lesson (الدرس الجديد), the recent revision
-  -- (المراجعة الحديثة) and the old revision (المراجعة القديمة).
+  -- (المراجعة القريبة) and the old revision (المراجعة البعيدة).
   portion              text not null default 'new' check (portion in ('new', 'recent', 'old')),
   assigned_at          timestamptz default now(),
   due_date             date,

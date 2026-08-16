@@ -5,8 +5,8 @@ import { useCallback, useState } from "react";
 /**
  * The three portions a hifz student is set each day:
  * - new    — الدرس الجديد, today's new memorisation
- * - recent — المراجعة الحديثة, revision of what was learnt lately
- * - old    — المراجعة القديمة, the older ground, cycled to keep it
+ * - recent — المراجعة القريبة, revision of what was learnt lately
+ * - old    — المراجعة البعيدة, the older ground, cycled to keep it
  */
 export type HifzPortion = "new" | "recent" | "old";
 

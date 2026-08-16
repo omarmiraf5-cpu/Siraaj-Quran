@@ -251,8 +251,8 @@ export const PORTION_LABELS: Record<HifzPortion, string> = {
 
 export const PORTION_ARABIC: Record<HifzPortion, string> = {
   new: "الدَّرْسُ الْجَدِيدُ",
-  recent: "الْمُرَاجَعَةُ الْحَدِيثَةُ",
-  old: "الْمُرَاجَعَةُ الْقَدِيمَةُ",
+  recent: "الْمُرَاجَعَةُ الْقَرِيبَةُ",
+  old: "الْمُرَاجَعَةُ الْبَعِيدَةُ",
 };
 
 /** What each portion is for, in a line. */
