@@ -370,6 +370,8 @@ export function SurahGridTile({
   detail,
   level,
   href,
+  eyebrow,
+  arabic,
   delay = 0,
 }: {
   colour: IllumColour;
@@ -377,6 +379,10 @@ export function SurahGridTile({
   detail: string;
   level: number;
   href: string;
+  /** Small label above the name — the portion this tile stands for. */
+  eyebrow?: string;
+  /** The portion's Arabic name, under the English. */
+  arabic?: string;
   delay?: number;
 }) {
   const size = 58;
@@ -391,6 +397,21 @@ export function SurahGridTile({
       style={{ animationDelay: `${delay}ms` }}
     >
       <span className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
+
+      {eyebrow && (
+        <span className="relative block text-[9px] font-bold uppercase tracking-wider text-white/70 mb-0.5 leading-tight">
+          {eyebrow}
+        </span>
+      )}
+      {arabic && (
+        <span
+          className="relative block font-arabic text-[12px] text-white/60 mb-2 leading-tight truncate w-full"
+          dir="rtl"
+          lang="ar"
+        >
+          {arabic}
+        </span>
+      )}
 
       <span className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90 absolute inset-0" aria-hidden="true">

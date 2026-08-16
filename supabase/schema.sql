@@ -260,6 +260,10 @@ create table if not exists quranic_assignments (
   surah                int not null check (surah between 1 and 114),
   ayah_start           int not null check (ayah_start >= 1),
   ayah_end             int not null check (ayah_end >= ayah_start),
+  -- Which of the three daily portions this is. A hifz student is set all
+  -- three each day: the new lesson (الدرس الجديد), the recent revision
+  -- (المراجعة الحديثة) and the old revision (المراجعة القديمة).
+  portion              text not null default 'new' check (portion in ('new', 'recent', 'old')),
   assigned_at          timestamptz default now(),
   due_date             date,
   status               text not null default 'assigned' check (status in ('assigned', 'in_progress', 'completed', 'needs_review')),
@@ -269,6 +273,23 @@ create table if not exists quranic_assignments (
   created_at           timestamptz default now(),
   updated_at           timestamptz default now()
 );
+
+-- `create table if not exists` above does nothing to a table that already
+-- exists, so a school running an earlier build needs the column added.
+-- Existing rows become new lessons, which is what a single daily assignment
+-- was standing in for.
+alter table quranic_assignments
+  add column if not exists portion text not null default 'new';
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'quranic_assignments_portion_check'
+  ) then
+    alter table quranic_assignments
+      add constraint quranic_assignments_portion_check
+      check (portion in ('new', 'recent', 'old'));
+  end if;
+end $$;
 alter table quranic_assignments enable row level security;
 create policy "Teachers can manage own quranic assignments" on quranic_assignments
   for all using (teacher_id = auth.uid());

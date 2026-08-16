@@ -1,4 +1,4 @@
-import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
+import type { QuranicAssignment, HifzPortion } from "@/hooks/useQuranicAssignments";
 
 // Sample data used to populate the portals before a school has real records
 // in the database. Every screen draws from this one file so the same students
@@ -118,6 +118,7 @@ export const ATTENDANCE_STYLES: Record<AttendanceStatus, string> = {
 function assignment(
   id: string,
   studentId: string,
+  portion: HifzPortion,
   surah: number,
   from: number,
   to: number,
@@ -134,6 +135,7 @@ function assignment(
     surah,
     ayah_start: from,
     ayah_end: to,
+    portion,
     assigned_at: assigned,
     due_date: due,
     status,
@@ -145,25 +147,56 @@ function assignment(
   };
 }
 
+// Every student carries all three portions, which is how a maktab actually
+// runs: a new lesson to learn, the recent ground to keep warm, and the older
+// ground cycled so it is not lost. The old revision is deliberately the
+// largest range and the new lesson the smallest.
 export const DEMO_ASSIGNMENTS: QuranicAssignment[] = [
-  assignment("a1", "s1", 78, 1, 20, "in_progress", 60, "2026-08-20", "2026-08-06",
+  // Amina Hassan — working down Juz Amma.
+  assignment("a1", "s1", "new", 78, 1, 20, "in_progress", 60, "2026-08-20", "2026-08-12",
     "Careful with the madd in ayah 13 — hold it the full six counts."),
-  assignment("a2", "s1", 1, 1, 7, "completed", 100, "2026-08-08", "2026-07-30",
-    "Beautifully done. Ready to move on."),
-  assignment("a3", "s1", 36, 1, 12, "needs_review", 45, "2026-08-14", "2026-08-04",
+  assignment("a2", "s1", "recent", 79, 1, 26, "needs_review", 45, "2026-08-14", "2026-08-10",
     "Revise ayahs 8 to 12, the endings are running together."),
-  assignment("a4", "s2", 67, 1, 15, "in_progress", 35, "2026-08-22", "2026-08-07", null),
-  assignment("a5", "s2", 112, 1, 4, "completed", 100, "2026-08-05", "2026-07-28",
-    "Excellent tajweed."),
-  assignment("a6", "s3", 55, 1, 25, "assigned", 0, "2026-08-25", "2026-08-11",
-    "Listen to the recitation twice before starting."),
-  assignment("a7", "s4", 2, 255, 257, "in_progress", 70, "2026-08-18", "2026-08-05",
+  assignment("a3", "s1", "old", 67, 1, 30, "completed", 100, "2026-08-16", "2026-07-30",
+    "Beautifully held. This one is settled."),
+
+  // Omar Warsame
+  assignment("a4", "s2", "new", 80, 1, 15, "in_progress", 35, "2026-08-20", "2026-08-12", null),
+  assignment("a5", "s2", "recent", 81, 1, 29, "assigned", 0, "2026-08-18", "2026-08-11",
+    "Listen to the recitation twice before you start."),
+  assignment("a6", "s2", "old", 55, 1, 78, "completed", 95, "2026-08-17", "2026-07-28",
+    "Excellent tajweed throughout."),
+
+  // Safia Abdi
+  assignment("a7", "s3", "new", 55, 1, 25, "assigned", 0, "2026-08-21", "2026-08-12", null),
+  assignment("a8", "s3", "recent", 56, 1, 40, "in_progress", 55, "2026-08-19", "2026-08-09", null),
+  assignment("a9", "s3", "old", 36, 1, 83, "completed", 100, "2026-08-16", "2026-07-27",
+    "Ya-Sin is solid. Keep it in the weekly cycle."),
+
+  // Yusuf Ahmed
+  assignment("a10", "s4", "new", 2, 255, 257, "in_progress", 70, "2026-08-18", "2026-08-12",
     "Ayat al-Kursi — focus on the stops."),
-  assignment("a8", "s5", 18, 1, 10, "assigned", 0, "2026-08-28", "2026-08-12", null),
-  assignment("a9", "s6", 49, 1, 13, "completed", 95, "2026-08-09", "2026-07-29",
+  assignment("a11", "s4", "recent", 18, 1, 10, "needs_review", 40, "2026-08-15", "2026-08-08",
+    "The first ten of Al-Kahf need another week."),
+  assignment("a12", "s4", "old", 78, 1, 40, "completed", 90, "2026-08-17", "2026-07-29", null),
+
+  // Hawa Mohamed
+  assignment("a13", "s5", "new", 18, 1, 10, "assigned", 0, "2026-08-22", "2026-08-12", null),
+  assignment("a14", "s5", "recent", 19, 1, 15, "in_progress", 45, "2026-08-19", "2026-08-10", null),
+  assignment("a15", "s5", "old", 67, 1, 30, "completed", 100, "2026-08-16", "2026-07-31",
+    "Held well. Recite it to your parents this week."),
+
+  // Ibrahim Osman
+  assignment("a16", "s6", "new", 50, 1, 20, "in_progress", 60, "2026-08-20", "2026-08-12", null),
+  assignment("a17", "s6", "recent", 49, 1, 13, "completed", 95, "2026-08-15", "2026-08-07",
     "Very strong. A little more fluency on ayah 11."),
-  assignment("a10", "s7", 93, 1, 11, "needs_review", 55, "2026-08-16", "2026-08-06",
+  assignment("a18", "s6", "old", 78, 1, 40, "completed", 100, "2026-08-17", "2026-07-29", null),
+
+  // Fatuma Ali
+  assignment("a19", "s7", "new", 93, 1, 11, "needs_review", 55, "2026-08-16", "2026-08-12",
     "Good effort — practise the last three ayahs again."),
+  assignment("a20", "s7", "recent", 95, 1, 8, "in_progress", 70, "2026-08-19", "2026-08-10", null),
+  assignment("a21", "s7", "old", 87, 1, 19, "completed", 100, "2026-08-17", "2026-07-30", null),
 ];
 
 export function demoAssignmentsFor(studentId: string): QuranicAssignment[] {
@@ -203,6 +236,40 @@ export function dueLabel(due: string | null): DueLabel | null {
   if (days === 0) return { text: "Due today", urgent: true, overdue: false };
   if (days === 1) return { text: "Due tomorrow", urgent: true, overdue: false };
   return { text: `Due in ${days} days`, urgent: days <= 3, overdue: false };
+}
+
+// ── The three daily portions ────────────────────────────────────────────
+// Ordered as they are recited in the halaqa: the new lesson first while the
+// student is freshest, then the recent ground, then the old.
+export const HIFZ_PORTIONS: HifzPortion[] = ["new", "recent", "old"];
+
+export const PORTION_LABELS: Record<HifzPortion, string> = {
+  new: "New lesson",
+  recent: "Recent revision",
+  old: "Old revision",
+};
+
+export const PORTION_ARABIC: Record<HifzPortion, string> = {
+  new: "الدَّرْسُ الْجَدِيدُ",
+  recent: "الْمُرَاجَعَةُ الْحَدِيثَةُ",
+  old: "الْمُرَاجَعَةُ الْقَدِيمَةُ",
+};
+
+/** What each portion is for, in a line. */
+export const PORTION_BLURB: Record<HifzPortion, string> = {
+  new: "Today's new memorisation.",
+  recent: "What was learnt lately, kept warm.",
+  old: "Older ground, cycled so it is not lost.",
+};
+
+export function assignmentsByPortion(
+  assignments: QuranicAssignment[]
+): Record<HifzPortion, QuranicAssignment[]> {
+  return {
+    new: assignments.filter((a) => a.portion === "new"),
+    recent: assignments.filter((a) => a.portion === "recent"),
+    old: assignments.filter((a) => a.portion === "old"),
+  };
 }
 
 export const ASSIGNMENT_LABELS: Record<QuranicAssignment["status"], string> = {

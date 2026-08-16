@@ -15,6 +15,7 @@ import {
   initials,
   ASSIGNMENT_LABELS,
   ASSIGNMENT_STYLES,
+  PORTION_LABELS,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import { Modal, ProgressBar, EmptyNote, AttendanceStrip } from "@/components/portal-ui";
@@ -201,7 +202,13 @@ function AssignmentList({
               <div className="flex items-start gap-3">
                 <Avatar name={name} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{name}</p>
+                  <p className="text-[13px] font-semibold text-ink truncate">
+                    {name}
+                    <span className="font-normal text-ink-muted">
+                      {" · "}
+                      {PORTION_LABELS[a.portion]}
+                    </span>
+                  </p>
                   <p className="text-[12px] text-ink-body">
                     {surah ? surah.englishName : `Surah ${a.surah}`}
                     <span className="text-ink-muted">

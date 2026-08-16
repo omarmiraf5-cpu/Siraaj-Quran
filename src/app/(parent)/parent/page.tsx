@@ -14,6 +14,7 @@ import {
   initials,
   ASSIGNMENT_LABELS,
   ASSIGNMENT_STYLES,
+  PORTION_LABELS,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import { PortalHero, HeroButtonPrimary, HeroButtonGhost } from "@/components/PortalHero";
@@ -131,7 +132,8 @@ export default function ParentDashboard() {
                   <li key={a.id}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-[13px] font-semibold text-ink truncate">
+                        <p className="eyebrow">{PORTION_LABELS[a.portion]}</p>
+                        <p className="text-[13px] font-semibold text-ink truncate mt-0.5">
                           {surah ? surah.englishName : `Surah ${a.surah}`}
                           <span className="font-normal text-ink-muted">
                             {" "}

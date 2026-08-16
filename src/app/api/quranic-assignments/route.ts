@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       surah,
       ayah_start,
       ayah_end,
+      portion,
       due_date,
       teacher_notes,
     } = body;
@@ -50,6 +51,18 @@ export async function POST(req: NextRequest) {
     if (!student_id || !surah || !ayah_start || !ayah_end) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Which of the three daily portions this is. Checked here rather than
+    // left to the column constraint, so a bad value comes back as a 400 the
+    // form can show instead of a 500 from the database.
+    const PORTIONS = ["new", "recent", "old"];
+    const portionValue = portion ?? "new";
+    if (!PORTIONS.includes(portionValue)) {
+      return NextResponse.json(
+        { error: `portion must be one of: ${PORTIONS.join(", ")}` },
         { status: 400 }
       );
     }
@@ -86,6 +99,7 @@ export async function POST(req: NextRequest) {
         surah,
         ayah_start,
         ayah_end,
+        portion: portionValue,
         due_date,
         teacher_notes,
         status: "assigned",

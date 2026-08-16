@@ -10,6 +10,8 @@ import {
   dueLabel,
   ASSIGNMENT_LABELS,
   ASSIGNMENT_STYLES,
+  PORTION_LABELS,
+  PORTION_ARABIC,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import {
@@ -97,7 +99,17 @@ export default function ParentQuranProgressPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-[14px] font-semibold text-ink truncate">
+                        <p className="eyebrow">
+                          {PORTION_LABELS[a.portion]}
+                          <span
+                            className="font-arabic text-[13px] normal-case tracking-normal ms-2"
+                            dir="rtl"
+                            lang="ar"
+                          >
+                            {PORTION_ARABIC[a.portion]}
+                          </span>
+                        </p>
+                        <p className="text-[14px] font-semibold text-ink truncate mt-0.5">
                           {surah ? surah.englishName : `Surah ${a.surah}`}
                           <span className="font-normal text-ink-muted">
                             {" "}

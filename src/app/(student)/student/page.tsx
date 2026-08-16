@@ -12,7 +12,21 @@ import {
   formatDay,
   dueLabel,
   ASSIGNMENT_LABELS,
+  assignmentsByPortion,
+  HIFZ_PORTIONS,
+  PORTION_LABELS,
+  PORTION_ARABIC,
 } from "@/data/demo";
+import type { HifzPortion } from "@/hooks/useQuranicAssignments";
+import type { IllumColour } from "@/components/student-ui";
+
+// Held steady with the assignments page, so a child learns the three by
+// colour before they learn them by name.
+const PORTION_COLOUR: Record<HifzPortion, IllumColour> = {
+  new: "saffron",
+  recent: "turquoise",
+  old: "aubergine",
+};
 import { getSurahById } from "@/data/mushaf-index";
 import { computeXp, levelFor, levelMessage } from "@/lib/progress";
 import { SectionCard, AttendanceStrip, EmptyNote, TeacherNote } from "@/components/portal-ui";
@@ -51,6 +65,7 @@ export default function StudentDashboard() {
 
   const open = assignments.filter((a) => a.status !== "completed");
   const done = assignments.filter((a) => a.status === "completed");
+  const byPortion = assignmentsByPortion(assignments);
 
   // Days attended in a row, counting back from the most recent.
   let streak = 0;
@@ -62,10 +77,14 @@ export default function StudentDashboard() {
   const xp = computeXp(assignments, attendance);
   const level = levelFor(xp.total);
 
-  // What to do next: the soonest unfinished thing.
-  const nextUp = [...open].sort((a, b) =>
-    (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999")
-  )[0];
+  // What to do next. The new lesson comes first whatever its due date — that
+  // is the order the halaqa recites in, and it is the portion a tired child
+  // is most likely to put off.
+  const nextUp =
+    open.find((a) => a.portion === "new") ??
+    [...open].sort((a, b) =>
+      (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999")
+    )[0];
   const nextSurah = nextUp ? getSurahById(nextUp.surah) : null;
   const nextDue = nextUp ? dueLabel(nextUp.due_date) : null;
 
@@ -151,23 +170,29 @@ export default function StudentDashboard() {
         )}
       </div>
 
-      {/* My surahs — the bright grid. */}
+      {/* Today's three — the shape of a hifz day, one tile per portion,
+          rather than an undifferentiated list of surahs. */}
       {assignments.length > 0 && (
         <div className="space-y-2.5">
           <SectionLabel colour="lapis" icon={<IconBookOpen size={13} />}>
-            My surahs
+            Today&apos;s three
           </SectionLabel>
 
           <div className="grid grid-cols-3 gap-2.5">
-            {assignments.map((a, i) => {
-              const surah = getSurahById(a.surah);
+            {HIFZ_PORTIONS.map((portion, i) => {
+              const a = byPortion[portion][0];
+              const surah = a ? getSurahById(a.surah) : null;
               return (
                 <SurahGridTile
-                  key={a.id}
-                  colour={surahColour(a.surah)}
-                  name={surah ? surah.englishName : `Surah ${a.surah}`}
-                  detail={`${a.memorization_level}% learnt`}
-                  level={a.memorization_level}
+                  key={portion}
+                  colour={PORTION_COLOUR[portion]}
+                  eyebrow={PORTION_LABELS[portion]}
+                  arabic={PORTION_ARABIC[portion]}
+                  name={
+                    a ? (surah ? surah.englishName : `Surah ${a.surah}`) : "Not set"
+                  }
+                  detail={a ? `${a.memorization_level}% learnt` : "—"}
+                  level={a?.memorization_level ?? 0}
                   href="/student/assignments"
                   delay={180 + i * 70}
                 />

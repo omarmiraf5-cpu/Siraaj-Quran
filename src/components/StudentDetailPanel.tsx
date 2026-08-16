@@ -10,6 +10,7 @@ import {
   initials,
   ASSIGNMENT_LABELS,
   ASSIGNMENT_STYLES,
+  PORTION_LABELS,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import {
@@ -84,7 +85,8 @@ export function StudentDetailPanel({
                   <li key={a.id}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold text-ink">
+                        <p className="eyebrow">{PORTION_LABELS[a.portion]}</p>
+                        <p className="text-[13px] font-semibold text-ink mt-0.5">
                           {surah ? surah.englishName : `Surah ${a.surah}`}
                           <span className="font-normal text-ink-muted">
                             {" "}

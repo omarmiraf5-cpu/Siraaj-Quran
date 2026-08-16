@@ -10,7 +10,12 @@ import {
   formatDay,
   ASSIGNMENT_LABELS,
   ASSIGNMENT_STYLES,
+  HIFZ_PORTIONS,
+  PORTION_LABELS,
+  PORTION_ARABIC,
+  PORTION_BLURB,
 } from "@/data/demo";
+import type { HifzPortion } from "@/hooks/useQuranicAssignments";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { PortalHero } from "@/components/PortalHero";
@@ -27,6 +32,7 @@ export default function QuranAssignmentsPage() {
   const surahs = QURAN;
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState("");
+  const [portion, setPortion] = useState<HifzPortion>("new");
   const [selectedSurah, setSelectedSurah] = useState("");
   const [ayahStart, setAyahStart] = useState("");
   const [ayahEnd, setAyahEnd] = useState("");
@@ -83,6 +89,7 @@ export default function QuranAssignmentsPage() {
           surah: parseInt(selectedSurah),
           ayah_start: parseInt(ayahStart),
           ayah_end: parseInt(ayahEnd),
+          portion,
           due_date: dueDate || null,
           teacher_notes: notes || null,
         }),
@@ -95,6 +102,7 @@ export default function QuranAssignmentsPage() {
 
       setSuccess(true);
       setSelectedStudent("");
+      setPortion("new");
       setSelectedSurah("");
       setAyahStart("");
       setAyahEnd("");
@@ -145,6 +153,46 @@ export default function QuranAssignmentsPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Which of the three daily portions. Defaults to the new lesson,
+              which is the one most often being set. */}
+          <div>
+            <label className="block text-sm font-semibold text-ink mb-2">
+              Portion *
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {HIFZ_PORTIONS.map((p) => {
+                const active = portion === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPortion(p)}
+                    aria-pressed={active}
+                    className={`rounded-2xl border px-2 py-2.5 text-center transition-all active:scale-[.98] ${
+                      active
+                        ? "border-brand-navy bg-brand-navy text-white"
+                        : "border-surface-border bg-surface-card text-ink hover:border-brand-navy/40"
+                    }`}
+                  >
+                    <span className="block text-[12px] font-semibold leading-tight">
+                      {PORTION_LABELS[p]}
+                    </span>
+                    <span
+                      className={`block font-arabic text-[13px] mt-1 leading-tight ${
+                        active ? "text-white/70" : "text-ink-muted"
+                      }`}
+                      dir="rtl"
+                      lang="ar"
+                    >
+                      {PORTION_ARABIC[p]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-ink-muted mt-2">{PORTION_BLURB[portion]}</p>
           </div>
 
           <div>
@@ -327,7 +375,13 @@ export default function QuranAssignmentsPage() {
                 </span>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{name}</p>
+                  <p className="text-[13px] font-semibold text-ink truncate">
+                    {name}
+                    <span className="font-normal text-ink-muted">
+                      {" · "}
+                      {PORTION_LABELS[a.portion]}
+                    </span>
+                  </p>
                   <p className="text-[11px] text-ink-muted truncate">
                     {surah ? surah.englishName : `Surah ${a.surah}`} · ayahs{" "}
                     {a.ayah_start}–{a.ayah_end}

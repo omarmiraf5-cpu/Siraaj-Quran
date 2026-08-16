@@ -2,6 +2,14 @@
 
 import { useCallback, useState } from "react";
 
+/**
+ * The three portions a hifz student is set each day:
+ * - new    — الدرس الجديد, today's new memorisation
+ * - recent — المراجعة الحديثة, revision of what was learnt lately
+ * - old    — المراجعة القديمة, the older ground, cycled to keep it
+ */
+export type HifzPortion = "new" | "recent" | "old";
+
 export interface QuranicAssignment {
   id: string;
   student_id: string;
@@ -9,6 +17,7 @@ export interface QuranicAssignment {
   surah: number;
   ayah_start: number;
   ayah_end: number;
+  portion: HifzPortion;
   assigned_at: string;
   due_date: string | null;
   status: "assigned" | "in_progress" | "completed" | "needs_review";
