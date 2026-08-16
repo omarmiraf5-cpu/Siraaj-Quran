@@ -17,13 +17,20 @@ import {
 // dim them, and sat right next to the teacher's crisp line icons. Each now
 // carries its own illumination colour, so the bar is colourful and a child
 // navigates by colour as much as by label.
+// "Learn" is a hub rather than a page: the Qa'idah, Tajweed and the Forty
+// Hadith behind one tab. Giving each its own would have made seven tabs along
+// the bottom of a phone, and the row is already at the width where a thumb
+// starts missing.
 const TABS = [
   { href: "/student", label: "Home", Icon: IconHome, colour: "saffron" },
   { href: "/student/quran", label: "Quran", Icon: IconBook, colour: "lapis" },
   { href: "/student/assignments", label: "Work", Icon: IconPen, colour: "verdigris" },
-  { href: "/student/tajweed", label: "Tajweed", Icon: IconPalette, colour: "aubergine" },
+  { href: "/student/learn", label: "Learn", Icon: IconPalette, colour: "aubergine" },
   { href: "/student/attendance", label: "Register", Icon: IconCalendar, colour: "turquoise" },
 ] as const;
+
+// The Learn tab stays lit while you are inside any of the books it holds.
+const LEARN_PATHS = ["/student/learn", "/student/qaidah", "/student/tajweed", "/student/hadith"];
 
 function StudentTabBar() {
   const pathname = usePathname();
@@ -32,7 +39,10 @@ function StudentTabBar() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-card/90 backdrop-blur-xl border-t border-surface-border safe-area-bottom">
       <div className="max-w-3xl mx-auto flex px-2 py-1.5">
         {TABS.map(({ href, label, Icon, colour }) => {
-          const active = pathname === href;
+          const active =
+            href === "/student/learn"
+              ? LEARN_PATHS.some((p) => pathname.startsWith(p))
+              : pathname === href;
           return (
             <Link
               key={href}
