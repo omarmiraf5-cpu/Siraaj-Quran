@@ -89,7 +89,18 @@ const RECITERS: Reciter[] = [
   },
 ];
 
-const REPEAT_OPTIONS = [1, 2, 3, 4, 5];
+// Infinity is a genuine number in JS (typeof Infinity === "number"), and the
+// playback engine's own loop check further down — `s.pass < s.total - 1` —
+// already does the right thing with it for free: Infinity - 1 is still
+// Infinity, so that comparison stays true forever and the session just keeps
+// re-queuing passes until the listener hits stop. The only place that needed
+// real handling was display, since `${Infinity}` renders as the word
+// "Infinity" rather than the symbol.
+const REPEAT_OPTIONS = [1, 2, 3, 4, 5, Infinity];
+
+function repeatLabel(n: number): string {
+  return n === Infinity ? "∞" : `${n}×`;
+}
 
 // Keep in sync with the `@container mushaf (min-width: ...)` rule in
 // globals.css, which performs the same switch for the layout itself.
@@ -746,13 +757,14 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
               key={n}
               onClick={() => setRepeatCount(n)}
               aria-pressed={repeatCount === n}
+              title={n === Infinity ? "Repeat until stopped" : `Repeat ${n} times`}
               className={`px-2 py-1 rounded-md text-[11px] font-semibold tabular-nums transition active:scale-95 ${
                 repeatCount === n
                   ? "bg-emerald-600 text-white"
                   : "bg-surface-card border border-surface-border text-ink hover:bg-surface-bg"
               }`}
             >
-              {n}×
+              {repeatLabel(n)}
             </button>
           ))}
         </div>
@@ -841,7 +853,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
               )}
               {progress && progress.total > 1 && (
                 <span className="text-[9px] text-emerald-400/80 flex-shrink-0 tabular-nums font-semibold">
-                  pass {progress.pass}/{progress.total}
+                  pass {progress.pass}/{progress.total === Infinity ? "∞" : progress.total}
                 </span>
               )}
               <button
