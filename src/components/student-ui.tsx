@@ -6,6 +6,7 @@
 // so the page is something to look at. All of it is still built from the
 // warm ground, the serif titles and the gold rules the other portals use.
 
+import { useEffect, useMemo, useState } from "react";
 import {
   IconFlame,
   IconCheck,
@@ -333,7 +334,7 @@ export function UpNextCard({
   return (
     <a
       href={href}
-      className={`${GRAD_CLASS[colour]} group relative overflow-hidden flex items-center gap-4 p-4 rounded-[20px] transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[.99]`}
+      className={`${GRAD_CLASS[colour]} group relative overflow-hidden flex items-center gap-4 p-4 rounded-[20px] transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-0.5 hover:shadow-lg active:scale-[.96]`}
     >
       <span className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
 
@@ -402,7 +403,7 @@ export function SurahGridTile({
   return (
     <a
       href={href}
-      className={`${GRAD_CLASS[colour]} relative overflow-hidden rounded-[20px] p-4 flex flex-col items-center text-center animate-rise transition-transform hover:-translate-y-1 active:scale-[.97]`}
+      className={`${GRAD_CLASS[colour]} relative overflow-hidden rounded-[20px] p-4 flex flex-col items-center text-center animate-rise transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-1 active:scale-[.94]`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <span className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
@@ -499,7 +500,7 @@ export function BigTile({
   return (
     <a
       href={href}
-      className={`${GRAD_CLASS[colour]} relative overflow-hidden rounded-[20px] px-5 py-5 animate-rise transition-transform hover:-translate-y-1 active:scale-[.97]`}
+      className={`${GRAD_CLASS[colour]} relative overflow-hidden rounded-[20px] px-5 py-5 animate-rise transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-1 active:scale-[.94]`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <span className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
@@ -543,6 +544,167 @@ export function XpTile({
       <p className="relative text-[10px] font-bold text-white/70 uppercase tracking-wide mt-1.5">
         {label}
       </p>
+    </div>
+  );
+}
+
+/* ── Confetti ──────────────────────────────────────────────────────────
+   The one moment of pure delight on the page: fired when a child drags the
+   memorisation slider to 100%. Nothing else here rewards the act of doing
+   the work — the rings and chips all describe state, none of them react to
+   an action — so this is deliberately the single place that does.
+
+   `burstKey` is a counter the caller bumps to fire a new burst; 0 renders
+   nothing. Particle positions are derived from `burstKey` with a small
+   seeded generator rather than Math.random() in render, so a burst is
+   reproducible for its key and two renders of the same key never disagree
+   — the usual reason to avoid bare Math.random() in a component body. It
+   is still fine to depend on real randomness here because a burst only
+   ever fires from a client event well after hydration, never during the
+   render React reconciles against the server; the seeding is about
+   render-to-render stability, not hydration safety. */
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+}
+
+const CONFETTI_COLOURS = [
+  "#d2941f", // saffron
+  "#1f8a6d", // verdigris
+  "#1f8b9b", // turquoise
+  "#c4553c", // vermilion
+  "#2f5ea8", // lapis
+  "#834272", // aubergine
+  "#c6a253", // gold
+];
+
+// The animation runs 750ms; a little slack so a slow frame doesn't cut the
+// fade off visibly before the DOM node is removed.
+const CONFETTI_LIFETIME_MS = 900;
+
+export function Confetti({ burstKey }: { burstKey: number }) {
+  // Without this, every spent burst's 16 spans sit invisible in the DOM
+  // forever — harmless to look at (opacity 0, pointer-events-none) but
+  // there is no reason to keep them once the animation that used them has
+  // finished.
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!burstKey) return;
+    setVisible(true);
+    const t = setTimeout(() => setVisible(false), CONFETTI_LIFETIME_MS);
+    return () => clearTimeout(t);
+  }, [burstKey]);
+
+  const pieces = useMemo(() => {
+    if (!visible || !burstKey) return [];
+    const rand = seededRandom(burstKey * 7919);
+    return Array.from({ length: 16 }, (_, i) => {
+      const angle = rand() * Math.PI * 2;
+      const dist = 34 + rand() * 46;
+      return {
+        id: i,
+        dx: Math.cos(angle) * dist,
+        // Biased upward — a burst that only fell would read as debris, not
+        // a celebration.
+        dy: Math.sin(angle) * dist - 18,
+        rot: Math.round(rand() * 300 - 150),
+        colour: CONFETTI_COLOURS[i % CONFETTI_COLOURS.length],
+        delay: Math.round(rand() * 80),
+        square: i % 2 === 0,
+      };
+    });
+  }, [burstKey, visible]);
+
+  if (pieces.length === 0) return null;
+
+  return (
+    <span className="absolute inset-0 pointer-events-none overflow-visible" aria-hidden="true">
+      {pieces.map((p) => (
+        <span
+          key={`${burstKey}-${p.id}`}
+          className={`confetti-piece ${p.square ? "rounded-[2px]" : "rounded-full"}`}
+          style={
+            {
+              "--dx": `${p.dx}px`,
+              "--dy": `${p.dy}px`,
+              "--rot": `${p.rot}deg`,
+              background: p.colour,
+              animationDelay: `${p.delay}ms`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </span>
+  );
+}
+
+/* ── Mascot ────────────────────────────────────────────────────────────
+   A crescent moon with a face, for the moments the page has nothing to
+   show — an empty "up next" or an empty work list. Those used to be a flat
+   line of grey text; a blank state is exactly where a little personality
+   costs nothing and reads as warmth rather than clutter. The crescent
+   itself is the standard two-arc construction (a large circle with a
+   smaller one cut from it) used across icon sets for a moon glyph — a
+   generic geometric shape, not an illustration, which keeps it cheap to
+   render correctly at any size rather than something that could come out
+   lopsided. */
+export function MascotMoon({
+  size = 56,
+  mood = "happy",
+}: {
+  size?: number;
+  mood?: "happy" | "calm";
+}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"
+        fill="#d9bd74"
+      />
+      <circle cx="10.6" cy="9.7" r="0.85" fill="#4a3712" />
+      <circle cx="14.1" cy="9.1" r="0.85" fill="#4a3712" />
+      {mood === "happy" ? (
+        <path
+          d="M10.3 12.3c.9 1.1 2.9 1.5 4.3.6"
+          stroke="#4a3712"
+          strokeWidth="1.3"
+          fill="none"
+          strokeLinecap="round"
+        />
+      ) : (
+        <path
+          d="M10.6 12.7h3.6"
+          stroke="#4a3712"
+          strokeWidth="1.3"
+          fill="none"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+/* ── Friendly empty state ──────────────────────────────────────────────
+   The mascot plus a short, warm line — the replacement for a plain
+   EmptyNote wherever the empty state is on a student-facing screen rather
+   than a teacher or parent one. */
+export function FriendlyEmpty({
+  title,
+  sub,
+  mood = "calm",
+}: {
+  title: string;
+  sub: string;
+  mood?: "happy" | "calm";
+}) {
+  return (
+    <div className="flex flex-col items-center text-center py-3">
+      <MascotMoon size={52} mood={mood} />
+      <p className="page-title text-[15px] mt-2.5">{title}</p>
+      <p className="text-[12px] text-ink-muted mt-1">{sub}</p>
     </div>
   );
 }

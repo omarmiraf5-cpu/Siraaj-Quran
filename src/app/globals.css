@@ -167,8 +167,38 @@
   100% { transform: translateX(100%); }
 }
 
+/* One piece of the confetit burst in student-ui.tsx's <Confetti>. Each piece
+   sets its own --dx/--dy/--rot; the keyframe just animates toward whatever
+   those resolve to, which is how one rule serves sixteen different paths. */
+/* The 60% stop matters: the animation's own easing (below) is a strong
+   ease-out, front-loaded so most of the outward travel happens early. Fading
+   opacity across the full 0–100% range under that same curve meant a piece
+   was already three-quarters transparent by a third of the way through —
+   visible for a puff, not a burst. Holding it at full opacity through 60%
+   and only fading in the last stretch keeps it visible while it is actually
+   travelling, and confines the fade to the settle at the end. */
+@keyframes confettiPiece {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 1; }
+  60% { opacity: 1; }
+  100% {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)) scale(0.5);
+    opacity: 0;
+  }
+}
+.confetti-piece {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  animation: confettiPiece 750ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Everything above is decoration. Anyone who has asked their system to stop
-   moving things gets the layout without the motion. */
+   moving things gets the layout without the motion. Confetti isn't listed:
+   its trigger (student-ui.tsx) checks the same media query itself and skips
+   firing rather than firing invisibly, since a burst with the animation
+   switched off would just be sixteen dots parked on top of each other. */
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .shine::after,
@@ -450,10 +480,10 @@ body {
     background: linear-gradient(140deg, #d9bd74, #c6a253);
     border: 2px solid var(--c-surface-card);
     box-shadow: 0 2px 6px rgba(60, 48, 28, 0.3);
-    transition: transform 0.15s ease;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .student-range::-webkit-slider-thumb:active {
-    transform: scale(1.15);
+    transform: scale(1.25);
   }
   .student-range::-moz-range-thumb {
     width: 26px;

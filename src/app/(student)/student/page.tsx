@@ -29,7 +29,7 @@ const PORTION_COLOUR: Record<HifzPortion, IllumColour> = {
 };
 import { getSurahById } from "@/data/mushaf-index";
 import { computeXp, levelFor, levelMessage } from "@/lib/progress";
-import { SectionCard, AttendanceStrip, EmptyNote, TeacherNote } from "@/components/portal-ui";
+import { SectionCard, AttendanceStrip, TeacherNote } from "@/components/portal-ui";
 import {
   Avatar,
   StreakPill,
@@ -40,6 +40,7 @@ import {
   BigTile,
   XpTile,
   ProgressRing,
+  FriendlyEmpty,
   ILLUM_CLASS,
   STATUS_COLOUR,
   surahColour,
@@ -166,7 +167,11 @@ export default function StudentDashboard() {
           />
         ) : (
           <div className="card-quiet p-5">
-            <EmptyNote>Everything is finished. Beautiful work.</EmptyNote>
+            <FriendlyEmpty
+              title="All done for today!"
+              sub="Beautiful work — come back tomorrow."
+              mood="happy"
+            />
           </div>
         )}
 

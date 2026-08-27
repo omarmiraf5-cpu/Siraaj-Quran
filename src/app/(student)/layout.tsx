@@ -48,7 +48,7 @@ function StudentTabBar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-2xl transition-transform active:scale-90"
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-2xl transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-90"
             >
               <span
                 className={`w-10 h-8 rounded-full flex items-center justify-center transition-all ${
