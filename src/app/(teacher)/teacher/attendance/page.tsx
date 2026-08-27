@@ -130,8 +130,14 @@ export default function TeacherAttendancePage() {
         })}
       </div>
 
-      {/* Sticky save — clears the sidebar on desktop */}
-      <div className="fixed bottom-0 left-0 right-0 md:left-56 p-3 bg-surface-card border-t border-surface-border z-30">
+      {/* Sticky save — clears the sidebar on desktop. On mobile it docks
+          above the tab bar (bottom-20, the same clearance the layout's
+          <main> already reserves for that bar) rather than at bottom-0:
+          both this bar and the tab bar are `fixed bottom-0`, and since the
+          tab bar renders after this one in the DOM with a higher z-index,
+          it was winning the stacking fight and hiding all but a sliver of
+          the button underneath it. */}
+      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-56 p-3 bg-surface-card border-t border-surface-border z-30">
         <button
           onClick={() => setSaved(true)}
           disabled={marked === 0}
