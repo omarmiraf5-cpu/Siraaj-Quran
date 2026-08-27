@@ -285,12 +285,20 @@ export default function TeacherDashboard() {
         <p className="text-[11px] text-ink-muted mt-2">Prophet Muhammad &#xFDFA;</p>
       </section>
 
-      {/* A stat opens its list; a name in that list opens the student. */}
+      {/* A stat opens its list; a name in that list opens the student.
+          Picking a student clears `drilldown` too — leaving it set meant
+          closing the student panel dropped `selectedStudentId` but not
+          `drilldown`, so the list this student came from popped back open
+          underneath. From the outside that looked exactly like the X on the
+          student panel doing nothing: click it, and a screen appears again. */}
       {drilldown && !selectedStudentId && (
         <TeacherDrilldown
           view={drilldown}
           onClose={() => setDrilldown(null)}
-          onSelectStudent={(id) => setSelectedStudentId(id)}
+          onSelectStudent={(id) => {
+            setDrilldown(null);
+            setSelectedStudentId(id);
+          }}
         />
       )}
 
