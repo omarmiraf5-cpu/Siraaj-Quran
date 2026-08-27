@@ -15,7 +15,7 @@ import {
   PORTION_ARABIC,
   PORTION_BLURB,
 } from "@/data/demo";
-import type { HifzPortion } from "@/hooks/useQuranicAssignments";
+import type { HifzPortion, QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { PortalHero } from "@/components/PortalHero";
@@ -25,6 +25,24 @@ import { IconBook } from "@/components/icons";
 interface Student {
   id: string;
   full_name: string;
+}
+
+// Assignments created while browsing without a real Supabase session. This is
+// the only write path in the app that ever talked to a real backend — every
+// other "save" (attendance, the memorisation slider) is local state, so it
+// always appears to work. This one used to fall straight through to the API
+// and 401, dead-ending the one workflow a prospective school would actually
+// want to try. Kept in localStorage, not just React state, so it survives a
+// refresh during a demo.
+const DEMO_CREATED_KEY = "demo_created_assignments";
+
+function loadDemoCreated(): QuranicAssignment[] {
+  try {
+    const raw = localStorage.getItem(DEMO_CREATED_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 }
 
 export default function QuranAssignmentsPage() {
@@ -42,6 +60,8 @@ export default function QuranAssignmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
+  const [demoCreated, setDemoCreated] = useState<QuranicAssignment[]>([]);
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -49,8 +69,12 @@ export default function QuranAssignmentsPage() {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-          // Demo mode or no auth: use the sample roster.
+          // Demo mode or no auth: use the sample roster, and remember that
+          // there is no real session so submitting the form doesn't try — and
+          // fail — a real write.
+          setIsDemo(true);
           setStudents(DEMO_STUDENTS.map((s) => ({ id: s.id, full_name: s.name })));
+          setDemoCreated(loadDemoCreated());
           return;
         }
 
@@ -81,23 +105,56 @@ export default function QuranAssignmentsPage() {
         throw new Error("Please fill in all required fields");
       }
 
-      const res = await fetch("/api/quranic-assignments", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+      if (isDemo) {
+        // No real session to write against — /api/quranic-assignments would
+        // correctly 401 here, since it has no school or teacher row to
+        // attach the row to. Simulate the write in the browser instead of
+        // dead-ending the one workflow a prospective school would want to
+        // try first.
+        const created: QuranicAssignment = {
+          id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           student_id: selectedStudent,
+          teacher_id: "t1",
           surah: parseInt(selectedSurah),
           ayah_start: parseInt(ayahStart),
           ayah_end: parseInt(ayahEnd),
           portion,
+          assigned_at: new Date().toISOString(),
           due_date: dueDate || null,
+          status: "assigned",
+          memorization_level: 0,
           teacher_notes: notes || null,
-        }),
-      });
+          student_notes: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const next = [created, ...demoCreated];
+        setDemoCreated(next);
+        try {
+          localStorage.setItem(DEMO_CREATED_KEY, JSON.stringify(next));
+        } catch {
+          // Private browsing or a full quota — the assignment still shows
+          // for this visit, it just won't survive a refresh.
+        }
+      } else {
+        const res = await fetch("/api/quranic-assignments", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            student_id: selectedStudent,
+            surah: parseInt(selectedSurah),
+            ayah_start: parseInt(ayahStart),
+            ayah_end: parseInt(ayahEnd),
+            portion,
+            due_date: dueDate || null,
+            teacher_notes: notes || null,
+          }),
+        });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to create assignment");
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to create assignment");
+        }
       }
 
       setSuccess(true);
@@ -123,6 +180,10 @@ export default function QuranAssignmentsPage() {
 
   const canPreview = selectedSurah && ayahStart && ayahEnd;
 
+  // Newest first, so an assignment just created shows at the top of the list
+  // below rather than getting lost among the sample data.
+  const allAssignments = [...demoCreated, ...DEMO_ASSIGNMENTS];
+
   return (
     <div className="max-w-4xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
@@ -130,7 +191,7 @@ export default function QuranAssignmentsPage() {
         title="Assignments"
         meta={[
           `${students.length} students`,
-          `${DEMO_ASSIGNMENTS.length} set this term`,
+          `${allAssignments.length} set this term`,
         ]}
       />
 
@@ -303,7 +364,9 @@ export default function QuranAssignmentsPage() {
           {success && (
             <div className="bg-green-50 dark:bg-green-950/25 border border-green-200 dark:border-green-800/40 rounded-2xl p-4">
               <p className="text-sm text-green-700 dark:text-green-300">
-                Assignment created.
+                {isDemo
+                  ? "Assignment added below — this preview saves in your browser only."
+                  : "Assignment created."}
               </p>
             </div>
           )}
@@ -358,13 +421,14 @@ export default function QuranAssignmentsPage() {
       </div>
 
       {/* What has already been set. Sample data until the school has its own
-          records; the create form above writes real ones. */}
+          records; the create form above writes real ones once a teacher is
+          properly signed in, and adds a browser-local preview row otherwise. */}
       <SectionCard
         title="Current assignments"
-        note={`${DEMO_ASSIGNMENTS.length} across all students`}
+        note={`${allAssignments.length} across all students`}
       >
         <ul className="divide-y divide-surface-border -my-1">
-          {DEMO_ASSIGNMENTS.map((a) => {
+          {allAssignments.map((a) => {
             const surah = getSurahById(a.surah);
             const name = studentName(a.student_id);
 
