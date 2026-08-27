@@ -333,29 +333,38 @@ export function UpNextCard({
   return (
     <a
       href={href}
-      className="card-quiet group flex items-center gap-4 p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[.99]"
+      className={`${GRAD_CLASS[colour]} group relative overflow-hidden flex items-center gap-4 p-4 rounded-[20px] transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[.99]`}
     >
-      <span
-        className={`${GRAD_CLASS[colour]} w-14 h-14 rounded-2xl flex items-center justify-center text-white flex-shrink-0 shadow-sm`}
-      >
+      <span className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
+
+      {/* The icon tile is translucent white rather than the card's own
+          gradient — a same-colour icon on a same-colour card disappears,
+          the way the play button below would if it weren't inverted too. */}
+      <span className="relative w-14 h-14 rounded-2xl bg-white/20 border border-white/25 flex items-center justify-center text-white flex-shrink-0">
         <IconBookOpen size={24} />
       </span>
 
-      <span className="flex-1 min-w-0">
-        <span className={`block text-[11px] font-bold uppercase tracking-wider ${TEXT_CLASS[colour]}`}>
+      <span className="relative flex-1 min-w-0">
+        <span className="block text-[11px] font-bold uppercase tracking-wider text-white/75">
           {eyebrow}
         </span>
-        <span className="block page-title text-[17px] truncate mt-0.5">{title}</span>
-        <span className="block text-[12px] text-ink-muted mt-0.5">{detail}</span>
+        <span className="block page-title text-white text-[17px] truncate mt-0.5">
+          {title}
+        </span>
+        <span className="block text-[12px] text-white/70 mt-0.5">{detail}</span>
       </span>
 
-      <span className="flex-shrink-0 flex flex-col items-center gap-1">
+      <span className="relative flex-shrink-0 flex flex-col items-center gap-1">
+        {/* Solid white rather than another gradient circle, so the button
+            still reads as the one thing to press once its backdrop is the
+            same hue it used to stand out against. */}
         <span
-          className={`${GRAD_CLASS[colour]} w-11 h-11 rounded-full flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform`}
+          className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform"
+          style={{ color: RING_STROKE[colour] }}
         >
           <IconPlay size={18} />
         </span>
-        <span className="text-[10px] font-bold text-ink-muted tabular-nums">{level}%</span>
+        <span className="text-[10px] font-bold text-white/70 tabular-nums">{level}%</span>
       </span>
     </a>
   );

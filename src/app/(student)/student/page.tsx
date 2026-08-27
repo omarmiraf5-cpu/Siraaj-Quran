@@ -122,20 +122,27 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-      {/* Dua — the calm beat between the scoreboard and the work. */}
+      {/* Dua — the calm beat between the scoreboard and the work. Coloured
+          with the page's own hero gradient rather than one of the six
+          portion/status colours: every one of those already means something
+          specific elsewhere on this page (new lesson, finishing, needs
+          review…), and the dua is not any of them. The personal gradient
+          has no such job, so it bookends the page instead — greeting and
+          reflection in the same hue, the work between them in the palette. */}
       <section
-        className="card-quiet card-feature px-5 py-6 text-center animate-rise"
+        className={`${theme.hero} relative overflow-hidden rounded-[20px] px-5 py-6 text-center animate-rise`}
         style={{ animationDelay: "60ms" }}
       >
+        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
         <p
-          className="font-calligraphy text-[25px] md:text-[30px] text-ink leading-[2.1]"
+          className="relative font-calligraphy text-[25px] md:text-[30px] text-white leading-[2.1]"
           dir="rtl"
           lang="ar"
         >
           اللَّهُمَّ لَا سَهْلَ إِلَّا مَا جَعَلْتَهُ سَهْلًا
         </p>
-        <div className="gold-rule w-20 mx-auto my-4" />
-        <p className="font-serif text-[14px] text-ink-body italic">
+        <div className="gold-rule w-20 mx-auto my-4 relative" />
+        <p className="relative font-serif text-[14px] text-white/80 italic">
           &ldquo;O Allah, nothing is easy except what You make easy.&rdquo;
         </p>
       </section>
