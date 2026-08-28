@@ -14,6 +14,9 @@ interface HighlightRange {
   surah: number;
   start: number;
   end: number;
+  /** Ending surah, when the range covers more than one (e.g. a muraajah
+      portion spanning several surahs). Defaults to `surah` when absent. */
+  surahEnd?: number;
 }
 
 interface MushafProps {

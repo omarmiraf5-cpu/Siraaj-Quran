@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
+import { JUZ_STARTS, getJuzRange } from "@/data/juz-index";
 import {
   DEMO_ASSIGNMENTS,
   DEMO_STUDENTS,
@@ -73,6 +74,16 @@ export default function QuranAssignmentsPage() {
   const [selectedSurah, setSelectedSurah] = useState("");
   const [ayahStart, setAyahStart] = useState("");
   const [ayahEnd, setAyahEnd] = useState("");
+  // Spanning into a second surah — off by default, since most assignments
+  // are one surah. Cleared whenever the portion or start surah changes, so
+  // a stale end-surah from a previous pick can't linger.
+  const [spansSurah, setSpansSurah] = useState(false);
+  const [endSurah, setEndSurah] = useState("");
+  // Quick-fill for muraajah: pick a starting juz' and how many to cover,
+  // and "Apply" fills in the surah/ayah fields above rather than requiring
+  // the teacher to look up boundaries by hand.
+  const [juzStart, setJuzStart] = useState("1");
+  const [juzCount, setJuzCount] = useState("1");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -132,6 +143,8 @@ export default function QuranAssignmentsPage() {
         throw new Error("Please fill in all required fields");
       }
 
+      const surahEndValue = parseInt(spansSurah && endSurah ? endSurah : selectedSurah);
+
       if (isDemo) {
         // No real session to write against — /api/quranic-assignments would
         // correctly 401 here, since it has no school or teacher row to
@@ -144,9 +157,15 @@ export default function QuranAssignmentsPage() {
           teacher_id: "t1",
           surah: parseInt(selectedSurah),
           ayah_start: parseInt(ayahStart),
+          surah_end: surahEndValue,
           ayah_end: parseInt(ayahEnd),
           portion,
-          assigned_at: new Date().toISOString(),
+          // A plain date, not a full timestamp — formatDay elsewhere expects
+          // "YYYY-MM-DD" the way every other assigned_at in the app is
+          // shaped, and DEMO_TODAY rather than the real clock so a newly
+          // created row reads as "today" on the same fixed timeline the
+          // rest of the demo data uses instead of the real calendar date.
+          assigned_at: DEMO_TODAY,
           due_date: dueDate || null,
           status: "assigned",
           memorization_level: 0,
@@ -172,6 +191,7 @@ export default function QuranAssignmentsPage() {
             student_id: selectedStudent,
             surah: parseInt(selectedSurah),
             ayah_start: parseInt(ayahStart),
+            surah_end: surahEndValue,
             ayah_end: parseInt(ayahEnd),
             portion,
             due_date: dueDate || null,
@@ -191,6 +211,8 @@ export default function QuranAssignmentsPage() {
       setSelectedSurah("");
       setAyahStart("");
       setAyahEnd("");
+      setSpansSurah(false);
+      setEndSurah("");
       setDueDate("");
       setNotes("");
       setShowPreview(false);
@@ -205,6 +227,30 @@ export default function QuranAssignmentsPage() {
 
   const selectedSurahData = getSurahById(parseInt(selectedSurah) || 0);
   const maxAyahs = selectedSurahData?.ayahs ?? 0;
+
+  const effectiveEndSurahId = spansSurah && endSurah ? parseInt(endSurah) : parseInt(selectedSurah) || 0;
+  const endSurahData = getSurahById(effectiveEndSurahId);
+  const maxAyahsEnd = endSurahData?.ayahs ?? 0;
+
+  // Only surahs at or after the start are offered, since a muraajah range
+  // always reads forward through the mushaf regardless of which direction
+  // the student originally memorised it in.
+  const endSurahOptions = QURAN.filter((s) => s.id >= (parseInt(selectedSurah) || 0));
+
+  const applyJuzRange = () => {
+    const range = getJuzRange(parseInt(juzStart), parseInt(juzCount) || 1, (s) => getSurahById(s)?.ayahs ?? 0);
+    setSelectedSurah(String(range.surahStart));
+    setAyahStart(String(range.ayahStart));
+    setAyahEnd(String(range.ayahEnd));
+    if (range.surahEnd !== range.surahStart) {
+      setSpansSurah(true);
+      setEndSurah(String(range.surahEnd));
+    } else {
+      setSpansSurah(false);
+      setEndSurah("");
+    }
+    setShowPreview(false);
+  };
 
   const canPreview = selectedSurah && ayahStart && ayahEnd;
 
@@ -247,6 +293,7 @@ export default function QuranAssignmentsPage() {
               portion: a.portion,
               surah: a.surah,
               ayah_start: a.ayah_start,
+              surah_end: a.surah_end,
               ayah_end: a.ayah_end,
               rating: draftRating,
               notes: draftNotes.trim() || null,
@@ -271,6 +318,7 @@ export default function QuranAssignmentsPage() {
               portion: a.portion,
               surah: a.surah,
               ayah_start: a.ayah_start,
+              surah_end: a.surah_end,
               ayah_end: a.ayah_end,
               rating: draftRating,
               notes: draftNotes.trim() || null,
@@ -329,7 +377,11 @@ export default function QuranAssignmentsPage() {
                   <button
                     key={p}
                     type="button"
-                    onClick={() => setPortion(p)}
+                    onClick={() => {
+                      setPortion(p);
+                      setSpansSurah(false);
+                      setEndSurah("");
+                    }}
                     aria-pressed={active}
                     className={`rounded-2xl border px-2 py-2.5 text-center transition-all active:scale-[.98] ${
                       active
@@ -356,6 +408,55 @@ export default function QuranAssignmentsPage() {
             <p className="text-xs text-ink-muted mt-2">{PORTION_BLURB[portion]}</p>
           </div>
 
+          {/* Muraajah is usually set as a quantity — a juz', two juz' —
+              rather than by hunting down exact ayah numbers, so give that
+              as a quick-fill on top of the manual fields below. Not shown
+              for the new lesson, which is a small daily portion picked by
+              surah and ayah, not by the juz'. */}
+          {portion !== "new" && (
+            <div className="rounded-2xl border border-brand-gold/35 bg-brand-gold/8 p-3.5">
+              <p className="text-sm font-semibold text-ink mb-2">Or set by juz'</p>
+              <div className="flex items-end gap-2">
+                <label className="flex-1 min-w-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">Starting juz'</span>
+                  <select
+                    value={juzStart}
+                    onChange={(e) => setJuzStart(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  >
+                    {JUZ_STARTS.map((j) => (
+                      <option key={j.juz} value={j.juz}>
+                        Juz {j.juz}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="w-20 flex-shrink-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">Juz' count</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={juzCount}
+                    onChange={(e) => setJuzCount(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink text-center tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={applyJuzRange}
+                  className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] transition-all"
+                >
+                  Apply
+                </button>
+              </div>
+              <p className="text-[11px] text-ink-muted mt-2">
+                Fills in the surah and ayahs below — a juz' rarely lines up
+                with a surah's edges, so this often spans more than one.
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
               Surah *
@@ -364,6 +465,8 @@ export default function QuranAssignmentsPage() {
               value={selectedSurah}
               onChange={(e) => {
                 setSelectedSurah(e.target.value);
+                setSpansSurah(false);
+                setEndSurah("");
                 setShowPreview(false);
               }}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
@@ -402,22 +505,69 @@ export default function QuranAssignmentsPage() {
               <input
                 type="number"
                 min="1"
-                max={maxAyahs}
+                max={maxAyahsEnd}
                 value={ayahEnd}
                 onChange={(e) => {
                   setAyahEnd(e.target.value);
                   setShowPreview(false);
                 }}
-                placeholder={maxAyahs.toString()}
+                placeholder={maxAyahsEnd.toString()}
                 className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
               />
             </div>
           </div>
-          {maxAyahs > 0 && (
+          {maxAyahs > 0 && !spansSurah && (
             <p className="text-xs text-ink-muted">
               This Surah has {maxAyahs} Ayahs
             </p>
           )}
+
+          {/* Multiple surahs, manually: for a lesson or muraajah that
+              simply doesn't line up with the quantity picker above. */}
+          {selectedSurah &&
+            (spansSurah ? (
+              <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-ink">Ends in surah</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSpansSurah(false);
+                      setEndSurah("");
+                      setShowPreview(false);
+                    }}
+                    className="text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <select
+                  value={endSurah || selectedSurah}
+                  onChange={(e) => {
+                    setEndSurah(e.target.value);
+                    setShowPreview(false);
+                  }}
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                >
+                  {endSurahOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.id}. {s.englishName} ({s.ayahs} Ayahs)
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-ink-muted">
+                  Ayah End above is now within {endSurahData?.englishName ?? "this surah"}.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSpansSurah(true)}
+                className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+              >
+                + End in a different surah
+              </button>
+            ))}
 
           {canPreview && !showPreview && (
             <button
@@ -486,7 +636,9 @@ export default function QuranAssignmentsPage() {
             <div className="card-quiet p-5 overflow-hidden">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="page-title text-lg">
-                  {selectedSurahData?.englishName ?? "Preview"}
+                  {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
+                    ? `${selectedSurahData?.englishName ?? "Preview"} – ${endSurahData.englishName}`
+                    : (selectedSurahData?.englishName ?? "Preview")}
                 </h2>
                 <button
                   onClick={() => setShowPreview(false)}
@@ -501,6 +653,7 @@ export default function QuranAssignmentsPage() {
                 highlightedRange={{
                   surah: parseInt(selectedSurah),
                   start: parseInt(ayahStart),
+                  surahEnd: effectiveEndSurahId,
                   end: parseInt(ayahEnd),
                 }}
               />
@@ -530,8 +683,13 @@ export default function QuranAssignmentsPage() {
         <ul className="divide-y divide-surface-border -my-1">
           {allAssignments.map((a) => {
             const surah = getSurahById(a.surah);
+            const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
             const name = studentName(a.student_id);
             const isOpen = editingId === a.id;
+
+            const rangeLabel = surahEnd
+              ? `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
+              : `${surah?.englishName ?? `Surah ${a.surah}`} · ayahs ${a.ayah_start}–${a.ayah_end}`;
 
             return (
               <li key={a.id}>
@@ -554,8 +712,7 @@ export default function QuranAssignmentsPage() {
                       </span>
                     </p>
                     <p className="text-[11px] text-ink-muted truncate">
-                      {surah ? surah.englishName : `Surah ${a.surah}`} · ayahs{" "}
-                      {a.ayah_start}–{a.ayah_end}
+                      {rangeLabel}
                       {a.due_date ? ` · due ${formatDay(a.due_date)}` : ""}
                     </p>
                   </div>

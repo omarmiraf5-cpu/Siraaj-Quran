@@ -21,8 +21,13 @@ export interface QuranicAssignment {
   id: string;
   student_id: string;
   teacher_id: string;
+  /** Starting surah of the range. Equal to surah_end for the common
+      single-surah case. */
   surah: number;
   ayah_start: number;
+  /** Ending surah of the range — a muraajah portion covering several
+      surahs (e.g. two full juz') has surah_end > surah. */
+  surah_end: number;
   ayah_end: number;
   portion: HifzPortion;
   assigned_at: string;

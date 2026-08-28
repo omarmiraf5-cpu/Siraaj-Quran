@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import { useStudentTheme } from "@/hooks/useStudentTheme";
 import {
   DEMO_CURRENT_STUDENT,
   DEMO_ATTENDANCE,
   DEMO_TODAY,
+  DEMO_CREATED_ASSIGNMENTS_KEY,
   demoAssignmentsFor,
   summariseAttendance,
   formatDay,
@@ -17,7 +19,8 @@ import {
   PORTION_LABELS,
   PORTION_ARABIC,
 } from "@/data/demo";
-import type { HifzPortion } from "@/hooks/useQuranicAssignments";
+import { readDemoStore } from "@/lib/demoStore";
+import type { HifzPortion, QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import type { IllumColour } from "@/components/student-ui";
 
 // Held steady with the assignments page, so a child learns the three by
@@ -62,7 +65,12 @@ export default function StudentDashboard() {
   const student = DEMO_CURRENT_STUDENT;
   const attendance = DEMO_ATTENDANCE[student.id] ?? [];
   const summary = summariseAttendance(attendance);
-  const assignments = demoAssignmentsFor(student.id);
+
+  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
+  useEffect(() => {
+    setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
+  }, []);
+  const assignments = demoAssignmentsFor(student.id, createdAssignments);
 
   const open = assignments.filter((a) => a.status !== "completed");
   const done = assignments.filter((a) => a.status === "completed");
@@ -194,6 +202,7 @@ export default function StudentDashboard() {
             {HIFZ_PORTIONS.map((portion, i) => {
               const a = byPortion[portion][0];
               const surah = a ? getSurahById(a.surah) : null;
+              const surahEnd = a && a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
               return (
                 <SurahGridTile
                   key={portion}
@@ -201,7 +210,11 @@ export default function StudentDashboard() {
                   eyebrow={PORTION_LABELS[portion]}
                   arabic={PORTION_ARABIC[portion]}
                   name={
-                    a ? (surah ? surah.englishName : `Surah ${a.surah}`) : "Not set"
+                    a
+                      ? surahEnd
+                        ? `${surah?.englishName ?? `Surah ${a.surah}`} – ${surahEnd.englishName}`
+                        : (surah ? surah.englishName : `Surah ${a.surah}`)
+                      : "Not set"
                   }
                   detail={a ? `${a.memorization_level}% learnt` : "—"}
                   level={a?.memorization_level ?? 0}

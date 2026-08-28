@@ -259,6 +259,10 @@ create table if not exists quranic_assignments (
   school_id            uuid not null references schools(id) on delete cascade,
   surah                int not null check (surah between 1 and 114),
   ayah_start           int not null check (ayah_start >= 1),
+  -- Ending surah, when the range covers more than one — a muraajah portion
+  -- set as "two juz'" rarely lines up with a surah's own edges. Equal to
+  -- surah for the common single-surah case.
+  surah_end            int not null check (surah_end between surah and 114),
   ayah_end             int not null check (ayah_end >= ayah_start),
   -- Which of the three daily portions this is. A hifz student is set all
   -- three each day: the new lesson (الدرس الجديد), the recent revision
@@ -303,6 +307,21 @@ begin
     alter table quranic_assignments
       add constraint quranic_assignments_daily_rating_check
       check (daily_rating in ('excellent', 'very_good', 'good', 'weak'));
+  end if;
+end $$;
+alter table quranic_assignments
+  add column if not exists surah_end int;
+update quranic_assignments set surah_end = surah where surah_end is null;
+alter table quranic_assignments
+  alter column surah_end set not null;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'quranic_assignments_surah_end_check'
+  ) then
+    alter table quranic_assignments
+      add constraint quranic_assignments_surah_end_check
+      check (surah_end between surah and 114);
   end if;
 end $$;
 alter table quranic_assignments enable row level security;
@@ -525,6 +544,9 @@ create table if not exists recitation_log (
   portion       text not null check (portion in ('new', 'recent', 'old')),
   surah         int not null check (surah between 1 and 114),
   ayah_start    int not null check (ayah_start >= 1),
+  -- Ending surah, when the session covered more than one. Equal to surah
+  -- for the common single-surah case.
+  surah_end     int not null check (surah_end between surah and 114),
   ayah_end      int not null check (ayah_end >= ayah_start),
   rating        text not null check (rating in ('excellent', 'very_good', 'good', 'weak')),
   notes         text,
@@ -534,6 +556,21 @@ create table if not exists recitation_log (
   session_date  date not null default current_date,
   created_at    timestamptz default now()
 );
+alter table recitation_log
+  add column if not exists surah_end int;
+update recitation_log set surah_end = surah where surah_end is null;
+alter table recitation_log
+  alter column surah_end set not null;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'recitation_log_surah_end_check'
+  ) then
+    alter table recitation_log
+      add constraint recitation_log_surah_end_check
+      check (surah_end between surah and 114);
+  end if;
+end $$;
 alter table recitation_log enable row level security;
 create policy "Teachers can manage recitation log for own students" on recitation_log
   for all using (teacher_id = auth.uid());

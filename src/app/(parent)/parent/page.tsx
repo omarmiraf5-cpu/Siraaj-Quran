@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
   DEMO_CHILDREN,
   DEMO_ATTENDANCE,
   DEMO_TODAY,
+  DEMO_CREATED_ASSIGNMENTS_KEY,
   demoAssignmentsFor,
   summariseAttendance,
   formatDay,
@@ -17,6 +18,8 @@ import {
   PORTION_LABELS,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
+import { readDemoStore } from "@/lib/demoStore";
+import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { PortalHero, HeroButtonPrimary, HeroButtonGhost } from "@/components/PortalHero";
 import {
   SectionCard,
@@ -34,10 +37,17 @@ export default function ParentDashboard() {
   const demoUser = useDemoUser();
   const [childId, setChildId] = useState(DEMO_CHILDREN[0].id);
   const child = DEMO_CHILDREN.find((c) => c.id === childId) ?? DEMO_CHILDREN[0];
+  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
+
+  // Assignments a teacher created in the demo since this page's sample data
+  // was written; shared via the same browser storage.
+  useEffect(() => {
+    setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
+  }, []);
 
   const attendance = DEMO_ATTENDANCE[child.id] ?? [];
   const summary = summariseAttendance(attendance);
-  const assignments = demoAssignmentsFor(child.id);
+  const assignments = demoAssignmentsFor(child.id, createdAssignments);
 
   const active = assignments.filter((a) => a.status !== "completed");
   const done = assignments.filter((a) => a.status === "completed");
@@ -127,6 +137,7 @@ export default function ParentDashboard() {
             <ul className="space-y-4">
               {assignments.map((a) => {
                 const surah = getSurahById(a.surah);
+                const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
                 const due = a.status === "completed" ? null : dueLabel(a.due_date);
                 return (
                   <li key={a.id}>
@@ -134,11 +145,17 @@ export default function ParentDashboard() {
                       <div className="min-w-0">
                         <p className="eyebrow">{PORTION_LABELS[a.portion]}</p>
                         <p className="text-[13px] font-semibold text-ink truncate mt-0.5">
-                          {surah ? surah.englishName : `Surah ${a.surah}`}
-                          <span className="font-normal text-ink-muted">
-                            {" "}
-                            · ayahs {a.ayah_start}–{a.ayah_end}
-                          </span>
+                          {surahEnd ? (
+                            `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
+                          ) : (
+                            <>
+                              {surah ? surah.englishName : `Surah ${a.surah}`}
+                              <span className="font-normal text-ink-muted">
+                                {" "}
+                                · ayahs {a.ayah_start}–{a.ayah_end}
+                              </span>
+                            </>
+                          )}
                         </p>
                         {due && (
                           <p

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getSurahById } from "@/data/mushaf-index";
 import {
   DEMO_CURRENT_STUDENT,
+  DEMO_CREATED_ASSIGNMENTS_KEY,
   demoAssignmentsFor,
   assignmentsByPortion,
   dueLabel,
@@ -13,7 +14,8 @@ import {
   PORTION_ARABIC,
   PORTION_BLURB,
 } from "@/data/demo";
-import type { HifzPortion } from "@/hooks/useQuranicAssignments";
+import { readDemoStore } from "@/lib/demoStore";
+import type { HifzPortion, QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { TeacherNote } from "@/components/portal-ui";
 import {
   ProgressRing,
@@ -39,15 +41,29 @@ const PORTION_STYLE: Record<
 };
 
 export default function StudentAssignmentsPage() {
-  const all = demoAssignmentsFor(DEMO_CURRENT_STUDENT.id);
+  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
+  const all = demoAssignmentsFor(DEMO_CURRENT_STUDENT.id, createdAssignments);
   const grouped = assignmentsByPortion(all);
   const [levels, setLevels] = useState<Record<string, number>>(
-    Object.fromEntries(all.map((a) => [a.id, a.memorization_level]))
+    Object.fromEntries(demoAssignmentsFor(DEMO_CURRENT_STUDENT.id).map((a) => [a.id, a.memorization_level]))
   );
   // Bumped once per assignment each time its slider newly reaches 100 — the
   // one moment on this page that rewards the child for doing something,
   // rather than just describing state a teacher set.
   const [bursts, setBursts] = useState<Record<string, number>>({});
+
+  // Assignments a teacher created since this page's sample data was
+  // written, and their starting slider positions — loaded together so
+  // `levels` never falls out of sync with `all`.
+  useEffect(() => {
+    const created = readDemoStore<QuranicAssignment[]>(DEMO_CREATED_ASSIGNMENTS_KEY, []);
+    if (created.length === 0) return;
+    setCreatedAssignments(created);
+    setLevels((l) => ({
+      ...Object.fromEntries(created.map((a) => [a.id, a.memorization_level])),
+      ...l,
+    }));
+  }, []);
 
   const setLevel = (id: string, next: number) => {
     setLevels((l) => {
@@ -132,6 +148,7 @@ export default function StudentAssignmentsPage() {
             ) : (
               items.map((a, i) => {
                 const surah = getSurahById(a.surah);
+                const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
                 // Nothing is overdue once it is finished.
                 const due = a.status === "completed" ? null : dueLabel(a.due_date);
                 const level = levels[a.id];
@@ -163,7 +180,9 @@ export default function StudentAssignmentsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="page-title text-[19px] truncate">
-                            {surah ? surah.englishName : `Surah ${a.surah}`}
+                            {surahEnd
+                              ? `${surah?.englishName ?? `Surah ${a.surah}`} – ${surahEnd.englishName}`
+                              : (surah ? surah.englishName : `Surah ${a.surah}`)}
                           </h3>
                           {isDone && (
                             <span
@@ -175,8 +194,17 @@ export default function StudentAssignmentsPage() {
                           )}
                         </div>
                         <p className="text-[12px] text-ink-muted mt-0.5">
-                          Ayahs {a.ayah_start}–{a.ayah_end}
-                          {surah ? ` · page ${surah.startPage}` : ""}
+                          {surahEnd ? (
+                            <>
+                              Ayah {a.ayah_start} of {surah?.englishName} – Ayah {a.ayah_end} of{" "}
+                              {surahEnd.englishName}
+                            </>
+                          ) : (
+                            <>
+                              Ayahs {a.ayah_start}–{a.ayah_end}
+                              {surah ? ` · page ${surah.startPage}` : ""}
+                            </>
+                          )}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 mt-2">
                           <span

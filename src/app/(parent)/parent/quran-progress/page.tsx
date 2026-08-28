@@ -5,6 +5,7 @@ import { getSurahById } from "@/data/mushaf-index";
 import { Mushaf } from "@/components/Mushaf";
 import {
   DEMO_CHILDREN,
+  DEMO_CREATED_ASSIGNMENTS_KEY,
   demoAssignmentsFor,
   formatDay,
   dueLabel,
@@ -17,6 +18,7 @@ import {
   type AssignmentOverride,
   type RecitationLogEntry,
 } from "@/data/demo";
+import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { PortalHero } from "@/components/PortalHero";
 import {
   SectionCard,
@@ -42,18 +44,23 @@ export default function ParentQuranProgressPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
   const [log, setLog] = useState<RecitationLogEntry[]>([]);
+  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
 
-  // Ratings and remarks a teacher has set since this page's sample data was
-  // written; shared with the teacher portal via the same browser storage.
+  // Ratings, remarks and newly-created assignments a teacher has set since
+  // this page's sample data was written; shared with the teacher portal via
+  // the same browser storage.
   useEffect(() => {
     setOverrides(readDemoStore(OVERRIDES_KEY, {}));
     setLog(readDemoStore(LOG_KEY, []));
+    setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
   }, []);
 
   // The same records the teacher set and the student sees. This page used to
   // invent its own children and assignments, so a parent switching between
   // portals in a demo saw two different families.
-  const assignments = demoAssignmentsFor(child.id).map((a) => withOverride(a, overrides));
+  const assignments = demoAssignmentsFor(child.id, createdAssignments).map((a) =>
+    withOverride(a, overrides)
+  );
 
   const completed = assignments.filter((a) => a.status === "completed").length;
   const avg = assignments.length
@@ -107,6 +114,10 @@ export default function ParentQuranProgressPage() {
           <ul className="space-y-1">
             {assignments.map((a) => {
               const surah = getSurahById(a.surah);
+              const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
+              const rangeLabel = surahEnd
+                ? `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
+                : `ayahs ${a.ayah_start}–${a.ayah_end}`;
               const due = a.status === "completed" ? null : dueLabel(a.due_date);
               const isOpen = expanded === a.id;
 
@@ -131,11 +142,14 @@ export default function ParentQuranProgressPage() {
                           </span>
                         </p>
                         <p className="text-[14px] font-semibold text-ink truncate mt-0.5">
-                          {surah ? surah.englishName : `Surah ${a.surah}`}
-                          <span className="font-normal text-ink-muted">
-                            {" "}
-                            · ayahs {a.ayah_start}–{a.ayah_end}
-                          </span>
+                          {surahEnd ? (
+                            rangeLabel
+                          ) : (
+                            <>
+                              {surah ? surah.englishName : `Surah ${a.surah}`}
+                              <span className="font-normal text-ink-muted"> · {rangeLabel}</span>
+                            </>
+                          )}
                         </p>
                         <p className="text-[11px] text-ink-muted mt-0.5">
                           Set {formatDay(a.assigned_at)}
@@ -203,8 +217,9 @@ export default function ParentQuranProgressPage() {
                     <div className="mt-2 mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4">
                       <div className="flex items-baseline justify-between mb-3">
                         <p className="eyebrow">
-                          {surah ? surah.englishName : `Surah ${a.surah}`} · ayahs{" "}
-                          {a.ayah_start}–{a.ayah_end}
+                          {surahEnd
+                            ? rangeLabel
+                            : `${surah ? surah.englishName : `Surah ${a.surah}`} · ${rangeLabel}`}
                         </p>
                         <button
                           type="button"
@@ -219,6 +234,7 @@ export default function ParentQuranProgressPage() {
                         highlightedRange={{
                           surah: a.surah,
                           start: a.ayah_start,
+                          surahEnd: a.surah_end,
                           end: a.ayah_end,
                         }}
                       />

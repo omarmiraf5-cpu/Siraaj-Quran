@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   DEMO_STUDENTS,
   DEMO_ATTENDANCE,
+  DEMO_CREATED_ASSIGNMENTS_KEY,
   demoAssignmentsFor,
   summariseAttendance,
   formatDay,
@@ -21,6 +23,8 @@ import {
   EmptyNote,
   TeacherNote,
 } from "@/components/portal-ui";
+import { readDemoStore } from "@/lib/demoStore";
+import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 
 export function StudentDetailPanel({
   studentId,
@@ -30,11 +34,17 @@ export function StudentDetailPanel({
   onClose: () => void;
 }) {
   const student = DEMO_STUDENTS.find((s) => s.id === studentId);
+  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
+
+  useEffect(() => {
+    setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
+  }, []);
+
   if (!student) return null;
 
   const attendance = DEMO_ATTENDANCE[student.id] ?? [];
   const summary = summariseAttendance(attendance);
-  const assignments = demoAssignmentsFor(student.id);
+  const assignments = demoAssignmentsFor(student.id, createdAssignments);
 
   return (
     <Modal
@@ -80,6 +90,7 @@ export function StudentDetailPanel({
             <ul className="space-y-4 mt-3">
               {assignments.map((a) => {
                 const surah = getSurahById(a.surah);
+                const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
                 const due = a.status === "completed" ? null : dueLabel(a.due_date);
                 return (
                   <li key={a.id}>
@@ -87,11 +98,17 @@ export function StudentDetailPanel({
                       <div className="min-w-0 flex-1">
                         <p className="eyebrow">{PORTION_LABELS[a.portion]}</p>
                         <p className="text-[13px] font-semibold text-ink mt-0.5">
-                          {surah ? surah.englishName : `Surah ${a.surah}`}
-                          <span className="font-normal text-ink-muted">
-                            {" "}
-                            · ayahs {a.ayah_start}–{a.ayah_end}
-                          </span>
+                          {surahEnd ? (
+                            `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
+                          ) : (
+                            <>
+                              {surah ? surah.englishName : `Surah ${a.surah}`}
+                              <span className="font-normal text-ink-muted">
+                                {" "}
+                                · ayahs {a.ayah_start}–{a.ayah_end}
+                              </span>
+                            </>
+                          )}
                         </p>
                         {due && a.due_date && (
                           <p

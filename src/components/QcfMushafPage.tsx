@@ -53,7 +53,7 @@ export function QcfMushafPage({
 }: {
   pageNum: number;
   layout: PageLayout | null;
-  highlightedRange?: { surah: number; start: number; end: number };
+  highlightedRange?: { surah: number; start: number; end: number; surahEnd?: number };
   playingKey: string | null;
   onAyahClick: (surah: number, ayah: number) => void;
 }) {
@@ -139,14 +139,17 @@ export function QcfMushafPage({
   const wordSize = `min(6.2cqw, ${fitHeight}cqh)`;
   const headerSize = `min(10cqw, ${(Number(fitHeight) * HEADER_SCALE).toFixed(2)}cqh)`;
 
+  // A surah:ayah pair orders correctly against another as long as ayah
+  // counts never reach 1000 — the largest surah (Al-Baqarah) has 286.
+  const readingKey = (surah: number, ayah: number) => surah * 1000 + ayah;
+
   const isHighlighted = (key: string | number) => {
     if (!highlightedRange || typeof key !== "string") return false;
     const [s, a] = key.split(":").map(Number);
-    return (
-      s === highlightedRange.surah &&
-      a >= highlightedRange.start &&
-      a <= highlightedRange.end
-    );
+    const k = readingKey(s, a);
+    const lo = readingKey(highlightedRange.surah, highlightedRange.start);
+    const hi = readingKey(highlightedRange.surahEnd ?? highlightedRange.surah, highlightedRange.end);
+    return k >= lo && k <= hi;
   };
 
   return (

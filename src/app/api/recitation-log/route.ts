@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { student_id, portion, surah, ayah_start, ayah_end, rating, notes, session_date } = body;
+    const { student_id, portion, surah, ayah_start, surah_end, ayah_end, rating, notes, session_date } = body;
 
     if (!student_id || !portion || !surah || !ayah_start || !ayah_end || !rating) {
       return NextResponse.json(
@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
         portion,
         surah,
         ayah_start,
+        surah_end: surah_end ?? surah,
         ayah_end,
         rating,
         notes: notes || null,

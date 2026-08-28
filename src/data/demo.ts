@@ -127,7 +127,8 @@ function assignment(
   due: string | null,
   assigned: string,
   notes: string | null,
-  rating: DailyRating | null = null
+  rating: DailyRating | null = null,
+  surahEnd: number = surah
 ): QuranicAssignment {
   return {
     id,
@@ -135,6 +136,7 @@ function assignment(
     teacher_id: "t1",
     surah,
     ayah_start: from,
+    surah_end: surahEnd,
     ayah_end: to,
     portion,
     assigned_at: assigned,
@@ -210,8 +212,18 @@ export const DEMO_ASSIGNMENTS: QuranicAssignment[] = [
   assignment("a21", "s7", "old", 95, 1, 8, "completed", 100, "2026-08-17", "2026-07-30", null, "excellent"),
 ];
 
-export function demoAssignmentsFor(studentId: string): QuranicAssignment[] {
-  return DEMO_ASSIGNMENTS.filter((a) => a.student_id === studentId);
+// Assignments a teacher creates while browsing without a real Supabase
+// session, kept in localStorage under this key. Read by every portal that
+// shows an assignment, not just the teacher's own page — a parent or
+// student who can't see what was just assigned would make the whole demo
+// look broken.
+export const DEMO_CREATED_ASSIGNMENTS_KEY = "demo_created_assignments";
+
+export function demoAssignmentsFor(
+  studentId: string,
+  extra: QuranicAssignment[] = []
+): QuranicAssignment[] {
+  return [...extra, ...DEMO_ASSIGNMENTS].filter((a) => a.student_id === studentId);
 }
 
 // ── Daily rating ─────────────────────────────────────────────────────────
@@ -467,6 +479,8 @@ export interface RecitationLogEntry {
   portion: HifzPortion;
   surah: number;
   ayah_start: number;
+  /** Equal to surah for the common single-surah case. */
+  surah_end: number;
   ayah_end: number;
   rating: DailyRating;
   notes: string | null;
@@ -519,6 +533,7 @@ function buildRecitationLog(): RecitationLogEntry[] {
           portion,
           surah: current.surah,
           ayah_start: current.ayah_start,
+          surah_end: current.surah_end,
           ayah_end: current.ayah_end,
           rating: pool[pseudoIndex(seed, pool.length)],
           notes: null,
