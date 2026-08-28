@@ -10,6 +10,13 @@ import { useCallback, useState } from "react";
  */
 export type HifzPortion = "new" | "recent" | "old";
 
+/**
+ * How the teacher graded today's recitation of this portion. Parents read
+ * this word before anything else — it is how a maktab actually talks about
+ * a session, ahead of any percentage.
+ */
+export type DailyRating = "excellent" | "very_good" | "good" | "weak";
+
 export interface QuranicAssignment {
   id: string;
   student_id: string;
@@ -22,6 +29,7 @@ export interface QuranicAssignment {
   due_date: string | null;
   status: "assigned" | "in_progress" | "completed" | "needs_review";
   memorization_level: number;
+  daily_rating: DailyRating | null;
   teacher_notes: string | null;
   student_notes: string | null;
   created_at: string;

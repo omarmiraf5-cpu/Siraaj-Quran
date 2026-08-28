@@ -1,4 +1,4 @@
-import type { QuranicAssignment, HifzPortion } from "@/hooks/useQuranicAssignments";
+import type { QuranicAssignment, HifzPortion, DailyRating } from "@/hooks/useQuranicAssignments";
 
 // Sample data used to populate the portals before a school has real records
 // in the database. Every screen draws from this one file so the same students
@@ -126,7 +126,8 @@ function assignment(
   level: number,
   due: string | null,
   assigned: string,
-  notes: string | null
+  notes: string | null,
+  rating: DailyRating | null = null
 ): QuranicAssignment {
   return {
     id,
@@ -140,6 +141,7 @@ function assignment(
     due_date: due,
     status,
     memorization_level: level,
+    daily_rating: rating,
     teacher_notes: notes,
     student_notes: null,
     created_at: assigned,
@@ -154,53 +156,88 @@ function assignment(
 export const DEMO_ASSIGNMENTS: QuranicAssignment[] = [
   // Amina Hassan — working down Juz Amma.
   assignment("a1", "s1", "new", 78, 1, 20, "in_progress", 60, "2026-08-20", "2026-08-12",
-    "Careful with the madd in ayah 13 — hold it the full six counts."),
+    "Careful with the madd in ayah 13 — hold it the full six counts.", "good"),
   assignment("a2", "s1", "recent", 79, 1, 26, "needs_review", 45, "2026-08-14", "2026-08-10",
-    "Revise ayahs 8 to 12, the endings are running together."),
+    "Revise ayahs 8 to 12, the endings are running together.", "weak"),
   assignment("a3", "s1", "old", 67, 1, 30, "completed", 100, "2026-08-16", "2026-07-30",
-    "Beautifully held. This one is settled."),
+    "Beautifully held. This one is settled.", "excellent"),
 
   // Omar Warsame
-  assignment("a4", "s2", "new", 80, 1, 15, "in_progress", 35, "2026-08-20", "2026-08-12", null),
+  assignment("a4", "s2", "new", 80, 1, 15, "in_progress", 35, "2026-08-20", "2026-08-12", null, null),
   assignment("a5", "s2", "recent", 81, 1, 29, "assigned", 0, "2026-08-18", "2026-08-11",
-    "Listen to the recitation twice before you start."),
+    "Listen to the recitation twice before you start.", null),
   assignment("a6", "s2", "old", 55, 1, 78, "completed", 95, "2026-08-17", "2026-07-28",
-    "Excellent tajweed throughout."),
+    "Excellent tajweed throughout.", "excellent"),
 
   // Safia Abdi
-  assignment("a7", "s3", "new", 55, 1, 25, "assigned", 0, "2026-08-21", "2026-08-12", null),
-  assignment("a8", "s3", "recent", 56, 1, 40, "in_progress", 55, "2026-08-19", "2026-08-09", null),
+  assignment("a7", "s3", "new", 55, 1, 25, "assigned", 0, "2026-08-21", "2026-08-12", null, null),
+  assignment("a8", "s3", "recent", 56, 1, 40, "in_progress", 55, "2026-08-19", "2026-08-09", null, "good"),
   assignment("a9", "s3", "old", 36, 1, 83, "completed", 100, "2026-08-16", "2026-07-27",
-    "Ya-Sin is solid. Keep it in the weekly cycle."),
+    "Ya-Sin is solid. Keep it in the weekly cycle.", "excellent"),
 
   // Yusuf Ahmed
   assignment("a10", "s4", "new", 2, 255, 257, "in_progress", 70, "2026-08-18", "2026-08-12",
-    "Ayat al-Kursi — focus on the stops."),
+    "Ayat al-Kursi — focus on the stops.", "very_good"),
   assignment("a11", "s4", "recent", 18, 1, 10, "needs_review", 40, "2026-08-15", "2026-08-08",
-    "The first ten of Al-Kahf need another week."),
-  assignment("a12", "s4", "old", 78, 1, 40, "completed", 90, "2026-08-17", "2026-07-29", null),
+    "The first ten of Al-Kahf need another week.", "weak"),
+  assignment("a12", "s4", "old", 78, 1, 40, "completed", 90, "2026-08-17", "2026-07-29", null, "very_good"),
 
   // Hawa Mohamed
-  assignment("a13", "s5", "new", 18, 1, 10, "assigned", 0, "2026-08-22", "2026-08-12", null),
-  assignment("a14", "s5", "recent", 19, 1, 15, "in_progress", 45, "2026-08-19", "2026-08-10", null),
+  assignment("a13", "s5", "new", 18, 1, 10, "assigned", 0, "2026-08-22", "2026-08-12", null, null),
+  assignment("a14", "s5", "recent", 19, 1, 15, "in_progress", 45, "2026-08-19", "2026-08-10", null, "good"),
   assignment("a15", "s5", "old", 67, 1, 30, "completed", 100, "2026-08-16", "2026-07-31",
-    "Held well. Recite it to your parents this week."),
+    "Held well. Recite it to your parents this week.", "excellent"),
 
   // Ibrahim Osman
-  assignment("a16", "s6", "new", 50, 1, 20, "in_progress", 60, "2026-08-20", "2026-08-12", null),
+  assignment("a16", "s6", "new", 50, 1, 20, "in_progress", 60, "2026-08-20", "2026-08-12", null, "good"),
   assignment("a17", "s6", "recent", 49, 1, 13, "completed", 95, "2026-08-15", "2026-08-07",
-    "Very strong. A little more fluency on ayah 11."),
-  assignment("a18", "s6", "old", 78, 1, 40, "completed", 100, "2026-08-17", "2026-07-29", null),
+    "Very strong. A little more fluency on ayah 11.", "excellent"),
+  assignment("a18", "s6", "old", 78, 1, 40, "completed", 100, "2026-08-17", "2026-07-29", null, "excellent"),
 
   // Fatuma Ali
   assignment("a19", "s7", "new", 93, 1, 11, "needs_review", 55, "2026-08-16", "2026-08-12",
-    "Good effort — practise the last three ayahs again."),
-  assignment("a20", "s7", "recent", 95, 1, 8, "in_progress", 70, "2026-08-19", "2026-08-10", null),
-  assignment("a21", "s7", "old", 87, 1, 19, "completed", 100, "2026-08-17", "2026-07-30", null),
+    "Good effort — practise the last three ayahs again.", "weak"),
+  assignment("a20", "s7", "recent", 95, 1, 8, "in_progress", 70, "2026-08-19", "2026-08-10", null, "very_good"),
+  assignment("a21", "s7", "old", 87, 1, 19, "completed", 100, "2026-08-17", "2026-07-30", null, "excellent"),
 ];
 
 export function demoAssignmentsFor(studentId: string): QuranicAssignment[] {
   return DEMO_ASSIGNMENTS.filter((a) => a.student_id === studentId);
+}
+
+// ── Daily rating ─────────────────────────────────────────────────────────
+// What a teacher grades today's recitation as, read before any percentage.
+export const DAILY_RATING_ORDER: DailyRating[] = ["excellent", "very_good", "good", "weak"];
+
+export const DAILY_RATING_LABELS: Record<DailyRating, string> = {
+  excellent: "Excellent",
+  very_good: "Very good",
+  good: "Good",
+  weak: "Weak",
+};
+
+export const DAILY_RATING_STYLES: Record<DailyRating, string> = {
+  excellent: "bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300",
+  very_good: "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300",
+  good: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300",
+  weak: "bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300",
+};
+
+/**
+ * Merges a teacher's demo-mode edit (set via localStorage, since the sample
+ * assignments themselves are static data) on top of an assignment. Applied
+ * the same way in every portal so an edited rating shows everywhere.
+ */
+export type AssignmentOverride = Partial<
+  Pick<QuranicAssignment, "daily_rating" | "teacher_notes" | "status" | "memorization_level">
+>;
+
+export function withOverride(
+  a: QuranicAssignment,
+  overrides: Record<string, AssignmentOverride>
+): QuranicAssignment {
+  const o = overrides[a.id];
+  return o ? { ...a, ...o } : a;
 }
 
 // The date every portal treats as "today": the most recent day in the register.
@@ -309,4 +346,94 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
 export function formatDay(iso: string): string {
   const d = new Date(iso + "T00:00:00Z");
   return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+// ── Parent ↔ teacher communication ──────────────────────────────────────
+// One thread per student, shared by that student's parent and the teacher.
+// An "absence" message carries a specific date rather than free text, so it
+// shows up distinctly from a general concern.
+
+export const DEMO_TEACHER_NAME = "Ustadh Kareem";
+
+export type MessageAuthor = "parent" | "teacher";
+export type MessageKind = "message" | "absence";
+
+export interface ThreadMessage {
+  id: string;
+  student_id: string;
+  author: MessageAuthor;
+  author_name: string;
+  kind: MessageKind;
+  body: string;
+  /** ISO date, only set when kind is "absence". */
+  absence_date?: string;
+  /** ISO datetime. */
+  created_at: string;
+}
+
+export const DEMO_MESSAGES: ThreadMessage[] = [
+  {
+    id: "m1",
+    student_id: "s1",
+    author: "parent",
+    author_name: "Amina's parent",
+    kind: "message",
+    body: "Salaam ustadh, Amina says the new lesson felt quite long this week — is that expected?",
+    created_at: "2026-08-11T18:20:00Z",
+  },
+  {
+    id: "m2",
+    student_id: "s1",
+    author: "teacher",
+    author_name: DEMO_TEACHER_NAME,
+    kind: "message",
+    body: "Wa alaykum salaam. Surah An-Naba is longer than her usual portion — we can split it over two days if that helps her.",
+    created_at: "2026-08-11T19:05:00Z",
+  },
+  {
+    id: "m3",
+    student_id: "s1",
+    author: "parent",
+    author_name: "Amina's parent",
+    kind: "absence",
+    body: "Amina has a dentist appointment and will miss halaqa.",
+    absence_date: "2026-08-13",
+    created_at: "2026-08-12T09:00:00Z",
+  },
+  {
+    id: "m4",
+    student_id: "s2",
+    author: "teacher",
+    author_name: DEMO_TEACHER_NAME,
+    kind: "message",
+    body: "Omar recited beautifully today, mashaAllah. Encourage him to keep revising Surah An-Nazi'at at home too.",
+    created_at: "2026-08-10T17:40:00Z",
+  },
+  {
+    id: "m5",
+    student_id: "s2",
+    author: "parent",
+    author_name: "Omar's parent",
+    kind: "message",
+    body: "JazakAllah khair for letting us know, we'll go over it with him tonight.",
+    created_at: "2026-08-10T20:15:00Z",
+  },
+];
+
+export function demoMessagesFor(studentId: string, extra: ThreadMessage[] = []): ThreadMessage[] {
+  return [...DEMO_MESSAGES, ...extra]
+    .filter((m) => m.student_id === studentId)
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+}
+
+// Built by hand rather than toLocaleTimeString, for the same server/client
+// ICU mismatch reason as formatDay above — the input is a fixed ISO string
+// either way, so this stays stable between the two renders.
+export function formatMessageTime(iso: string): string {
+  const d = new Date(iso);
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  const ampm = h < 12 ? "am" : "pm";
+  return `${formatDay(iso.slice(0, 10))} · ${h12}:${String(m).padStart(2, "0")}${ampm}`;
 }

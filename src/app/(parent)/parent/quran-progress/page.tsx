@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getSurahById } from "@/data/mushaf-index";
 import { Mushaf } from "@/components/Mushaf";
 import {
@@ -12,6 +12,8 @@ import {
   ASSIGNMENT_STYLES,
   PORTION_LABELS,
   PORTION_ARABIC,
+  withOverride,
+  type AssignmentOverride,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import {
@@ -21,18 +23,29 @@ import {
   SegmentedSwitch,
   EmptyNote,
   TeacherNote,
+  RatingPill,
 } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
+import { readDemoStore } from "@/lib/demoStore";
+
+const OVERRIDES_KEY = "demo_assignment_overrides";
 
 export default function ParentQuranProgressPage() {
   const [childId, setChildId] = useState(DEMO_CHILDREN[0].id);
   const child = DEMO_CHILDREN.find((c) => c.id === childId) ?? DEMO_CHILDREN[0];
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
+
+  // Ratings and remarks a teacher has set since this page's sample data was
+  // written; shared with the teacher portal via the same browser storage.
+  useEffect(() => {
+    setOverrides(readDemoStore(OVERRIDES_KEY, {}));
+  }, []);
 
   // The same records the teacher set and the student sees. This page used to
   // invent its own children and assignments, so a parent switching between
   // portals in a demo saw two different families.
-  const assignments = demoAssignmentsFor(child.id);
+  const assignments = demoAssignmentsFor(child.id).map((a) => withOverride(a, overrides));
 
   const completed = assignments.filter((a) => a.status === "completed").length;
   const avg = assignments.length
@@ -146,6 +159,21 @@ export default function ParentQuranProgressPage() {
                       </div>
                     </div>
 
+                    {/* The rating word leads, with the teacher's remark right
+                        after it — a parent reads "Excellent — held the madd
+                        well" faster than a bare percentage. The percentage
+                        stays underneath as the finer-grained measure. */}
+                    {a.daily_rating && (
+                      <div className="flex items-start gap-2 mt-2.5">
+                        <RatingPill rating={a.daily_rating} />
+                        {a.teacher_notes && (
+                          <p className="text-[12.5px] text-ink-body font-serif italic leading-snug pt-0.5">
+                            {a.teacher_notes}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Capped, because a bar spanning the full width of a
                         desktop card reads as a page loader rather than a
                         measure of one surah. */}
@@ -158,7 +186,9 @@ export default function ParentQuranProgressPage() {
                       </span>
                     </div>
 
-                    {a.teacher_notes && <TeacherNote>{a.teacher_notes}</TeacherNote>}
+                    {!a.daily_rating && a.teacher_notes && (
+                      <TeacherNote>{a.teacher_notes}</TeacherNote>
+                    )}
                   </button>
 
                   {isOpen && (

@@ -14,13 +14,18 @@ import {
   PORTION_LABELS,
   PORTION_ARABIC,
   PORTION_BLURB,
+  DAILY_RATING_ORDER,
+  DAILY_RATING_LABELS,
+  withOverride,
+  type AssignmentOverride,
 } from "@/data/demo";
-import type { HifzPortion, QuranicAssignment } from "@/hooks/useQuranicAssignments";
+import type { HifzPortion, QuranicAssignment, DailyRating } from "@/hooks/useQuranicAssignments";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, ProgressBar } from "@/components/portal-ui";
-import { IconBook } from "@/components/icons";
+import { SectionCard, ProgressBar, RatingPill } from "@/components/portal-ui";
+import { IconBook, IconArrow } from "@/components/icons";
+import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 
 interface Student {
   id: string;
@@ -45,6 +50,11 @@ function loadDemoCreated(): QuranicAssignment[] {
   }
 }
 
+// Rating and remark edits against the sample assignments, which are static
+// data and cannot be mutated in place. Read by the parent portal too, so a
+// rating set here shows up there in the same browser.
+const OVERRIDES_KEY = "demo_assignment_overrides";
+
 export default function QuranAssignmentsPage() {
   const supabase = createClient();
   const surahs = QURAN;
@@ -62,6 +72,11 @@ export default function QuranAssignmentsPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [demoCreated, setDemoCreated] = useState<QuranicAssignment[]>([]);
+  const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftRating, setDraftRating] = useState<DailyRating | null>(null);
+  const [draftNotes, setDraftNotes] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -75,6 +90,7 @@ export default function QuranAssignmentsPage() {
           setIsDemo(true);
           setStudents(DEMO_STUDENTS.map((s) => ({ id: s.id, full_name: s.name })));
           setDemoCreated(loadDemoCreated());
+          setOverrides(readDemoStore(OVERRIDES_KEY, {}));
           return;
         }
 
@@ -123,6 +139,7 @@ export default function QuranAssignmentsPage() {
           due_date: dueDate || null,
           status: "assigned",
           memorization_level: 0,
+          daily_rating: null,
           teacher_notes: notes || null,
           student_notes: null,
           created_at: new Date().toISOString(),
@@ -182,7 +199,39 @@ export default function QuranAssignmentsPage() {
 
   // Newest first, so an assignment just created shows at the top of the list
   // below rather than getting lost among the sample data.
-  const allAssignments = [...demoCreated, ...DEMO_ASSIGNMENTS];
+  const allAssignments = [...demoCreated, ...DEMO_ASSIGNMENTS].map((a) =>
+    withOverride(a, overrides)
+  );
+
+  const startEditing = (a: QuranicAssignment) => {
+    setEditingId(a.id === editingId ? null : a.id);
+    setDraftRating(a.daily_rating);
+    setDraftNotes(a.teacher_notes ?? "");
+  };
+
+  const saveEdit = async (a: QuranicAssignment) => {
+    setSavingEdit(true);
+    const patch: AssignmentOverride = {
+      daily_rating: draftRating,
+      teacher_notes: draftNotes.trim() || null,
+    };
+    try {
+      if (isDemo) {
+        const next = { ...overrides, [a.id]: { ...overrides[a.id], ...patch } };
+        setOverrides(next);
+        writeDemoStore(OVERRIDES_KEY, next);
+      } else {
+        await fetch(`/api/quranic-assignments/${a.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+      }
+      setEditingId(null);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto pb-20 space-y-4 pt-2">
@@ -425,46 +474,125 @@ export default function QuranAssignmentsPage() {
           properly signed in, and adds a browser-local preview row otherwise. */}
       <SectionCard
         title="Current assignments"
-        note={`${allAssignments.length} across all students`}
+        note={`${allAssignments.length} across all students · tap to grade`}
       >
         <ul className="divide-y divide-surface-border -my-1">
           {allAssignments.map((a) => {
             const surah = getSurahById(a.surah);
             const name = studentName(a.student_id);
+            const isOpen = editingId === a.id;
 
             return (
-              <li key={a.id} className="flex items-center gap-3 py-3">
-                <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
-                  {initials(name)}
-                </span>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">
-                    {name}
-                    <span className="font-normal text-ink-muted">
-                      {" · "}
-                      {PORTION_LABELS[a.portion]}
-                    </span>
-                  </p>
-                  <p className="text-[11px] text-ink-muted truncate">
-                    {surah ? surah.englishName : `Surah ${a.surah}`} · ayahs{" "}
-                    {a.ayah_start}–{a.ayah_end}
-                    {a.due_date ? ` · due ${formatDay(a.due_date)}` : ""}
-                  </p>
-                </div>
-
-                <div className="w-16 flex-shrink-0 hidden sm:block">
-                  <ProgressBar value={a.memorization_level} />
-                  <p className="text-[10px] text-ink-muted text-right mt-1 tabular-nums">
-                    {a.memorization_level}%
-                  </p>
-                </div>
-
-                <span
-                  className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${ASSIGNMENT_STYLES[a.status]}`}
+              <li key={a.id}>
+                <button
+                  type="button"
+                  onClick={() => startEditing(a)}
+                  aria-expanded={isOpen}
+                  className="w-full flex items-center gap-3 py-3 text-left hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
                 >
-                  {ASSIGNMENT_LABELS[a.status]}
-                </span>
+                  <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
+                    {initials(name)}
+                  </span>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-ink truncate">
+                      {name}
+                      <span className="font-normal text-ink-muted">
+                        {" · "}
+                        {PORTION_LABELS[a.portion]}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-ink-muted truncate">
+                      {surah ? surah.englishName : `Surah ${a.surah}`} · ayahs{" "}
+                      {a.ayah_start}–{a.ayah_end}
+                      {a.due_date ? ` · due ${formatDay(a.due_date)}` : ""}
+                    </p>
+                  </div>
+
+                  {a.daily_rating ? (
+                    <RatingPill rating={a.daily_rating} />
+                  ) : (
+                    <div className="w-16 flex-shrink-0 hidden sm:block">
+                      <ProgressBar value={a.memorization_level} />
+                      <p className="text-[10px] text-ink-muted text-right mt-1 tabular-nums">
+                        {a.memorization_level}%
+                      </p>
+                    </div>
+                  )}
+
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap hidden sm:inline-block ${ASSIGNMENT_STYLES[a.status]}`}
+                  >
+                    {ASSIGNMENT_LABELS[a.status]}
+                  </span>
+
+                  <span
+                    className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}
+                  >
+                    <IconArrow size={14} />
+                  </span>
+                </button>
+
+                {isOpen && (
+                  <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-ink mb-2">
+                        Today&apos;s rating
+                      </p>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {DAILY_RATING_ORDER.map((r) => {
+                          const active = draftRating === r;
+                          return (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => setDraftRating(active ? null : r)}
+                              aria-pressed={active}
+                              className={`rounded-xl border px-1.5 py-2 text-[11px] font-semibold text-center transition-all active:scale-[.97] ${
+                                active
+                                  ? "border-brand-navy bg-brand-navy text-white"
+                                  : "border-surface-border bg-surface-card text-ink hover:border-brand-navy/40"
+                              }`}
+                            >
+                              {DAILY_RATING_LABELS[r]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-ink mb-1.5">
+                        Remark for the parent
+                      </label>
+                      <textarea
+                        value={draftNotes}
+                        onChange={(e) => setDraftNotes(e.target.value)}
+                        rows={3}
+                        placeholder="e.g. Held the madd well today, keep it up."
+                        className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition resize-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveEdit(a)}
+                        disabled={savingEdit}
+                        className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50 hover:opacity-90 active:scale-[.98] transition-all"
+                      >
+                        {savingEdit ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </li>
             );
           })}

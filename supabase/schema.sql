@@ -268,6 +268,9 @@ create table if not exists quranic_assignments (
   due_date             date,
   status               text not null default 'assigned' check (status in ('assigned', 'in_progress', 'completed', 'needs_review')),
   memorization_level   int not null default 0 check (memorization_level between 0 and 100),
+  -- How the teacher graded today's recitation. Parents read this before any
+  -- percentage, so it is set independently of memorization_level.
+  daily_rating         text check (daily_rating in ('excellent', 'very_good', 'good', 'weak')),
   teacher_notes        text,
   student_notes        text,
   created_at           timestamptz default now(),
@@ -288,6 +291,18 @@ begin
     alter table quranic_assignments
       add constraint quranic_assignments_portion_check
       check (portion in ('new', 'recent', 'old'));
+  end if;
+end $$;
+alter table quranic_assignments
+  add column if not exists daily_rating text;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'quranic_assignments_daily_rating_check'
+  ) then
+    alter table quranic_assignments
+      add constraint quranic_assignments_daily_rating_check
+      check (daily_rating in ('excellent', 'very_good', 'good', 'weak'));
   end if;
 end $$;
 alter table quranic_assignments enable row level security;
@@ -459,6 +474,42 @@ create policy "Admins can manage announcements" on announcements
   );
 
 -- ══════════════════════════════════════
+-- Messages (parent ↔ teacher, per student)
+-- ══════════════════════════════════════
+create table if not exists messages (
+  id            uuid primary key default gen_random_uuid(),
+  student_id    uuid not null references students(id) on delete cascade,
+  school_id     uuid not null references schools(id) on delete cascade,
+  author_id     uuid not null references profiles(id),
+  author_role   text not null check (author_role in ('parent', 'teacher')),
+  -- "absence" carries a specific date rather than free text, so a teacher's
+  -- inbox can flag it distinctly from a general concern.
+  kind          text not null default 'message' check (kind in ('message', 'absence')),
+  body          text not null,
+  absence_date  date,
+  created_at    timestamptz default now()
+);
+alter table messages enable row level security;
+create policy "Teachers can manage messages for own students" on messages
+  for all using (
+    student_id in (
+      select id from students s
+      join classes c on c.school_id = s.school_id
+      where c.teacher_id = auth.uid()
+    )
+    or author_id = auth.uid()
+  );
+create policy "Parents can read and send messages for own children" on messages
+  for all using (
+    student_id in (select student_id from parent_students where parent_id = auth.uid())
+    or author_id = auth.uid()
+  );
+create policy "Admins can read all messages" on messages
+  for select using (
+    school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- ══════════════════════════════════════
 -- Indexes for performance
 -- ══════════════════════════════════════
 create index if not exists idx_profiles_school   on profiles(school_id);
@@ -477,3 +528,5 @@ create index if not exists idx_announcements_school on announcements(school_id);
 create index if not exists idx_quranic_assignments_student on quranic_assignments(student_id);
 create index if not exists idx_quranic_assignments_teacher on quranic_assignments(teacher_id);
 create index if not exists idx_quranic_assignments_surah on quranic_assignments(surah);
+create index if not exists idx_messages_student on messages(student_id);
+create index if not exists idx_messages_created on messages(created_at);

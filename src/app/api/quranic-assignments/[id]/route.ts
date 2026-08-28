@@ -13,6 +13,7 @@ export async function PATCH(
     const {
       status,
       memorization_level,
+      daily_rating,
       student_notes,
       teacher_notes,
     } = body;
@@ -31,6 +32,7 @@ export async function PATCH(
       .update({
         status,
         memorization_level,
+        daily_rating,
         student_notes,
         teacher_notes,
         updated_at: new Date().toISOString(),

@@ -10,10 +10,13 @@ import { useEffect } from "react";
 import {
   ATTENDANCE_DOT,
   ATTENDANCE_LABELS,
+  DAILY_RATING_LABELS,
+  DAILY_RATING_STYLES,
   formatDay,
   type AttendanceDay,
   type AttendanceSummary,
 } from "@/data/demo";
+import type { DailyRating } from "@/hooks/useQuranicAssignments";
 
 /* ── Modal ─────────────────────────────────────────────────────────────
    Escape and a backdrop click both close. The navy header matches the
@@ -287,6 +290,20 @@ export function SegmentedSwitch<T extends string>({
    Quiet rather than an alert box; nothing here is a problem. */
 export function EmptyNote({ children }: { children: React.ReactNode }) {
   return <p className="text-[13px] text-ink-muted py-2">{children}</p>;
+}
+
+/* ── Daily rating pill ─────────────────────────────────────────────────
+   Excellent / Very good / Good / Weak — what a teacher grades today's
+   recitation as, coloured so a parent reads it at a glance before any
+   percentage. */
+export function RatingPill({ rating }: { rating: DailyRating }) {
+  return (
+    <span
+      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${DAILY_RATING_STYLES[rating]}`}
+    >
+      {DAILY_RATING_LABELS[rating]}
+    </span>
+  );
 }
 
 /* ── Teacher's note ────────────────────────────────────────────────────
