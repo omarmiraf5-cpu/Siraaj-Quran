@@ -153,27 +153,36 @@ function assignment(
 // runs: a new lesson to learn, the recent ground to keep warm, and the older
 // ground cycled so it is not lost. The old revision is deliberately the
 // largest range and the new lesson the smallest.
+//
+// A hifz student here works backward through the mushaf from An-Nas (114)
+// toward Al-Fatihah, so surah number only ever falls as they progress: the
+// old revision — settled longest ago, closest to where they started — is
+// always the highest surah number of the three, the new lesson — today's
+// frontier, furthest toward the front of the mushaf — is always the lowest,
+// and recent revision sits in between.
 export const DEMO_ASSIGNMENTS: QuranicAssignment[] = [
-  // Amina Hassan — working down Juz Amma.
-  assignment("a1", "s1", "new", 78, 1, 20, "in_progress", 60, "2026-08-20", "2026-08-12",
+  // Amina Hassan — finished Juz Amma down to An-Naba, now starting Al-Mulk,
+  // one of the first surahs commonly taught right after Juz Amma.
+  assignment("a1", "s1", "new", 67, 1, 30, "in_progress", 60, "2026-08-20", "2026-08-12",
     "Careful with the madd in ayah 13 — hold it the full six counts.", "good"),
-  assignment("a2", "s1", "recent", 79, 1, 26, "needs_review", 45, "2026-08-14", "2026-08-10",
+  assignment("a2", "s1", "recent", 78, 1, 20, "needs_review", 45, "2026-08-14", "2026-08-10",
     "Revise ayahs 8 to 12, the endings are running together.", "weak"),
-  assignment("a3", "s1", "old", 67, 1, 30, "completed", 100, "2026-08-16", "2026-07-30",
+  assignment("a3", "s1", "old", 79, 1, 46, "completed", 100, "2026-08-16", "2026-07-30",
     "Beautifully held. This one is settled.", "excellent"),
 
-  // Omar Warsame
-  assignment("a4", "s2", "new", 80, 1, 15, "in_progress", 35, "2026-08-20", "2026-08-12", null, null),
-  assignment("a5", "s2", "recent", 81, 1, 29, "assigned", 0, "2026-08-18", "2026-08-11",
+  // Omar Warsame — settled the end of Juz Amma, now working through Ar-Rahman.
+  assignment("a4", "s2", "new", 55, 1, 25, "in_progress", 35, "2026-08-20", "2026-08-12", null, null),
+  assignment("a5", "s2", "recent", 80, 1, 42, "assigned", 0, "2026-08-18", "2026-08-11",
     "Listen to the recitation twice before you start.", null),
-  assignment("a6", "s2", "old", 55, 1, 78, "completed", 95, "2026-08-17", "2026-07-28",
+  assignment("a6", "s2", "old", 81, 1, 29, "completed", 95, "2026-08-17", "2026-07-28",
     "Excellent tajweed throughout.", "excellent"),
 
-  // Safia Abdi
-  assignment("a7", "s3", "new", 55, 1, 25, "assigned", 0, "2026-08-21", "2026-08-12", null, null),
-  assignment("a8", "s3", "recent", 56, 1, 40, "in_progress", 55, "2026-08-19", "2026-08-09", null, "good"),
-  assignment("a9", "s3", "old", 36, 1, 83, "completed", 100, "2026-08-16", "2026-07-27",
-    "Ya-Sin is solid. Keep it in the weekly cycle.", "excellent"),
+  // Safia Abdi — settled Al-Waqi'ah, now working back through Ar-Rahman
+  // toward Ya-Sin.
+  assignment("a7", "s3", "new", 36, 1, 25, "assigned", 0, "2026-08-21", "2026-08-12", null, null),
+  assignment("a8", "s3", "recent", 55, 1, 35, "in_progress", 55, "2026-08-19", "2026-08-09", null, "good"),
+  assignment("a9", "s3", "old", 56, 1, 96, "completed", 100, "2026-08-16", "2026-07-27",
+    "Al-Waqi'ah is solid. Keep it in the weekly cycle.", "excellent"),
 
   // Yusuf Ahmed
   assignment("a10", "s4", "new", 2, 255, 257, "in_progress", 70, "2026-08-18", "2026-08-12",
@@ -188,17 +197,17 @@ export const DEMO_ASSIGNMENTS: QuranicAssignment[] = [
   assignment("a15", "s5", "old", 67, 1, 30, "completed", 100, "2026-08-16", "2026-07-31",
     "Held well. Recite it to your parents this week.", "excellent"),
 
-  // Ibrahim Osman
-  assignment("a16", "s6", "new", 50, 1, 20, "in_progress", 60, "2026-08-20", "2026-08-12", null, "good"),
-  assignment("a17", "s6", "recent", 49, 1, 13, "completed", 95, "2026-08-15", "2026-08-07",
+  // Ibrahim Osman — settled An-Naba and Qaf, now on Al-Hujurat.
+  assignment("a16", "s6", "new", 49, 1, 8, "in_progress", 60, "2026-08-20", "2026-08-12", null, "good"),
+  assignment("a17", "s6", "recent", 50, 1, 45, "completed", 95, "2026-08-15", "2026-08-07",
     "Very strong. A little more fluency on ayah 11.", "excellent"),
   assignment("a18", "s6", "old", 78, 1, 40, "completed", 100, "2026-08-17", "2026-07-29", null, "excellent"),
 
-  // Fatuma Ali
-  assignment("a19", "s7", "new", 93, 1, 11, "needs_review", 55, "2026-08-16", "2026-08-12",
+  // Fatuma Ali — settled At-Tin and Ad-Duha, now on Al-A'la.
+  assignment("a19", "s7", "new", 87, 1, 11, "needs_review", 55, "2026-08-16", "2026-08-12",
     "Good effort — practise the last three ayahs again.", "weak"),
-  assignment("a20", "s7", "recent", 95, 1, 8, "in_progress", 70, "2026-08-19", "2026-08-10", null, "very_good"),
-  assignment("a21", "s7", "old", 87, 1, 19, "completed", 100, "2026-08-17", "2026-07-30", null, "excellent"),
+  assignment("a20", "s7", "recent", 93, 1, 11, "in_progress", 70, "2026-08-19", "2026-08-10", null, "very_good"),
+  assignment("a21", "s7", "old", 95, 1, 8, "completed", 100, "2026-08-17", "2026-07-30", null, "excellent"),
 ];
 
 export function demoAssignmentsFor(studentId: string): QuranicAssignment[] {
