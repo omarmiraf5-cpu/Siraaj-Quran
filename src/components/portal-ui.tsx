@@ -314,11 +314,39 @@ export function RatingPill({ rating }: { rating: DailyRating }) {
   );
 }
 
+/* ── One recitation, in full ──────────────────────────────────────────
+   What was read, and how it went. Shared between the timeline and the
+   selected-day detail below, since both show the same thing. */
+function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?: boolean }) {
+  const surah = getSurahById(entry.surah);
+  return (
+    <div className="flex items-start justify-between gap-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-[12px] font-semibold text-ink">
+          {showDate && `${formatDay(entry.date)} · `}
+          {PORTION_LABELS[entry.portion]}
+        </p>
+        <p className="text-[11px] text-ink-muted truncate">
+          {surah ? surah.englishName : `Surah ${entry.surah}`} · ayahs {entry.ayah_start}–{entry.ayah_end}
+        </p>
+        {entry.notes && (
+          <p className="text-[12px] text-ink-body font-serif italic leading-snug mt-1">
+            {entry.notes}
+          </p>
+        )}
+      </div>
+      <RatingPill rating={entry.rating} />
+    </div>
+  );
+}
+
 /* ── Recitation history ────────────────────────────────────────────────
    A month calendar coloured by that day's rating, a tally for the month,
    and a day-by-day list of exactly what was read. Shared by the parent
    and teacher portals so a family and a teacher are reading the same
-   record rather than two different views of it. */
+   record rather than two different views of it. Tapping a day on the
+   calendar opens that day's complete record — every portion heard that
+   day, not just whichever one happens to colour the dot. */
 export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }) {
   // The most recent session's month drives the calendar, so opening the
   // page lands on whichever month actually has sessions logged in it.
@@ -327,10 +355,18 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
     const d = latest ? new Date(latest.date + "T00:00:00Z") : new Date();
     return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
   });
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+  // Grouped rather than one-entry-per-day: a day a teacher graded more than
+  // one portion on should show all of them, not just whichever was written
+  // to the map last.
   const byDate = useMemo(() => {
-    const map = new Map<string, RecitationLogEntry>();
-    for (const e of entries) map.set(e.date, e);
+    const map = new Map<string, RecitationLogEntry[]>();
+    for (const e of entries) {
+      const list = map.get(e.date);
+      if (list) list.push(e);
+      else map.set(e.date, [e]);
+    }
     return map;
   }, [entries]);
 
@@ -346,8 +382,10 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
   const monthEntries = entries.filter((e) => e.date.startsWith(`${cursor.year}-${pad(cursor.month + 1)}`));
   const tally = tallyRatings(monthEntries);
   const hasAny = entries.length > 0;
+  const selectedEntries = selectedDate ? (byDate.get(selectedDate) ?? []) : [];
 
   const shiftMonth = (delta: number) => {
+    setSelectedDate(null);
     setCursor(({ year, month }) => {
       const d = new Date(Date.UTC(year, month + delta, 1));
       return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
@@ -382,25 +420,74 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-y-1.5 text-center mb-1">
+      <div className="grid grid-cols-7 gap-y-1 text-center mb-1">
         {WEEKDAY_SHORT.map((w) => (
           <span key={w} className="text-[9px] font-semibold text-ink-muted uppercase">{w}</span>
         ))}
         {cells.map((day, i) => {
           if (day === null) return <span key={i} />;
           const iso = `${cursor.year}-${pad(cursor.month + 1)}-${pad(day)}`;
-          const entry = byDate.get(iso);
+          const dayEntries = byDate.get(iso) ?? [];
+          const selected = selectedDate === iso;
           return (
-            <div key={i} className="flex flex-col items-center justify-center h-7 gap-0.5">
-              <span className="text-[10px] text-ink-muted tabular-nums">{day}</span>
+            <button
+              key={i}
+              type="button"
+              onClick={() => setSelectedDate(selected ? null : iso)}
+              aria-pressed={selected}
+              aria-label={
+                dayEntries.length > 0
+                  ? `${formatDay(iso)} — ${dayEntries.length} session${dayEntries.length > 1 ? "s" : ""} graded`
+                  : formatDay(iso)
+              }
+              className={`flex flex-col items-center justify-center h-8 gap-0.5 rounded-lg transition-colors ${
+                selected ? "bg-brand-navy/10 dark:bg-brand-gold/15" : "hover:bg-surface-bg-warm"
+              }`}
+            >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${entry ? DAILY_RATING_DOT[entry.rating] : "bg-transparent"}`}
-                title={entry ? `${formatDay(entry.date)} · ${DAILY_RATING_LABELS[entry.rating]}` : undefined}
-              />
-            </div>
+                className={`text-[10px] tabular-nums ${selected ? "font-bold text-ink" : "text-ink-muted"}`}
+              >
+                {day}
+              </span>
+              <span className="flex items-center gap-0.5 h-1.5">
+                {dayEntries.length === 0 ? (
+                  <span className="w-1.5 h-1.5" />
+                ) : (
+                  dayEntries.map((e) => (
+                    <span key={e.id} className={`w-1.5 h-1.5 rounded-full ${DAILY_RATING_DOT[e.rating]}`} />
+                  ))
+                )}
+              </span>
+            </button>
           );
         })}
       </div>
+
+      {selectedDate && (
+        <div className="mt-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5">
+          <div className="flex items-baseline justify-between mb-1">
+            <p className="eyebrow">{formatDay(selectedDate)}</p>
+            <button
+              type="button"
+              onClick={() => setSelectedDate(null)}
+              className="text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors"
+            >
+              Close
+            </button>
+          </div>
+          {selectedEntries.length === 0 ? (
+            <EmptyNote>No session was graded this day.</EmptyNote>
+          ) : (
+            <ul className="divide-y divide-surface-border -my-1">
+              {selectedEntries.map((e) => (
+                <li key={e.id}>
+                  <LogEntryRow entry={e} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="gold-rule my-4" />
 
@@ -423,31 +510,11 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
         {entries
           .slice()
           .reverse()
-          .map((e) => {
-            const surah = getSurahById(e.surah);
-            return (
-              <li key={e.id} className="flex items-start justify-between gap-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-[12px] font-semibold text-ink">
-                    {formatDay(e.date)}
-                    <span className="font-normal text-ink-muted">
-                      {" · "}
-                      {PORTION_LABELS[e.portion]}
-                    </span>
-                  </p>
-                  <p className="text-[11px] text-ink-muted truncate">
-                    {surah ? surah.englishName : `Surah ${e.surah}`} · ayahs {e.ayah_start}–{e.ayah_end}
-                  </p>
-                  {e.notes && (
-                    <p className="text-[12px] text-ink-body font-serif italic leading-snug mt-1">
-                      {e.notes}
-                    </p>
-                  )}
-                </div>
-                <RatingPill rating={e.rating} />
-              </li>
-            );
-          })}
+          .map((e) => (
+            <li key={e.id}>
+              <LogEntryRow entry={e} showDate />
+            </li>
+          ))}
       </ul>
     </div>
   );
