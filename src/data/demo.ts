@@ -474,61 +474,75 @@ export interface RecitationLogEntry {
   date: string;
 }
 
-// One pattern per student, oldest first, so the story of the month (who is
-// trending up, who has a rough patch) is distinct per child rather than
-// everyone looking the same. Portions are graded in rotation — new, recent,
-// old — the same order a halaqa hears them in, so each gets heard roughly
-// every third day rather than all three every single day.
-const RATING_HISTORY_PATTERNS: Record<string, DailyRating[]> = {
-  s1: ["good","very_good","weak","good","excellent","good","weak","very_good","good","excellent","weak","good","very_good","excellent","good","weak","good","excellent","very_good","good"],
-  s2: ["good","good","very_good","excellent","good","weak","good","very_good","excellent","good","good","very_good","excellent","good","weak","good","very_good","excellent","good","good"],
-  s3: ["weak","good","good","very_good","excellent","good","weak","good","very_good","excellent","good","good","weak","very_good","excellent","good","good","very_good","excellent","good"],
-  s4: ["very_good","good","weak","very_good","good","excellent","weak","very_good","good","excellent","weak","very_good","good","excellent","weak","very_good","good","excellent","weak","very_good"],
-  s5: ["good","good","very_good","excellent","good","good","weak","good","very_good","excellent","good","good","weak","good","very_good","excellent","good","good","very_good","good"],
-  s6: ["very_good","excellent","good","excellent","very_good","excellent","good","excellent","very_good","excellent","good","excellent","very_good","excellent","good","excellent","very_good","excellent","good","excellent"],
-  s7: ["good","weak","very_good","excellent","good","weak","very_good","excellent","weak","good","very_good","excellent","weak","good","very_good","excellent","weak","good","very_good","excellent"],
+// All three portions are heard the same day — the new lesson, then the
+// recent ground, then the old, in one sitting, exactly as HIFZ_PORTIONS is
+// ordered above. So every school day gets one entry per portion, not one
+// portion rotating across days.
+//
+// Ratings vary without a literal 420-value table (7 students × 20 days × 3
+// portions) by drawing from a per-portion weighted pool: repeating a rating
+// in its pool biases the draw toward it without separate probability math.
+// The old ground is the most rehearsed material a student has, so it skews
+// toward excellent; the new lesson is the least secure, so it skews toward
+// the middle and dips into weak more often — the same shape a real hifz
+// record has, where today's newest work is shakier than what was settled
+// weeks ago.
+const PORTION_RATING_POOL: Record<HifzPortion, DailyRating[]> = {
+  new: ["excellent", "very_good", "good", "good", "good", "weak", "weak"],
+  recent: ["excellent", "very_good", "very_good", "good", "good", "weak"],
+  old: ["excellent", "excellent", "excellent", "very_good", "very_good", "good"],
 };
 
-function buildRecitationLog(): RecitationLogEntry[] {
-  const orderedDays = DAYS.slice().reverse(); // oldest first, to match the patterns above
-  const entries: RecitationLogEntry[] = [];
+// Deterministic, not Math.random(): this file runs on the server for the
+// first paint and in the browser for hydration, and two different random
+// draws for the same entry would be reported as a mismatch between them.
+function pseudoIndex(seed: number, buckets: number): number {
+  const x = Math.abs(Math.sin(seed * 12.9898) * 43758.5453);
+  return Math.floor((x - Math.floor(x)) * buckets);
+}
 
-  for (const student of DEMO_STUDENTS) {
-    const pattern = RATING_HISTORY_PATTERNS[student.id];
+function buildRecitationLog(): RecitationLogEntry[] {
+  const orderedDays = DAYS.slice().reverse(); // oldest first
+
+  const entries = DEMO_STUDENTS.flatMap((student, studentIndex) => {
     const portions = assignmentsByPortion(demoAssignmentsFor(student.id));
 
-    orderedDays.forEach((date, i) => {
-      const portion = HIFZ_PORTIONS[i % HIFZ_PORTIONS.length];
-      const current = portions[portion][0];
-      if (!current) return;
-      entries.push({
-        id: `log-${student.id}-${i}`,
-        student_id: student.id,
-        portion,
-        surah: current.surah,
-        ayah_start: current.ayah_start,
-        ayah_end: current.ayah_end,
-        rating: pattern[i],
-        notes: null,
-        date,
-      });
-    });
+    const studentEntries = orderedDays.flatMap((date, dayIndex) =>
+      HIFZ_PORTIONS.flatMap((portion) => {
+        const current = portions[portion][0];
+        if (!current) return [];
+        const pool = PORTION_RATING_POOL[portion];
+        const seed = studentIndex * 97 + dayIndex * 13 + portion.length;
+        const entry: RecitationLogEntry = {
+          id: `log-${student.id}-${portion}-${dayIndex}`,
+          student_id: student.id,
+          portion,
+          surah: current.surah,
+          ayah_start: current.ayah_start,
+          ayah_end: current.ayah_end,
+          rating: pool[pseudoIndex(seed, pool.length)],
+          notes: null,
+          date,
+        };
+        return [entry];
+      })
+    );
 
     // The most recent session for each portion should read exactly like
     // that portion's assignment card — same rating, same remark — rather
-    // than an independent value the pattern above happened to land on.
+    // than an independent value the draw above happened to land on.
     for (const portion of HIFZ_PORTIONS) {
       const current = portions[portion][0];
       if (!current || !current.daily_rating) continue;
-      const last = [...entries]
-        .reverse()
-        .find((e) => e.student_id === student.id && e.portion === portion);
+      const last = [...studentEntries].reverse().find((e) => e.portion === portion);
       if (last) {
         last.rating = current.daily_rating;
         last.notes = current.teacher_notes;
       }
     }
-  }
+
+    return studentEntries;
+  });
 
   return entries;
 }
