@@ -160,13 +160,43 @@ export function QcfMushafPage({
           line.length > 0 &&
           (line[0][0] === KIND_HEADER || line[0][0] === KIND_BISMILLAH);
 
+        // Total words + end-markers on the line — every character across
+        // every segment, since that is exactly what becomes a flex child
+        // below. Checked across a spread of real pages before picking 5:
+        // an ordinary page's sparsest line still lands at 6-7, while a
+        // genuinely short line — the tail of a short surah, both cases
+        // reported — sits at 2-4. A short line stretched edge to edge with
+        // only two or three words to hold it apart doesn't get a run of
+        // modest gaps, it gets one or two canyons, because there is
+        // nowhere else for the leftover width to go. No real justified
+        // typesetting — Arabic or Latin — stretches a line that sparse; a
+        // short line is set at its natural width instead, which for RTL
+        // means it starts flush at the right and simply ends wherever its
+        // last word ends, exactly like a paragraph's ragged last line.
+        const wordCount = line.reduce(
+          (sum, seg) => sum + Array.from(seg[2] || "").length,
+          0
+        );
+        const justify = centered
+          ? "justify-center"
+          : wordCount < 5
+            ? "justify-start"
+            : "justify-between";
+
         return (
           <div
             key={li}
-            className={`flex items-center w-full ${
-              centered ? "justify-center" : "justify-between"
-            }`}
-            style={{ lineHeight: 1.7 }}
+            className={`flex items-center w-full ${justify}`}
+            style={{
+              lineHeight: 1.7,
+              // justify-between makes its own gaps out of the leftover
+              // width; justify-start has no leftover to spend, so without
+              // an explicit gap here the words on a short line would sit
+              // flush against each other with no space at all. Sized off
+              // wordSize (below) rather than a fixed length so it scales
+              // with the same cqw/cqh terms the glyphs themselves do.
+              gap: justify === "justify-start" ? `calc(${wordSize} * 0.4)` : undefined,
+            }}
           >
             {line.map((seg, si) => {
               const [kind, key, chars] = seg;
