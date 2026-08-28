@@ -510,6 +510,47 @@ create policy "Admins can read all messages" on messages
   );
 
 -- ══════════════════════════════════════
+-- Recitation log (one dated entry per graded session)
+-- ══════════════════════════════════════
+-- quranic_assignments.daily_rating is only ever the latest snapshot for a
+-- portion — grading it again overwrites the last mark. Every grading also
+-- writes a row here, so a parent or teacher can look back over the whole
+-- month rather than only ever seeing today's mark.
+create table if not exists recitation_log (
+  id            uuid primary key default gen_random_uuid(),
+  student_id    uuid not null references students(id) on delete cascade,
+  teacher_id    uuid not null references profiles(id),
+  school_id     uuid not null references schools(id) on delete cascade,
+  assignment_id uuid references quranic_assignments(id) on delete set null,
+  portion       text not null check (portion in ('new', 'recent', 'old')),
+  surah         int not null check (surah between 1 and 114),
+  ayah_start    int not null check (ayah_start >= 1),
+  ayah_end      int not null check (ayah_end >= ayah_start),
+  rating        text not null check (rating in ('excellent', 'very_good', 'good', 'weak')),
+  notes         text,
+  -- The day the session was heard, distinct from created_at (when the row
+  -- was written) so a teacher can log yesterday's session without it
+  -- appearing to have happened today.
+  session_date  date not null default current_date,
+  created_at    timestamptz default now()
+);
+alter table recitation_log enable row level security;
+create policy "Teachers can manage recitation log for own students" on recitation_log
+  for all using (teacher_id = auth.uid());
+create policy "Students can read own recitation log" on recitation_log
+  for select using (
+    student_id in (select id from students where profile_id = auth.uid())
+  );
+create policy "Parents can read children recitation log" on recitation_log
+  for select using (
+    student_id in (select student_id from parent_students where parent_id = auth.uid())
+  );
+create policy "Admins can read all recitation log" on recitation_log
+  for select using (
+    school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- ══════════════════════════════════════
 -- Indexes for performance
 -- ══════════════════════════════════════
 create index if not exists idx_profiles_school   on profiles(school_id);
@@ -530,3 +571,5 @@ create index if not exists idx_quranic_assignments_teacher on quranic_assignment
 create index if not exists idx_quranic_assignments_surah on quranic_assignments(surah);
 create index if not exists idx_messages_student on messages(student_id);
 create index if not exists idx_messages_created on messages(created_at);
+create index if not exists idx_recitation_log_student on recitation_log(student_id);
+create index if not exists idx_recitation_log_date on recitation_log(session_date);

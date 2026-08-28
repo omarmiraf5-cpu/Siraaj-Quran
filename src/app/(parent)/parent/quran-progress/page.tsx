@@ -13,7 +13,9 @@ import {
   PORTION_LABELS,
   PORTION_ARABIC,
   withOverride,
+  recitationLogFor,
   type AssignmentOverride,
+  type RecitationLogEntry,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import {
@@ -24,22 +26,28 @@ import {
   EmptyNote,
   TeacherNote,
   RatingPill,
+  RecitationHistory,
 } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 
 const OVERRIDES_KEY = "demo_assignment_overrides";
+// Same key the teacher's assignments page writes to — every graded session
+// they log shows up here in the same browser.
+const LOG_KEY = "demo_recitation_log_v1";
 
 export default function ParentQuranProgressPage() {
   const [childId, setChildId] = useState(DEMO_CHILDREN[0].id);
   const child = DEMO_CHILDREN.find((c) => c.id === childId) ?? DEMO_CHILDREN[0];
   const [expanded, setExpanded] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
+  const [log, setLog] = useState<RecitationLogEntry[]>([]);
 
   // Ratings and remarks a teacher has set since this page's sample data was
   // written; shared with the teacher portal via the same browser storage.
   useEffect(() => {
     setOverrides(readDemoStore(OVERRIDES_KEY, {}));
+    setLog(readDemoStore(LOG_KEY, []));
   }, []);
 
   // The same records the teacher set and the student sees. This page used to
@@ -221,6 +229,13 @@ export default function ParentQuranProgressPage() {
             })}
           </ul>
         )}
+      </SectionCard>
+
+      <SectionCard
+        title="This month"
+        note="every session, graded"
+      >
+        <RecitationHistory entries={recitationLogFor(child.id, log)} />
       </SectionCard>
 
       <section className="card-quiet px-6 py-7 text-center">

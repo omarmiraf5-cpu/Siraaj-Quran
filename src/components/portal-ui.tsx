@@ -6,16 +6,24 @@
 // serif one on another, bars in four different heights — which is what made
 // the product read as three products.
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ATTENDANCE_DOT,
   ATTENDANCE_LABELS,
+  DAILY_RATING_DOT,
   DAILY_RATING_LABELS,
+  DAILY_RATING_ORDER,
   DAILY_RATING_STYLES,
+  MONTHS,
+  PORTION_LABELS,
+  WEEKDAY_SHORT,
   formatDay,
+  tallyRatings,
   type AttendanceDay,
   type AttendanceSummary,
+  type RecitationLogEntry,
 } from "@/data/demo";
+import { getSurahById } from "@/data/mushaf-index";
 import type { DailyRating } from "@/hooks/useQuranicAssignments";
 
 /* ── Modal ─────────────────────────────────────────────────────────────
@@ -303,6 +311,145 @@ export function RatingPill({ rating }: { rating: DailyRating }) {
     >
       {DAILY_RATING_LABELS[rating]}
     </span>
+  );
+}
+
+/* ── Recitation history ────────────────────────────────────────────────
+   A month calendar coloured by that day's rating, a tally for the month,
+   and a day-by-day list of exactly what was read. Shared by the parent
+   and teacher portals so a family and a teacher are reading the same
+   record rather than two different views of it. */
+export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }) {
+  // The most recent session's month drives the calendar, so opening the
+  // page lands on whichever month actually has sessions logged in it.
+  const latest = entries[entries.length - 1];
+  const [cursor, setCursor] = useState(() => {
+    const d = latest ? new Date(latest.date + "T00:00:00Z") : new Date();
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
+  });
+
+  const byDate = useMemo(() => {
+    const map = new Map<string, RecitationLogEntry>();
+    for (const e of entries) map.set(e.date, e);
+    return map;
+  }, [entries]);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const first = new Date(Date.UTC(cursor.year, cursor.month, 1));
+  const startWeekday = first.getUTCDay();
+  const daysInMonth = new Date(Date.UTC(cursor.year, cursor.month + 1, 0)).getUTCDate();
+  const cells: (number | null)[] = [
+    ...Array(startWeekday).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  const monthEntries = entries.filter((e) => e.date.startsWith(`${cursor.year}-${pad(cursor.month + 1)}`));
+  const tally = tallyRatings(monthEntries);
+  const hasAny = entries.length > 0;
+
+  const shiftMonth = (delta: number) => {
+    setCursor(({ year, month }) => {
+      const d = new Date(Date.UTC(year, month + delta, 1));
+      return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
+    });
+  };
+
+  if (!hasAny) {
+    return <EmptyNote>No sessions have been graded yet.</EmptyNote>;
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <button
+          type="button"
+          onClick={() => shiftMonth(-1)}
+          aria-label="Previous month"
+          className="w-7 h-7 rounded-full flex items-center justify-center text-ink-muted hover:bg-surface-bg-warm hover:text-ink transition"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <p className="text-[13px] font-semibold text-ink tabular-nums">
+          {MONTHS[cursor.month]} {cursor.year}
+        </p>
+        <button
+          type="button"
+          onClick={() => shiftMonth(1)}
+          aria-label="Next month"
+          className="w-7 h-7 rounded-full flex items-center justify-center text-ink-muted hover:bg-surface-bg-warm hover:text-ink transition"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-1.5 text-center mb-1">
+        {WEEKDAY_SHORT.map((w) => (
+          <span key={w} className="text-[9px] font-semibold text-ink-muted uppercase">{w}</span>
+        ))}
+        {cells.map((day, i) => {
+          if (day === null) return <span key={i} />;
+          const iso = `${cursor.year}-${pad(cursor.month + 1)}-${pad(day)}`;
+          const entry = byDate.get(iso);
+          return (
+            <div key={i} className="flex flex-col items-center justify-center h-7 gap-0.5">
+              <span className="text-[10px] text-ink-muted tabular-nums">{day}</span>
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${entry ? DAILY_RATING_DOT[entry.rating] : "bg-transparent"}`}
+                title={entry ? `${formatDay(entry.date)} · ${DAILY_RATING_LABELS[entry.rating]}` : undefined}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="gold-rule my-4" />
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-4">
+        {monthEntries.length === 0 ? (
+          <EmptyNote>No sessions logged this month.</EmptyNote>
+        ) : (
+          DAILY_RATING_ORDER.filter((r) => tally[r] > 0).map((r) => (
+            <span key={r} className="inline-flex items-center gap-1.5 text-[12px]">
+              <span className={`w-1.5 h-1.5 rounded-full ${DAILY_RATING_DOT[r]}`} />
+              <span className="tabular-nums font-semibold text-ink">{tally[r]}</span>
+              <span className="text-ink-muted">{DAILY_RATING_LABELS[r]}</span>
+            </span>
+          ))
+        )}
+      </div>
+
+      {/* Newest first — what was read each day, and how it went. */}
+      <ul className="divide-y divide-surface-border -my-1 max-h-72 overflow-y-auto">
+        {entries
+          .slice()
+          .reverse()
+          .map((e) => {
+            const surah = getSurahById(e.surah);
+            return (
+              <li key={e.id} className="flex items-start justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[12px] font-semibold text-ink">
+                    {formatDay(e.date)}
+                    <span className="font-normal text-ink-muted">
+                      {" · "}
+                      {PORTION_LABELS[e.portion]}
+                    </span>
+                  </p>
+                  <p className="text-[11px] text-ink-muted truncate">
+                    {surah ? surah.englishName : `Surah ${e.surah}`} · ayahs {e.ayah_start}–{e.ayah_end}
+                  </p>
+                  {e.notes && (
+                    <p className="text-[12px] text-ink-body font-serif italic leading-snug mt-1">
+                      {e.notes}
+                    </p>
+                  )}
+                </div>
+                <RatingPill rating={e.rating} />
+              </li>
+            );
+          })}
+      </ul>
+    </div>
   );
 }
 

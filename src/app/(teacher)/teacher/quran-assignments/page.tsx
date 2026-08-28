@@ -5,6 +5,7 @@ import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
 import {
   DEMO_ASSIGNMENTS,
   DEMO_STUDENTS,
+  DEMO_TODAY,
   studentName,
   initials,
   formatDay,
@@ -17,13 +18,15 @@ import {
   DAILY_RATING_ORDER,
   DAILY_RATING_LABELS,
   withOverride,
+  recitationLogFor,
   type AssignmentOverride,
+  type RecitationLogEntry,
 } from "@/data/demo";
 import type { HifzPortion, QuranicAssignment, DailyRating } from "@/hooks/useQuranicAssignments";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, ProgressBar, RatingPill } from "@/components/portal-ui";
+import { SectionCard, ProgressBar, RatingPill, RecitationHistory } from "@/components/portal-ui";
 import { IconBook, IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 
@@ -55,6 +58,12 @@ function loadDemoCreated(): QuranicAssignment[] {
 // rating set here shows up there in the same browser.
 const OVERRIDES_KEY = "demo_assignment_overrides";
 
+// Every graded session, dated, on top of the seeded month of history — kept
+// separately from OVERRIDES_KEY above, since an override replaces an
+// assignment's *current* rating while this accumulates one entry per day.
+// Read by the parent portal too, for the same reason.
+const LOG_KEY = "demo_recitation_log_v1";
+
 export default function QuranAssignmentsPage() {
   const supabase = createClient();
   const surahs = QURAN;
@@ -77,6 +86,7 @@ export default function QuranAssignmentsPage() {
   const [draftRating, setDraftRating] = useState<DailyRating | null>(null);
   const [draftNotes, setDraftNotes] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [log, setLog] = useState<RecitationLogEntry[]>([]);
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -91,6 +101,7 @@ export default function QuranAssignmentsPage() {
           setStudents(DEMO_STUDENTS.map((s) => ({ id: s.id, full_name: s.name })));
           setDemoCreated(loadDemoCreated());
           setOverrides(readDemoStore(OVERRIDES_KEY, {}));
+          setLog(readDemoStore(LOG_KEY, []));
           return;
         }
 
@@ -220,12 +231,52 @@ export default function QuranAssignmentsPage() {
         const next = { ...overrides, [a.id]: { ...overrides[a.id], ...patch } };
         setOverrides(next);
         writeDemoStore(OVERRIDES_KEY, next);
+
+        // A rating turns into today's entry in the history log — replacing
+        // today's entry for this same portion if one already exists, rather
+        // than piling up duplicates from re-grading the same session.
+        if (draftRating) {
+          const withoutToday = log.filter(
+            (e) => !(e.student_id === a.student_id && e.portion === a.portion && e.date === DEMO_TODAY)
+          );
+          const nextLog = [
+            ...withoutToday,
+            {
+              id: `local-log-${a.student_id}-${a.portion}-${DEMO_TODAY}`,
+              student_id: a.student_id,
+              portion: a.portion,
+              surah: a.surah,
+              ayah_start: a.ayah_start,
+              ayah_end: a.ayah_end,
+              rating: draftRating,
+              notes: draftNotes.trim() || null,
+              date: DEMO_TODAY,
+            },
+          ];
+          setLog(nextLog);
+          writeDemoStore(LOG_KEY, nextLog);
+        }
       } else {
         await fetch(`/api/quranic-assignments/${a.id}`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(patch),
         });
+        if (draftRating) {
+          await fetch("/api/recitation-log", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              student_id: a.student_id,
+              portion: a.portion,
+              surah: a.surah,
+              ayah_start: a.ayah_start,
+              ayah_end: a.ayah_end,
+              rating: draftRating,
+              notes: draftNotes.trim() || null,
+            }),
+          });
+        }
       }
       setEditingId(null);
     } finally {
@@ -590,6 +641,13 @@ export default function QuranAssignmentsPage() {
                       >
                         Cancel
                       </button>
+                    </div>
+
+                    <div className="pt-1">
+                      <p className="text-xs font-semibold text-ink mb-2">
+                        {name.split(" ")[0]}&apos;s history
+                      </p>
+                      <RecitationHistory entries={recitationLogFor(a.student_id, log)} />
                     </div>
                   </div>
                 )}

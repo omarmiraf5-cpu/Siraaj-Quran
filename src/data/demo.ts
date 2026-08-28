@@ -232,6 +232,14 @@ export const DAILY_RATING_STYLES: Record<DailyRating, string> = {
   weak: "bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300",
 };
 
+// Solid fills for the calendar dots, where a tinted pill would disappear.
+export const DAILY_RATING_DOT: Record<DailyRating, string> = {
+  excellent: "bg-green-600",
+  very_good: "bg-emerald-500",
+  good: "bg-amber-500",
+  weak: "bg-red-600",
+};
+
 /**
  * Merges a teacher's demo-mode edit (set via localStorage, since the sample
  * assignments themselves are static data) on top of an assignment. Applied
@@ -345,7 +353,8 @@ export function initials(name: string): string {
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+export const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // Built by hand rather than with toLocaleDateString: Node and the browser ship
@@ -445,4 +454,98 @@ export function formatMessageTime(iso: string): string {
   const h12 = h % 12 === 0 ? 12 : h % 12;
   const ampm = h < 12 ? "am" : "pm";
   return `${formatDay(iso.slice(0, 10))} · ${h12}:${String(m).padStart(2, "0")}${ampm}`;
+}
+
+// ── Recitation history ───────────────────────────────────────────────────
+// A daily_rating on an assignment is only ever today's snapshot — grading a
+// session again tomorrow overwrites it. Every graded session also becomes
+// its own dated entry here, so a parent or teacher can look back over the
+// whole month rather than only ever seeing the latest mark.
+export interface RecitationLogEntry {
+  id: string;
+  student_id: string;
+  portion: HifzPortion;
+  surah: number;
+  ayah_start: number;
+  ayah_end: number;
+  rating: DailyRating;
+  notes: string | null;
+  /** ISO date — the day this session was heard and graded. */
+  date: string;
+}
+
+// One pattern per student, oldest first, so the story of the month (who is
+// trending up, who has a rough patch) is distinct per child rather than
+// everyone looking the same. Portions are graded in rotation — new, recent,
+// old — the same order a halaqa hears them in, so each gets heard roughly
+// every third day rather than all three every single day.
+const RATING_HISTORY_PATTERNS: Record<string, DailyRating[]> = {
+  s1: ["good","very_good","weak","good","excellent","good","weak","very_good","good","excellent","weak","good","very_good","excellent","good","weak","good","excellent","very_good","good"],
+  s2: ["good","good","very_good","excellent","good","weak","good","very_good","excellent","good","good","very_good","excellent","good","weak","good","very_good","excellent","good","good"],
+  s3: ["weak","good","good","very_good","excellent","good","weak","good","very_good","excellent","good","good","weak","very_good","excellent","good","good","very_good","excellent","good"],
+  s4: ["very_good","good","weak","very_good","good","excellent","weak","very_good","good","excellent","weak","very_good","good","excellent","weak","very_good","good","excellent","weak","very_good"],
+  s5: ["good","good","very_good","excellent","good","good","weak","good","very_good","excellent","good","good","weak","good","very_good","excellent","good","good","very_good","good"],
+  s6: ["very_good","excellent","good","excellent","very_good","excellent","good","excellent","very_good","excellent","good","excellent","very_good","excellent","good","excellent","very_good","excellent","good","excellent"],
+  s7: ["good","weak","very_good","excellent","good","weak","very_good","excellent","weak","good","very_good","excellent","weak","good","very_good","excellent","weak","good","very_good","excellent"],
+};
+
+function buildRecitationLog(): RecitationLogEntry[] {
+  const orderedDays = DAYS.slice().reverse(); // oldest first, to match the patterns above
+  const entries: RecitationLogEntry[] = [];
+
+  for (const student of DEMO_STUDENTS) {
+    const pattern = RATING_HISTORY_PATTERNS[student.id];
+    const portions = assignmentsByPortion(demoAssignmentsFor(student.id));
+
+    orderedDays.forEach((date, i) => {
+      const portion = HIFZ_PORTIONS[i % HIFZ_PORTIONS.length];
+      const current = portions[portion][0];
+      if (!current) return;
+      entries.push({
+        id: `log-${student.id}-${i}`,
+        student_id: student.id,
+        portion,
+        surah: current.surah,
+        ayah_start: current.ayah_start,
+        ayah_end: current.ayah_end,
+        rating: pattern[i],
+        notes: null,
+        date,
+      });
+    });
+
+    // The most recent session for each portion should read exactly like
+    // that portion's assignment card — same rating, same remark — rather
+    // than an independent value the pattern above happened to land on.
+    for (const portion of HIFZ_PORTIONS) {
+      const current = portions[portion][0];
+      if (!current || !current.daily_rating) continue;
+      const last = [...entries]
+        .reverse()
+        .find((e) => e.student_id === student.id && e.portion === portion);
+      if (last) {
+        last.rating = current.daily_rating;
+        last.notes = current.teacher_notes;
+      }
+    }
+  }
+
+  return entries;
+}
+
+export const DEMO_RECITATION_LOG: RecitationLogEntry[] = buildRecitationLog();
+
+export function recitationLogFor(
+  studentId: string,
+  extra: RecitationLogEntry[] = []
+): RecitationLogEntry[] {
+  return [...DEMO_RECITATION_LOG, ...extra]
+    .filter((e) => e.student_id === studentId)
+    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+}
+
+export function tallyRatings(entries: RecitationLogEntry[]): Record<DailyRating, number> {
+  const tally: Record<DailyRating, number> = { excellent: 0, very_good: 0, good: 0, weak: 0 };
+  for (const e of entries) tally[e.rating]++;
+  return tally;
 }
