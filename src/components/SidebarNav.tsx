@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -20,12 +21,26 @@ interface SidebarNavProps {
   portalLinks?: NavItem[];
 }
 
+// Above four visible tabs plus "More", the labels start touching each
+// other — a portal with six or seven destinations was cramming every one
+// into an equal-width column with no room to breathe. Past that count the
+// less-frequently-opened items move into a sheet behind a fifth "More" tab
+// instead, which is how every mobile app with this many destinations
+// handles it.
+const MAX_PRIMARY_TABS = 4;
+
 export function SidebarNav({ items, role, userName = "User", portalLinks }: SidebarNavProps) {
   const pathname = usePathname();
   const router   = useRouter();
   const supabase = createClient();
   const demoUser = useDemoUser();
   const displayName = demoUser?.name ?? userName;
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const showOverflow = items.length > MAX_PRIMARY_TABS + 1;
+  const primaryItems = showOverflow ? items.slice(0, MAX_PRIMARY_TABS) : items;
+  const moreItems = showOverflow ? items.slice(MAX_PRIMARY_TABS) : [];
+  const moreActive = moreItems.some((item) => pathname === item.href);
 
   const handleSignOut = async () => {
     localStorage.removeItem("demo_user");
@@ -66,7 +81,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
 
       {/* ── MOBILE BOTTOM TAB BAR ── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-brand-navy border-t border-white/10 flex safe-area-bottom">
-        {items.map((item) => {
+        {primaryItems.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
@@ -81,7 +96,55 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
             </Link>
           );
         })}
+        {showOverflow && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors ${
+              moreActive || moreOpen ? "text-brand-gold" : "text-white/45 hover:text-white/80"
+            }`}
+          >
+            <span className={moreActive || moreOpen ? "text-brand-gold" : ""}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            More
+          </button>
+        )}
       </nav>
+
+      {/* ── MOBILE "MORE" SHEET ── */}
+      {showOverflow && moreOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/40"
+            onClick={() => setMoreOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="md:hidden fixed bottom-14 left-0 right-0 z-50 bg-brand-navy border-t border-white/10 rounded-t-2xl shadow-dark p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+            {moreItems.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMoreOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    active ? "bg-white/15 text-brand-gold" : "text-white/70 hover:bg-white/8 hover:text-white"
+                  }`}
+                >
+                  <span className="flex-shrink-0 opacity-80">{item.icon}</span>
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* ── DESKTOP SIDEBAR ── */}
       <aside className="hidden md:flex flex-col w-56 min-h-screen gradient-navy text-white p-4 gap-2 flex-shrink-0">
