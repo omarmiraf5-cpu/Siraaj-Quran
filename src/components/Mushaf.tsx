@@ -797,7 +797,20 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           second page shows, and the row direction, are container-query driven
           (see .mushaf-* rules in globals.css). */}
       <div className="relative bg-[#3a3228] dark:bg-[#1a1610] rounded-xl p-1.5 lg:p-2 shadow-2xl">
-        <div className="mushaf-gutter absolute left-1/2 top-2 bottom-2 w-[3px] -translate-x-1/2 bg-gradient-to-r from-black/20 via-black/5 to-black/20 z-10" />
+        {/* The book-spine shadow between two pages. Its own visibility was
+            purely CSS/container-width driven, with no idea whether a second
+            page actually exists to divide from the first — so on page 604,
+            the Quran's last page, a wide-enough viewport still tried to pair
+            it with page 605 for the spread layout, and while the missing
+            page's content correctly stayed empty (leftPageNum <= TOTAL_PAGES
+            below), this line had no matching check and drew anyway: one
+            real page, one blank slot, and a seam down the middle of nothing.
+            Gating it on the same condition as the content it divides fixes
+            that without touching the width-based logic for every other
+            page. */}
+        {leftPageNum <= TOTAL_PAGES && (
+          <div className="mushaf-gutter absolute left-1/2 top-2 bottom-2 w-[3px] -translate-x-1/2 bg-gradient-to-r from-black/20 via-black/5 to-black/20 z-10" />
+        )}
 
         <div className="mushaf-spread-row flex flex-col items-center justify-center gap-1.5 lg:gap-[3px]">
           <MushafPage
