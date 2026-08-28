@@ -182,32 +182,18 @@ export function QcfMushafPage({
                 onAyahClick(s, a);
               };
 
-              // One flex child per segment (word or end-marker), not per
-              // glyph. A "word" in this font is often several PUA codepoints
-              // strung together — up to ten or more once harakat are counted
-              // as their own codepoints — and this used to explode every one
-              // of them into its own flex child of the same justify-between
-              // row. justify-between doesn't know a run of codepoints belongs
-              // to one word, so it spaced them apart exactly like separate
-              // words: invisible on a dense 15-line page, where a dozen-plus
-              // children per line leave barely any slack to distribute, but
-              // glaring on Al-Fatihah, where a line can hold as few as one
-              // word split into four codepoints — the same total slack now
-              // lands as a handful of large gaps, some of them landing
-              // inside that one word's own letters. Grouping by segment
-              // keeps a word's codepoints in one run, so justify-between can
-              // only ever open space between whole words, which is what
-              // "justified" is supposed to mean.
-              return (
+              // Each glyph is one whole word — render individually so the
+              // flex row can stretch the line edge to edge like the print.
+              return Array.from(chars).map((ch, ci) => (
                 <span
-                  key={si}
+                  key={`${si}-${ci}`}
                   role={clickable ? "button" : undefined}
                   tabIndex={clickable ? 0 : undefined}
                   onClick={handle}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handle();
                   }}
-                  className={`inline-block ${clickable ? "cursor-pointer" : ""} ${
+                  className={`${clickable ? "cursor-pointer" : ""} ${
                     playing
                       ? "bg-emerald-200/70 dark:bg-emerald-900/50 rounded"
                       : hl
@@ -234,9 +220,9 @@ export function QcfMushafPage({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {chars}
+                  {ch}
                 </span>
-              );
+              ));
             })}
           </div>
         );
