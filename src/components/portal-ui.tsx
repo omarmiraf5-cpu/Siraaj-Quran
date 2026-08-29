@@ -324,7 +324,9 @@ function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?
       <div className="min-w-0">
         <p className="text-[12px] font-semibold text-ink">
           {showDate && `${formatDay(entry.date)} · `}
-          {PORTION_LABELS[entry.portion]}
+          <span className="underline decoration-2 underline-offset-2">
+            {PORTION_LABELS[entry.portion]}
+          </span>
         </p>
         <p className="text-[11px] text-ink-muted truncate">
           {surah ? surah.englishName : `Surah ${entry.surah}`} · ayahs {entry.ayah_start}–{entry.ayah_end}

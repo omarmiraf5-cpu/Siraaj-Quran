@@ -132,7 +132,9 @@ export default function ParentQuranProgressPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="eyebrow">
-                          {PORTION_LABELS[a.portion]}
+                          <span className="underline decoration-2 underline-offset-2 text-ink">
+                            {PORTION_LABELS[a.portion]}
+                          </span>
                           <span
                             className="font-arabic text-[13px] normal-case tracking-normal ms-2"
                             dir="rtl"

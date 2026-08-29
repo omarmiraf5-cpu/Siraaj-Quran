@@ -155,8 +155,14 @@ export default function ParentMessagesPage() {
         </button>
       )}
 
-      {/* Composer */}
-      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-56 p-3 bg-surface-card border-t border-surface-border z-30">
+      {/* Composer. Right padding on mobile is wider than the others — the
+          floating "ask AI" button (ChatWidget, shared by every portal page)
+          sits fixed at bottom-28 right-4, a 56px circle, which otherwise
+          lands directly on top of the send button below at this bar's own
+          right edge. The extra space just keeps the two apart; it isn't
+          needed on desktop, where the button sits well clear of this bar's
+          centered, narrower content. */}
+      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-56 p-3 pr-20 md:pr-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-surface-card border-t border-surface-border z-30">
         <div className="max-w-2xl mx-auto flex items-center gap-2">
           <input
             value={text}
@@ -170,7 +176,7 @@ export default function ParentMessagesPage() {
           <button
             onClick={send}
             disabled={!text.trim()}
-            className="w-10 h-10 rounded-full gradient-emerald flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
+            className="w-11 h-11 rounded-full gradient-emerald shadow-md flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
             aria-label="Send"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

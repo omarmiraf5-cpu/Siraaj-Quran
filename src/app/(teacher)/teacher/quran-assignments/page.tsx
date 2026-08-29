@@ -706,8 +706,8 @@ export default function QuranAssignmentsPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold text-ink truncate">
                       {name}
-                      <span className="font-normal text-ink-muted">
-                        {" · "}
+                      {" · "}
+                      <span className="underline decoration-2 underline-offset-2">
                         {PORTION_LABELS[a.portion]}
                       </span>
                     </p>

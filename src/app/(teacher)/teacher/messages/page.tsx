@@ -130,7 +130,7 @@ export default function TeacherMessagesPage() {
             <button
               onClick={send}
               disabled={!text.trim()}
-              className="w-10 h-10 rounded-full gradient-emerald flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
+              className="w-11 h-11 rounded-full gradient-emerald shadow-md flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
               aria-label="Send"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

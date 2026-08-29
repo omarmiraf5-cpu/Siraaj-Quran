@@ -96,7 +96,9 @@ export function StudentDetailPanel({
                   <li key={a.id}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="eyebrow">{PORTION_LABELS[a.portion]}</p>
+                        <p className="eyebrow underline decoration-2 underline-offset-2 text-ink">
+                          {PORTION_LABELS[a.portion]}
+                        </p>
                         <p className="text-[13px] font-semibold text-ink mt-0.5">
                           {surahEnd ? (
                             `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
