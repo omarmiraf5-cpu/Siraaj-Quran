@@ -5,8 +5,10 @@ import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
 import { JUZ_STARTS, getJuzRange } from "@/data/juz-index";
 import {
   DEMO_ASSIGNMENTS,
-  DEMO_STUDENTS,
+  DEMO_CREATED_STUDENTS_KEY,
+  DEMO_STUDENT_OVERRIDES_KEY,
   DEMO_TODAY,
+  allStudents,
   studentName,
   initials,
   formatDay,
@@ -23,6 +25,7 @@ import {
   type AssignmentOverride,
   type RecitationLogEntry,
 } from "@/data/demo";
+import type { DemoStudent } from "@/data/demo";
 import type { HifzPortion, QuranicAssignment, DailyRating } from "@/hooks/useQuranicAssignments";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
@@ -69,6 +72,9 @@ export default function QuranAssignmentsPage() {
   const supabase = createClient();
   const surahs = QURAN;
   const [students, setStudents] = useState<Student[]>([]);
+  // Full roster (admin-created students merged in), kept for name lookups
+  // in the assignments list below — the dropdown above only needs id/name.
+  const [roster, setRoster] = useState<DemoStudent[]>([]);
   const [selectedStudent, setSelectedStudent] = useState("");
   const [portion, setPortion] = useState<HifzPortion>("new");
   const [selectedSurah, setSelectedSurah] = useState("");
@@ -109,7 +115,17 @@ export default function QuranAssignmentsPage() {
           // there is no real session so submitting the form doesn't try — and
           // fail — a real write.
           setIsDemo(true);
-          setStudents(DEMO_STUDENTS.map((s) => ({ id: s.id, full_name: s.name })));
+          // Merged with whatever the admin portal has added, so a student
+          // added there is immediately assignable — active only, since a
+          // withdrawn student isn't getting new work.
+          const fullRoster = allStudents(
+            readDemoStore(DEMO_CREATED_STUDENTS_KEY, []),
+            readDemoStore(DEMO_STUDENT_OVERRIDES_KEY, {})
+          );
+          setRoster(fullRoster);
+          setStudents(
+            fullRoster.filter((s) => s.active !== false).map((s) => ({ id: s.id, full_name: s.name }))
+          );
           setDemoCreated(loadDemoCreated());
           setOverrides(readDemoStore(OVERRIDES_KEY, {}));
           setLog(readDemoStore(LOG_KEY, []));
@@ -684,7 +700,7 @@ export default function QuranAssignmentsPage() {
           {allAssignments.map((a) => {
             const surah = getSurahById(a.surah);
             const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
-            const name = studentName(a.student_id);
+            const name = studentName(a.student_id, roster);
             const isOpen = editingId === a.id;
 
             const rangeLabel = surahEnd

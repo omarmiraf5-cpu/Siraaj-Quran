@@ -1,18 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DEMO_STUDENTS,
   DEMO_ATTENDANCE,
   DEMO_TODAY,
+  DEMO_CREATED_STUDENTS_KEY,
+  DEMO_STUDENT_OVERRIDES_KEY,
   ATTENDANCE_LABELS,
+  allStudents,
   summariseAttendance,
   initials,
   formatDay,
   type AttendanceStatus,
+  type DemoStudent,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import { IconCheck } from "@/components/icons";
+import { readDemoStore } from "@/lib/demoStore";
 
 const MARKS: {
   status: AttendanceStatus;
@@ -29,8 +34,19 @@ const MARKS: {
 ];
 
 export default function TeacherAttendancePage() {
+  const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
   const [saved, setSaved] = useState(false);
+
+  // Merged with whatever the admin portal has added, so a newly enrolled
+  // student shows up on today's register without a page reload elsewhere.
+  useEffect(() => {
+    const roster = allStudents(
+      readDemoStore(DEMO_CREATED_STUDENTS_KEY, []),
+      readDemoStore(DEMO_STUDENT_OVERRIDES_KEY, {})
+    ).filter((s) => s.active !== false);
+    setStudents(roster);
+  }, []);
 
   const mark = (id: string, status: AttendanceStatus) => {
     setSaved(false);
@@ -45,13 +61,13 @@ export default function TeacherAttendancePage() {
 
   const markAllPresent = () => {
     setSaved(false);
-    setRecords(Object.fromEntries(DEMO_STUDENTS.map((s) => [s.id, "present" as const])));
+    setRecords(Object.fromEntries(students.map((s) => [s.id, "present" as const])));
   };
 
   const count = (s: AttendanceStatus) =>
     Object.values(records).filter((v) => v === s).length;
   const marked = Object.keys(records).length;
-  const remaining = DEMO_STUDENTS.length - marked;
+  const remaining = students.length - marked;
 
   return (
     <div className="max-w-2xl mx-auto pb-28 space-y-4 pt-2">
@@ -60,7 +76,7 @@ export default function TeacherAttendancePage() {
         title="Attendance"
         meta={[
           formatDay(DEMO_TODAY),
-          `${DEMO_STUDENTS.length} students`,
+          `${students.length} students`,
           remaining > 0 ? `${remaining} still to mark` : "everyone marked",
         ]}
       />
@@ -94,8 +110,8 @@ export default function TeacherAttendancePage() {
 
       {/* Roster */}
       <div className="card-quiet divide-y divide-surface-border overflow-hidden">
-        {DEMO_STUDENTS.map((s) => {
-          const history = summariseAttendance(DEMO_ATTENDANCE[s.id]);
+        {students.map((s) => {
+          const history = summariseAttendance(DEMO_ATTENDANCE[s.id] ?? []);
           return (
             <div key={s.id} className="flex items-center gap-3 px-3 py-3">
               <div className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-xs flex-shrink-0">

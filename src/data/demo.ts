@@ -12,6 +12,10 @@ export interface DemoStudent {
   id: string;
   name: string;
   halaqa: string;
+  /** Absent means active — only ever written explicitly by the admin
+      portal's deactivate action, so the seven seed students below don't
+      all need touching. */
+  active?: boolean;
 }
 
 export const DEMO_STUDENTS: DemoStudent[] = [
@@ -23,6 +27,116 @@ export const DEMO_STUDENTS: DemoStudent[] = [
   { id: "s6", name: "Ibrahim Osman", halaqa: "Halaqa B" },
   { id: "s7", name: "Fatuma Ali", halaqa: "Halaqa B" },
 ];
+
+// Students the admin portal creates in the demo, kept in localStorage under
+// this key. Merged into the roster everywhere a student list is drawn from
+// — the teacher's assignment and attendance rosters included — the same
+// way DEMO_CREATED_ASSIGNMENTS_KEY already works for assignments.
+export const DEMO_CREATED_STUDENTS_KEY = "demo_created_students";
+export const DEMO_STUDENT_OVERRIDES_KEY = "demo_student_overrides";
+
+export type StudentOverride = Partial<Pick<DemoStudent, "name" | "halaqa" | "active">>;
+
+export function withStudentOverride(
+  s: DemoStudent,
+  overrides: Record<string, StudentOverride>
+): DemoStudent {
+  const o = overrides[s.id];
+  return o ? { ...s, ...o } : s;
+}
+
+export function allStudents(
+  created: DemoStudent[] = [],
+  overrides: Record<string, StudentOverride> = {}
+): DemoStudent[] {
+  return [...DEMO_STUDENTS, ...created].map((s) => withStudentOverride(s, overrides));
+}
+
+// ── Admin: teachers & halaqas ────────────────────────────────────────────
+// Matches DEMO_ACCOUNTS.teacher.name (src/lib/demo.ts) — used to name a
+// different teacher than the one a demo teacher login actually signs in
+// as, which the parent-teacher messages thread made obvious.
+export const DEMO_TEACHER_NAME = "Ms. Farah";
+
+export interface DemoTeacher {
+  id: string;
+  name: string;
+  email: string;
+  active?: boolean;
+}
+
+// Every existing assignment and message uses teacher_id "t1", so that one
+// has to stay Ms. Farah. A second, halaqa-less teacher exists so the admin
+// roster has an "assign them to a halaqa" flow to demonstrate on day one
+// instead of a list of exactly one name.
+export const DEMO_TEACHERS: DemoTeacher[] = [
+  { id: "t1", name: DEMO_TEACHER_NAME, email: "ms.farah@mydiiwaan.com" },
+  { id: "t2", name: "Ustadh Bilal", email: "bilal@mydiiwaan.com" },
+];
+
+export const DEMO_CREATED_TEACHERS_KEY = "demo_created_teachers";
+export const DEMO_TEACHER_OVERRIDES_KEY = "demo_teacher_overrides";
+
+export type TeacherOverride = Partial<Pick<DemoTeacher, "name" | "email" | "active">>;
+
+export function withTeacherOverride(
+  t: DemoTeacher,
+  overrides: Record<string, TeacherOverride>
+): DemoTeacher {
+  const o = overrides[t.id];
+  return o ? { ...t, ...o } : t;
+}
+
+export function allTeachers(
+  created: DemoTeacher[] = [],
+  overrides: Record<string, TeacherOverride> = {}
+): DemoTeacher[] {
+  return [...DEMO_TEACHERS, ...created].map((t) => withTeacherOverride(t, overrides));
+}
+
+export function teacherName(id: string | null, teachers: DemoTeacher[] = DEMO_TEACHERS): string {
+  if (!id) return "Unassigned";
+  return teachers.find((t) => t.id === id)?.name ?? "Unknown";
+}
+
+export interface DemoHalaqa {
+  id: string;
+  /** Matches DemoStudent.halaqa — a plain name rather than a foreign key,
+      since that field already exists everywhere a student's halaqa is
+      shown and re-keying it to an id would touch every one of those. */
+  name: string;
+  teacherId: string | null;
+  schedule: string;
+}
+
+export const DEMO_HALAQAS: DemoHalaqa[] = [
+  { id: "h1", name: "Halaqa A", teacherId: "t1", schedule: "Sun–Thu · 4:00–5:30pm" },
+  { id: "h2", name: "Halaqa B", teacherId: "t1", schedule: "Sun–Thu · 5:30–7:00pm" },
+];
+
+export const DEMO_CREATED_HALAQAS_KEY = "demo_created_halaqas";
+export const DEMO_HALAQA_OVERRIDES_KEY = "demo_halaqa_overrides";
+
+export type HalaqaOverride = Partial<Pick<DemoHalaqa, "name" | "teacherId" | "schedule">>;
+
+export function withHalaqaOverride(
+  h: DemoHalaqa,
+  overrides: Record<string, HalaqaOverride>
+): DemoHalaqa {
+  const o = overrides[h.id];
+  return o ? { ...h, ...o } : h;
+}
+
+export function allHalaqas(
+  created: DemoHalaqa[] = [],
+  overrides: Record<string, HalaqaOverride> = {}
+): DemoHalaqa[] {
+  return [...DEMO_HALAQAS, ...created].map((h) => withHalaqaOverride(h, overrides));
+}
+
+export function studentsInHalaqa(halaqaName: string, students: DemoStudent[]): DemoStudent[] {
+  return students.filter((s) => s.halaqa === halaqaName);
+}
 
 // The student whose own portal is being previewed.
 export const DEMO_CURRENT_STUDENT = DEMO_STUDENTS[0];
@@ -356,8 +470,8 @@ export const ASSIGNMENT_STYLES: Record<QuranicAssignment["status"], string> = {
 /** The children a signed-in parent can see. Two, so the switcher is visible. */
 export const DEMO_CHILDREN = DEMO_STUDENTS.slice(0, 2);
 
-export function studentName(id: string): string {
-  return DEMO_STUDENTS.find((s) => s.id === id)?.name ?? "Student";
+export function studentName(id: string, roster: DemoStudent[] = DEMO_STUDENTS): string {
+  return roster.find((s) => s.id === id)?.name ?? "Student";
 }
 
 export function initials(name: string): string {
@@ -382,8 +496,6 @@ export function formatDay(iso: string): string {
 // One thread per student, shared by that student's parent and the teacher.
 // An "absence" message carries a specific date rather than free text, so it
 // shows up distinctly from a general concern.
-
-export const DEMO_TEACHER_NAME = "Ustadh Kareem";
 
 export type MessageAuthor = "parent" | "teacher";
 export type MessageKind = "message" | "absence";
@@ -577,4 +689,21 @@ export function tallyRatings(entries: RecitationLogEntry[]): Record<DailyRating,
   const tally: Record<DailyRating, number> = { excellent: 0, very_good: 0, good: 0, weak: 0 };
   for (const e of entries) tally[e.rating]++;
   return tally;
+}
+
+// ── School-wide summary (admin dashboard) ────────────────────────────────
+// Aggregated from raw day counts across every student rather than
+// averaging each student's own rate, so one student with a short history
+// doesn't count for as much as one with a full term of records.
+export function schoolAttendanceRate(students: DemoStudent[]): number {
+  let presentOrLate = 0;
+  let assessed = 0;
+  for (const s of students) {
+    for (const day of DEMO_ATTENDANCE[s.id] ?? []) {
+      if (day.status === "excused") continue;
+      assessed++;
+      if (day.status === "present" || day.status === "late") presentOrLate++;
+    }
+  }
+  return assessed > 0 ? Math.round((presentOrLate / assessed) * 100) : 0;
 }

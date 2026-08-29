@@ -16,6 +16,12 @@ export const DEMO_ACCOUNTS = {
     name: "Omar W.",
     role: "student" as const,
   },
+  admin: {
+    email: "admin@mydiiwaan.com",
+    password: "admin123",
+    name: "Khalid Nur",
+    role: "admin" as const,
+  },
 };
 
 export const DEMO_SCHOOL = {
