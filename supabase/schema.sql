@@ -43,12 +43,19 @@ create table if not exists profiles (
   full_name   text not null,
   email       text,
   phone       text,
-  school_id   uuid not null references schools(id) on delete cascade,
+  school_id   uuid references schools(id) on delete cascade,
   avatar_url  text,
   active      boolean not null default true,
   created_at  timestamptz default now()
 );
 alter table profiles enable row level security;
+
+-- Migration for databases created before this was relaxed. A user created
+-- straight from the Supabase dashboard's Auth UI (no raw_user_meta_data)
+-- would otherwise fail the on_auth_user_created trigger's not-null
+-- constraint before an admin ever gets the chance to assign their real
+-- role and school via a follow-up update.
+alter table profiles alter column school_id drop not null;
 create policy "Users can read own profile" on profiles
   for select using (auth.uid() = id);
 create policy "Users can update own profile" on profiles
