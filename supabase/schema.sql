@@ -25,14 +25,6 @@ create table if not exists schools (
   created_at   timestamptz default now()
 );
 alter table schools enable row level security;
-create policy "Authenticated users can read their school" on schools
-  for select using (
-    id in (select school_id from profiles where id = auth.uid())
-  );
-create policy "Admins can update own school" on schools
-  for update using (
-    id in (select school_id from profiles where id = auth.uid() and role = 'admin')
-  );
 
 -- ══════════════════════════════════════
 -- Profiles (extends auth.users)
@@ -43,12 +35,19 @@ create table if not exists profiles (
   full_name   text not null,
   email       text,
   phone       text,
-  school_id   uuid not null references schools(id) on delete cascade,
+  school_id   uuid references schools(id) on delete cascade,
   avatar_url  text,
   active      boolean not null default true,
   created_at  timestamptz default now()
 );
 alter table profiles enable row level security;
+
+-- Migration for databases created before this was relaxed. A user created
+-- straight from the Supabase dashboard's Auth UI (no raw_user_meta_data)
+-- would otherwise fail the on_auth_user_created trigger's not-null
+-- constraint before an admin ever gets the chance to assign their real
+-- role and school via a follow-up update.
+alter table profiles alter column school_id drop not null;
 create policy "Users can read own profile" on profiles
   for select using (auth.uid() = id);
 create policy "Users can update own profile" on profiles
@@ -66,11 +65,28 @@ create policy "Admins can update profiles in their school" on profiles
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
   );
 
--- Auto-create profile on signup
+-- Schools' own policies reference profiles (to check the caller's school
+-- and role), so they're defined here rather than right after the schools
+-- table — a policy's USING clause is resolved against real tables at
+-- creation time and can't forward-reference one defined later in the file.
+create policy "Authenticated users can read their school" on schools
+  for select using (
+    id in (select school_id from profiles where id = auth.uid())
+  );
+create policy "Admins can update own school" on schools
+  for update using (
+    id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- Auto-create profile on signup. Schema-qualified and with search_path
+-- pinned explicitly: this trigger fires inside a transaction run by
+-- Supabase's own auth service role, whose default search_path doesn't
+-- include public, so an unqualified "profiles" fails to resolve even
+-- though the table exists — a well-known gotcha for this exact pattern.
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into profiles (id, role, full_name, email, school_id)
+  insert into public.profiles (id, role, full_name, email, school_id)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'role', 'parent'),
@@ -80,7 +96,7 @@ begin
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -107,10 +123,6 @@ alter table students enable row level security;
 create policy "Admins and teachers can read students in their school" on students
   for select using (
     school_id in (select school_id from profiles where id = auth.uid() and role in ('admin', 'teacher'))
-  );
-create policy "Parents can read own children" on students
-  for select using (
-    id in (select student_id from parent_students where parent_id = auth.uid())
   );
 create policy "Student can read own record" on students
   for select using (profile_id = auth.uid());
@@ -140,6 +152,14 @@ create policy "Admins can manage parent links" on parent_students
     )
   );
 
+-- Depends on parent_students existing, so it's defined here rather than
+-- alongside students' other policies (same forward-reference reason as
+-- schools' policies above).
+create policy "Parents can read own children" on students
+  for select using (
+    id in (select student_id from parent_students where parent_id = auth.uid())
+  );
+
 -- ══════════════════════════════════════
 -- Classes
 -- ══════════════════════════════════════
@@ -149,26 +169,26 @@ create table if not exists classes (
   subject     text not null,
   grade       int not null check (grade between 0 and 10),
   section     text,
-  teacher_id  uuid not null references profiles(id),
+  schedule    text,
+  teacher_id  uuid references profiles(id),
   school_id   uuid not null references schools(id) on delete cascade,
   school_year text not null default '2026-2027',
   active      boolean not null default true,
   created_at  timestamptz default now()
 );
 alter table classes enable row level security;
+
+-- Migration for databases created before these existed. A halaqa can be
+-- created before a teacher is assigned to it (the admin UI's "Unassigned"
+-- state), and needs a free-text meeting time — neither was in the original
+-- generic-curriculum shape of this table.
+alter table classes add column if not exists schedule text;
+alter table classes alter column teacher_id drop not null;
 create policy "Teachers can read own classes" on classes
   for select using (teacher_id = auth.uid());
 create policy "Admins can manage all classes" on classes
   for all using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
-  );
-create policy "Students can read enrolled classes" on classes
-  for select using (
-    id in (
-      select class_id from class_enrollments ce
-      join students s on s.id = ce.student_id
-      where s.profile_id = auth.uid()
-    )
   );
 
 -- ══════════════════════════════════════
@@ -191,6 +211,18 @@ create policy "Admins can manage enrollments" on class_enrollments
       select 1 from classes c
       join profiles p on p.school_id = c.school_id
       where c.id = class_enrollments.class_id and p.id = auth.uid() and p.role = 'admin'
+    )
+  );
+
+-- Depends on class_enrollments existing, so it's defined here rather than
+-- alongside classes' other policies (same forward-reference reason as
+-- schools' and students' policies above).
+create policy "Students can read enrolled classes" on classes
+  for select using (
+    id in (
+      select class_id from class_enrollments ce
+      join students s on s.id = ce.student_id
+      where s.profile_id = auth.uid()
     )
   );
 
@@ -512,8 +544,8 @@ alter table messages enable row level security;
 create policy "Teachers can manage messages for own students" on messages
   for all using (
     student_id in (
-      select id from students s
-      join classes c on c.school_id = s.school_id
+      select ce.student_id from class_enrollments ce
+      join classes c on c.id = ce.class_id
       where c.teacher_id = auth.uid()
     )
     or author_id = auth.uid()

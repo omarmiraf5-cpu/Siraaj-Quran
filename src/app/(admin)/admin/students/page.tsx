@@ -19,8 +19,13 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AdminStudentsPage() {
+  const supabase = createClient();
+  const [isDemo, setIsDemo] = useState(false);
+  const [schoolId, setSchoolId] = useState<string | null>(null);
+
   const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
   const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(DEMO_HALAQAS);
   const [created, setCreated] = useState<DemoStudent[]>([]);
@@ -30,41 +35,141 @@ export default function AdminStudentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newHalaqa, setNewHalaqa] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftHalaqa, setDraftHalaqa] = useState("");
   const [draftActive, setDraftActive] = useState(true);
 
-  useEffect(() => {
-    const c = readDemoStore<DemoStudent[]>(DEMO_CREATED_STUDENTS_KEY, []);
-    const o = readDemoStore<Record<string, StudentOverride>>(DEMO_STUDENT_OVERRIDES_KEY, {});
-    setCreated(c);
-    setOverrides(o);
-    setStudents(allStudents(c, o));
-    setHalaqas(
-      allHalaqas(
-        readDemoStore(DEMO_CREATED_HALAQAS_KEY, []),
-        readDemoStore<Record<string, HalaqaOverride>>(DEMO_HALAQA_OVERRIDES_KEY, {})
-      )
+  const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
+    const { data } = await supabase
+      .from("classes")
+      .select("id, name, teacher_id, schedule")
+      .order("name");
+    return (data ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      teacherId: c.teacher_id,
+      schedule: c.schedule ?? "",
+    }));
+  };
+
+  // A student's halaqa is a separate enrollment row in the real schema
+  // (many-to-many), unlike the demo model's plain name field — this folds
+  // it back down to "one halaqa name per student" so the rest of the page,
+  // built around that simpler shape, doesn't need to change.
+  const loadRealStudents = async () => {
+    const { data: studentRows } = await supabase
+      .from("students")
+      .select("id, full_name, active")
+      .order("full_name");
+    const { data: enrollments } = await supabase
+      .from("class_enrollments")
+      .select("student_id, classes(name)");
+    const halaqaByStudent = new Map<string, string>();
+    for (const e of enrollments ?? []) {
+      const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
+      if (className) halaqaByStudent.set(e.student_id, className);
+    }
+    setStudents(
+      (studentRows ?? []).map((s) => ({
+        id: s.id,
+        name: s.full_name,
+        halaqa: halaqaByStudent.get(s.id) ?? "",
+        active: s.active,
+      }))
     );
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setIsDemo(true);
+        const c = readDemoStore<DemoStudent[]>(DEMO_CREATED_STUDENTS_KEY, []);
+        const o = readDemoStore<Record<string, StudentOverride>>(DEMO_STUDENT_OVERRIDES_KEY, {});
+        setCreated(c);
+        setOverrides(o);
+        setStudents(allStudents(c, o));
+        setHalaqas(
+          allHalaqas(
+            readDemoStore(DEMO_CREATED_HALAQAS_KEY, []),
+            readDemoStore<Record<string, HalaqaOverride>>(DEMO_HALAQA_OVERRIDES_KEY, {})
+          )
+        );
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("school_id")
+        .eq("id", user.id)
+        .single();
+      setSchoolId(profile?.school_id ?? null);
+      await Promise.all([loadRealStudents(), loadRealHalaqas().then(setHalaqas)]);
+    };
+    load();
   }, []);
 
-  const addStudent = (e: React.FormEvent) => {
+  const addStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newHalaqa) return;
-    const student: DemoStudent = {
-      id: `local-student-${Date.now()}`,
-      name: newName.trim(),
-      halaqa: newHalaqa,
-    };
-    const next = [...created, student];
-    setCreated(next);
-    writeDemoStore(DEMO_CREATED_STUDENTS_KEY, next);
-    setStudents(allStudents(next, overrides));
-    setNewName("");
-    setNewHalaqa("");
-    setShowForm(false);
+
+    if (isDemo) {
+      const student: DemoStudent = {
+        id: `local-student-${Date.now()}`,
+        name: newName.trim(),
+        halaqa: newHalaqa,
+      };
+      const next = [...created, student];
+      setCreated(next);
+      writeDemoStore(DEMO_CREATED_STUDENTS_KEY, next);
+      setStudents(allStudents(next, overrides));
+      setNewName("");
+      setNewHalaqa("");
+      setShowForm(false);
+      return;
+    }
+
+    if (!schoolId) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      const name = newName.trim();
+      const { data: student, error: studentError } = await supabase
+        .from("students")
+        .insert({
+          full_name: name,
+          grade: 0,
+          avatar_initials: initials(name),
+          school_id: schoolId,
+        })
+        .select("id")
+        .single();
+      if (studentError) throw studentError;
+
+      const halaqa = halaqas.find((h) => h.name === newHalaqa);
+      if (halaqa) {
+        const { error: enrollError } = await supabase
+          .from("class_enrollments")
+          .insert({ class_id: halaqa.id, student_id: student.id });
+        if (enrollError) throw enrollError;
+      }
+
+      await loadRealStudents();
+      setNewName("");
+      setNewHalaqa("");
+      setShowForm(false);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to add student");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const startEditing = (s: DemoStudent) => {
@@ -74,16 +179,37 @@ export default function AdminStudentsPage() {
     setDraftActive(s.active !== false);
   };
 
-  const saveEdit = (s: DemoStudent) => {
-    const patch: StudentOverride = {
-      name: draftName.trim() || s.name,
-      halaqa: draftHalaqa,
-      active: draftActive,
-    };
-    const next = { ...overrides, [s.id]: { ...overrides[s.id], ...patch } };
-    setOverrides(next);
-    writeDemoStore(DEMO_STUDENT_OVERRIDES_KEY, next);
-    setStudents(allStudents(created, next));
+  const saveEdit = async (s: DemoStudent) => {
+    if (isDemo) {
+      const patch: StudentOverride = {
+        name: draftName.trim() || s.name,
+        halaqa: draftHalaqa,
+        active: draftActive,
+      };
+      const next = { ...overrides, [s.id]: { ...overrides[s.id], ...patch } };
+      setOverrides(next);
+      writeDemoStore(DEMO_STUDENT_OVERRIDES_KEY, next);
+      setStudents(allStudents(created, next));
+      setEditingId(null);
+      return;
+    }
+
+    await supabase
+      .from("students")
+      .update({ full_name: draftName.trim() || s.name, active: draftActive })
+      .eq("id", s.id);
+
+    if (draftHalaqa !== s.halaqa) {
+      await supabase.from("class_enrollments").delete().eq("student_id", s.id);
+      const halaqa = halaqas.find((h) => h.name === draftHalaqa);
+      if (halaqa) {
+        await supabase
+          .from("class_enrollments")
+          .insert({ class_id: halaqa.id, student_id: s.id });
+      }
+    }
+
+    await loadRealStudents();
     setEditingId(null);
   };
 
@@ -142,12 +268,13 @@ export default function AdminStudentsPage() {
               ))}
             </select>
           </div>
+          {formError && <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>}
           <button
             type="submit"
-            disabled={!newName.trim() || !newHalaqa}
+            disabled={!newName.trim() || !newHalaqa || saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            Add student
+            {saving ? "Adding…" : "Add student"}
           </button>
         </form>
       )}

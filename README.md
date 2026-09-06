@@ -78,7 +78,12 @@ Add your Supabase credentials:
 ```
 NEXT_PUBLIC_SUPABASE_URL=your_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
+
+The service-role key is server-only (never prefixed `NEXT_PUBLIC_`) and is
+needed for the admin portal to invite real teacher accounts. Also add
+`ANTHROPIC_API_KEY` if you want the in-app chat assistant to work.
 
 4. Run the development server:
 ```bash
