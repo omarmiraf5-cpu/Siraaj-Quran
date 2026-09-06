@@ -19,8 +19,12 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AdminTeachersPage() {
+  const supabase = createClient();
+  const [isDemo, setIsDemo] = useState(false);
+
   const [teachers, setTeachers] = useState<DemoTeacher[]>(DEMO_TEACHERS);
   const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(DEMO_HALAQAS);
   const [created, setCreated] = useState<DemoTeacher[]>([]);
@@ -29,41 +33,112 @@ export default function AdminTeachersPage() {
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteNote, setInviteNote] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftEmail, setDraftEmail] = useState("");
   const [draftActive, setDraftActive] = useState(true);
 
-  useEffect(() => {
-    const c = readDemoStore<DemoTeacher[]>(DEMO_CREATED_TEACHERS_KEY, []);
-    const o = readDemoStore<Record<string, TeacherOverride>>(DEMO_TEACHER_OVERRIDES_KEY, {});
-    setCreated(c);
-    setOverrides(o);
-    setTeachers(allTeachers(c, o));
-    setHalaqas(
-      allHalaqas(
-        readDemoStore(DEMO_CREATED_HALAQAS_KEY, []),
-        readDemoStore<Record<string, HalaqaOverride>>(DEMO_HALAQA_OVERRIDES_KEY, {})
-      )
+  // Real halaqas, for showing each teacher's assignment(s) — kept as a
+  // separate loader so the demo path can reuse it unchanged.
+  const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
+    const { data } = await supabase
+      .from("classes")
+      .select("id, name, teacher_id, schedule")
+      .order("name");
+    return (data ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      teacherId: c.teacher_id,
+      schedule: c.schedule ?? "",
+    }));
+  };
+
+  const loadRealTeachers = async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, active")
+      .eq("role", "teacher")
+      .order("full_name");
+    setTeachers(
+      (data ?? []).map((p) => ({
+        id: p.id,
+        name: p.full_name,
+        email: p.email ?? "",
+        active: p.active,
+      }))
     );
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setIsDemo(true);
+        const c = readDemoStore<DemoTeacher[]>(DEMO_CREATED_TEACHERS_KEY, []);
+        const o = readDemoStore<Record<string, TeacherOverride>>(DEMO_TEACHER_OVERRIDES_KEY, {});
+        setCreated(c);
+        setOverrides(o);
+        setTeachers(allTeachers(c, o));
+        setHalaqas(
+          allHalaqas(
+            readDemoStore(DEMO_CREATED_HALAQAS_KEY, []),
+            readDemoStore<Record<string, HalaqaOverride>>(DEMO_HALAQA_OVERRIDES_KEY, {})
+          )
+        );
+        return;
+      }
+
+      await Promise.all([loadRealTeachers(), loadRealHalaqas().then(setHalaqas)]);
+    };
+    load();
   }, []);
 
-  const addTeacher = (e: React.FormEvent) => {
+  const addTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newEmail.trim()) return;
-    const teacher: DemoTeacher = {
-      id: `local-teacher-${Date.now()}`,
-      name: newName.trim(),
-      email: newEmail.trim(),
-    };
-    const next = [...created, teacher];
-    setCreated(next);
-    writeDemoStore(DEMO_CREATED_TEACHERS_KEY, next);
-    setTeachers(allTeachers(next, overrides));
-    setNewName("");
-    setNewEmail("");
-    setShowForm(false);
+
+    if (isDemo) {
+      const teacher: DemoTeacher = {
+        id: `local-teacher-${Date.now()}`,
+        name: newName.trim(),
+        email: newEmail.trim(),
+      };
+      const next = [...created, teacher];
+      setCreated(next);
+      writeDemoStore(DEMO_CREATED_TEACHERS_KEY, next);
+      setTeachers(allTeachers(next, overrides));
+      setNewName("");
+      setNewEmail("");
+      setShowForm(false);
+      return;
+    }
+
+    setInviting(true);
+    setInviteNote(null);
+    try {
+      const res = await fetch("/api/admin/teachers", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ full_name: newName.trim(), email: newEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to invite teacher");
+      await loadRealTeachers();
+      setNewName("");
+      setNewEmail("");
+      setShowForm(false);
+      setInviteNote(`Invite sent to ${data.email}. They'll appear here once they accept it.`);
+    } catch (err) {
+      setInviteNote(err instanceof Error ? err.message : "Failed to invite teacher");
+    } finally {
+      setInviting(false);
+    }
   };
 
   const startEditing = (t: DemoTeacher) => {
@@ -73,16 +148,28 @@ export default function AdminTeachersPage() {
     setDraftActive(t.active !== false);
   };
 
-  const saveEdit = (t: DemoTeacher) => {
-    const patch: TeacherOverride = {
-      name: draftName.trim() || t.name,
-      email: draftEmail.trim() || t.email,
-      active: draftActive,
-    };
-    const next = { ...overrides, [t.id]: { ...overrides[t.id], ...patch } };
-    setOverrides(next);
-    writeDemoStore(DEMO_TEACHER_OVERRIDES_KEY, next);
-    setTeachers(allTeachers(created, next));
+  const saveEdit = async (t: DemoTeacher) => {
+    if (isDemo) {
+      const patch: TeacherOverride = {
+        name: draftName.trim() || t.name,
+        email: draftEmail.trim() || t.email,
+        active: draftActive,
+      };
+      const next = { ...overrides, [t.id]: { ...overrides[t.id], ...patch } };
+      setOverrides(next);
+      writeDemoStore(DEMO_TEACHER_OVERRIDES_KEY, next);
+      setTeachers(allTeachers(created, next));
+      setEditingId(null);
+      return;
+    }
+
+    // Email is the account's real sign-in identity, so it isn't editable
+    // from this simple form — only name and active status are.
+    await supabase
+      .from("profiles")
+      .update({ full_name: draftName.trim() || t.name, active: draftActive })
+      .eq("id", t.id);
+    await loadRealTeachers();
     setEditingId(null);
   };
 
@@ -127,16 +214,24 @@ export default function AdminTeachersPage() {
             />
           </div>
           <p className="text-xs text-ink-muted">
-            New teachers start without a halaqa — assign one from the Halaqas page.
+            {isDemo
+              ? "New teachers start without a halaqa — assign one from the Halaqas page."
+              : "An invite email is sent to this address — they'll set their own password and start without a halaqa assigned."}
           </p>
           <button
             type="submit"
-            disabled={!newName.trim() || !newEmail.trim()}
+            disabled={!newName.trim() || !newEmail.trim() || inviting}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            Add teacher
+            {isDemo ? "Add teacher" : inviting ? "Sending invite…" : "Send invite"}
           </button>
         </form>
+      )}
+
+      {inviteNote && (
+        <div className="card-quiet p-4 text-sm text-ink border border-emerald-600/30">
+          {inviteNote}
+        </div>
       )}
 
       <SectionCard title="All teachers" note={`${teachers.length} total`}>
@@ -200,8 +295,14 @@ export default function AdminTeachersPage() {
                           type="email"
                           value={draftEmail}
                           onChange={(e) => setDraftEmail(e.target.value)}
-                          className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                          disabled={!isDemo}
+                          className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition disabled:opacity-60 disabled:cursor-not-allowed"
                         />
+                        {!isDemo && (
+                          <p className="text-[11px] text-ink-muted mt-1">
+                            Email is the sign-in address and can&apos;t be changed here.
+                          </p>
+                        )}
                       </div>
                       <label className="flex items-center gap-2 text-sm text-ink">
                         <input

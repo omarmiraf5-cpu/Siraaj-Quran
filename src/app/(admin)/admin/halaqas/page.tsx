@@ -25,8 +25,13 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AdminHalaqasPage() {
+  const supabase = createClient();
+  const [isDemo, setIsDemo] = useState(false);
+  const [schoolId, setSchoolId] = useState<string | null>(null);
+
   const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(DEMO_HALAQAS);
   const [teachers, setTeachers] = useState<DemoTeacher[]>(DEMO_TEACHERS);
   const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
@@ -37,49 +42,151 @@ export default function AdminHalaqasPage() {
   const [newName, setNewName] = useState("");
   const [newSchedule, setNewSchedule] = useState("");
   const [newTeacherId, setNewTeacherId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftSchedule, setDraftSchedule] = useState("");
   const [draftTeacherId, setDraftTeacherId] = useState("");
 
+  const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
+    const { data } = await supabase
+      .from("classes")
+      .select("id, name, teacher_id, schedule")
+      .order("name");
+    return (data ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      teacherId: c.teacher_id,
+      schedule: c.schedule ?? "",
+    }));
+  };
+
+  const loadRealTeachers = async (): Promise<DemoTeacher[]> => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, active")
+      .eq("role", "teacher")
+      .order("full_name");
+    return (data ?? []).map((p) => ({
+      id: p.id,
+      name: p.full_name,
+      email: p.email ?? "",
+      active: p.active,
+    }));
+  };
+
+  const loadRealStudents = async (): Promise<DemoStudent[]> => {
+    const { data: studentRows } = await supabase
+      .from("students")
+      .select("id, full_name, active")
+      .order("full_name");
+    const { data: enrollments } = await supabase
+      .from("class_enrollments")
+      .select("student_id, classes(name)");
+    const halaqaByStudent = new Map<string, string>();
+    for (const e of enrollments ?? []) {
+      const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
+      if (className) halaqaByStudent.set(e.student_id, className);
+    }
+    return (studentRows ?? []).map((s) => ({
+      id: s.id,
+      name: s.full_name,
+      halaqa: halaqaByStudent.get(s.id) ?? "",
+      active: s.active,
+    }));
+  };
+
   useEffect(() => {
-    const c = readDemoStore<DemoHalaqa[]>(DEMO_CREATED_HALAQAS_KEY, []);
-    const o = readDemoStore<Record<string, HalaqaOverride>>(DEMO_HALAQA_OVERRIDES_KEY, {});
-    setCreated(c);
-    setOverrides(o);
-    setHalaqas(allHalaqas(c, o));
-    setTeachers(
-      allTeachers(
-        readDemoStore(DEMO_CREATED_TEACHERS_KEY, []),
-        readDemoStore<Record<string, TeacherOverride>>(DEMO_TEACHER_OVERRIDES_KEY, {})
-      )
-    );
-    setStudents(
-      allStudents(
-        readDemoStore(DEMO_CREATED_STUDENTS_KEY, []),
-        readDemoStore<Record<string, StudentOverride>>(DEMO_STUDENT_OVERRIDES_KEY, {})
-      )
-    );
+    const load = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setIsDemo(true);
+        const c = readDemoStore<DemoHalaqa[]>(DEMO_CREATED_HALAQAS_KEY, []);
+        const o = readDemoStore<Record<string, HalaqaOverride>>(DEMO_HALAQA_OVERRIDES_KEY, {});
+        setCreated(c);
+        setOverrides(o);
+        setHalaqas(allHalaqas(c, o));
+        setTeachers(
+          allTeachers(
+            readDemoStore(DEMO_CREATED_TEACHERS_KEY, []),
+            readDemoStore<Record<string, TeacherOverride>>(DEMO_TEACHER_OVERRIDES_KEY, {})
+          )
+        );
+        setStudents(
+          allStudents(
+            readDemoStore(DEMO_CREATED_STUDENTS_KEY, []),
+            readDemoStore<Record<string, StudentOverride>>(DEMO_STUDENT_OVERRIDES_KEY, {})
+          )
+        );
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("school_id")
+        .eq("id", user.id)
+        .single();
+      setSchoolId(profile?.school_id ?? null);
+      await Promise.all([
+        loadRealHalaqas().then(setHalaqas),
+        loadRealTeachers().then(setTeachers),
+        loadRealStudents().then(setStudents),
+      ]);
+    };
+    load();
   }, []);
 
-  const addHalaqa = (e: React.FormEvent) => {
+  const addHalaqa = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newSchedule.trim()) return;
-    const halaqa: DemoHalaqa = {
-      id: `local-halaqa-${Date.now()}`,
-      name: newName.trim(),
-      schedule: newSchedule.trim(),
-      teacherId: newTeacherId || null,
-    };
-    const next = [...created, halaqa];
-    setCreated(next);
-    writeDemoStore(DEMO_CREATED_HALAQAS_KEY, next);
-    setHalaqas(allHalaqas(next, overrides));
-    setNewName("");
-    setNewSchedule("");
-    setNewTeacherId("");
-    setShowForm(false);
+
+    if (isDemo) {
+      const halaqa: DemoHalaqa = {
+        id: `local-halaqa-${Date.now()}`,
+        name: newName.trim(),
+        schedule: newSchedule.trim(),
+        teacherId: newTeacherId || null,
+      };
+      const next = [...created, halaqa];
+      setCreated(next);
+      writeDemoStore(DEMO_CREATED_HALAQAS_KEY, next);
+      setHalaqas(allHalaqas(next, overrides));
+      setNewName("");
+      setNewSchedule("");
+      setNewTeacherId("");
+      setShowForm(false);
+      return;
+    }
+
+    if (!schoolId) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      const { error } = await supabase.from("classes").insert({
+        name: newName.trim(),
+        subject: "Qur'an & Hifz",
+        grade: 0,
+        schedule: newSchedule.trim(),
+        teacher_id: newTeacherId || null,
+        school_id: schoolId,
+      });
+      if (error) throw error;
+
+      setHalaqas(await loadRealHalaqas());
+      setNewName("");
+      setNewSchedule("");
+      setNewTeacherId("");
+      setShowForm(false);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to add halaqa");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const startEditing = (h: DemoHalaqa) => {
@@ -89,16 +196,30 @@ export default function AdminHalaqasPage() {
     setDraftTeacherId(h.teacherId ?? "");
   };
 
-  const saveEdit = (h: DemoHalaqa) => {
-    const patch: HalaqaOverride = {
-      name: draftName.trim() || h.name,
-      schedule: draftSchedule.trim() || h.schedule,
-      teacherId: draftTeacherId || null,
-    };
-    const next = { ...overrides, [h.id]: { ...overrides[h.id], ...patch } };
-    setOverrides(next);
-    writeDemoStore(DEMO_HALAQA_OVERRIDES_KEY, next);
-    setHalaqas(allHalaqas(created, next));
+  const saveEdit = async (h: DemoHalaqa) => {
+    if (isDemo) {
+      const patch: HalaqaOverride = {
+        name: draftName.trim() || h.name,
+        schedule: draftSchedule.trim() || h.schedule,
+        teacherId: draftTeacherId || null,
+      };
+      const next = { ...overrides, [h.id]: { ...overrides[h.id], ...patch } };
+      setOverrides(next);
+      writeDemoStore(DEMO_HALAQA_OVERRIDES_KEY, next);
+      setHalaqas(allHalaqas(created, next));
+      setEditingId(null);
+      return;
+    }
+
+    await supabase
+      .from("classes")
+      .update({
+        name: draftName.trim() || h.name,
+        schedule: draftSchedule.trim() || h.schedule,
+        teacher_id: draftTeacherId || null,
+      })
+      .eq("id", h.id);
+    setHalaqas(await loadRealHalaqas());
     setEditingId(null);
   };
 
@@ -154,12 +275,13 @@ export default function AdminHalaqasPage() {
               ))}
             </select>
           </div>
+          {formError && <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>}
           <button
             type="submit"
-            disabled={!newName.trim() || !newSchedule.trim()}
+            disabled={!newName.trim() || !newSchedule.trim() || saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            Add halaqa
+            {saving ? "Adding…" : "Add halaqa"}
           </button>
         </form>
       )}

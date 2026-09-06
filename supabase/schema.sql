@@ -149,13 +149,21 @@ create table if not exists classes (
   subject     text not null,
   grade       int not null check (grade between 0 and 10),
   section     text,
-  teacher_id  uuid not null references profiles(id),
+  schedule    text,
+  teacher_id  uuid references profiles(id),
   school_id   uuid not null references schools(id) on delete cascade,
   school_year text not null default '2026-2027',
   active      boolean not null default true,
   created_at  timestamptz default now()
 );
 alter table classes enable row level security;
+
+-- Migration for databases created before these existed. A halaqa can be
+-- created before a teacher is assigned to it (the admin UI's "Unassigned"
+-- state), and needs a free-text meeting time — neither was in the original
+-- generic-curriculum shape of this table.
+alter table classes add column if not exists schedule text;
+alter table classes alter column teacher_id drop not null;
 create policy "Teachers can read own classes" on classes
   for select using (teacher_id = auth.uid());
 create policy "Admins can manage all classes" on classes
