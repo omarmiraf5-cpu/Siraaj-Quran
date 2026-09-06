@@ -78,11 +78,15 @@ create policy "Admins can update own school" on schools
     id in (select school_id from profiles where id = auth.uid() and role = 'admin')
   );
 
--- Auto-create profile on signup
+-- Auto-create profile on signup. Schema-qualified and with search_path
+-- pinned explicitly: this trigger fires inside a transaction run by
+-- Supabase's own auth service role, whose default search_path doesn't
+-- include public, so an unqualified "profiles" fails to resolve even
+-- though the table exists — a well-known gotcha for this exact pattern.
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into profiles (id, role, full_name, email, school_id)
+  insert into public.profiles (id, role, full_name, email, school_id)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'role', 'parent'),
@@ -92,7 +96,7 @@ begin
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
