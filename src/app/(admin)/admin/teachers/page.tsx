@@ -128,14 +128,16 @@ export default function AdminTeachersPage() {
         body: JSON.stringify({ full_name: newName.trim(), email: newEmail.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to invite teacher");
+      if (!res.ok) throw new Error(data.error || "Failed to create teacher");
       await loadRealTeachers();
       setNewName("");
       setNewEmail("");
       setShowForm(false);
-      setInviteNote(`Invite sent to ${data.email}. They'll appear here once they accept it.`);
+      setInviteNote(
+        `Account created for ${data.email}. Temporary password: ${data.temp_password} — share this with them so they can sign in.`
+      );
     } catch (err) {
-      setInviteNote(err instanceof Error ? err.message : "Failed to invite teacher");
+      setInviteNote(err instanceof Error ? err.message : "Failed to create teacher");
     } finally {
       setInviting(false);
     }
@@ -216,14 +218,14 @@ export default function AdminTeachersPage() {
           <p className="text-xs text-ink-muted">
             {isDemo
               ? "New teachers start without a halaqa — assign one from the Halaqas page."
-              : "An invite email is sent to this address — they'll set their own password and start without a halaqa assigned."}
+              : "You'll get a temporary password to share with them — they start without a halaqa assigned."}
           </p>
           <button
             type="submit"
             disabled={!newName.trim() || !newEmail.trim() || inviting}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            {isDemo ? "Add teacher" : inviting ? "Sending invite…" : "Send invite"}
+            {isDemo ? "Add teacher" : inviting ? "Creating…" : "Create login"}
           </button>
         </form>
       )}
