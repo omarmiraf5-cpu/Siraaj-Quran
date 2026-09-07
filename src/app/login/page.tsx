@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DEMO_ACCOUNTS } from "@/lib/demo";
 import type { Role } from "@/lib/types";
+import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 
 const ROLES: { key: Role; label: string; portal: string }[] = [
   { key: "parent",  label: "Parent",  portal: "Parent Portal"  },
@@ -61,6 +62,13 @@ const STUDENT_AVATARS = [
   { id: "E", color: "bg-subject-pink"   },
 ];
 
+interface RosterStudent {
+  id: string;
+  first_name: string;
+  initials: string;
+  colour: string;
+}
+
 export default function LoginPage() {
   const router   = useRouter();
   const supabase = createClient();
@@ -72,6 +80,28 @@ export default function LoginPage() {
   const [loading,         setLoading]         = useState(false);
   const [selectedAvatar,  setSelectedAvatar]  = useState<string | null>(null);
   const [pin,             setPin]             = useState("");
+
+  // A child's school comes from the link the school hands out
+  // (/login?school=their-slug). Without one there is no roster to show, so
+  // the student tab falls back to the demo avatars.
+  const [roster,          setRoster]          = useState<RosterStudent[] | null>(null);
+  const [schoolName,      setSchoolName]      = useState<string | null>(null);
+  const [studentId,       setStudentId]       = useState<string | null>(null);
+
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get("school");
+    if (!slug) return;
+    fetch(`/api/student-roster?school=${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setRoster(data.students ?? []);
+        setSchoolName(data.school?.name ?? null);
+      })
+      .catch(() => {
+        /* No roster: the demo avatars stay as they were. */
+      });
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,21 +125,50 @@ export default function LoginPage() {
     router.push(`/${role}`);
   };
 
+  // Appending through the updater rather than off the rendered value: a
+  // child hammering the keypad can land two taps inside one render, and
+  // reading `pin` directly would drop the second one.
   const handlePin = (digit: string) => {
-    if (pin.length >= 4) return;
-    const next = pin + digit;
-    setPin(next);
-    if (next.length === 4) {
-      if (next === DEMO_ACCOUNTS.student.pin) {
-        localStorage.setItem("demo_user", JSON.stringify(DEMO_ACCOUNTS.student));
-        document.cookie = "demo_mode=true; path=/; max-age=86400; SameSite=Lax";
-        setTimeout(() => router.push("/student"), 300);
-      } else {
-        setError("Wrong PIN. Try 1234.");
-        setPin("");
-      }
-    }
+    setPin((current) => (current.length >= 4 ? current : current + digit));
   };
+
+  // The fourth digit is what submits, so the attempt hangs off the PIN
+  // itself rather than off the tap that completed it.
+  useEffect(() => {
+    if (pin.length !== 4) return;
+
+    // A real roster means a real account behind the PIN; without one this is
+    // the demo, where a single PIN opens the sample student.
+    if (roster && studentId) {
+      setLoading(true);
+      supabase.auth
+        .signInWithPassword({
+          email: studentLoginEmail(studentId),
+          password: studentLoginPassword(studentId, pin),
+        })
+        .then(({ error }) => {
+          setLoading(false);
+          if (error) {
+            setError("That PIN didn't work. Try again.");
+            setPin("");
+            return;
+          }
+          router.push("/student");
+        });
+      return;
+    }
+
+    if (pin === DEMO_ACCOUNTS.student.pin) {
+      localStorage.setItem("demo_user", JSON.stringify(DEMO_ACCOUNTS.student));
+      document.cookie = "demo_mode=true; path=/; max-age=86400; SameSite=Lax";
+      const t = setTimeout(() => router.push("/student"), 300);
+      return () => clearTimeout(t);
+    }
+
+    setError("Wrong PIN. Try 1234.");
+    setPin("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin, roster, studentId]);
 
   return (
     <div className="relative min-h-screen gradient-navy flex items-center justify-center overflow-hidden">
@@ -239,21 +298,52 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {role === "student" ? (
             <div className="space-y-5">
-              <div className="flex justify-center gap-3">
-                {STUDENT_AVATARS.map((av) => (
-                  <button
-                    key={av.id}
-                    onClick={() => { setSelectedAvatar(av.id); setPin(""); }}
-                    className={`w-12 h-12 rounded-full ${av.color} text-white font-bold text-lg flex items-center justify-center transition-all ${
-                      selectedAvatar === av.id
-                        ? "ring-2 ring-white ring-offset-2 ring-offset-transparent scale-110"
-                        : "opacity-70 hover:opacity-100"
-                    }`}
-                  >
-                    {av.id}
-                  </button>
-                ))}
-              </div>
+              {schoolName && (
+                <p className="text-center text-white/70 text-sm">
+                  {schoolName} — tap your name, then your PIN
+                </p>
+              )}
+
+              {roster && roster.length > 0 ? (
+                <div className="flex flex-wrap justify-center gap-3">
+                  {roster.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => { setStudentId(s.id); setSelectedAvatar(s.id); setPin(""); setError(null); }}
+                      className={`flex flex-col items-center gap-1 transition-all ${
+                        selectedAvatar === s.id ? "scale-105" : "opacity-70 hover:opacity-100"
+                      }`}
+                    >
+                      <span
+                        className={`w-12 h-12 rounded-full ${s.colour} text-white font-bold text-sm flex items-center justify-center ${
+                          selectedAvatar === s.id
+                            ? "ring-2 ring-white ring-offset-2 ring-offset-transparent"
+                            : ""
+                        }`}
+                      >
+                        {s.initials}
+                      </span>
+                      <span className="text-[11px] font-semibold text-white/80">{s.first_name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex justify-center gap-3">
+                  {STUDENT_AVATARS.map((av) => (
+                    <button
+                      key={av.id}
+                      onClick={() => { setSelectedAvatar(av.id); setPin(""); }}
+                      className={`w-12 h-12 rounded-full ${av.color} text-white font-bold text-lg flex items-center justify-center transition-all ${
+                        selectedAvatar === av.id
+                          ? "ring-2 ring-white ring-offset-2 ring-offset-transparent scale-110"
+                          : "opacity-70 hover:opacity-100"
+                      }`}
+                    >
+                      {av.id}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {selectedAvatar && (
                 <>

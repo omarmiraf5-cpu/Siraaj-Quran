@@ -138,6 +138,14 @@ create policy "Admins can manage students" on students
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
   );
 
+-- A child signs in with a 4-digit PIN rather than an email and password,
+-- which means the office has to be able to read it back to a child who has
+-- forgotten it — so it is stored as typed rather than hashed. That is a
+-- deliberate trade: a PIN is a low-value credential guarding a child's own
+-- homework, and the alternative (resetting it every time a seven-year-old
+-- forgets) is worse. RLS keeps it to the school's own staff.
+alter table students add column if not exists pin text;
+
 -- ══════════════════════════════════════
 -- Parent ↔ Student (many-to-many)
 -- ══════════════════════════════════════
