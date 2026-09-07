@@ -122,10 +122,14 @@ export default function AdminTeachersPage() {
     setInviting(true);
     setInviteNote(null);
     try {
-      const res = await fetch("/api/admin/teachers", {
+      const res = await fetch("/api/admin/accounts", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ full_name: newName.trim(), email: newEmail.trim() }),
+        body: JSON.stringify({
+          role: "teacher",
+          full_name: newName.trim(),
+          email: newEmail.trim(),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create teacher");
