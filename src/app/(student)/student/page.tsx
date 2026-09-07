@@ -34,6 +34,7 @@ import { getSurahById } from "@/data/mushaf-index";
 import { computeXp, levelFor, levelMessage } from "@/lib/progress";
 import { SectionCard, AttendanceStrip, TeacherNote } from "@/components/portal-ui";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
+import { AchievementsCard } from "@/components/AchievementsCard";
 import {
   Avatar,
   StreakPill,
@@ -305,6 +306,8 @@ export default function StudentDashboard() {
           delay={480}
         />
       </div>
+
+      <AchievementsCard studentId={student.id} title="My stars & badges" possessive="You have" />
 
       <AnnouncementsFeed audience="students" />
 

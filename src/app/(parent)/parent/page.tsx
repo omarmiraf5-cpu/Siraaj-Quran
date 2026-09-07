@@ -33,6 +33,7 @@ import {
 } from "@/components/portal-ui";
 import { IconBook, IconChart, IconCalendar, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
+import { AchievementsCard } from "@/components/AchievementsCard";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
@@ -125,6 +126,12 @@ export default function ParentDashboard() {
           sub={done.length ? "well done" : "none yet"}
         />
       </div>
+
+      <AchievementsCard
+        studentId={child.id}
+        title={`${child.name.split(" ")[0]}'s stars & badges`}
+        possessive={`${child.name.split(" ")[0]} has`}
+      />
 
       <AnnouncementsFeed audience="parents" />
 

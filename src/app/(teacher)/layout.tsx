@@ -40,6 +40,11 @@ const NAV = [
     label: "Forty Hadith",
     icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3.2l2.5 5.2 5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4 5.7-.8Z"/></svg>,
   },
+  {
+    href: "/teacher/awards",
+    label: "Stars & badges",
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.2 12.5 7 22l5-2.5L17 22l-1.2-9.5"/></svg>,
+  },
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {

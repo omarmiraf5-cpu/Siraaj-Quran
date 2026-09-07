@@ -627,6 +627,65 @@ create policy "Admins can read all recitation log" on recitation_log
   );
 
 -- ══════════════════════════════════════
+-- Stars and badges (teacher-awarded recognition)
+-- ══════════════════════════════════════
+-- Separate from the XP the student portal computes from assignments and
+-- attendance. XP is earned by doing the work; a star is a teacher choosing
+-- to mark something. Keeping them in different places means neither can be
+-- mistaken for the other.
+create table if not exists student_stars (
+  id          uuid primary key default gen_random_uuid(),
+  student_id  uuid not null references students(id) on delete cascade,
+  teacher_id  uuid not null references profiles(id),
+  school_id   uuid not null references schools(id) on delete cascade,
+  reason      text not null check (reason in ('attendance', 'assignment', 'quiz', 'quran', 'effort')),
+  note        text,
+  created_at  timestamptz default now()
+);
+alter table student_stars enable row level security;
+create policy "Teachers can manage stars for own students" on student_stars
+  for all using (teacher_id = auth.uid());
+create policy "Students can read own stars" on student_stars
+  for select using (
+    student_id in (select id from students where profile_id = auth.uid())
+  );
+create policy "Parents can read children stars" on student_stars
+  for select using (
+    student_id in (select student_id from parent_students where parent_id = auth.uid())
+  );
+create policy "Admins can read all stars" on student_stars
+  for select using (
+    school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- One of each badge per student: a badge is a standing achievement, not a
+-- tally, so awarding the same one twice would say nothing new.
+create table if not exists student_badges (
+  id          uuid primary key default gen_random_uuid(),
+  student_id  uuid not null references students(id) on delete cascade,
+  teacher_id  uuid not null references profiles(id),
+  school_id   uuid not null references schools(id) on delete cascade,
+  badge       text not null check (badge in ('perfect_attendance', 'homework_champion', 'quran_achiever', 'tajweed_star', 'most_improved', 'consistent_learner')),
+  created_at  timestamptz default now(),
+  unique (student_id, badge)
+);
+alter table student_badges enable row level security;
+create policy "Teachers can manage badges for own students" on student_badges
+  for all using (teacher_id = auth.uid());
+create policy "Students can read own badges" on student_badges
+  for select using (
+    student_id in (select id from students where profile_id = auth.uid())
+  );
+create policy "Parents can read children badges" on student_badges
+  for select using (
+    student_id in (select student_id from parent_students where parent_id = auth.uid())
+  );
+create policy "Admins can read all badges" on student_badges
+  for select using (
+    school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- ══════════════════════════════════════
 -- Indexes for performance
 -- ══════════════════════════════════════
 create index if not exists idx_profiles_school   on profiles(school_id);
@@ -649,3 +708,5 @@ create index if not exists idx_messages_student on messages(student_id);
 create index if not exists idx_messages_created on messages(created_at);
 create index if not exists idx_recitation_log_student on recitation_log(student_id);
 create index if not exists idx_recitation_log_date on recitation_log(session_date);
+create index if not exists idx_student_stars_student on student_stars(student_id);
+create index if not exists idx_student_badges_student on student_badges(student_id);
