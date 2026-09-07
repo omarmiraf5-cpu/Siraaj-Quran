@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useDemoUser } from "@/hooks/useDemoUser";
+import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 
 interface NavItem {
   href: string;
@@ -29,11 +29,50 @@ interface SidebarNavProps {
 // handles it.
 const MAX_PRIMARY_TABS = 4;
 
+// A school's own name replaces the platform wordmark wholesale; only the
+// MyDiiwaan default gets the two-tone "My"/"Diiwaan" split.
+function Wordmark({ branding, className }: { branding: SchoolBranding; className: string }) {
+  return (
+    <span className={className}>
+      {branding.isCustom ? (
+        <span className="gold-foil">{branding.name}</span>
+      ) : (
+        <>
+          <span className="text-white">My</span>
+          <span className="gold-foil">Diiwaan</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+// A school's logo can live on any host they like, so this stays a plain
+// <img> rather than next/image, which would need every one of those hosts
+// declared in next.config up front.
+function Crest({ branding, size, className }: { branding: SchoolBranding; size: number; className: string }) {
+  return (
+    <div className={className}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={branding.logoUrl}
+        alt={branding.name}
+        width={size}
+        height={size}
+        // The platform crest is a square image meant to fill its slot; a
+        // school's own logo is artwork with its own margins, so it gets
+        // fitted rather than cropped.
+        className={`w-full h-full ${branding.isCustom ? "object-contain bg-white" : "object-cover"}`}
+      />
+    </div>
+  );
+}
+
 export function SidebarNav({ items, role, userName = "User", portalLinks }: SidebarNavProps) {
   const pathname = usePathname();
   const router   = useRouter();
   const supabase = createClient();
   const demoUser = useDemoUser();
+  const branding = useSchoolBranding();
   const displayName = demoUser?.name ?? userName;
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -53,15 +92,14 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
     <>
       {/* ── MOBILE TOP BAR ── */}
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 gradient-navy flex items-center justify-between px-4 h-14 shadow-dark">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg overflow-hidden ring-1 ring-brand-gold/60 flex-shrink-0">
-            <Image src="/crest.jpg" alt="MyDiiwaan" width={32} height={32} className="object-cover w-full h-full" />
-          </div>
-          <span className="font-display text-sm font-bold tracking-tight">
-            <span className="text-white/90">My</span>
-            <span className="gold-foil">Diiwaan</span>
-          </span>
-          <span className="text-white/30 text-xs font-medium">· {role}</span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Crest
+            branding={branding}
+            size={32}
+            className="w-8 h-8 rounded-lg overflow-hidden ring-1 ring-brand-gold/60 flex-shrink-0"
+          />
+          <Wordmark branding={branding} className="font-display text-sm font-bold tracking-tight truncate" />
+          <span className="text-white/30 text-xs font-medium flex-shrink-0">· {role}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
@@ -150,17 +188,21 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
       <aside className="hidden md:flex flex-col w-56 min-h-screen gradient-navy text-white p-4 gap-2 flex-shrink-0">
         {/* Logo + branding */}
         <div className="flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
-          <div className="w-28 h-28 rounded-2xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark flex-shrink-0">
-            <Image src="/crest.jpg" alt="MyDiiwaan" width={112} height={112} className="object-cover w-full h-full" />
-          </div>
+          <Crest
+            branding={branding}
+            size={112}
+            className="w-28 h-28 rounded-2xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark flex-shrink-0"
+          />
           <div className="flex flex-col items-center gap-1">
-            <span className="font-display text-lg font-bold tracking-tight leading-tight text-center">
-              <span className="text-white">My</span>
-              <span className="gold-foil">Diiwaan</span>
-            </span>
-            <span className="font-calligraphy font-bold text-2xl text-brand-gold-light leading-none" dir="rtl" lang="ar">
-              ديواني
-            </span>
+            <Wordmark
+              branding={branding}
+              className="font-display text-lg font-bold tracking-tight leading-tight text-center"
+            />
+            {branding.nameArabic && (
+              <span className="font-calligraphy font-bold text-2xl text-brand-gold-light leading-none" dir="rtl" lang="ar">
+                {branding.nameArabic}
+              </span>
+            )}
           </div>
         </div>
 

@@ -10,6 +10,10 @@ alter default privileges in schema public grant all on tables to postgres, anon,
 create table if not exists schools (
   id           uuid primary key default gen_random_uuid(),
   name         text not null,
+  -- Shown in the portal chrome under the school's name, the way "ديواني"
+  -- sits under the platform wordmark. Optional: the sidebar just omits the
+  -- line when a school hasn't given one.
+  name_arabic  text,
   slug         text unique not null,
   address      text,
   city         text not null default 'Edmonton',
@@ -25,6 +29,9 @@ create table if not exists schools (
   created_at   timestamptz default now()
 );
 alter table schools enable row level security;
+
+-- Migration for schools created before the portal could be white-labelled.
+alter table schools add column if not exists name_arabic text;
 
 -- ══════════════════════════════════════
 -- Profiles (extends auth.users)
