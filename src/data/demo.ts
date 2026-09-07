@@ -707,3 +707,62 @@ export function schoolAttendanceRate(students: DemoStudent[]): number {
   }
   return assessed > 0 ? Math.round((presentOrLate / assessed) * 100) : 0;
 }
+
+// ── Fees ─────────────────────────────────────────────────────────────────
+// A fee's status isn't stored: "paid"/"partial"/"due" is entirely a function
+// of what's owed against what's come in, so deriving it keeps the two from
+// ever drifting apart. The real `fees` table does carry a status column —
+// the admin portal writes the derived value into it on every change so
+// database-side reporting sees the same answer.
+export interface DemoFee {
+  id: string;
+  studentId: string;
+  description: string;
+  amountDue: number;
+  amountPaid: number;
+  dueDate: string;
+  term: number;
+}
+
+export type FeeStatus = "paid" | "partial" | "due";
+
+export function feeStatus(fee: Pick<DemoFee, "amountDue" | "amountPaid">): FeeStatus {
+  if (fee.amountPaid >= fee.amountDue) return "paid";
+  if (fee.amountPaid > 0) return "partial";
+  return "due";
+}
+
+export const FEE_STATUS_LABELS: Record<FeeStatus, string> = {
+  paid: "Paid",
+  partial: "Partial",
+  due: "Due",
+};
+
+export const FEE_STATUS_STYLES: Record<FeeStatus, string> = {
+  paid: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+  partial: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  due: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300",
+};
+
+export const DEMO_FEES: DemoFee[] = [
+  { id: "f1", studentId: "s1", description: "Term 1 tuition", amountDue: 300, amountPaid: 300, dueDate: "2026-09-15", term: 1 },
+  { id: "f2", studentId: "s2", description: "Term 1 tuition", amountDue: 300, amountPaid: 150, dueDate: "2026-09-15", term: 1 },
+  { id: "f3", studentId: "s3", description: "Term 1 tuition", amountDue: 300, amountPaid: 0, dueDate: "2026-09-15", term: 1 },
+  { id: "f4", studentId: "s4", description: "Term 1 tuition", amountDue: 300, amountPaid: 300, dueDate: "2026-09-15", term: 1 },
+  { id: "f5", studentId: "s5", description: "Term 1 tuition", amountDue: 300, amountPaid: 0, dueDate: "2026-09-15", term: 1 },
+  { id: "f6", studentId: "s1", description: "Mushaf & workbook", amountDue: 45, amountPaid: 45, dueDate: "2026-09-01", term: 1 },
+  { id: "f7", studentId: "s4", description: "Mushaf & workbook", amountDue: 45, amountPaid: 0, dueDate: "2026-09-01", term: 1 },
+];
+
+export const DEMO_CREATED_FEES_KEY = "demo_created_fees";
+export const DEMO_FEE_OVERRIDES_KEY = "demo_fee_overrides";
+
+export type FeeOverride = Partial<Pick<DemoFee, "description" | "amountDue" | "amountPaid" | "dueDate">>;
+
+export function allFees(created: DemoFee[], overrides: Record<string, FeeOverride>): DemoFee[] {
+  return [...DEMO_FEES, ...created].map((f) => ({ ...f, ...overrides[f.id] }));
+}
+
+export function money(amount: number): string {
+  return `$${amount.toFixed(2)}`;
+}
