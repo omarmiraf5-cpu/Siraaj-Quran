@@ -11,7 +11,7 @@ import {
   type StudentOverride,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 
@@ -32,9 +32,10 @@ const DEMO_CREATED_PARENTS_KEY = "demo_created_parents";
 export default function AdminParentsPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  const [parents, setParents] = useState<ParentRow[]>(DEMO_PARENTS);
-  const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
+  const [parents, setParents] = useState<ParentRow[]>([]);
+  const [students, setStudents] = useState<DemoStudent[]>([]);
   const [created, setCreated] = useState<ParentRow[]>([]);
 
   const [showForm, setShowForm] = useState(false);
@@ -97,7 +98,7 @@ export default function AdminParentsPage() {
       );
       await loadReal();
     };
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const toggleChild = (id: string) => {
@@ -250,7 +251,9 @@ export default function AdminParentsPage() {
       )}
 
       <SectionCard title="All parents" note={`${parents.length} total`}>
-        {parents.length === 0 ? (
+        {!ready ? (
+          <LoadingNote />
+        ) : parents.length === 0 ? (
           <EmptyNote>No parent accounts yet.</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">

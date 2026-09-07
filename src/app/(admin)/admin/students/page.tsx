@@ -16,7 +16,7 @@ import {
 } from "@/data/demo";
 import type { DemoStudent, DemoHalaqa } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
@@ -24,10 +24,11 @@ import { createClient } from "@/lib/supabase/client";
 export default function AdminStudentsPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
+  const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
 
-  const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
-  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(DEMO_HALAQAS);
+  const [students, setStudents] = useState<DemoStudent[]>([]);
+  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
   const [created, setCreated] = useState<DemoStudent[]>([]);
   const [overrides, setOverrides] = useState<Record<string, StudentOverride>>({});
 
@@ -116,7 +117,7 @@ export default function AdminStudentsPage() {
       setSchoolId(profile?.school_id ?? null);
       await Promise.all([loadRealStudents(), loadRealHalaqas().then(setHalaqas)]);
     };
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const addStudent = async (e: React.FormEvent) => {
@@ -304,7 +305,9 @@ export default function AdminStudentsPage() {
       )}
 
       <SectionCard title="All students" note={`${filtered.length} shown`}>
-        {filtered.length === 0 ? (
+        {!ready ? (
+          <LoadingNote />
+        ) : filtered.length === 0 ? (
           <EmptyNote>No students match that search.</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">

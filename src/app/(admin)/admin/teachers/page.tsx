@@ -16,7 +16,7 @@ import {
 } from "@/data/demo";
 import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
@@ -24,9 +24,10 @@ import { createClient } from "@/lib/supabase/client";
 export default function AdminTeachersPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  const [teachers, setTeachers] = useState<DemoTeacher[]>(DEMO_TEACHERS);
-  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(DEMO_HALAQAS);
+  const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
+  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
   const [created, setCreated] = useState<DemoTeacher[]>([]);
   const [overrides, setOverrides] = useState<Record<string, TeacherOverride>>({});
 
@@ -96,7 +97,7 @@ export default function AdminTeachersPage() {
 
       await Promise.all([loadRealTeachers(), loadRealHalaqas().then(setHalaqas)]);
     };
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const addTeacher = async (e: React.FormEvent) => {
@@ -241,7 +242,9 @@ export default function AdminTeachersPage() {
       )}
 
       <SectionCard title="All teachers" note={`${teachers.length} total`}>
-        {teachers.length === 0 ? (
+        {!ready ? (
+          <LoadingNote />
+        ) : teachers.length === 0 ? (
           <EmptyNote>No teachers yet.</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">

@@ -9,7 +9,7 @@ import {
   type AnnouncementAudience,
   type DemoAnnouncement,
 } from "@/data/demo";
-import { SectionCard, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 
@@ -24,6 +24,7 @@ export function AnnouncementsFeed({
   limit?: number;
 }) {
   const [items, setItems] = useState<DemoAnnouncement[]>([]);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -64,14 +65,16 @@ export function AnnouncementsFeed({
       );
     };
 
-    load();
+    load().finally(() => setReady(true));
   }, [audience]);
 
   const shown = items.slice(0, limit);
 
   return (
     <SectionCard title="Announcements" note={items.length ? `${items.length} posted` : undefined}>
-      {shown.length === 0 ? (
+      {!ready ? (
+        <LoadingNote />
+      ) : shown.length === 0 ? (
         <EmptyNote>Nothing from the office right now.</EmptyNote>
       ) : (
         <ul className="divide-y divide-surface-border -my-1">

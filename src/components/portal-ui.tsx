@@ -300,6 +300,20 @@ export function EmptyNote({ children }: { children: React.ReactNode }) {
   return <p className="text-[13px] text-ink-muted py-2">{children}</p>;
 }
 
+/* ── Loading state ─────────────────────────────────────────────────────
+   Every page that can run against either a real school or the demo has to
+   ask Supabase who is signed in before it knows which to draw. This holds
+   the space while that answer is in flight — the alternative, rendering the
+   demo roster first and swapping it out a moment later, briefly shows one
+   school somebody else's names. */
+export function LoadingNote({ children = "Loading…" }: { children?: React.ReactNode }) {
+  return (
+    <p className="text-[13px] text-ink-muted py-2 animate-pulse" aria-live="polite">
+      {children}
+    </p>
+  );
+}
+
 /* ── Daily rating pill ─────────────────────────────────────────────────
    Excellent / Very good / Good / Weak — what a teacher grades today's
    recitation as, coloured so a parent reads it at a glance before any

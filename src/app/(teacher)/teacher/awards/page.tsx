@@ -29,17 +29,18 @@ import {
   type BadgeKind,
 } from "@/data/awards";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TeacherAwardsPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
+  const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
   const [teacherId, setTeacherId] = useState<string | null>(null);
 
-  const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
+  const [students, setStudents] = useState<DemoStudent[]>([]);
   const [stars, setStars] = useState<DemoStar[]>([]);
   const [badges, setBadges] = useState<DemoBadge[]>([]);
   const [createdStars, setCreatedStars] = useState<DemoStar[]>([]);
@@ -123,7 +124,7 @@ export default function TeacherAwardsPage() {
       );
       await loadReal();
     };
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const say = (message: string) => {
@@ -355,7 +356,9 @@ export default function TeacherAwardsPage() {
       </SectionCard>
 
       <SectionCard title="Recently given" note={`${stars.length} stars`}>
-        {stars.length === 0 ? (
+        {!ready ? (
+          <LoadingNote />
+        ) : stars.length === 0 ? (
           <EmptyNote>No stars given yet.</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">

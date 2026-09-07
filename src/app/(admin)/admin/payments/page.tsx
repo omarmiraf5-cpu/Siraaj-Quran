@@ -21,7 +21,7 @@ import {
   type StudentOverride,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
@@ -29,10 +29,11 @@ import { createClient } from "@/lib/supabase/client";
 export default function AdminPaymentsPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
+  const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
 
-  const [fees, setFees] = useState<DemoFee[]>(DEMO_FEES);
-  const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
+  const [fees, setFees] = useState<DemoFee[]>([]);
+  const [students, setStudents] = useState<DemoStudent[]>([]);
   const [created, setCreated] = useState<DemoFee[]>([]);
   const [overrides, setOverrides] = useState<Record<string, FeeOverride>>({});
 
@@ -103,7 +104,7 @@ export default function AdminPaymentsPage() {
       setSchoolId(profile?.school_id ?? null);
       await Promise.all([loadRealFees(), loadRealStudents().then(setStudents)]);
     };
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const addFee = async (e: React.FormEvent) => {
@@ -286,7 +287,9 @@ export default function AdminPaymentsPage() {
       )}
 
       <SectionCard title="All charges" note={`${fees.length} total`}>
-        {sorted.length === 0 ? (
+        {!ready ? (
+          <LoadingNote />
+        ) : sorted.length === 0 ? (
           <EmptyNote>No fees recorded yet.</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">

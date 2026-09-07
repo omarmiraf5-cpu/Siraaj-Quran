@@ -22,7 +22,7 @@ import {
 } from "@/data/demo";
 import type { DemoHalaqa, DemoTeacher, DemoStudent } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
@@ -30,11 +30,12 @@ import { createClient } from "@/lib/supabase/client";
 export default function AdminHalaqasPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
+  const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
 
-  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(DEMO_HALAQAS);
-  const [teachers, setTeachers] = useState<DemoTeacher[]>(DEMO_TEACHERS);
-  const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
+  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
+  const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
+  const [students, setStudents] = useState<DemoStudent[]>([]);
   const [created, setCreated] = useState<DemoHalaqa[]>([]);
   const [overrides, setOverrides] = useState<Record<string, HalaqaOverride>>({});
 
@@ -138,7 +139,7 @@ export default function AdminHalaqasPage() {
         loadRealStudents().then(setStudents),
       ]);
     };
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const addHalaqa = async (e: React.FormEvent) => {
@@ -287,7 +288,9 @@ export default function AdminHalaqasPage() {
       )}
 
       <SectionCard title="All halaqas" note={`${halaqas.length} total`}>
-        {halaqas.length === 0 ? (
+        {!ready ? (
+          <LoadingNote />
+        ) : halaqas.length === 0 ? (
           <EmptyNote>No halaqas yet.</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">

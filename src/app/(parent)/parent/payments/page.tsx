@@ -16,14 +16,15 @@ import {
   type DemoStudent,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ParentPaymentsPage() {
   const supabase = createClient();
+  const [ready, setReady] = useState(false);
   const [fees, setFees] = useState<DemoFee[]>([]);
-  const [children, setChildren] = useState<DemoStudent[]>(DEMO_CHILDREN);
+  const [children, setChildren] = useState<DemoStudent[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -63,7 +64,7 @@ export default function ParentPaymentsPage() {
         }))
       );
     };
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const childName = (id: string) => children.find((s) => s.id === id)?.name ?? "Your child";
@@ -87,7 +88,9 @@ export default function ParentPaymentsPage() {
       </div>
 
       <SectionCard title="Your charges" note={`${fees.length} total`}>
-        {fees.length === 0 ? (
+        {!ready ? (
+          <LoadingNote />
+        ) : fees.length === 0 ? (
           <EmptyNote>Nothing has been billed yet.</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">

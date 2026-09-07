@@ -38,6 +38,7 @@ type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: 
 
 export default function AdminDashboard() {
   const supabase = createClient();
+  const [ready, setReady] = useState(false);
 
   const [school, setSchool] = useState({
     name: DEMO_SCHOOL.name,
@@ -46,8 +47,8 @@ export default function AdminDashboard() {
   });
   const [studentCount, setStudentCount] = useState(0);
   const [activeStudentCount, setActiveStudentCount] = useState(0);
-  const [teachers, setTeachers] = useState<DemoTeacher[]>(DEMO_TEACHERS);
-  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(DEMO_HALAQAS);
+  const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
+  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
   const [attendanceRate, setAttendanceRate] = useState<number | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [absenceItems, setAbsenceItems] = useState<AbsenceItem[]>([]);
@@ -193,7 +194,7 @@ export default function AdminDashboard() {
       setAbsenceItems(realAbsences);
       setAttendanceRate(realAttendance);
     };
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const activeTeachers = teachers.filter((t) => t.active !== false);

@@ -19,7 +19,7 @@ import {
   type StarReason,
   type BadgeKind,
 } from "@/data/awards";
-import { SectionCard, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 
@@ -37,6 +37,7 @@ export function AchievementsCard({
 }) {
   const [stars, setStars] = useState<DemoStar[]>([]);
   const [badges, setBadges] = useState<DemoBadge[]>([]);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -86,7 +87,7 @@ export function AchievementsCard({
       );
     };
 
-    load();
+    load().finally(() => setReady(true));
   }, [studentId]);
 
   const count = stars.length;
@@ -97,7 +98,9 @@ export function AchievementsCard({
 
   return (
     <SectionCard title={title} note={count ? `${count} ${count === 1 ? "star" : "stars"}` : undefined}>
-      {count === 0 && badges.length === 0 ? (
+      {!ready ? (
+        <LoadingNote />
+      ) : count === 0 && badges.length === 0 ? (
         <EmptyNote>No stars yet — they&apos;re given by your teacher for good work.</EmptyNote>
       ) : (
         <div className="space-y-4">
