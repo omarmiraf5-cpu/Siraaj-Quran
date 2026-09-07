@@ -4,11 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
-  DEMO_CHILDREN,
-  DEMO_ATTENDANCE,
   DEMO_TODAY,
-  DEMO_CREATED_ASSIGNMENTS_KEY,
-  demoAssignmentsFor,
   summariseAttendance,
   formatDay,
   dueLabel,
@@ -18,8 +14,7 @@ import {
   PORTION_LABELS,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
-import { readDemoStore } from "@/lib/demoStore";
-import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
+import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { PortalHero, HeroButtonPrimary, HeroButtonGhost } from "@/components/PortalHero";
 import {
   SectionCard,
@@ -29,6 +24,7 @@ import {
   AttendanceLegend,
   SegmentedSwitch,
   EmptyNote,
+  LoadingNote,
   TeacherNote,
 } from "@/components/portal-ui";
 import { IconBook, IconChart, IconCalendar, IconArrow } from "@/components/icons";
@@ -37,19 +33,21 @@ import { AchievementsCard } from "@/components/AchievementsCard";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
-  const [childId, setChildId] = useState(DEMO_CHILDREN[0].id);
-  const child = DEMO_CHILDREN.find((c) => c.id === childId) ?? DEMO_CHILDREN[0];
-  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
 
-  // Assignments a teacher created in the demo since this page's sample data
-  // was written; shared via the same browser storage.
+  // RLS narrows this to the signed-in parent's own children; in demo mode
+  // it's the two sample ones.
+  const { mode, students: children } = usePortalRoster();
+  const [childId, setChildId] = useState<string | null>(null);
+  const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
+
+  // Until the roster arrives there is no child to pick, so the first one
+  // becomes the selection as soon as there is one.
   useEffect(() => {
-    setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
-  }, []);
+    if (!childId && children.length > 0) setChildId(children[0].id);
+  }, [children, childId]);
 
-  const attendance = DEMO_ATTENDANCE[child.id] ?? [];
+  const { attendance, assignments, ready } = useStudentRecord(child?.id ?? null, mode);
   const summary = summariseAttendance(attendance);
-  const assignments = demoAssignmentsFor(child.id, createdAssignments);
 
   const active = assignments.filter((a) => a.status !== "completed");
   const done = assignments.filter((a) => a.status === "completed");
@@ -67,6 +65,26 @@ export default function ParentDashboard() {
     .sort()[0];
 
   const todayStatus = attendance[0]?.status;
+
+  // Everything below reads from one child, so there is nothing to draw until
+  // the roster has arrived — and a parent whose children haven't been linked
+  // to them yet needs telling rather than an empty dashboard.
+  if (mode === "loading" || !child) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-4 pt-2">
+        <PortalHero eyebrow="Asalaamu alaykum" title={demoUser?.name ?? "Parent"} />
+        <SectionCard title="Your children">
+          {mode === "loading" ? (
+            <LoadingNote />
+          ) : (
+            <EmptyNote>
+              No children are linked to your account yet — the school office can add them.
+            </EmptyNote>
+          )}
+        </SectionCard>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 pt-2">
@@ -91,14 +109,14 @@ export default function ParentDashboard() {
       />
 
       {/* Which child. A parent with one child never sees this. */}
-      {DEMO_CHILDREN.length > 1 && (
+      {children.length > 1 && (
         <div className="flex items-center gap-3">
           <span className="eyebrow">Viewing</span>
           <SegmentedSwitch
             label="Select child"
-            value={childId}
+            value={child?.id ?? ""}
             onChange={setChildId}
-            options={DEMO_CHILDREN.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+            options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
           />
         </div>
       )}
@@ -141,7 +159,9 @@ export default function ParentDashboard() {
           title="Current work"
           note={`${assignments.length} total`}
         >
-          {assignments.length === 0 ? (
+          {!ready ? (
+            <LoadingNote />
+          ) : assignments.length === 0 ? (
             <EmptyNote>Nothing has been set yet.</EmptyNote>
           ) : (
             <ul className="space-y-4">

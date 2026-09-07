@@ -6,10 +6,7 @@ import { useDemoUser } from "@/hooks/useDemoUser";
 import { useStudentTheme } from "@/hooks/useStudentTheme";
 import {
   DEMO_CURRENT_STUDENT,
-  DEMO_ATTENDANCE,
   DEMO_TODAY,
-  DEMO_CREATED_ASSIGNMENTS_KEY,
-  demoAssignmentsFor,
   summariseAttendance,
   formatDay,
   dueLabel,
@@ -19,7 +16,6 @@ import {
   PORTION_LABELS,
   PORTION_ARABIC,
 } from "@/data/demo";
-import { readDemoStore } from "@/lib/demoStore";
 import type { HifzPortion, QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import type { IllumColour } from "@/components/student-ui";
 
@@ -32,6 +28,7 @@ const PORTION_COLOUR: Record<HifzPortion, IllumColour> = {
 };
 import { getSurahById } from "@/data/mushaf-index";
 import { computeXp, levelFor, levelMessage } from "@/lib/progress";
+import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { SectionCard, AttendanceStrip, TeacherNote } from "@/components/portal-ui";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
@@ -64,15 +61,15 @@ export default function StudentDashboard() {
   const demoUser = useDemoUser();
   const theme = useStudentTheme();
 
-  const student = DEMO_CURRENT_STUDENT;
-  const attendance = DEMO_ATTENDANCE[student.id] ?? [];
+  // RLS gives a signed-in student exactly one row — their own — so the
+  // roster is a list of one. In demo mode it's the sample student.
+  const { mode, students } = usePortalRoster([DEMO_CURRENT_STUDENT]);
+  const student = students[0] ?? DEMO_CURRENT_STUDENT;
+  const { attendance, assignments } = useStudentRecord(
+    students[0]?.id ?? null,
+    mode
+  );
   const summary = summariseAttendance(attendance);
-
-  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
-  useEffect(() => {
-    setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
-  }, []);
-  const assignments = demoAssignmentsFor(student.id, createdAssignments);
 
   const open = assignments.filter((a) => a.status !== "completed");
   const done = assignments.filter((a) => a.status === "completed");
