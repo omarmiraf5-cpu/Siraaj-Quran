@@ -766,3 +766,77 @@ export function allFees(created: DemoFee[], overrides: Record<string, FeeOverrid
 export function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
+
+// ── Announcements ────────────────────────────────────────────────────────
+// School-wide notices from the office. Audience narrows who sees one; a
+// pinned notice stays at the top of every feed until it's unpinned.
+export type AnnouncementAudience = "all" | "teachers" | "parents" | "students";
+
+export interface DemoAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  audience: AnnouncementAudience;
+  authorName: string;
+  pinned: boolean;
+  createdAt: string;
+}
+
+export const ANNOUNCEMENT_AUDIENCE_LABELS: Record<AnnouncementAudience, string> = {
+  all: "Everyone",
+  teachers: "Teachers",
+  parents: "Parents",
+  students: "Students",
+};
+
+export const DEMO_ANNOUNCEMENTS: DemoAnnouncement[] = [
+  {
+    id: "a1",
+    title: "No classes this Saturday",
+    body: "There will be no classes this Saturday. Halaqas resume Sunday at the regular time. Jazakumullah khair.",
+    audience: "all",
+    authorName: "School office",
+    pinned: true,
+    createdAt: "2026-09-04",
+  },
+  {
+    id: "a2",
+    title: "Term 1 fees now due",
+    body: "Term 1 tuition is due by the 15th. Payments can be made at the office before or after halaqa.",
+    audience: "parents",
+    authorName: "School office",
+    pinned: false,
+    createdAt: "2026-09-02",
+  },
+  {
+    id: "a3",
+    title: "Bring your Mushaf every session",
+    body: "Please make sure your Mushaf is with you for every halaqa — we will be revising from it directly.",
+    audience: "students",
+    authorName: "School office",
+    pinned: false,
+    createdAt: "2026-08-30",
+  },
+];
+
+export const DEMO_CREATED_ANNOUNCEMENTS_KEY = "demo_created_announcements";
+export const DEMO_REMOVED_ANNOUNCEMENTS_KEY = "demo_removed_announcements";
+
+export function allAnnouncements(created: DemoAnnouncement[], removed: string[]): DemoAnnouncement[] {
+  const gone = new Set(removed);
+  return [...created, ...DEMO_ANNOUNCEMENTS]
+    .filter((a) => !gone.has(a.id))
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+}
+
+/** What a given portal should see: notices for everyone, plus those aimed
+ *  at that role specifically. */
+export function announcementsFor(
+  audience: Exclude<AnnouncementAudience, "all">,
+  list: DemoAnnouncement[]
+): DemoAnnouncement[] {
+  return list.filter((a) => a.audience === "all" || a.audience === audience);
+}

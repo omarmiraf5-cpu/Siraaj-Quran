@@ -33,6 +33,7 @@ const PORTION_COLOUR: Record<HifzPortion, IllumColour> = {
 import { getSurahById } from "@/data/mushaf-index";
 import { computeXp, levelFor, levelMessage } from "@/lib/progress";
 import { SectionCard, AttendanceStrip, TeacherNote } from "@/components/portal-ui";
+import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import {
   Avatar,
   StreakPill,
@@ -304,6 +305,8 @@ export default function StudentDashboard() {
           delay={480}
         />
       </div>
+
+      <AnnouncementsFeed audience="students" />
 
       <Link
         href="/student/assignments"

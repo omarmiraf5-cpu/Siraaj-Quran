@@ -32,6 +32,7 @@ import {
   TeacherNote,
 } from "@/components/portal-ui";
 import { IconBook, IconChart, IconCalendar, IconArrow } from "@/components/icons";
+import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
@@ -124,6 +125,8 @@ export default function ParentDashboard() {
           sub={done.length ? "well done" : "none yet"}
         />
       </div>
+
+      <AnnouncementsFeed audience="parents" />
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
         {/* The work itself, not a link to it. */}

@@ -25,6 +25,7 @@ import {
   EmptyNote,
 } from "@/components/portal-ui";
 import { IconBook, IconCalendar, IconPen, IconArrow } from "@/components/icons";
+import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
@@ -135,6 +136,8 @@ export default function TeacherDashboard() {
           onClick={() => setDrilldown("attendance")}
         />
       </div>
+
+      <AnnouncementsFeed audience="teachers" />
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
         {/* Today's register — the outcome and the exceptions, so the teacher
