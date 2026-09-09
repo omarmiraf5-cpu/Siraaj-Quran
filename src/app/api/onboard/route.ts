@@ -42,6 +42,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "School name, admin email, and password are required" }, { status: 400 });
     }
 
+    // Checked up front, before anything is created: a collision discovered
+    // partway through (e.g. on the third teacher) would already have left a
+    // real school and admin account behind, and simply fixing that one
+    // email and resubmitting would re-hit the same failure on the admin
+    // account this time, since it was already created by the first attempt.
+    const emails = [
+      data.admin.email.trim().toLowerCase(),
+      ...data.teachers.map((t) => t.email.trim().toLowerCase()),
+    ];
+    const duplicateWithinSubmission = emails.find((e, i) => emails.indexOf(e) !== i);
+    if (duplicateWithinSubmission) {
+      return NextResponse.json(
+        { error: `"${duplicateWithinSubmission}" is used more than once — each admin and teacher needs a different email.` },
+        { status: 400 }
+      );
+    }
+    const { data: alreadyRegistered } = await admin.from("profiles").select("email").in("email", emails);
+    if (alreadyRegistered && alreadyRegistered.length > 0) {
+      const taken = alreadyRegistered.map((p) => p.email).join(", ");
+      return NextResponse.json(
+        { error: `Already registered: ${taken}. Use different email addresses and try again.` },
+        { status: 400 }
+      );
+    }
+
     const baseSlug = slugify(data.school.name);
     let slug = baseSlug;
     for (let i = 1; i <= 50; i++) {
