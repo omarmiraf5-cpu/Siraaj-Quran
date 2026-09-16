@@ -1,0 +1,157 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+
+interface School {
+  id: string;
+  name: string;
+  slug: string;
+  city: string;
+  province: string;
+  plan: string;
+  active: boolean;
+  created_at: string;
+  studentCount: number;
+  teacherCount: number;
+  adminContact: { full_name: string; email: string } | null;
+}
+
+const PLAN_STYLES: Record<string, string> = {
+  starter: "bg-surface-border text-ink-muted",
+  growth: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+  premium: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+};
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+export default function PlatformPage() {
+  const [schools, setSchools] = useState<School[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/platform/schools")
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load schools");
+        setSchools(data.schools);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load schools"));
+  }, []);
+
+  const totalStudents = schools?.reduce((sum, s) => sum + s.studentCount, 0) ?? 0;
+  const totalTeachers = schools?.reduce((sum, s) => sum + s.teacherCount, 0) ?? 0;
+
+  return (
+    <div className="min-h-screen bg-surface-bg">
+      <header className="gradient-navy px-6 py-8 relative overflow-hidden">
+        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
+        <div className="max-w-5xl mx-auto relative flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <p className="text-white/45 text-xs font-semibold uppercase tracking-widest">Platform</p>
+            <h1 className="font-display text-3xl font-bold text-white mt-1">All Schools</h1>
+            {schools && (
+              <p className="text-white/60 text-sm mt-2">
+                {schools.length} school{schools.length === 1 ? "" : "s"} · {totalStudents} students · {totalTeachers} teachers
+              </p>
+            )}
+          </div>
+          <Link
+            href="/onboard"
+            className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition self-start"
+          >
+            + Onboard a school
+          </Link>
+        </div>
+      </header>
+
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        {error && (
+          <div className="card-quiet p-6 text-center space-y-2">
+            <p className="text-status-error-text font-semibold">{error}</p>
+            <p className="text-ink-muted text-sm">
+              This page is restricted to the platform operator. If you believe this is a mistake, make sure your
+              account has <code className="text-ink">is_platform_admin</code> set in Supabase.
+            </p>
+          </div>
+        )}
+
+        {!error && !schools && <p className="text-ink-muted text-sm">Loading…</p>}
+
+        {!error && schools && schools.length === 0 && (
+          <div className="card-quiet p-8 text-center space-y-3">
+            <p className="text-ink font-semibold">No schools yet.</p>
+            <p className="text-ink-muted text-sm">Onboard your first school to see it show up here.</p>
+          </div>
+        )}
+
+        {!error && schools && schools.length > 0 && (
+          <div className="card-quiet overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-border text-left text-xs text-ink-muted uppercase tracking-wide">
+                    <th className="px-5 py-3 font-semibold">School</th>
+                    <th className="px-5 py-3 font-semibold">Plan</th>
+                    <th className="px-5 py-3 font-semibold">Students</th>
+                    <th className="px-5 py-3 font-semibold">Teachers</th>
+                    <th className="px-5 py-3 font-semibold">Admin Contact</th>
+                    <th className="px-5 py-3 font-semibold">Signed Up</th>
+                    <th className="px-5 py-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-border">
+                  {schools.map((s) => (
+                    <tr key={s.id} className="hover:bg-surface-bg-warm transition-colors">
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-ink">{s.name}</p>
+                        <p className="text-ink-muted text-xs">
+                          {s.city}, {s.province} · {s.slug}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-1 rounded-full capitalize ${
+                            PLAN_STYLES[s.plan] ?? PLAN_STYLES.starter
+                          }`}
+                        >
+                          {s.plan}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-ink">{s.studentCount}</td>
+                      <td className="px-5 py-4 text-ink">{s.teacherCount}</td>
+                      <td className="px-5 py-4">
+                        {s.adminContact ? (
+                          <>
+                            <p className="text-ink">{s.adminContact.full_name}</p>
+                            <p className="text-ink-muted text-xs">{s.adminContact.email}</p>
+                          </>
+                        ) : (
+                          <span className="text-ink-muted text-xs">No admin found</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-ink-muted">{formatDate(s.created_at)}</td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-1 rounded-full ${
+                            s.active
+                              ? "bg-status-success-bg text-status-success-text"
+                              : "bg-status-error-bg text-status-error-text"
+                          }`}
+                        >
+                          {s.active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -49,6 +49,14 @@ create table if not exists profiles (
 );
 alter table profiles enable row level security;
 
+-- Marks the platform operator's own account(s) — the person onboarding
+-- schools and selling the product — not a per-school role. Nobody can set
+-- this on themselves: it has no UI, and is granted with a one-off
+-- `update profiles set is_platform_admin = true where email = '...'` run by
+-- whoever runs the database. Kept separate from `role` since it's
+-- orthogonal to which school (if any) the account belongs to.
+alter table profiles add column if not exists is_platform_admin boolean not null default false;
+
 -- Migration for databases created before this was relaxed. A user created
 -- straight from the Supabase dashboard's Auth UI (no raw_user_meta_data)
 -- would otherwise fail the on_auth_user_created trigger's not-null
