@@ -117,7 +117,15 @@ export async function POST(request: NextRequest) {
         email,
         password,
         email_confirm: true,
-        user_metadata: { role: "teacher", full_name: teacher.name.trim(), school_id: schoolId },
+        user_metadata: {
+          role: "teacher",
+          full_name: teacher.name.trim(),
+          school_id: schoolId,
+          // Read by /change-password and the login redirect — this
+          // password is the one printed on the onboarding completion
+          // screen, not one the teacher chose themselves.
+          must_change_password: true,
+        },
       });
       if (teacherError) throw new Error(`Teacher "${teacher.name}" failed: ${teacherError.message}`);
       teacherIdByHalaqa[teacher.halaqa] = teacherAuth.user.id;

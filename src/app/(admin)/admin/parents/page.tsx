@@ -143,7 +143,7 @@ export default function AdminParentsPage() {
       resetForm();
       setNote(
         data.warning ??
-          `Account created for ${data.email}. Temporary password: ${data.temp_password} — share this with them so they can sign in.`
+          `Account created for ${data.email}. Temporary password: ${data.temp_password} — share this with them so they can sign in. They'll be asked to set their own password the first time.`
       );
     } catch (err) {
       setNote(err instanceof Error ? err.message : "Failed to create parent account");

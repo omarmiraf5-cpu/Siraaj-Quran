@@ -1,5 +1,8 @@
+"use client";
+
 import { SidebarNav } from "@/components/SidebarNav";
 import { ChatWidget } from "@/components/ChatWidget";
+import { useRequirePasswordChange } from "@/hooks/useRequirePasswordChange";
 
 // Ordered so the four things a teacher actually opens every day come
 // first — SidebarNav keeps only that many as mobile tabs and folds
@@ -45,9 +48,16 @@ const NAV = [
     label: "Stars & badges",
     icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.2 12.5 7 22l5-2.5L17 22l-1.2-9.5"/></svg>,
   },
+  {
+    href: "/change-password",
+    label: "Change Password",
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  },
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
+  useRequirePasswordChange();
+
   return (
     <div className="flex min-h-screen bg-surface-bg">
       <SidebarNav items={NAV} role="Teacher" userName="Teacher" />

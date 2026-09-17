@@ -485,7 +485,8 @@ export default function OnboardPage() {
                 <h3 className="font-bold text-ink mb-1">Teacher logins</h3>
                 <p className="text-ink-muted text-xs mb-4">
                   Give each teacher their email and temporary password — they sign in at{" "}
-                  <span className="font-mono">{origin}/login</span> under &ldquo;Teacher&rdquo;.
+                  <span className="font-mono">{origin}/login</span> under &ldquo;Teacher&rdquo;, and
+                  will be asked to set their own password the first time.
                 </p>
                 <ul className="divide-y divide-surface-border">
                   {result.teachers.map((t) => (

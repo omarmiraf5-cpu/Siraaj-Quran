@@ -93,6 +93,10 @@ export async function POST(req: NextRequest) {
         role: role as AllowedRole,
         full_name: full_name.trim(),
         school_id: caller.school_id,
+        // Read by /change-password and the login redirect — nobody but the
+        // admin who just generated it knows this password, so the person
+        // has to set their own before they can use the rest of the app.
+        must_change_password: true,
       },
     });
 

@@ -120,8 +120,12 @@ export default function LoginPage() {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setError("Invalid email or password."); setLoading(false); return; }
+    if (data.user?.user_metadata?.must_change_password) {
+      router.push("/change-password");
+      return;
+    }
     router.push(`/${role}`);
   };
 
