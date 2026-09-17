@@ -7,7 +7,6 @@ import {
   DEMO_TODAY,
   DEMO_CREATED_STUDENTS_KEY,
   DEMO_STUDENT_OVERRIDES_KEY,
-  ATTENDANCE_LABELS,
   allStudents,
   summariseAttendance,
   initials,
@@ -21,6 +20,7 @@ import { IconCheck } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { LoadingNote } from "@/components/portal-ui";
+import { useLanguage } from "@/components/LanguageProvider";
 
 const MARKS: {
   status: AttendanceStatus;
@@ -42,6 +42,7 @@ function todayIso() {
 
 export default function TeacherAttendancePage() {
   const supabase = createClient();
+  const { t } = useLanguage();
   const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [today, setToday] = useState(DEMO_TODAY);
@@ -144,7 +145,7 @@ export default function TeacherAttendancePage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("You've been signed out — sign in again to save attendance.");
+      if (!user) throw new Error(t("teacher.attendance.signedOut"));
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -187,7 +188,7 @@ export default function TeacherAttendancePage() {
       });
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save attendance");
+      setError(err instanceof Error ? err.message : t("teacher.attendance.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -196,7 +197,7 @@ export default function TeacherAttendancePage() {
   if (!ready) {
     return (
       <div className="max-w-2xl mx-auto pt-10">
-        <LoadingNote>Loading today's register…</LoadingNote>
+        <LoadingNote>{t("teacher.attendance.loadingRegister")}</LoadingNote>
       </div>
     );
   }
@@ -204,12 +205,12 @@ export default function TeacherAttendancePage() {
   return (
     <div className="max-w-2xl mx-auto pb-28 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Today's register"
-        title="Attendance"
+        eyebrow={t("teacher.attendance.eyebrow")}
+        title={t("nav.attendance")}
         meta={[
           formatDay(today),
-          `${students.length} students`,
-          remaining > 0 ? `${remaining} still to mark` : "everyone marked",
+          `${students.length} ${t("common.students")}`,
+          remaining > 0 ? `${remaining} ${t("teacher.attendance.stillToMark")}` : t("teacher.attendance.everyoneMarked"),
         ]}
       />
 
@@ -222,7 +223,7 @@ export default function TeacherAttendancePage() {
             </p>
             <p className="eyebrow mt-2 flex items-center gap-1.5">
               <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-              {ATTENDANCE_LABELS[m.status]}
+              {t(`common.${m.status}`)}
             </p>
           </div>
         ))}
@@ -230,13 +231,13 @@ export default function TeacherAttendancePage() {
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-ink-muted">
-          {remaining > 0 ? `${remaining} still to mark` : "Everyone marked"}
+          {remaining > 0 ? `${remaining} ${t("teacher.attendance.stillToMark")}` : t("teacher.attendance.everyoneMarked")}
         </p>
         <button
           onClick={markAllPresent}
           className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
         >
-          Mark all present
+          {t("teacher.attendance.markAllPresent")}
         </button>
       </div>
 
@@ -252,7 +253,7 @@ export default function TeacherAttendancePage() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-ink truncate">{s.name}</p>
                 <p className="text-[11px] text-ink-muted">
-                  {s.halaqa} · {summary.rate}% this term
+                  {s.halaqa} · {summary.rate}% {t("common.thisTerm")}
                 </p>
               </div>
               <div className="flex gap-1.5 flex-shrink-0">
@@ -262,7 +263,7 @@ export default function TeacherAttendancePage() {
                     <button
                       key={m.status}
                       onClick={() => mark(s.id, m.status)}
-                      aria-label={`${ATTENDANCE_LABELS[m.status]} — ${s.name}`}
+                      aria-label={`${t(`common.${m.status}`)} — ${s.name}`}
                       aria-pressed={active}
                       className={`w-9 h-9 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
                         active ? m.on : `border-surface-border text-ink-muted ${m.off}`
@@ -299,12 +300,12 @@ export default function TeacherAttendancePage() {
         >
           {saved && <IconCheck size={16} />}
           {saving
-            ? "Saving…"
+            ? t("common.saving")
             : saved
-              ? "Attendance saved"
+              ? t("teacher.attendance.saved")
               : marked === 0
-                ? "Mark a student to save"
-                : `Save attendance · ${count("present")} present`}
+                ? t("teacher.attendance.markToSave")
+                : `${t("teacher.attendance.saveButton")} · ${count("present")} ${t("common.present").toLowerCase()}`}
         </button>
       </div>
     </div>

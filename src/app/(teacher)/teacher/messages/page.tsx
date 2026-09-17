@@ -13,6 +13,7 @@ import { MessageThread } from "@/components/MessageThread";
 import { LoadingNote, EmptyNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // Shared with the parent portal so a reply sent here shows up there, and a
 // parent's message shows up here, within the same browser (demo mode only).
@@ -26,6 +27,7 @@ interface RosterStudent {
 
 export default function TeacherMessagesPage() {
   const supabase = createClient();
+  const { t } = useLanguage();
   const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -102,7 +104,7 @@ export default function TeacherMessagesPage() {
             student_id: r.student_id,
             author: r.author_role as ThreadMessage["author"],
             author_name:
-              nameById.get(r.author_id) ?? (r.author_role === "teacher" ? "Teacher" : "Parent"),
+              nameById.get(r.author_id) ?? t(r.author_role === "teacher" ? "role.teacher" : "role.parent"),
             kind: r.kind as ThreadMessage["kind"],
             body: r.body,
             absence_date: r.absence_date ?? undefined,
@@ -195,7 +197,7 @@ export default function TeacherMessagesPage() {
   if (!ready) {
     return (
       <div className="max-w-5xl mx-auto pt-10">
-        <LoadingNote>Loading messages…</LoadingNote>
+        <LoadingNote>{t("teacher.messages.loadingMessages")}</LoadingNote>
       </div>
     );
   }
@@ -203,14 +205,14 @@ export default function TeacherMessagesPage() {
   return (
     <div className="max-w-5xl mx-auto pb-8 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Parent communication"
-        title="Messages"
-        meta={[`${students.length} students`, "concerns, questions & absences"]}
+        eyebrow={t("teacher.messages.eyebrow")}
+        title={t("nav.messages")}
+        meta={[`${students.length} ${t("common.students")}`, t("teacher.messages.subtitle")]}
       />
 
       {students.length === 0 ? (
         <div className="card-quiet p-8 text-center">
-          <EmptyNote>Add students in the admin portal to start messaging their parents.</EmptyNote>
+          <EmptyNote>{t("teacher.messages.noStudents")}</EmptyNote>
         </div>
       ) : (
         <div className="grid lg:grid-cols-[280px_1fr] gap-4 items-start">
@@ -235,10 +237,10 @@ export default function TeacherMessagesPage() {
                     <p className="text-[13px] font-semibold text-ink truncate">{s.name}</p>
                     <p className="text-[11px] text-ink-muted truncate">
                       {isAbsence
-                        ? `Absence · ${last.absence_date}`
+                        ? `${t("common.absence")} · ${last.absence_date}`
                         : last
                           ? last.body
-                          : "No messages yet"}
+                          : t("common.noMessagesYet")}
                     </p>
                   </div>
                   {isAbsence && (
@@ -267,14 +269,14 @@ export default function TeacherMessagesPage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") send();
                   }}
-                  placeholder={`Reply about ${student.name.split(" ")[0]}…`}
+                  placeholder={`${t("common.replyAbout")} ${student.name.split(" ")[0]}…`}
                   className="flex-1 min-w-0 bg-surface-bg border border-surface-border rounded-pill px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy transition"
                 />
                 <button
                   onClick={send}
                   disabled={!text.trim() || sending}
                   className="w-11 h-11 rounded-full gradient-emerald shadow-md flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
-                  aria-label="Send"
+                  aria-label={t("common.send")}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="22" y1="2" x2="11" y2="13" />
