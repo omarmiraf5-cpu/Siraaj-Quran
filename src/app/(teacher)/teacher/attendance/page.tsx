@@ -20,6 +20,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { IconCheck } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { LoadingNote } from "@/components/portal-ui";
 
 const MARKS: {
   status: AttendanceStatus;
@@ -41,10 +42,17 @@ function todayIso() {
 
 export default function TeacherAttendancePage() {
   const supabase = createClient();
+  const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [today, setToday] = useState(DEMO_TODAY);
-  const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
-  const [history, setHistory] = useState<Record<string, AttendanceDay[]>>(DEMO_ATTENDANCE);
+  // Starts empty rather than seeded with the demo roster: this page can
+  // load into either a real teacher's session or the demo, and showing the
+  // sample students first — then swapping to the real ones a moment later
+  // — briefly puts one school's roster on screen inside another's session.
+  // Nothing renders below until `ready`, once we actually know which one
+  // this is.
+  const [students, setStudents] = useState<DemoStudent[]>([]);
+  const [history, setHistory] = useState<Record<string, AttendanceDay[]>>({});
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -65,6 +73,7 @@ export default function TeacherAttendancePage() {
           readDemoStore(DEMO_STUDENT_OVERRIDES_KEY, {})
         ).filter((s) => s.active !== false);
         setStudents(roster);
+        setHistory(DEMO_ATTENDANCE);
         return;
       }
 
@@ -99,7 +108,7 @@ export default function TeacherAttendancePage() {
       setRecords(todayRecords);
     };
 
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   const mark = (id: string, status: AttendanceStatus) => {
@@ -183,6 +192,14 @@ export default function TeacherAttendancePage() {
       setSaving(false);
     }
   };
+
+  if (!ready) {
+    return (
+      <div className="max-w-2xl mx-auto pt-10">
+        <LoadingNote>Loading today's register…</LoadingNote>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto pb-28 space-y-4 pt-2">

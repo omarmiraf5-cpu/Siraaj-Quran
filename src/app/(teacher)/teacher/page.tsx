@@ -24,6 +24,7 @@ import {
   StatTile,
   AttendanceLegend,
   EmptyNote,
+  LoadingNote,
 } from "@/components/portal-ui";
 import { IconBook, IconCalendar, IconPen, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
@@ -61,12 +62,19 @@ export default function TeacherDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [drilldown, setDrilldown] = useState<DrilldownView | null>(null);
 
+  const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [today, setToday] = useState(DEMO_TODAY);
   const [teacherName, setTeacherName] = useState<string | null>(null);
-  const [students, setStudents] = useState<RosterStudent[]>(DEMO_STUDENTS);
-  const [assignments, setAssignments] = useState<QuranicAssignment[]>(DEMO_ASSIGNMENTS);
-  const [attendanceHistory, setAttendanceHistory] = useState<Record<string, AttendanceDay[]>>(DEMO_ATTENDANCE);
+  // Start empty rather than seeded with the demo roster: this dashboard can
+  // load into either a real teacher's session or the demo, and showing the
+  // sample class first — then swapping to the real one a moment later —
+  // briefly puts one school's data on screen inside another's session.
+  // Nothing renders below until `ready`, once we actually know which one
+  // this is.
+  const [students, setStudents] = useState<RosterStudent[]>([]);
+  const [assignments, setAssignments] = useState<QuranicAssignment[]>([]);
+  const [attendanceHistory, setAttendanceHistory] = useState<Record<string, AttendanceDay[]>>({});
   const [todayStatus, setTodayStatus] = useState<Record<string, AttendanceStatus> | null>(null);
 
   useEffect(() => {
@@ -77,6 +85,9 @@ export default function TeacherDashboard() {
 
       if (!user) {
         setIsDemo(true);
+        setStudents(DEMO_STUDENTS);
+        setAssignments(DEMO_ASSIGNMENTS);
+        setAttendanceHistory(DEMO_ATTENDANCE);
         return;
       }
 
@@ -106,7 +117,7 @@ export default function TeacherDashboard() {
       setTodayStatus(todayMarks);
     };
 
-    load();
+    load().finally(() => setReady(true));
   }, []);
 
   // Today's register: in demo mode every student always has a status
@@ -154,6 +165,14 @@ export default function TeacherDashboard() {
       : 0;
 
   const halaqas = [...new Set(students.map((s) => s.halaqa))];
+
+  if (!ready) {
+    return (
+      <div className="max-w-4xl mx-auto pt-10">
+        <LoadingNote>Loading your dashboard…</LoadingNote>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 pt-2">
