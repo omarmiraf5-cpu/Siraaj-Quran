@@ -146,11 +146,7 @@ export default function ParentDashboard() {
         />
       </div>
 
-      <AchievementsCard
-        studentId={child.id}
-        title={`${child.name.split(" ")[0]}'s stars & badges`}
-        possessive={`${child.name.split(" ")[0]} has`}
-      />
+      <AchievementsCard studentId={child.id} studentFirstName={child.name.split(" ")[0]} />
 
       <AnnouncementsFeed audience="parents" />
 

@@ -12,6 +12,7 @@ import {
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // The same notice board seen from a teacher's, parent's or student's
 // dashboard — each only gets what's addressed to everyone plus what's aimed
@@ -23,6 +24,7 @@ export function AnnouncementsFeed({
   audience: Exclude<AnnouncementAudience, "all">;
   limit?: number;
 }) {
+  const { t } = useLanguage();
   const [items, setItems] = useState<DemoAnnouncement[]>([]);
   const [ready, setReady] = useState(false);
 
@@ -58,7 +60,7 @@ export function AnnouncementsFeed({
           audience: a.audience as AnnouncementAudience,
           authorName:
             (a as unknown as { profiles: { full_name: string } | null }).profiles?.full_name ??
-            "School office",
+            t("common.schoolOffice"),
           pinned: a.pinned,
           createdAt: (a.created_at ?? "").slice(0, 10),
         }))
@@ -71,11 +73,11 @@ export function AnnouncementsFeed({
   const shown = items.slice(0, limit);
 
   return (
-    <SectionCard title="Announcements" note={items.length ? `${items.length} posted` : undefined}>
+    <SectionCard title={t("nav.announcements")} note={items.length ? `${items.length} ${t("common.posted")}` : undefined}>
       {!ready ? (
         <LoadingNote />
       ) : shown.length === 0 ? (
-        <EmptyNote>Nothing from the office right now.</EmptyNote>
+        <EmptyNote>{t("common.nothingFromOffice")}</EmptyNote>
       ) : (
         <ul className="divide-y divide-surface-border -my-1">
           {shown.map((a) => (
@@ -83,7 +85,7 @@ export function AnnouncementsFeed({
               <div className="flex items-center gap-2">
                 {a.pinned && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex-shrink-0">
-                    Pinned
+                    {t("common.pinned")}
                   </span>
                 )}
                 <p className="text-[13px] font-semibold text-ink truncate">{a.title}</p>

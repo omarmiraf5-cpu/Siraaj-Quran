@@ -10,10 +10,8 @@ import {
   summariseAttendance,
   formatDay,
   dueLabel,
-  ASSIGNMENT_LABELS,
   assignmentsByPortion,
   HIFZ_PORTIONS,
-  PORTION_LABELS,
   PORTION_ARABIC,
 } from "@/data/demo";
 import type { HifzPortion, QuranicAssignment } from "@/hooks/useQuranicAssignments";
@@ -56,8 +54,11 @@ import {
   IconTarget,
   IconBookOpen,
 } from "@/components/icons";
+import { useLanguage } from "@/components/LanguageProvider";
+import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 
 export default function StudentDashboard() {
+  const { t } = useLanguage();
   const demoUser = useDemoUser();
   const theme = useStudentTheme();
 
@@ -111,7 +112,7 @@ export default function StudentDashboard() {
         <div className="relative flex items-center gap-3.5">
           <Avatar name={displayName} />
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] text-white/55">Asalaamu alaykum</p>
+            <p className="text-[13px] text-white/55">{t("common.asalaamuAlaykum")}</p>
             <h1 className="page-title text-white text-[26px] leading-tight truncate">
               {firstName}
             </h1>
@@ -150,7 +151,7 @@ export default function StudentDashboard() {
           اللَّهُمَّ لَا سَهْلَ إِلَّا مَا جَعَلْتَهُ سَهْلًا
         </p>
         <div className="gold-rule w-20 mx-auto my-4 relative" />
-        <p className="relative font-serif text-[14px] text-white/80 italic">
+        <p className="relative font-serif text-[14px] text-white/80 italic" dir="ltr">
           &ldquo;O Allah, nothing is easy except what You make easy.&rdquo;
         </p>
       </section>
@@ -158,15 +159,15 @@ export default function StudentDashboard() {
       {/* Up next */}
       <div className="space-y-2.5 animate-rise" style={{ animationDelay: "120ms" }}>
         <SectionLabel colour="vermilion" icon={<IconTarget size={13} />}>
-          Up next
+          {t("common.upNext")}
         </SectionLabel>
 
         {nextUp && nextSurah ? (
           <UpNextCard
             colour={surahColour(nextUp.surah)}
-            eyebrow={ASSIGNMENT_LABELS[nextUp.status]}
+            eyebrow={t(ASSIGNMENT_STATUS_KEY[nextUp.status])}
             title={nextSurah.englishName}
-            detail={`Ayahs ${nextUp.ayah_start}–${nextUp.ayah_end}${
+            detail={`${t("common.ayahs")} ${nextUp.ayah_start}–${nextUp.ayah_end}${
               nextDue ? ` · ${nextDue.text}` : ""
             }`}
             href="/student/assignments"
@@ -175,8 +176,8 @@ export default function StudentDashboard() {
         ) : (
           <div className="card-quiet p-5">
             <FriendlyEmpty
-              title="All done for today!"
-              sub="Beautiful work — come back tomorrow."
+              title={t("common.allDoneToday")}
+              sub={t("common.beautifulWorkComeBack")}
               mood="happy"
             />
           </div>
@@ -194,7 +195,7 @@ export default function StudentDashboard() {
       {assignments.length > 0 && (
         <div className="space-y-2.5">
           <SectionLabel colour="lapis" icon={<IconBookOpen size={13} />}>
-            Today&apos;s three
+            {t("common.todaysThree")}
           </SectionLabel>
 
           <div className="grid grid-cols-3 gap-2.5">
@@ -206,16 +207,16 @@ export default function StudentDashboard() {
                 <SurahGridTile
                   key={portion}
                   colour={PORTION_COLOUR[portion]}
-                  eyebrow={PORTION_LABELS[portion]}
+                  eyebrow={t(`portion.${portion}`)}
                   arabic={PORTION_ARABIC[portion]}
                   name={
                     a
                       ? surahEnd
                         ? `${surah?.englishName ?? `Surah ${a.surah}`} – ${surahEnd.englishName}`
                         : (surah ? surah.englishName : `Surah ${a.surah}`)
-                      : "Not set"
+                      : t("common.notSet")
                   }
-                  detail={a ? `${a.memorization_level}% learnt` : "—"}
+                  detail={a ? `${a.memorization_level}% ${t("common.learnt")}` : "—"}
                   level={a?.memorization_level ?? 0}
                   href="/student/assignments"
                   delay={180 + i * 70}
@@ -230,7 +231,7 @@ export default function StudentDashboard() {
           reward, so the breakdown is on the page. */}
       <div className="space-y-2.5 animate-rise" style={{ animationDelay: "300ms" }}>
         <SectionLabel colour="saffron" icon={<IconStar size={13} />}>
-          Your points
+          {t("common.yourPoints")}
         </SectionLabel>
 
         <div className="grid grid-cols-3 gap-2.5">
@@ -238,21 +239,21 @@ export default function StudentDashboard() {
             colour="saffron"
             icon={<IconBookOpen size={15} />}
             value={xp.memorising}
-            label="Memorising"
+            label={t("common.memorising")}
             delay={300}
           />
           <XpTile
             colour="verdigris"
             icon={<IconCheck size={15} />}
             value={xp.finishing}
-            label="Finishing"
+            label={t("common.finishing")}
             delay={340}
           />
           <XpTile
             colour="turquoise"
             icon={<IconStar size={15} />}
             value={xp.attending}
-            label="Turning up"
+            label={t("common.turningUp")}
             delay={380}
           />
         </div>
@@ -262,24 +263,29 @@ export default function StudentDashboard() {
           it was. Kept as a white card so the run of colour above it has
           somewhere to land. */}
       <div className="space-y-2.5 animate-rise" style={{ animationDelay: "360ms" }}>
-        <SectionCard title="Your register" note={`last ${Math.min(14, attendance.length)} days`}>
+        <SectionCard
+          title={t("common.yourRegister")}
+          note={[t("common.last"), Math.min(14, attendance.length), t("common.days")]
+            .filter((x) => x !== "")
+            .join(" ")}
+        >
           <div className="flex items-center gap-4">
-            <ProgressRing value={summary.rate} colour="turquoise" size={64} label="here" />
+            <ProgressRing value={summary.rate} colour="turquoise" size={64} label={t("common.here")} />
             <div className="min-w-0 flex-1">
               <AttendanceStrip days={attendance} size="lg" />
               <p className="text-[12px] text-ink-muted mt-2.5">
                 {streak > 1
-                  ? `${streak} days in a row — that is ${streak * 25} XP.`
-                  : "Every day you show up is 25 XP."}
+                  ? `${streak} ${t("common.daysInARowThatIs")} ${streak * 25} XP.`
+                  : t("common.everyDayShowUp")}
               </p>
             </div>
           </div>
           <p className="text-[11px] text-ink-muted mt-4 pt-3 border-t border-surface-border">
             {formatDay(DEMO_TODAY)}
             <span className="mx-1.5">·</span>
-            {done.length} finished
+            {done.length} {t("common.finished").toLowerCase()}
             <span className="mx-1.5">·</span>
-            {open.length} to go
+            {open.length} {t("common.toGo")}
           </p>
         </SectionCard>
       </div>
@@ -290,21 +296,21 @@ export default function StudentDashboard() {
           href="/student/quran"
           colour="lapis"
           icon={<IconBook size={20} />}
-          title="My Quran"
-          sub="Read your ayahs and listen along."
+          title={t("common.myQuran")}
+          sub={t("common.readYourAyahs")}
           delay={420}
         />
         <BigTile
           href="/student/tajweed"
           colour="aubergine"
           icon={<IconPalette size={20} />}
-          title="Tajweed"
-          sub="The colours and what each one means."
+          title={t("common.tajweed")}
+          sub={t("common.tajweedBlurb")}
           delay={480}
         />
       </div>
 
-      <AchievementsCard studentId={student.id} title="My stars & badges" possessive="You have" />
+      <AchievementsCard studentId={student.id} />
 
       <AnnouncementsFeed audience="students" />
 
@@ -312,7 +318,7 @@ export default function StudentDashboard() {
         href="/student/assignments"
         className="group flex items-center justify-center gap-1.5 text-[12px] font-bold text-ink-muted hover:text-ink transition-colors py-1"
       >
-        See all my work
+        {t("common.seeAllMyWork")}
         <span className="group-hover:translate-x-0.5 transition-transform">
           <IconArrow size={14} />
         </span>

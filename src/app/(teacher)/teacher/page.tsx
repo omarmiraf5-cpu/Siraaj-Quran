@@ -30,6 +30,7 @@ import { IconBook, IconCalendar, IconPen, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
+import { useLanguage } from "@/components/LanguageProvider";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
@@ -58,6 +59,7 @@ function daysFromReal(iso: string, todayStr: string): number {
 
 export default function TeacherDashboard() {
   const supabase = createClient();
+  const { t } = useLanguage();
   const demoUser = useDemoUser();
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [drilldown, setDrilldown] = useState<DrilldownView | null>(null);
@@ -169,7 +171,7 @@ export default function TeacherDashboard() {
   if (!ready) {
     return (
       <div className="max-w-4xl mx-auto pt-10">
-        <LoadingNote>Loading your dashboard…</LoadingNote>
+        <LoadingNote>{t("common.loadingDashboard")}</LoadingNote>
       </div>
     );
   }
@@ -179,20 +181,20 @@ export default function TeacherDashboard() {
       {/* Greeting — carries the day's actual state and the two things a
           teacher opens this page to do, rather than standing empty. */}
       <PortalHero
-        eyebrow="Asalaamu alaykum"
-        title={(isDemo ? demoUser?.name : teacherName) ?? "Teacher"}
+        eyebrow={t("common.asalaamuAlaykum")}
+        title={(isDemo ? demoUser?.name : teacherName) ?? t("role.teacher")}
         meta={[
           formatDay(today),
-          `${inToday} of ${students.length} in today`,
-          `${review.length} to review`,
+          `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`,
+          `${review.length} ${t("common.toReview")}`,
         ]}
         actions={
           <>
             <HeroButtonPrimary href="/teacher/attendance" icon={<IconCalendar />}>
-              Register
+              {t("common.register")}
             </HeroButtonPrimary>
             <HeroButtonGhost href="/teacher/quran-assignments" icon={<IconPen />}>
-              Assign
+              {t("common.assign")}
             </HeroButtonGhost>
           </>
         }
@@ -206,28 +208,28 @@ export default function TeacherDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
           value={students.length}
-          label="Students"
+          label={t("nav.students")}
           sub={halaqas
-            .map((h) => `${students.filter((s) => s.halaqa === h).length} in ${h.replace("Halaqa ", "")}`)
+            .map((h) => `${students.filter((s) => s.halaqa === h).length} ${t("common.in")} ${h.replace("Halaqa ", "")}`)
             .join(" · ")}
           onClick={isDemo ? () => setDrilldown("students") : undefined}
         />
         <StatTile
           value={active.length}
-          label="Active work"
-          sub={dueThisWeek > 0 ? `${dueThisWeek} due this week` : "nothing due this week"}
+          label={t("common.activeWork")}
+          sub={dueThisWeek > 0 ? `${dueThisWeek} ${t("common.dueThisWeek")}` : t("common.nothingDueThisWeek")}
           onClick={isDemo ? () => setDrilldown("active") : undefined}
         />
         <StatTile
           value={review.length}
-          label="To review"
-          sub={reviewDue ? `oldest due ${formatDay(reviewDue)}` : "all clear"}
+          label={t("common.toReview")}
+          sub={reviewDue ? `${t("common.oldestDue")} ${formatDay(reviewDue)}` : t("common.allClear")}
           onClick={isDemo ? () => setDrilldown("review") : undefined}
         />
         <StatTile
           value={`${avgAttendance}%`}
-          label="Attendance"
-          sub={`${inToday} of ${students.length} in today`}
+          label={t("nav.attendance")}
+          sub={`${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`}
           onClick={isDemo ? () => setDrilldown("attendance") : undefined}
         />
       </div>
@@ -237,14 +239,14 @@ export default function TeacherDashboard() {
       <div className="grid md:grid-cols-2 gap-3 items-start">
         {/* Today's register — the outcome and the exceptions, so the teacher
             can see who needs chasing without opening the page. */}
-        <SectionCard title="Today's register" note={formatDay(today)}>
+        <SectionCard title={t("common.todaysRegister")} note={formatDay(today)}>
           <div className="-mt-1 mb-4">
             <AttendanceLegend counts={todayCounts} />
           </div>
 
           {exceptions.length === 0 ? (
             <EmptyNote>
-              {nothingMarkedYet ? "Attendance hasn't been taken yet today." : "Everyone was present today."}
+              {nothingMarkedYet ? t("common.attendanceNotTakenYet") : t("common.everyonePresentToday")}
             </EmptyNote>
           ) : (
             <ul className="space-y-1">
@@ -268,7 +270,7 @@ export default function TeacherDashboard() {
                       <span
                         className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}
                       >
-                        {status}
+                        {t(`common.${status}`)}
                       </span>
                     </button>
                   </li>
@@ -287,7 +289,7 @@ export default function TeacherDashboard() {
                       <span className="block text-[11px] text-ink-muted">{student.halaqa}</span>
                     </span>
                     <span className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}>
-                      {status}
+                      {t(`common.${status}`)}
                     </span>
                   </li>
                 )
@@ -299,7 +301,7 @@ export default function TeacherDashboard() {
             href="/teacher/attendance"
             className="group mt-4 inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
           >
-            Open register
+            {t("common.openRegister")}
             <span className="group-hover:translate-x-0.5 transition-transform">
               <IconArrow size={14} />
             </span>
@@ -307,9 +309,9 @@ export default function TeacherDashboard() {
         </SectionCard>
 
         {/* The review queue itself, not a link to where it lives. */}
-        <SectionCard title="Needs review" note={`${review.length} waiting`}>
+        <SectionCard title={t("common.needsReview")} note={`${review.length} ${t("common.waiting")}`}>
           {review.length === 0 ? (
-            <EmptyNote>Nothing waiting on you.</EmptyNote>
+            <EmptyNote>{t("common.nothingWaitingOnYou")}</EmptyNote>
           ) : (
             <ul className="space-y-1">
               {review.map((a) => {
@@ -322,13 +324,13 @@ export default function TeacherDashboard() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-ink truncate">
-                        {student?.name ?? "Student"}
+                        {student?.name ?? t("role.student")}
                       </p>
                       <p className="text-[12px] text-ink-body">
                         {surah ? surah.englishName : `Surah ${a.surah}`}
                         <span className="text-ink-muted">
                           {" "}
-                          · ayahs {a.ayah_start}–{a.ayah_end}
+                          · {t("common.ayahs")} {a.ayah_start}–{a.ayah_end}
                         </span>
                       </p>
                       {a.teacher_notes && (
@@ -367,7 +369,7 @@ export default function TeacherDashboard() {
             href="/teacher/quran-assignments"
             className="group mt-4 inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
           >
-            Open assignments
+            {t("common.openAssignments")}
             <span className="group-hover:translate-x-0.5 transition-transform">
               <IconArrow size={14} />
             </span>
@@ -385,9 +387,9 @@ export default function TeacherDashboard() {
           <IconBook size={19} />
         </span>
         <span className="flex-1 min-w-0">
-          <span className="block page-title text-[15px]">Mushaf</span>
+          <span className="block page-title text-[15px]">{t("nav.mushaf")}</span>
           <span className="block text-[12px] text-ink-muted">
-            Read the Madinah Mushaf, and play any ayah, page or surah aloud.
+            {t("teacher.dashboard.mushafBlurb")}
           </span>
         </span>
         <span className="text-ink-muted group-hover:translate-x-0.5 group-hover:text-ink transition-all flex-shrink-0">
@@ -397,7 +399,7 @@ export default function TeacherDashboard() {
 
       {/* Hadith — a quiet feature panel rather than a green alert box */}
       <section className="card-quiet px-6 py-8 text-center">
-        <p className="eyebrow">Daily reflection</p>
+        <p className="eyebrow">{t("common.dailyReflection")}</p>
         <p
           className="font-calligraphy text-[28px] md:text-[34px] text-ink mt-4 leading-[2.1]"
           dir="rtl"
@@ -406,10 +408,10 @@ export default function TeacherDashboard() {
           خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ
         </p>
         <div className="gold-rule w-20 mx-auto my-5" />
-        <p className="font-serif text-[15px] text-ink-body italic">
+        <p className="font-serif text-[15px] text-ink-body italic" dir="ltr">
           &ldquo;The best among you are those who learn the Qur&apos;an and teach it.&rdquo;
         </p>
-        <p className="text-[11px] text-ink-muted mt-2">Prophet Muhammad &#xFDFA;</p>
+        <p className="text-[11px] text-ink-muted mt-2" dir="ltr">Prophet Muhammad &#xFDFA;</p>
       </section>
 
       {/* A stat opens its list; a name in that list opens the student.

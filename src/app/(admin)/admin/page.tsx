@@ -32,12 +32,14 @@ import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type ReviewItem = { id: string; halaqaName: string };
 type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: string | null };
 
 export default function AdminDashboard() {
   const supabase = createClient();
+  const { t } = useLanguage();
   const [ready, setReady] = useState(false);
 
   const [school, setSchool] = useState({
@@ -94,7 +96,7 @@ export default function AdminDashboard() {
     }
     return assignments.map((a) => ({
       id: a.id,
-      halaqaName: halaqaByStudent.get(a.student_id) ?? "a halaqa",
+      halaqaName: halaqaByStudent.get(a.student_id) ?? t("common.aHalaqa"),
     }));
   };
 
@@ -110,7 +112,7 @@ export default function AdminDashboard() {
       body: m.body,
       authorName:
         (m as unknown as { profiles: { full_name: string } | null }).profiles?.full_name ??
-        "Unknown",
+        t("common.unknown"),
       absenceDate: m.absence_date,
     }));
   };
@@ -153,7 +155,7 @@ export default function AdminDashboard() {
             halaqaName:
               demoHalaqas.find((h) =>
                 studentsInHalaqa(h.name, students).some((s) => s.id === a.student_id)
-              )?.name ?? "a halaqa",
+              )?.name ?? t("common.aHalaqa"),
           }))
         );
         setAbsenceItems(
@@ -203,40 +205,40 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-5xl mx-auto space-y-4 pt-2">
       <PortalHero
-        eyebrow="School overview"
+        eyebrow={t("common.schoolOverview")}
         title={school.name}
         meta={[
           `${school.city}, ${school.province}`,
           formatDay(DEMO_TODAY),
-          `${reviewItems.length + unassignedHalaqas.length} open items`,
+          `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
         ]}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile value={activeStudentCount} label="Students" sub={`${studentCount - activeStudentCount} inactive`} />
-        <StatTile value={activeTeachers.length} label="Teachers" sub={`${halaqas.length} halaqas`} />
-        <StatTile value={halaqas.length} label="Halaqas" sub={unassignedHalaqas.length ? `${unassignedHalaqas.length} unassigned` : "all assigned"} />
-        <StatTile value={attendanceRate == null ? "—" : `${attendanceRate}%`} label="Attendance" sub="school-wide" />
+        <StatTile value={activeStudentCount} label={t("nav.students")} sub={`${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`} />
+        <StatTile value={activeTeachers.length} label={t("nav.teachers")} sub={`${halaqas.length} ${t("nav.halaqas").toLowerCase()}`} />
+        <StatTile value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? `${unassignedHalaqas.length} ${t("common.unassigned")}` : t("common.allAssigned")} />
+        <StatTile value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("nav.attendance")} sub={t("common.schoolWide")} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
-        <SectionCard title="Needs review" note={`${reviewItems.length} assignments`}>
+        <SectionCard title={t("common.needsReview")} note={`${reviewItems.length} ${t("common.assignmentsCount")}`}>
           {reviewItems.length === 0 ? (
-            <EmptyNote>Nothing waiting on a teacher&apos;s review.</EmptyNote>
+            <EmptyNote>{t("common.nothingWaitingOnTeacherReview")}</EmptyNote>
           ) : (
             <ul className="divide-y divide-surface-border -my-1">
               {reviewItems.map((r) => (
                 <li key={r.id} className="py-2.5 text-[13px] text-ink">
-                  A student in {r.halaqaName} has work flagged for review.
+                  {t("common.aStudentInPrefix")} {r.halaqaName} {t("common.hasWorkFlagged")}
                 </li>
               ))}
             </ul>
           )}
         </SectionCard>
 
-        <SectionCard title="Recent absences" note={`${absenceItems.length} reported`}>
+        <SectionCard title={t("common.recentAbsences")} note={`${absenceItems.length} ${t("common.reportedCount")}`}>
           {absenceItems.length === 0 ? (
-            <EmptyNote>No absences reported recently.</EmptyNote>
+            <EmptyNote>{t("common.noAbsencesRecently")}</EmptyNote>
           ) : (
             <ul className="divide-y divide-surface-border -my-1">
               {absenceItems.map((m) => (
@@ -252,23 +254,23 @@ export default function AdminDashboard() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Teachers" note={`${teachers.length} total`}>
+      <SectionCard title={t("nav.teachers")} note={`${teachers.length} ${t("common.total")}`}>
         <ul className="divide-y divide-surface-border -my-1">
-          {teachers.map((t) => {
-            const theirHalaqas = halaqas.filter((h) => h.teacherId === t.id);
+          {teachers.map((teacher) => {
+            const theirHalaqas = halaqas.filter((h) => h.teacherId === teacher.id);
             return (
-              <li key={t.id} className="flex items-center justify-between gap-3 py-2.5">
+              <li key={teacher.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{t.name}</p>
+                  <p className="text-[13px] font-semibold text-ink truncate">{teacher.name}</p>
                   <p className="text-[11px] text-ink-muted truncate">
                     {theirHalaqas.length > 0
                       ? theirHalaqas.map((h) => h.name).join(", ")
-                      : "No halaqa assigned"}
+                      : t("common.noHalaqaAssigned")}
                   </p>
                 </div>
-                {t.active === false && (
+                {teacher.active === false && (
                   <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
-                    Inactive
+                    {t("common.inactive")}
                   </span>
                 )}
               </li>
@@ -279,7 +281,7 @@ export default function AdminDashboard() {
           href="/admin/teachers"
           className="group mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
         >
-          Manage teachers
+          {t("common.manageTeachers")}
           <span className="group-hover:translate-x-0.5 transition-transform">
             <IconArrow size={14} />
           </span>
