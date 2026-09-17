@@ -598,13 +598,17 @@ create table if not exists messages (
   created_at    timestamptz default now()
 );
 alter table messages enable row level security;
-create policy "Teachers can manage messages for own students" on messages
+
+-- Originally scoped to students enrolled in one of the teacher's own
+-- classes, via class_enrollments/classes.teacher_id. Nothing in the admin
+-- UI requires a school to set up halaqas and enroll students into them
+-- before a teacher can be added — students, attendance, and quranic
+-- assignments all already treat "any teacher at this school" as enough —
+-- so a school that skipped that setup had a teacher who could never see a
+-- parent's messages at all: the class_enrollments join was always empty.
+create policy "Teachers can manage messages in their school" on messages
   for all using (
-    student_id in (
-      select ce.student_id from class_enrollments ce
-      join classes c on c.id = ce.class_id
-      where c.teacher_id = auth.uid()
-    )
+    (school_id = my_school_id() and my_role() in ('admin', 'teacher'))
     or author_id = auth.uid()
   );
 create policy "Parents can read and send messages for own children" on messages
