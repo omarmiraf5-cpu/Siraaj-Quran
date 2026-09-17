@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChatWidget } from "@/components/ChatWidget";
 import { ILLUM_CLASS } from "@/components/student-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import {
@@ -81,7 +80,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     <div className="min-h-screen bg-surface-bg pb-28">
       <div className="max-w-3xl mx-auto">{children}</div>
       <StudentTabBar />
-      <ChatWidget role="student" />
     </div>
   );
 }

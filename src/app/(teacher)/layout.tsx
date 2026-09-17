@@ -1,7 +1,6 @@
 "use client";
 
 import { SidebarNav } from "@/components/SidebarNav";
-import { ChatWidget } from "@/components/ChatWidget";
 import { useRequirePasswordChange } from "@/hooks/useRequirePasswordChange";
 
 // Ordered so the four things a teacher actually opens every day come
@@ -62,7 +61,6 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     <div className="flex min-h-screen bg-surface-bg">
       <SidebarNav items={NAV} roleKey="role.teacher" />
       <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-20 md:pb-6 overflow-auto">{children}</main>
-      <ChatWidget role="teacher" />
     </div>
   );
 }

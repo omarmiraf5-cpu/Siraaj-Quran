@@ -326,14 +326,7 @@ export default function ParentMessagesPage() {
         </button>
       )}
 
-      {/* Composer. Right padding on mobile is wider than the others — the
-          floating "ask AI" button (ChatWidget, shared by every portal page)
-          sits fixed at bottom-28 end-4, a 56px circle, which otherwise
-          lands directly on top of the send button below at this bar's own
-          right edge. The extra space just keeps the two apart; it isn't
-          needed on desktop, where the button sits well clear of this bar's
-          centered, narrower content. */}
-      <div className="fixed bottom-20 md:bottom-0 start-0 end-0 md:start-56 p-3 pe-20 md:pe-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-surface-card border-t border-surface-border z-30">
+      <div className="fixed bottom-20 md:bottom-0 start-0 end-0 md:start-56 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-surface-card border-t border-surface-border z-30">
         <div className="max-w-2xl mx-auto flex items-center gap-2">
           <input
             value={text}
