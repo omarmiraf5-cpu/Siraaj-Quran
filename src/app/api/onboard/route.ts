@@ -47,9 +47,12 @@ export async function POST(request: NextRequest) {
     // real school and admin account behind, and simply fixing that one
     // email and resubmitting would re-hit the same failure on the admin
     // account this time, since it was already created by the first attempt.
+    const teacherList = data.teachers ?? [];
+    const studentList = data.students ?? [];
+
     const emails = [
       data.admin.email.trim().toLowerCase(),
-      ...data.teachers.map((t) => t.email.trim().toLowerCase()),
+      ...teacherList.map((t) => t.email.trim().toLowerCase()),
     ];
     const duplicateWithinSubmission = emails.find((e, i) => emails.indexOf(e) !== i);
     if (duplicateWithinSubmission) {
@@ -101,20 +104,28 @@ export async function POST(request: NextRequest) {
     });
     if (adminError) throw new Error(`Admin account failed: ${adminError.message}`);
 
+    // Each teacher's temporary password goes back to the caller with them.
+    // It used to be generated here and discarded, which left every teacher a
+    // school added during signup holding an account nobody — not even the
+    // admin who just created it — knew the password to.
     const teacherIdByHalaqa: Record<string, string> = {};
-    for (const teacher of data.teachers) {
+    const teacherLogins: Array<{ name: string; email: string; password: string }> = [];
+    for (const teacher of teacherList) {
+      const email = teacher.email.trim().toLowerCase();
+      const password = `Temp${randomPin()}${randomPin()}!`;
       const { data: teacherAuth, error: teacherError } = await admin.auth.admin.createUser({
-        email: teacher.email.trim().toLowerCase(),
-        password: `Temp${randomPin()}${randomPin()}!`,
+        email,
+        password,
         email_confirm: true,
         user_metadata: { role: "teacher", full_name: teacher.name.trim(), school_id: schoolId },
       });
       if (teacherError) throw new Error(`Teacher "${teacher.name}" failed: ${teacherError.message}`);
       teacherIdByHalaqa[teacher.halaqa] = teacherAuth.user.id;
+      teacherLogins.push({ name: teacher.name.trim(), email, password });
     }
 
     const halaqaNames = Array.from(
-      new Set([...data.teachers.map((t) => t.halaqa), ...data.students.map((s) => s.halaqa)].filter(Boolean))
+      new Set([...teacherList.map((t) => t.halaqa), ...studentList.map((s) => s.halaqa)].filter(Boolean))
     );
     const classIdByHalaqa: Record<string, string> = {};
     for (const halaqa of halaqaNames) {
@@ -134,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
     const studentPins: Array<{ name: string; halaqa: string; pin: string }> = [];
-    for (const student of data.students) {
+    for (const student of studentList) {
       const { data: studentRow, error: studentError } = await admin
         .from("students")
         .insert({
@@ -173,6 +184,7 @@ export async function POST(request: NextRequest) {
         schoolId,
         slug,
         adminEmail: data.admin.email,
+        teachers: teacherLogins,
         students: studentPins,
       },
       { status: 201 }

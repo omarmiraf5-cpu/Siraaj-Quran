@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Step = "welcome" | "school" | "admin" | "teachers" | "students" | "halaqas" | "review" | "complete";
@@ -45,6 +45,11 @@ interface StudentPin {
   halaqa: string;
   pin: string;
 }
+interface TeacherLogin {
+  name: string;
+  email: string;
+  password: string;
+}
 
 const inputClass =
   "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
@@ -59,7 +64,18 @@ export default function OnboardPage() {
   const [step, setStep] = useState<Step>("welcome");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ slug: string; adminEmail: string; students: StudentPin[] } | null>(null);
+  const [result, setResult] = useState<{
+    slug: string;
+    adminEmail: string;
+    teachers: TeacherLogin[];
+    students: StudentPin[];
+  } | null>(null);
+
+  // Read after mount rather than at render: the completion screen prints
+  // links a school is meant to copy and hand out, and a bare "/login?school="
+  // is not something a non-technical admin can paste anywhere useful.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
 
   const [school, setSchool] = useState<SchoolForm>({ name: "", city: "", province: "AB", timezone: "America/Edmonton" });
   const [admin, setAdmin] = useState<AdminForm>({ fullName: "", email: "", password: "" });
@@ -451,11 +467,41 @@ export default function OnboardPage() {
               <p className="text-ink-muted text-sm">
                 Sign in at <span className="font-semibold text-ink">/login</span> with <span className="font-semibold text-ink">{result.adminEmail}</span> and the password you chose.
               </p>
-              <p className="text-ink-muted text-xs">
-                Student login link: <span className="font-mono">/login?school={result.slug}</span>
-              </p>
+              <div className="bg-status-info-bg rounded-2xl p-4 text-left space-y-1.5">
+                <p className="text-sm font-semibold text-status-info-text">Your students&apos; login link</p>
+                <p className="font-mono text-[12px] text-status-info-text break-all">
+                  {origin}/login?school={result.slug}
+                </p>
+                <p className="text-[11px] text-status-info-text/80">
+                  Students must use this exact link — it&apos;s what shows them your school&apos;s names to tap.
+                  The plain login page won&apos;t know which school they belong to.
+                </p>
+              </div>
               <button onClick={() => router.push("/login")} className={primaryBtn}>Go to login →</button>
             </div>
+
+            {result.teachers.length > 0 && (
+              <div className="card-quiet p-6">
+                <h3 className="font-bold text-ink mb-1">Teacher logins</h3>
+                <p className="text-ink-muted text-xs mb-4">
+                  Give each teacher their email and temporary password — they sign in at{" "}
+                  <span className="font-mono">{origin}/login</span> under &ldquo;Teacher&rdquo;.
+                </p>
+                <ul className="divide-y divide-surface-border">
+                  {result.teachers.map((t) => (
+                    <li key={t.email} className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-ink">{t.name}</p>
+                        <p className="text-xs text-ink-muted break-all">{t.email}</p>
+                      </div>
+                      <span className="font-mono text-sm font-bold text-brand-navy dark:text-brand-gold flex-shrink-0">
+                        {t.password}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="card-quiet p-6">
               <h3 className="font-bold text-ink mb-1">Student PINs</h3>
