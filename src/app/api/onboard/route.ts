@@ -11,10 +11,24 @@ interface OnboardingData {
   school: { name: string; city: string; province: string; timezone: string };
   admin: { fullName: string; email: string; password: string };
   teachers: Array<{ name: string; email: string; halaqa: string }>;
-  students: Array<{ name: string; grade: number; halaqa: string }>;
+  students: Array<{ name: string; age: number; halaqa: string }>;
 }
 
 const AVATAR_COLORS = ["bg-subject-blue", "bg-subject-teal", "bg-subject-purple", "bg-subject-orange", "bg-subject-pink"];
+
+// The students table still tracks school grade (not collected during
+// onboarding anymore) and has no separate "age" column, so an age is
+// converted both ways: a rough grade for the existing not-null column,
+// and an approximate date of birth — Jan 1 of the birth year, since an
+// age alone doesn't give an exact day — for anything that later wants
+// a real date rather than a school-year guess.
+function gradeFromAge(age: number): number {
+  return Math.min(10, Math.max(0, Math.round(age) - 6));
+}
+function approximateDateOfBirth(age: number): string {
+  const birthYear = new Date().getUTCFullYear() - Math.round(age);
+  return `${birthYear}-01-01`;
+}
 
 function slugify(name: string) {
   return name
@@ -158,7 +172,8 @@ export async function POST(request: NextRequest) {
         .from("students")
         .insert({
           full_name: student.name.trim(),
-          grade: student.grade,
+          grade: gradeFromAge(student.age),
+          date_of_birth: approximateDateOfBirth(student.age),
           avatar_initials: initials(student.name),
           avatar_color: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
           school_id: schoolId,

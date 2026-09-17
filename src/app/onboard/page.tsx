@@ -37,7 +37,7 @@ interface Teacher {
 interface Student {
   id: string;
   name: string;
-  grade: string;
+  age: string;
   halaqa: string;
 }
 interface StudentPin {
@@ -82,7 +82,10 @@ export default function OnboardPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [tempTeacher, setTempTeacher] = useState({ name: "", email: "", halaqa: "" });
-  const [tempStudent, setTempStudent] = useState({ name: "", grade: "5", halaqa: "" });
+  const [tempStudent, setTempStudent] = useState({ name: "", age: "10", halaqa: "" });
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
   const addTeacher = () => {
     if (!tempTeacher.name || !tempTeacher.email || !tempTeacher.halaqa) return;
@@ -94,11 +97,43 @@ export default function OnboardPage() {
   const addStudent = () => {
     if (!tempStudent.name || !tempStudent.halaqa) return;
     setStudents([...students, { id: crypto.randomUUID(), ...tempStudent }]);
-    setTempStudent({ name: "", grade: "5", halaqa: "" });
+    setTempStudent({ name: "", age: "10", halaqa: "" });
   };
   const removeStudent = (id: string) => setStudents(students.filter((s) => s.id !== id));
 
-  const halaqas = Array.from(new Set([...teachers.map((t) => t.halaqa), ...students.map((s) => s.halaqa)])).sort();
+  const importRoster = async (file: File) => {
+    setImporting(true);
+    setImportError(null);
+    setImportWarnings([]);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch("/api/onboard/parse-roster", { method: "POST", body });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Couldn't read that file.");
+
+      const imported: Student[] = payload.students.map(
+        (s: { name: string; age: number | null; halaqa: string }) => ({
+          id: crypto.randomUUID(),
+          name: s.name,
+          age: s.age != null ? String(s.age) : "10",
+          halaqa: s.halaqa,
+        })
+      );
+      setStudents([...students, ...imported]);
+      setImportWarnings(payload.warnings ?? []);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Couldn't read that file.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const halaqas = Array.from(
+    new Set([...teachers.map((t) => t.halaqa), ...students.map((s) => s.halaqa)])
+  )
+    .filter(Boolean)
+    .sort();
 
   const canProceed = () => {
     switch (step) {
@@ -135,7 +170,7 @@ export default function OnboardPage() {
           school,
           admin,
           teachers: teachers.map((t) => ({ name: t.name, email: t.email, halaqa: t.halaqa })),
-          students: students.map((s) => ({ name: s.name, grade: parseInt(s.grade, 10) || 0, halaqa: s.halaqa })),
+          students: students.map((s) => ({ name: s.name, age: parseInt(s.age, 10) || 0, halaqa: s.halaqa })),
         }),
       });
       const payload = await response.json();
@@ -356,6 +391,40 @@ export default function OnboardPage() {
           <div className="card-quiet p-8 space-y-5">
             <h2 className="text-xl font-bold text-ink">Add your students</h2>
             <p className="text-ink-muted text-sm">Assign each student to a halaqa. PINs are generated automatically.</p>
+
+            <div className="rounded-2xl border border-dashed border-surface-border p-4 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-sm font-semibold text-ink">Already have a roster?</p>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Upload a spreadsheet or Word doc with Name, Age (or Grade), and Halaqa columns —
+                  we&apos;ll add everyone we can read from it.
+                </p>
+              </div>
+              <label className={`${ghostBtn} cursor-pointer flex-shrink-0 ${importing ? "opacity-50 pointer-events-none" : ""}`}>
+                {importing ? "Reading…" : "Upload file"}
+                <input
+                  type="file"
+                  accept=".xlsx,.csv,.docx"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) importRoster(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            {importError && (
+              <p className="text-sm text-status-error-text bg-status-error-bg rounded-xl px-3 py-2">{importError}</p>
+            )}
+            {importWarnings.length > 0 && (
+              <div className="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/25 rounded-xl px-3 py-2 space-y-0.5">
+                {importWarnings.map((w) => (
+                  <p key={w}>{w}</p>
+                ))}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <input
                 value={tempStudent.name}
@@ -364,12 +433,12 @@ export default function OnboardPage() {
                 className={inputClass}
               />
               <select
-                value={tempStudent.grade}
-                onChange={(e) => setTempStudent({ ...tempStudent, grade: e.target.value })}
+                value={tempStudent.age}
+                onChange={(e) => setTempStudent({ ...tempStudent, age: e.target.value })}
                 className={inputClass}
               >
-                {Array.from({ length: 11 }, (_, g) => (
-                  <option key={g} value={g}>Grade {g}</option>
+                {Array.from({ length: 15 }, (_, i) => i + 4).map((age) => (
+                  <option key={age} value={age}>{age} years old</option>
                 ))}
               </select>
               <select
@@ -396,7 +465,7 @@ export default function OnboardPage() {
                   <li key={s.id} className="flex items-center justify-between py-2.5">
                     <div>
                       <p className="text-sm font-semibold text-ink">{s.name}</p>
-                      <p className="text-xs text-ink-muted">Grade {s.grade} · {s.halaqa}</p>
+                      <p className="text-xs text-ink-muted">{s.age} years old · {s.halaqa}</p>
                     </div>
                     <button onClick={() => removeStudent(s.id)} className="text-status-error-text text-sm hover:underline">
                       Remove
