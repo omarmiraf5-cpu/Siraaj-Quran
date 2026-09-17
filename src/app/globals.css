@@ -516,3 +516,15 @@ body {
     color: var(--c-gold);
   }
 }
+
+/* Arabic letters must sit flush against each other to join into their
+   correct initial/medial/final forms; any letter-spacing — our own
+   .eyebrow style, or a Tailwind tracking-wide/wider/widest utility —
+   forces every letter into its isolated form instead, which reads as
+   broken, disconnected script rather than the app being "cut off."
+   Left unlayered (outside @layer) so it outranks every Tailwind
+   utility class regardless of generation order, with no !important
+   needed. */
+[dir="rtl"] * {
+  letter-spacing: normal;
+}
