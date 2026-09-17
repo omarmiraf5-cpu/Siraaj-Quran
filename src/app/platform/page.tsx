@@ -215,7 +215,10 @@ export default function PlatformPage() {
                               <button
                                 type="button"
                                 onClick={() => deleteSchool(s)}
-                                disabled={confirmText !== s.name || deletingId === s.id}
+                                disabled={
+                                  confirmText.trim().toLowerCase() !== s.name.trim().toLowerCase() ||
+                                  deletingId === s.id
+                                }
                                 className="px-3.5 py-2 rounded-lg bg-status-error-text text-white text-[12px] font-semibold disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
                               >
                                 {deletingId === s.id ? "Deleting…" : "Permanently delete"}
