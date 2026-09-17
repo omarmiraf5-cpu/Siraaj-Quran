@@ -160,7 +160,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
               </svg>
             </span>
-            More
+            {t("common.more")}
           </button>
         )}
       </nav>

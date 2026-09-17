@@ -24,16 +24,16 @@ import { useLanguage } from "@/components/LanguageProvider";
 
 const MARKS: {
   status: AttendanceStatus;
-  letter: string;
+  letterKey: string;
   on: string;
   off: string;
   dot: string;
   num: string;
 }[] = [
-  { status: "present", letter: "P", on: "bg-green-700 border-green-700 text-white", off: "hover:border-green-700 hover:text-green-800", dot: "bg-green-700", num: "text-green-800 dark:text-green-300" },
-  { status: "late", letter: "L", on: "bg-amber-600 border-amber-600 text-white", off: "hover:border-amber-600 hover:text-amber-700", dot: "bg-amber-600", num: "text-amber-700 dark:text-amber-300" },
-  { status: "absent", letter: "A", on: "bg-red-700 border-red-700 text-white", off: "hover:border-red-700 hover:text-red-800", dot: "bg-red-700", num: "text-red-800 dark:text-red-300" },
-  { status: "excused", letter: "E", on: "bg-slate-600 border-slate-600 text-white", off: "hover:border-slate-600 hover:text-slate-700", dot: "bg-slate-500", num: "text-slate-700 dark:text-slate-300" },
+  { status: "present", letterKey: "common.presentLetter", on: "bg-green-700 border-green-700 text-white", off: "hover:border-green-700 hover:text-green-800", dot: "bg-green-700", num: "text-green-800 dark:text-green-300" },
+  { status: "late", letterKey: "common.lateLetter", on: "bg-amber-600 border-amber-600 text-white", off: "hover:border-amber-600 hover:text-amber-700", dot: "bg-amber-600", num: "text-amber-700 dark:text-amber-300" },
+  { status: "absent", letterKey: "common.absentLetter", on: "bg-red-700 border-red-700 text-white", off: "hover:border-red-700 hover:text-red-800", dot: "bg-red-700", num: "text-red-800 dark:text-red-300" },
+  { status: "excused", letterKey: "common.excusedLetter", on: "bg-slate-600 border-slate-600 text-white", off: "hover:border-slate-600 hover:text-slate-700", dot: "bg-slate-500", num: "text-slate-700 dark:text-slate-300" },
 ];
 
 function todayIso() {
@@ -269,7 +269,7 @@ export default function TeacherAttendancePage() {
                         active ? m.on : `border-surface-border text-ink-muted ${m.off}`
                       }`}
                     >
-                      {m.letter}
+                      {t(m.letterKey)}
                     </button>
                   );
                 })}

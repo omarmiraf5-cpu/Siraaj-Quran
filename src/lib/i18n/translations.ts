@@ -233,6 +233,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "parent.payments.footerNote":
       "Payments are recorded by the school office. If something here looks wrong, send a message and they'll sort it out.",
     "common.madinahScript": "Madinah script",
+    "common.presentLetter": "P",
+    "common.lateLetter": "L",
+    "common.absentLetter": "A",
+    "common.excusedLetter": "E",
+    "common.more": "More",
   },
 
   so: {
@@ -255,7 +260,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.announcements": "Ogeysiisyada",
     "nav.attendance": "Xaadirinta",
     "nav.assignments": "Hawlaha",
-    "nav.messages": "Fariimaha",
+    "nav.messages": "Farriimaha",
     "nav.mushaf": "Mushafka",
     "nav.qaidah": "Qaa'idada",
     "nav.hadith": "Afartanka Xadiith",
@@ -307,7 +312,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "common.late": "Daahay",
     "common.absent": "Maqnaa",
     "common.excused": "La fasaxay",
-    "common.students": "ardayda",
+    "common.students": "arday",
     "common.saving": "Waa la kaydinayaa…",
     "common.thisTerm": "xilligan dugsiga",
     "common.send": "Dir",
@@ -320,13 +325,13 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "teacher.attendance.eyebrow": "Diiwaanka Maanta",
     "teacher.attendance.loadingRegister": "Waa la soo rarayaa diiwaanka maanta…",
-    "teacher.attendance.stillToMark": "weli waa la calaamadinayaa",
+    "teacher.attendance.stillToMark": "weli lama calaamadin",
     "teacher.attendance.everyoneMarked": "Dhammaan waa la calaamadiyay",
-    "teacher.attendance.markAllPresent": "Dhammaan calaamadi joogitaan",
+    "teacher.attendance.markAllPresent": "Dhammaan wada jooji",
     "teacher.attendance.signedOut": "Waa lagaa saaray — mar kale soo gal si aad xaadirinta u kaydiso.",
     "teacher.attendance.saveFailed": "Xaadirinta lama kaydin karin",
     "teacher.attendance.saved": "Xaadirinta waa la kaydiyay",
-    "teacher.attendance.markToSave": "Calaamadi arday si aad u kaydiso",
+    "teacher.attendance.markToSave": "Calaamadi ardayda si aad u kaydiso",
     "teacher.attendance.saveButton": "Kaydi xaadirinta",
 
     "teacher.messages.eyebrow": "La Xiriirka Waalidka",
@@ -435,6 +440,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "parent.payments.footerNote":
       "Lacagaha waxaa diiwaan geliya xafiiska dugsiga. Haddii wax halkan ah ay khalad u eegtaan, fariin u dir oo way hagaajin doonaan.",
     "common.madinahScript": "Farta Madinah",
+    "common.presentLetter": "J",
+    "common.lateLetter": "D",
+    "common.absentLetter": "M",
+    "common.excusedLetter": "F",
+    "common.more": "Wax Kale",
   },
 
   ar: {
@@ -637,5 +647,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "parent.payments.footerNote":
       "يتم تسجيل المدفوعات من قبل إدارة المدرسة. إذا بدا هنا شيء غير صحيح، أرسل رسالة وسيقومون بتصحيحه.",
     "common.madinahScript": "الرسم المدني",
+    "common.presentLetter": "ح",
+    "common.lateLetter": "ت",
+    "common.absentLetter": "غ",
+    "common.excusedLetter": "م",
+    "common.more": "المزيد",
   },
 };
