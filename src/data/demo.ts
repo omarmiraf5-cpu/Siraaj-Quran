@@ -478,10 +478,10 @@ export function initials(name: string): string {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS = ["Sun.", "Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat."];
 export const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const MONTHS = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.",
+                "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
 
 // Built by hand rather than with toLocaleDateString: Node and the browser ship
 // different ICU builds, and the same call returned "Thu, 13 Aug" on the server
