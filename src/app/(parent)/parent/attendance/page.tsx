@@ -1,27 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  DEMO_CHILDREN,
-  DEMO_ATTENDANCE,
   ATTENDANCE_STYLES,
   ATTENDANCE_LABELS,
   summariseAttendance,
   formatDay,
 } from "@/data/demo";
+import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { PortalHero } from "@/components/PortalHero";
 import {
   SectionCard,
   AttendanceStrip,
   AttendanceLegend,
   SegmentedSwitch,
+  EmptyNote,
+  LoadingNote,
 } from "@/components/portal-ui";
 
 export default function ParentAttendancePage() {
-  const [childId, setChildId] = useState(DEMO_CHILDREN[0].id);
-  const child = DEMO_CHILDREN.find((c) => c.id === childId) ?? DEMO_CHILDREN[0];
-  const days = DEMO_ATTENDANCE[childId] ?? [];
+  // RLS narrows this to the signed-in parent's own children; in demo mode
+  // it's the two sample ones.
+  const { mode, students: children } = usePortalRoster();
+  const [childId, setChildId] = useState<string | null>(null);
+  const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
+
+  useEffect(() => {
+    if (!childId && children.length > 0) setChildId(children[0].id);
+  }, [children, childId]);
+
+  const { attendance: days, ready } = useStudentRecord(child?.id ?? null, mode);
   const s = summariseAttendance(days);
+
+  if (mode === "loading" || !child) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-4 pt-2">
+        <PortalHero eyebrow="Attendance" title="…" />
+        <SectionCard title="Your children">
+          {mode === "loading" ? (
+            <LoadingNote />
+          ) : (
+            <EmptyNote>
+              No children are linked to your account yet — the school office can add them.
+            </EmptyNote>
+          )}
+        </SectionCard>
+      </div>
+    );
+  }
 
   const firstName = child.name.split(" ")[0];
 
@@ -33,17 +59,19 @@ export default function ParentAttendancePage() {
         meta={[child.halaqa, `last ${s.total} school days`, `${s.rate}% present`]}
       />
 
-      {DEMO_CHILDREN.length > 1 && (
+      {children.length > 1 && (
         <div className="flex items-center gap-3">
           <span className="eyebrow">Viewing</span>
           <SegmentedSwitch
             label="Select child"
-            value={childId}
+            value={child.id}
             onChange={setChildId}
-            options={DEMO_CHILDREN.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+            options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
           />
         </div>
       )}
+
+      {!ready && <LoadingNote>Loading attendance…</LoadingNote>}
 
       <SectionCard title="Overall" note={`${s.total} days`}>
         <div className="flex items-end justify-between gap-4">

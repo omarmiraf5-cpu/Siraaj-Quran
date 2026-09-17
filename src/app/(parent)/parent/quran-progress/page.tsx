@@ -4,9 +4,6 @@ import { useEffect, useState } from "react";
 import { getSurahById } from "@/data/mushaf-index";
 import { Mushaf } from "@/components/Mushaf";
 import {
-  DEMO_CHILDREN,
-  DEMO_CREATED_ASSIGNMENTS_KEY,
-  demoAssignmentsFor,
   formatDay,
   dueLabel,
   ASSIGNMENT_LABELS,
@@ -18,7 +15,7 @@ import {
   type AssignmentOverride,
   type RecitationLogEntry,
 } from "@/data/demo";
-import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
+import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { PortalHero } from "@/components/PortalHero";
 import {
   SectionCard,
@@ -26,41 +23,92 @@ import {
   ProgressBar,
   SegmentedSwitch,
   EmptyNote,
+  LoadingNote,
   TeacherNote,
   RatingPill,
   RecitationHistory,
 } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
+import { createClient } from "@/lib/supabase/client";
 
 const OVERRIDES_KEY = "demo_assignment_overrides";
 // Same key the teacher's assignments page writes to — every graded session
-// they log shows up here in the same browser.
+// they log shows up here in the same browser (demo mode only; a real
+// grading writes straight to the row, so there's nothing to overlay).
 const LOG_KEY = "demo_recitation_log_v1";
 
 export default function ParentQuranProgressPage() {
-  const [childId, setChildId] = useState(DEMO_CHILDREN[0].id);
-  const child = DEMO_CHILDREN.find((c) => c.id === childId) ?? DEMO_CHILDREN[0];
+  // RLS narrows this to the signed-in parent's own children; in demo mode
+  // it's the two sample ones.
+  const { mode, students: children } = usePortalRoster();
+  const [childId, setChildId] = useState<string | null>(null);
+  const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
   const [expanded, setExpanded] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
-  const [log, setLog] = useState<RecitationLogEntry[]>([]);
-  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
+  const [demoLog, setDemoLog] = useState<RecitationLogEntry[]>([]);
+  const [realLog, setRealLog] = useState<RecitationLogEntry[]>([]);
 
-  // Ratings, remarks and newly-created assignments a teacher has set since
-  // this page's sample data was written; shared with the teacher portal via
-  // the same browser storage.
   useEffect(() => {
-    setOverrides(readDemoStore(OVERRIDES_KEY, {}));
-    setLog(readDemoStore(LOG_KEY, []));
-    setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
-  }, []);
+    if (!childId && children.length > 0) setChildId(children[0].id);
+  }, [children, childId]);
 
-  // The same records the teacher set and the student sees. This page used to
-  // invent its own children and assignments, so a parent switching between
-  // portals in a demo saw two different families.
-  const assignments = demoAssignmentsFor(child.id, createdAssignments).map((a) =>
-    withOverride(a, overrides)
-  );
+  const { assignments: baseAssignments, ready } = useStudentRecord(child?.id ?? null, mode);
+
+  // Ratings and remarks a teacher has set since this page's sample data was
+  // written, shared with the teacher portal via the same browser storage —
+  // demo mode only, since a real grading already lands directly on the row.
+  useEffect(() => {
+    if (mode !== "demo") return;
+    setOverrides(readDemoStore(OVERRIDES_KEY, {}));
+    setDemoLog(readDemoStore(LOG_KEY, []));
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "real" || !child) return;
+    const supabase = createClient();
+    supabase
+      .from("recitation_log")
+      .select("*")
+      .eq("student_id", child.id)
+      .order("session_date")
+      .then(({ data }) => {
+        setRealLog(
+          (data ?? []).map((r) => ({
+            id: r.id,
+            student_id: r.student_id,
+            portion: r.portion,
+            surah: r.surah,
+            ayah_start: r.ayah_start,
+            surah_end: r.surah_end,
+            ayah_end: r.ayah_end,
+            rating: r.rating,
+            notes: r.notes,
+            date: r.session_date,
+          }))
+        );
+      });
+  }, [mode, child]);
+
+  const assignments = mode === "demo" ? baseAssignments.map((a) => withOverride(a, overrides)) : baseAssignments;
+  const log = mode === "demo" ? demoLog : realLog;
+
+  if (mode === "loading" || !child) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-4 pt-2">
+        <PortalHero eyebrow="Quranic progress" title="…" />
+        <SectionCard title="Your children">
+          {mode === "loading" ? (
+            <LoadingNote />
+          ) : (
+            <EmptyNote>
+              No children are linked to your account yet — the school office can add them.
+            </EmptyNote>
+          )}
+        </SectionCard>
+      </div>
+    );
+  }
 
   const completed = assignments.filter((a) => a.status === "completed").length;
   const avg = assignments.length
@@ -83,20 +131,22 @@ export default function ParentQuranProgressPage() {
         ]}
       />
 
-      {DEMO_CHILDREN.length > 1 && (
+      {children.length > 1 && (
         <div className="flex items-center gap-3">
           <span className="eyebrow">Viewing</span>
           <SegmentedSwitch
             label="Select child"
-            value={childId}
+            value={child.id}
             onChange={(v) => {
               setChildId(v);
               setExpanded(null);
             }}
-            options={DEMO_CHILDREN.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+            options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
           />
         </div>
       )}
+
+      {!ready && <LoadingNote>Loading assignments…</LoadingNote>}
 
       <div className="grid grid-cols-3 gap-3">
         <StatTile value={assignments.length} label="Set" sub="this term" />

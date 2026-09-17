@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { getSurahById } from "@/data/mushaf-index";
 import {
   DEMO_CURRENT_STUDENT,
-  DEMO_CREATED_ASSIGNMENTS_KEY,
-  demoAssignmentsFor,
   assignmentsByPortion,
   dueLabel,
   ASSIGNMENT_LABELS,
@@ -14,9 +12,9 @@ import {
   PORTION_ARABIC,
   PORTION_BLURB,
 } from "@/data/demo";
-import { readDemoStore } from "@/lib/demoStore";
-import type { HifzPortion, QuranicAssignment } from "@/hooks/useQuranicAssignments";
-import { TeacherNote } from "@/components/portal-ui";
+import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
+import type { HifzPortion } from "@/hooks/useQuranicAssignments";
+import { TeacherNote, LoadingNote } from "@/components/portal-ui";
 import {
   ProgressRing,
   Confetti,
@@ -41,29 +39,27 @@ const PORTION_STYLE: Record<
 };
 
 export default function StudentAssignmentsPage() {
-  const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
-  const all = demoAssignmentsFor(DEMO_CURRENT_STUDENT.id, createdAssignments);
+  // RLS gives a signed-in student exactly one row — their own — so the
+  // roster is a list of one. In demo mode it's the sample student.
+  const { mode, students } = usePortalRoster([DEMO_CURRENT_STUDENT]);
+  const { assignments: all, ready } = useStudentRecord(students[0]?.id ?? null, mode);
   const grouped = assignmentsByPortion(all);
-  const [levels, setLevels] = useState<Record<string, number>>(
-    Object.fromEntries(demoAssignmentsFor(DEMO_CURRENT_STUDENT.id).map((a) => [a.id, a.memorization_level]))
-  );
+  const [levels, setLevels] = useState<Record<string, number>>({});
   // Bumped once per assignment each time its slider newly reaches 100 — the
   // one moment on this page that rewards the child for doing something,
   // rather than just describing state a teacher set.
   const [bursts, setBursts] = useState<Record<string, number>>({});
 
-  // Assignments a teacher created since this page's sample data was
-  // written, and their starting slider positions — loaded together so
-  // `levels` never falls out of sync with `all`.
+  // Seeded from each assignment's own memorization_level as they arrive —
+  // existing entries win over a fresh load, so a slider mid-drag never jumps
+  // back to the last-saved value underneath the child's thumb.
   useEffect(() => {
-    const created = readDemoStore<QuranicAssignment[]>(DEMO_CREATED_ASSIGNMENTS_KEY, []);
-    if (created.length === 0) return;
-    setCreatedAssignments(created);
+    if (all.length === 0) return;
     setLevels((l) => ({
-      ...Object.fromEntries(created.map((a) => [a.id, a.memorization_level])),
+      ...Object.fromEntries(all.map((a) => [a.id, a.memorization_level])),
       ...l,
     }));
-  }, []);
+  }, [all]);
 
   const setLevel = (id: string, next: number) => {
     setLevels((l) => {
@@ -83,6 +79,14 @@ export default function StudentAssignmentsPage() {
   const overall = all.length
     ? Math.round(Object.values(levels).reduce((s, v) => s + v, 0) / all.length)
     : 0;
+
+  if (!ready) {
+    return (
+      <div className="px-4 pt-10">
+        <LoadingNote>Loading your work…</LoadingNote>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pt-4 pb-4 space-y-5">
@@ -151,7 +155,12 @@ export default function StudentAssignmentsPage() {
                 const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
                 // Nothing is overdue once it is finished.
                 const due = a.status === "completed" ? null : dueLabel(a.due_date);
-                const level = levels[a.id];
+                // Falls back to the assignment's own value for the one render
+                // between `all` arriving and the seeding effect above
+                // catching up — otherwise the range input's `value` jumps
+                // from undefined to a number and React logs it as switching
+                // from an uncontrolled input to a controlled one.
+                const level = levels[a.id] ?? a.memorization_level;
                 const isDone = a.status === "completed";
                 // A live 100 on the slider outranks whatever the teacher's
                 // status says — it's the child's own report that they know

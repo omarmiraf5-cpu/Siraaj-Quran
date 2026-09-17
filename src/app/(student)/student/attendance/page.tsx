@@ -3,13 +3,13 @@
 import { useStudentTheme } from "@/hooks/useStudentTheme";
 import {
   DEMO_CURRENT_STUDENT,
-  DEMO_ATTENDANCE,
   ATTENDANCE_LABELS,
   summariseAttendance,
   formatDay,
   type AttendanceStatus,
 } from "@/data/demo";
-import { SectionCard, AttendanceStrip } from "@/components/portal-ui";
+import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
+import { SectionCard, AttendanceStrip, LoadingNote } from "@/components/portal-ui";
 import { ProgressRing, StreakBadge, ILLUM_CLASS } from "@/components/student-ui";
 import { IconCheck, IconClock, IconX, IconNote } from "@/components/icons";
 
@@ -28,7 +28,11 @@ const MARKS: {
 
 export default function StudentAttendancePage() {
   const theme = useStudentTheme();
-  const days = DEMO_ATTENDANCE[DEMO_CURRENT_STUDENT.id];
+
+  // RLS gives a signed-in student exactly one row — their own — so the
+  // roster is a list of one. In demo mode it's the sample student.
+  const { mode, students } = usePortalRoster([DEMO_CURRENT_STUDENT]);
+  const { attendance: days, ready } = useStudentRecord(students[0]?.id ?? null, mode);
   const s = summariseAttendance(days);
 
   // Days attended in a row, counting back from the most recent.
@@ -36,6 +40,14 @@ export default function StudentAttendancePage() {
   for (const d of days) {
     if (d.status === "absent") break;
     streak++;
+  }
+
+  if (!ready) {
+    return (
+      <div className="px-4 pt-10">
+        <LoadingNote>Loading your register…</LoadingNote>
+      </div>
+    );
   }
 
   return (
