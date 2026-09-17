@@ -12,12 +12,14 @@ import {
   summariseAttendance,
   initials,
   formatDay,
+  type AttendanceDay,
   type AttendanceStatus,
   type DemoStudent,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import { IconCheck } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
+import { createClient } from "@/lib/supabase/client";
 
 const MARKS: {
   status: AttendanceStatus;
@@ -33,19 +35,71 @@ const MARKS: {
   { status: "excused", letter: "E", on: "bg-slate-600 border-slate-600 text-white", off: "hover:border-slate-600 hover:text-slate-700", dot: "bg-slate-500", num: "text-slate-700 dark:text-slate-300" },
 ];
 
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function TeacherAttendancePage() {
+  const supabase = createClient();
+  const [isDemo, setIsDemo] = useState(false);
+  const [today, setToday] = useState(DEMO_TODAY);
   const [students, setStudents] = useState<DemoStudent[]>(DEMO_STUDENTS);
+  const [history, setHistory] = useState<Record<string, AttendanceDay[]>>(DEMO_ATTENDANCE);
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Merged with whatever the admin portal has added, so a newly enrolled
   // student shows up on today's register without a page reload elsewhere.
   useEffect(() => {
-    const roster = allStudents(
-      readDemoStore(DEMO_CREATED_STUDENTS_KEY, []),
-      readDemoStore(DEMO_STUDENT_OVERRIDES_KEY, {})
-    ).filter((s) => s.active !== false);
-    setStudents(roster);
+    const load = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setIsDemo(true);
+        const roster = allStudents(
+          readDemoStore(DEMO_CREATED_STUDENTS_KEY, []),
+          readDemoStore(DEMO_STUDENT_OVERRIDES_KEY, {})
+        ).filter((s) => s.active !== false);
+        setStudents(roster);
+        return;
+      }
+
+      const todayStr = todayIso();
+      setToday(todayStr);
+
+      const [{ data: studentRows }, { data: attendanceRows }] = await Promise.all([
+        supabase.from("students").select("id, full_name, grade, active").eq("active", true).order("full_name"),
+        // Scoped to this teacher's own recorded attendance — the same rows
+        // the "Teachers can manage attendance for own classes" policy
+        // already limits them to, kept explicit here for clarity.
+        supabase.from("attendance").select("student_id, class_date, status").eq("teacher_id", user.id),
+      ]);
+
+      setStudents(
+        (studentRows ?? []).map((s) => ({
+          id: s.id,
+          name: s.full_name,
+          halaqa: `Grade ${s.grade}`,
+          active: s.active,
+        }))
+      );
+
+      const byStudent: Record<string, AttendanceDay[]> = {};
+      const todayRecords: Record<string, AttendanceStatus> = {};
+      for (const row of attendanceRows ?? []) {
+        const day: AttendanceDay = { date: row.class_date, status: row.status as AttendanceStatus };
+        (byStudent[row.student_id] ??= []).push(day);
+        if (row.class_date === todayStr) todayRecords[row.student_id] = day.status;
+      }
+      setHistory(byStudent);
+      setRecords(todayRecords);
+    };
+
+    load();
   }, []);
 
   const mark = (id: string, status: AttendanceStatus) => {
@@ -69,13 +123,74 @@ export default function TeacherAttendancePage() {
   const marked = Object.keys(records).length;
   const remaining = students.length - marked;
 
+  const saveAttendance = async () => {
+    if (isDemo) {
+      setSaved(true);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("You've been signed out — sign in again to save attendance.");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("school_id")
+        .eq("id", user.id)
+        .single();
+
+      // Replace today's rows rather than upsert against the unique
+      // constraint: class_id is null for every row here (no halaqa
+      // filtering yet), and Postgres never treats two nulls as equal for
+      // uniqueness — an upsert wouldn't find today's existing rows to
+      // update, it would just pile up duplicates on every re-save.
+      const { error: deleteError } = await supabase
+        .from("attendance")
+        .delete()
+        .eq("teacher_id", user.id)
+        .eq("class_date", today);
+      if (deleteError) throw deleteError;
+
+      const rows = Object.entries(records).map(([student_id, status]) => ({
+        student_id,
+        class_date: today,
+        status,
+        teacher_id: user.id,
+        school_id: profile?.school_id,
+      }));
+
+      if (rows.length > 0) {
+        const { error: insertError } = await supabase.from("attendance").insert(rows);
+        if (insertError) throw insertError;
+      }
+
+      setHistory((h) => {
+        const next = { ...h };
+        for (const [student_id, status] of Object.entries(records)) {
+          const withoutToday = (next[student_id] ?? []).filter((d) => d.date !== today);
+          next[student_id] = [{ date: today, status }, ...withoutToday];
+        }
+        return next;
+      });
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save attendance");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto pb-28 space-y-4 pt-2">
       <PortalHero
         eyebrow="Today's register"
         title="Attendance"
         meta={[
-          formatDay(DEMO_TODAY),
+          formatDay(today),
           `${students.length} students`,
           remaining > 0 ? `${remaining} still to mark` : "everyone marked",
         ]}
@@ -111,7 +226,7 @@ export default function TeacherAttendancePage() {
       {/* Roster */}
       <div className="card-quiet divide-y divide-surface-border overflow-hidden">
         {students.map((s) => {
-          const history = summariseAttendance(DEMO_ATTENDANCE[s.id] ?? []);
+          const summary = summariseAttendance(history[s.id] ?? []);
           return (
             <div key={s.id} className="flex items-center gap-3 px-3 py-3">
               <div className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-xs flex-shrink-0">
@@ -120,7 +235,7 @@ export default function TeacherAttendancePage() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-ink truncate">{s.name}</p>
                 <p className="text-[11px] text-ink-muted">
-                  {s.halaqa} · {history.rate}% this term
+                  {s.halaqa} · {summary.rate}% this term
                 </p>
               </div>
               <div className="flex gap-1.5 flex-shrink-0">
@@ -146,6 +261,12 @@ export default function TeacherAttendancePage() {
         })}
       </div>
 
+      {error && (
+        <div className="bg-red-50 dark:bg-red-950/25 border border-red-200 dark:border-red-800/40 rounded-2xl p-4">
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
+
       {/* Sticky save — clears the sidebar on desktop. On mobile it docks
           above the tab bar (bottom-20, the same clearance the layout's
           <main> already reserves for that bar) rather than at bottom-0:
@@ -155,16 +276,18 @@ export default function TeacherAttendancePage() {
           the button underneath it. */}
       <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-56 p-3 bg-surface-card border-t border-surface-border z-30">
         <button
-          onClick={() => setSaved(true)}
-          disabled={marked === 0}
+          onClick={saveAttendance}
+          disabled={marked === 0 || saving}
           className="w-full max-w-2xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
         >
           {saved && <IconCheck size={16} />}
-          {saved
-            ? "Attendance saved"
-            : marked === 0
-              ? "Mark a student to save"
-              : `Save attendance · ${count("present")} present`}
+          {saving
+            ? "Saving…"
+            : saved
+              ? "Attendance saved"
+              : marked === 0
+                ? "Mark a student to save"
+                : `Save attendance · ${count("present")} present`}
         </button>
       </div>
     </div>

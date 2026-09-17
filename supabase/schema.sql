@@ -455,7 +455,7 @@ create table if not exists attendance (
   student_id  uuid not null references students(id) on delete cascade,
   class_id    uuid references classes(id) on delete set null,
   class_date  date not null,
-  status      text not null check (status in ('present', 'late', 'absent')),
+  status      text not null check (status in ('present', 'late', 'absent', 'excused')),
   notes       text,
   teacher_id  uuid not null references profiles(id),
   school_id   uuid not null references schools(id) on delete cascade,
@@ -463,6 +463,21 @@ create table if not exists attendance (
   unique (student_id, class_id, class_date)
 );
 alter table attendance enable row level security;
+
+-- Migration for databases created before "excused" existed as a status —
+-- the teacher attendance UI has always offered it as a fourth option
+-- alongside present/late/absent.
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint where conname = 'attendance_status_check'
+  ) then
+    alter table attendance drop constraint attendance_status_check;
+  end if;
+  alter table attendance
+    add constraint attendance_status_check
+    check (status in ('present', 'late', 'absent', 'excused'));
+end $$;
 create policy "Teachers can manage attendance for own classes" on attendance
   for all using (teacher_id = auth.uid());
 create policy "Admins can read all attendance" on attendance
