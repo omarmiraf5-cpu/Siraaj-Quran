@@ -95,7 +95,6 @@ export default function QuranAssignmentsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [demoCreated, setDemoCreated] = useState<QuranicAssignment[]>([]);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
@@ -231,7 +230,6 @@ export default function QuranAssignmentsPage() {
       setEndSurah("");
       setDueDate("");
       setNotes("");
-      setShowPreview(false);
 
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
@@ -265,7 +263,6 @@ export default function QuranAssignmentsPage() {
       setSpansSurah(false);
       setEndSurah("");
     }
-    setShowPreview(false);
   };
 
   const canPreview = selectedSurah && ayahStart && ayahEnd;
@@ -483,7 +480,6 @@ export default function QuranAssignmentsPage() {
                 setSelectedSurah(e.target.value);
                 setSpansSurah(false);
                 setEndSurah("");
-                setShowPreview(false);
               }}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
@@ -508,7 +504,6 @@ export default function QuranAssignmentsPage() {
                 value={ayahStart}
                 onChange={(e) => {
                   setAyahStart(e.target.value);
-                  setShowPreview(false);
                 }}
                 placeholder="1"
                 className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
@@ -525,7 +520,6 @@ export default function QuranAssignmentsPage() {
                 value={ayahEnd}
                 onChange={(e) => {
                   setAyahEnd(e.target.value);
-                  setShowPreview(false);
                 }}
                 placeholder={maxAyahsEnd.toString()}
                 className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
@@ -550,7 +544,6 @@ export default function QuranAssignmentsPage() {
                     onClick={() => {
                       setSpansSurah(false);
                       setEndSurah("");
-                      setShowPreview(false);
                     }}
                     className="text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors"
                   >
@@ -561,7 +554,6 @@ export default function QuranAssignmentsPage() {
                   value={endSurah || selectedSurah}
                   onChange={(e) => {
                     setEndSurah(e.target.value);
-                    setShowPreview(false);
                   }}
                   className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                 >
@@ -584,17 +576,6 @@ export default function QuranAssignmentsPage() {
                 + End in a different surah
               </button>
             ))}
-
-          {canPreview && !showPreview && (
-            <button
-              type="button"
-              onClick={() => setShowPreview(true)}
-              className="w-full inline-flex items-center justify-center gap-2 border border-brand-gold/45 bg-brand-gold/12 text-[#6f5518] dark:text-brand-gold font-semibold py-3 rounded-2xl transition-all hover:bg-brand-gold/20 active:scale-[.98]"
-            >
-              <IconBook size={16} />
-              Preview in the Mushaf
-            </button>
-          )}
 
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
@@ -646,23 +627,20 @@ export default function QuranAssignmentsPage() {
           </button>
         </form>
 
-        {/* Mushaf Preview Panel */}
+        {/* Mushaf preview panel. Opens itself as soon as the surah and ayah
+            range are filled in, rather than waiting on a button: seeing the
+            exact Tajweed-highlighted text being assigned is the point of
+            setting it here rather than on paper, and a teacher shouldn't
+            have to ask for it every time. It follows the fields live, so
+            correcting an ayah number redraws it. */}
         <div className="lg:sticky lg:top-10 lg:self-start">
-          {showPreview && canPreview ? (
+          {canPreview ? (
             <div className="card-quiet p-5 overflow-hidden">
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="page-title text-lg">
-                  {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
-                    ? `${selectedSurahData?.englishName ?? "Preview"} – ${endSurahData.englishName}`
-                    : (selectedSurahData?.englishName ?? "Preview")}
-                </h2>
-                <button
-                  onClick={() => setShowPreview(false)}
-                  className="text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors flex-shrink-0"
-                >
-                  Close
-                </button>
-              </div>
+              <h2 className="page-title text-lg">
+                {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
+                  ? `${selectedSurahData?.englishName ?? "Preview"} – ${endSurahData.englishName}`
+                  : (selectedSurahData?.englishName ?? "Preview")}
+              </h2>
               <div className="gold-rule my-4" />
               <Mushaf
                 initialPage={selectedSurahData?.startPage ?? 1}
@@ -681,8 +659,8 @@ export default function QuranAssignmentsPage() {
               </span>
               <h3 className="page-title text-lg mb-2">Mushaf preview</h3>
               <p className="text-[13px] text-ink-muted leading-relaxed max-w-xs mx-auto">
-                Pick a surah and an ayah range, then preview it to see exactly
-                the Tajweed-highlighted text your student will study.
+                Pick a surah and an ayah range — the Tajweed-highlighted text
+                your student will study appears here as you go.
               </p>
             </div>
           )}
