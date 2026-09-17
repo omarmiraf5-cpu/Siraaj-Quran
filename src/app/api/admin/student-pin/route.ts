@@ -22,13 +22,29 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: caller } = await supabase
+    const { data: caller, error: callerError } = await supabase
       .from("profiles")
       .select("role, school_id")
       .eq("id", user.id)
       .single();
-    if (!caller || caller.role !== "admin") {
-      return NextResponse.json({ error: "Only an admin can set a student's PIN" }, { status: 403 });
+    if (callerError || !caller || caller.role !== "admin") {
+      console.error("Admin check failed for student PIN:", {
+        userId: user.id,
+        callerError: callerError?.message,
+        callerErrorCode: callerError?.code,
+        caller,
+      });
+      return NextResponse.json(
+        {
+          error: "Only an admin can set a student's PIN",
+          debug: callerError
+            ? `${callerError.code ?? ""} ${callerError.message}`.trim()
+            : caller
+            ? `signed-in account has role "${caller.role}", not admin`
+            : "no profile row is visible for this session",
+        },
+        { status: 403 }
+      );
     }
 
     // Read through the caller's own session, so RLS confirms this student

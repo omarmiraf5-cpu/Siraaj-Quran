@@ -49,15 +49,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: caller } = await supabase
+    const { data: caller, error: callerError } = await supabase
       .from("profiles")
       .select("role, school_id")
       .eq("id", user.id)
       .single();
 
-    if (!caller || caller.role !== "admin") {
+    if (callerError || !caller || caller.role !== "admin") {
+      // This 403 has fired for accounts that really were role='admin' in the
+      // table, so the generic message alone wasn't enough to tell a missing
+      // row apart from a wrong role apart from an RLS/session problem. Log
+      // the real cause server-side and echo a short hint in the response so
+      // it's visible without needing Vercel log access.
+      console.error("Admin check failed for account creation:", {
+        userId: user.id,
+        callerError: callerError?.message,
+        callerErrorCode: callerError?.code,
+        caller,
+      });
       return NextResponse.json(
-        { error: "Only an admin can create accounts" },
+        {
+          error: "Only an admin can create accounts",
+          debug: callerError
+            ? `${callerError.code ?? ""} ${callerError.message}`.trim()
+            : caller
+            ? `signed-in account has role "${caller.role}", not admin`
+            : "no profile row is visible for this session",
+        },
         { status: 403 }
       );
     }

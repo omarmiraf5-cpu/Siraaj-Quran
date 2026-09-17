@@ -133,7 +133,7 @@ export default function AdminTeachersPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create teacher");
+      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || "Failed to create teacher");
       await loadRealTeachers();
       setNewName("");
       setNewEmail("");

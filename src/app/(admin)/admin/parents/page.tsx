@@ -138,7 +138,7 @@ export default function AdminParentsPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create parent account");
+      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || "Failed to create parent account");
       await loadReal();
       resetForm();
       setNote(

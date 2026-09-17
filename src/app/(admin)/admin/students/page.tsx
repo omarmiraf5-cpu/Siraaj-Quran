@@ -195,7 +195,7 @@ export default function AdminStudentsPage() {
         body: JSON.stringify({ student_id: s.id, pin: draftPin }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to set PIN");
+      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || "Failed to set PIN");
       setPinNote(`PIN set. ${s.name.split(" ")[0]} can sign in with ${draftPin}.`);
     } catch (err) {
       setPinNote(err instanceof Error ? err.message : "Failed to set PIN");
