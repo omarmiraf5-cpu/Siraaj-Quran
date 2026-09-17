@@ -156,19 +156,25 @@ export function StatTile({
   const body = (
     <>
       <p className="text-[26px] font-bold text-ink tabular-nums leading-none">{value}</p>
-      <p className="eyebrow mt-2 whitespace-nowrap">{label}</p>
+      <p className="eyebrow mt-2">{label}</p>
       {sub && <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
     </>
   );
 
+  // min-w-0 matters here: these tiles sit in a CSS grid, where a grid
+  // item's default min-width is auto, not 0. A translated label longer
+  // than its English original (e.g. Arabic "بحاجة إلى مراجعة") would
+  // otherwise force its whole track wider than its fair share, blowing
+  // out the grid — and with it the page's horizontal scroll — instead
+  // of just wrapping to a second line.
   if (!onClick) {
-    return <div className="card-quiet px-4 py-4">{body}</div>;
+    return <div className="card-quiet px-4 py-4 min-w-0">{body}</div>;
   }
   return (
     <button
       type="button"
       onClick={onClick}
-      className="card-quiet px-4 py-4 text-start cursor-pointer hover:bg-surface-bg-warm hover:-translate-y-0.5 transition-all active:scale-[.98]"
+      className="card-quiet px-4 py-4 min-w-0 text-start cursor-pointer hover:bg-surface-bg-warm hover:-translate-y-0.5 transition-all active:scale-[.98]"
     >
       {body}
     </button>
