@@ -67,17 +67,36 @@ create policy "Users can read own profile" on profiles
   for select using (auth.uid() = id);
 create policy "Users can update own profile" on profiles
   for update using (auth.uid() = id);
+-- security definer + a pinned search_path so these run as the function
+-- owner and bypass profiles' own RLS internally. Without that, a policy
+-- on profiles that subqueries profiles (e.g. "is the caller an admin of
+-- this school") recurses into itself — Postgres has to re-apply every
+-- profiles SELECT policy, including this one, to answer that subquery.
+-- Postgres reports that as `42P17 infinite recursion detected in policy
+-- for relation "profiles"`, and it fires even for a plain self-read: the
+-- subquery is planned as an uncorrelated InitPlan evaluated up front,
+-- before the simple `auth.uid() = id` branch could ever short-circuit it.
+create or replace function my_role()
+returns text
+language sql security definer stable set search_path = public
+as $$ select role from profiles where id = auth.uid() $$;
+
+create or replace function my_school_id()
+returns uuid
+language sql security definer stable set search_path = public
+as $$ select school_id from profiles where id = auth.uid() $$;
+
 create policy "Admins can read all school profiles" on profiles
   for select using (
-    school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+    school_id = my_school_id() and my_role() = 'admin'
   );
 create policy "Admins can insert profiles in their school" on profiles
   for insert with check (
-    school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+    school_id = my_school_id() and my_role() = 'admin'
   );
 create policy "Admins can update profiles in their school" on profiles
   for update using (
-    school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+    school_id = my_school_id() and my_role() = 'admin'
   );
 
 -- Schools' own policies reference profiles (to check the caller's school
