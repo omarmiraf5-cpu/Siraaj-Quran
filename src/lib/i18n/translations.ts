@@ -408,7 +408,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "common.worksNeedReview": "hawlood ayaa sugaya dib-u-eegista macallinka.",
     "common.readAlongWith": "La akhri",
     "common.playAyahAloud": "oo dhageyso aayad kasta.",
-    "common.dailyReflection": "Fikirka Maalinlaha ah",
+    "common.dailyReflection": "Tafakkurka Maanta",
     "parent.quranProgress.eyebrow": "Horumarka Qur'aanka",
     "common.finished": "Dhammaystiran",
     "common.loadingAssignments": "Hawlaha waa la soo raraya…",
