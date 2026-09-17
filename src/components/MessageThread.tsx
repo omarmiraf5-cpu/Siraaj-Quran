@@ -4,7 +4,7 @@
 // owns its own composer — the parent's includes an absence form the
 // teacher's does not — so only the read side lives here.
 
-import { formatMessageTime, type MessageAuthor, type ThreadMessage } from "@/data/demo";
+import { formatDay, formatMessageTime, type MessageAuthor, type ThreadMessage } from "@/data/demo";
 import { EmptyNote } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -31,10 +31,13 @@ export function MessageThread({
           return (
             <div key={m.id} className="flex justify-center">
               <div className="max-w-[85%] rounded-2xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/25 dark:border-amber-800/40 px-4 py-2.5 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                  {t("messages.absenceReported")} · {m.absence_date}
+                <p
+                  className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"
+                  dir="auto"
+                >
+                  {t("messages.absenceReported")} · {m.absence_date && formatDay(m.absence_date)}
                 </p>
-                <p className="text-[13px] text-ink-body mt-1">{m.body}</p>
+                <p className="text-[13px] text-ink-body mt-1" dir="auto">{m.body}</p>
                 <p className="text-[10px] text-ink-muted mt-1">
                   {m.author_name} · {formatMessageTime(m.created_at)}
                 </p>
@@ -46,6 +49,7 @@ export function MessageThread({
           <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[80%] ${mine ? "items-end" : "items-start"} flex flex-col`}>
               <div
+                dir="auto"
                 className={`text-sm rounded-card px-3.5 py-2.5 leading-relaxed whitespace-pre-wrap ${
                   mine ? "bg-brand-navy text-white" : "bg-surface-bg text-ink-body"
                 }`}

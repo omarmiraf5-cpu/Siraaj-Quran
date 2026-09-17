@@ -8,6 +8,7 @@ import { SectionCard, SegmentedSwitch, EmptyNote, LoadingNote } from "@/componen
 import { MessageThread } from "@/components/MessageThread";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // Shared with the teacher portal so a message sent here shows up there, and
 // a reply shows up here, within the same browser (demo mode only).
@@ -15,6 +16,7 @@ const MESSAGES_KEY = "demo_messages_v1";
 
 export default function ParentMessagesPage() {
   const supabase = createClient();
+  const { t } = useLanguage();
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster();
@@ -83,7 +85,7 @@ export default function ParentMessagesPage() {
           student_id: r.student_id,
           author: r.author_role as ThreadMessage["author"],
           author_name:
-            nameById.get(r.author_id) ?? (r.author_role === "teacher" ? "Teacher" : "Parent"),
+            nameById.get(r.author_id) ?? t(r.author_role === "teacher" ? "role.teacher" : "role.parent"),
           kind: r.kind as ThreadMessage["kind"],
           body: r.body,
           absence_date: r.absence_date ?? undefined,
@@ -115,19 +117,17 @@ export default function ParentMessagesPage() {
     mode === "demo"
       ? DEMO_TEACHER_NAME
       : [...messages].reverse().find((m) => m.author === "teacher")?.author_name ??
-        "your child's teacher";
+        t("parent.messages.yourChildsTeacher");
 
   if (mode === "loading" || !child) {
     return (
       <div className="max-w-2xl mx-auto space-y-4 pt-2">
-        <PortalHero eyebrow="Speak with the teacher" title="Messages" />
-        <SectionCard title="Your children">
+        <PortalHero eyebrow={t("parent.messages.eyebrow")} title={t("nav.messages")} />
+        <SectionCard title={t("common.yourChildren")}>
           {mode === "loading" ? (
             <LoadingNote />
           ) : (
-            <EmptyNote>
-              No children are linked to your account yet — the school office can add them.
-            </EmptyNote>
+            <EmptyNote>{t("common.noChildrenLinked")}</EmptyNote>
           )}
         </SectionCard>
       </div>
@@ -246,16 +246,16 @@ export default function ParentMessagesPage() {
   return (
     <div className="max-w-2xl mx-auto pb-28 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Speak with the teacher"
-        title="Messages"
-        meta={[child.halaqa, teacherLabel, `${messages.length} messages`]}
+        eyebrow={t("parent.messages.eyebrow")}
+        title={t("nav.messages")}
+        meta={[child.halaqa, teacherLabel, `${messages.length} ${t("common.messagesCount")}`]}
       />
 
       {children.length > 1 && (
         <div className="flex items-center gap-3">
-          <span className="eyebrow">About</span>
+          <span className="eyebrow">{t("common.about")}</span>
           <SegmentedSwitch
-            label="Select child"
+            label={t("common.selectChild")}
             value={child.id}
             onChange={setChildId}
             options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
@@ -263,7 +263,7 @@ export default function ParentMessagesPage() {
         </div>
       )}
 
-      <SectionCard title="Conversation" note={teacherLabel}>
+      <SectionCard title={t("common.conversation")} note={teacherLabel}>
         {!ready ? (
           <LoadingNote />
         ) : (
@@ -275,10 +275,10 @@ export default function ParentMessagesPage() {
       </SectionCard>
 
       {showAbsence ? (
-        <SectionCard title="Report an absence" note={firstName}>
+        <SectionCard title={t("common.reportAbsence")} note={firstName}>
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-ink mb-1.5">Date</label>
+              <label className="block text-xs font-semibold text-ink mb-1.5">{t("common.date")}</label>
               <input
                 type="date"
                 value={absenceDate}
@@ -287,12 +287,13 @@ export default function ParentMessagesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-ink mb-1.5">Reason</label>
+              <label className="block text-xs font-semibold text-ink mb-1.5">{t("common.reason")}</label>
               <textarea
                 value={absenceReason}
                 onChange={(e) => setAbsenceReason(e.target.value)}
                 rows={2}
-                placeholder="e.g. Doctor's appointment"
+                placeholder={t("parent.messages.absenceReasonPlaceholder")}
+                dir="auto"
                 className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition resize-none"
               />
             </div>
@@ -303,14 +304,14 @@ export default function ParentMessagesPage() {
                 disabled={!absenceDate || !absenceReason.trim()}
                 className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50 hover:opacity-90 active:scale-[.98] transition-all"
               >
-                Notify teacher
+                {t("parent.messages.notifyTeacher")}
               </button>
               <button
                 type="button"
                 onClick={() => setShowAbsence(false)}
                 className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
             </div>
           </div>
@@ -321,7 +322,7 @@ export default function ParentMessagesPage() {
           onClick={() => setShowAbsence(true)}
           className="w-full flex items-center justify-center gap-2 border border-brand-gold/45 bg-brand-gold/12 text-[#6f5518] dark:text-brand-gold font-semibold py-3 rounded-2xl transition-all hover:bg-brand-gold/20 active:scale-[.98]"
         >
-          Report an absence
+          {t("common.reportAbsence")}
         </button>
       )}
 
@@ -340,14 +341,15 @@ export default function ParentMessagesPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter") send();
             }}
-            placeholder={`Message ${teacherLabel} about ${firstName}…`}
+            placeholder={`${t("common.messagePrefix")} ${teacherLabel} ${t("common.about").toLowerCase()} ${firstName}…`}
+            dir="auto"
             className="flex-1 min-w-0 bg-surface-bg border border-surface-border rounded-pill px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy transition"
           />
           <button
             onClick={send}
             disabled={!text.trim()}
             className="w-11 h-11 rounded-full gradient-emerald shadow-md flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
-            aria-label="Send"
+            aria-label={t("common.send")}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="22" y1="2" x2="11" y2="13" />

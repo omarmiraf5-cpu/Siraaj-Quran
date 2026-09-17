@@ -5,6 +5,7 @@ import {
   DEMO_STUDENTS,
   DEMO_TEACHER_NAME,
   demoMessagesFor,
+  formatDay,
   initials,
   type ThreadMessage,
 } from "@/data/demo";
@@ -235,9 +236,9 @@ export default function TeacherMessagesPage() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold text-ink truncate">{s.name}</p>
-                    <p className="text-[11px] text-ink-muted truncate">
+                    <p className="text-[11px] text-ink-muted truncate" dir="auto">
                       {isAbsence
-                        ? `${t("common.absence")} · ${last.absence_date}`
+                        ? `${t("common.absence")} · ${formatDay(last.absence_date!)}`
                         : last
                           ? last.body
                           : t("common.noMessagesYet")}
@@ -270,6 +271,7 @@ export default function TeacherMessagesPage() {
                     if (e.key === "Enter") send();
                   }}
                   placeholder={`${t("common.replyAbout")} ${student.name.split(" ")[0]}…`}
+                  dir="auto"
                   className="flex-1 min-w-0 bg-surface-bg border border-surface-border rounded-pill px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy transition"
                 />
                 <button

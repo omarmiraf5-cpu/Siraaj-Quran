@@ -9,13 +9,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ATTENDANCE_DOT,
-  ATTENDANCE_LABELS,
   DAILY_RATING_DOT,
-  DAILY_RATING_LABELS,
   DAILY_RATING_ORDER,
   DAILY_RATING_STYLES,
   MONTHS,
-  PORTION_LABELS,
   WEEKDAY_SHORT,
   formatDay,
   tallyRatings,
@@ -25,6 +22,16 @@ import {
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import type { DailyRating } from "@/hooks/useQuranicAssignments";
+import { useLanguage } from "@/components/LanguageProvider";
+
+// DAILY_RATING_LABELS keys are snake_case (very_good); translation keys are
+// camelCase (rating.veryGood) to match the rest of the dictionary.
+const RATING_KEY: Record<DailyRating, string> = {
+  excellent: "rating.excellent",
+  very_good: "rating.veryGood",
+  good: "rating.good",
+  weak: "rating.weak",
+};
 
 /* ── Modal ─────────────────────────────────────────────────────────────
    Escape and a backdrop click both close. The navy header matches the
@@ -43,6 +50,7 @@ export function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useLanguage();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -81,7 +89,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.close")}
             className="absolute top-4 end-4 z-20 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -213,18 +221,19 @@ export function AttendanceStrip({
       than a footnote and wants to be seen across a room. */
   size?: "sm" | "lg";
 }) {
+  const { t } = useLanguage();
   const recent = days.slice(0, limit).slice().reverse();
   const bar = size === "lg" ? "h-7 rounded-lg" : "h-1.5 rounded-full";
   return (
     <div
       className={`flex ${size === "lg" ? "gap-1.5" : "gap-1"}`}
       role="img"
-      aria-label={`Attendance for the last ${recent.length} days`}
+      aria-label={`${t("common.attendanceForLastDays")} ${recent.length} ${t("common.days")}`}
     >
       {recent.map((d) => (
         <span
           key={d.date}
-          title={`${formatDay(d.date)} · ${ATTENDANCE_LABELS[d.status]}`}
+          title={`${formatDay(d.date)} · ${t(`common.${d.status}`)}`}
           className={`flex-1 ${bar} ${ATTENDANCE_DOT[d.status]}`}
         />
       ))}
@@ -235,6 +244,7 @@ export function AttendanceStrip({
 /* ── Attendance legend ─────────────────────────────────────────────────
    Counts with their dot, hiding any status that did not occur. */
 export function AttendanceLegend({ counts }: { counts: AttendanceSummary }) {
+  const { t } = useLanguage();
   const order = ["present", "late", "absent", "excused"] as const;
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
@@ -244,7 +254,7 @@ export function AttendanceLegend({ counts }: { counts: AttendanceSummary }) {
           <span key={s} className="inline-flex items-center gap-1.5 text-[12px]">
             <span className={`w-1.5 h-1.5 rounded-full ${ATTENDANCE_DOT[s]}`} />
             <span className="tabular-nums font-semibold text-ink">{counts[s]}</span>
-            <span className="text-ink-muted">{s}</span>
+            <span className="text-ink-muted">{t(`common.${s}`)}</span>
           </span>
         ))}
     </div>
@@ -319,11 +329,12 @@ export function LoadingNote({ children = "Loading…" }: { children?: React.Reac
    recitation as, coloured so a parent reads it at a glance before any
    percentage. */
 export function RatingPill({ rating }: { rating: DailyRating }) {
+  const { t } = useLanguage();
   return (
     <span
       className={`text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${DAILY_RATING_STYLES[rating]}`}
     >
-      {DAILY_RATING_LABELS[rating]}
+      {t(RATING_KEY[rating])}
     </span>
   );
 }
@@ -332,6 +343,7 @@ export function RatingPill({ rating }: { rating: DailyRating }) {
    What was read, and how it went. Shared between the timeline and the
    selected-day detail below, since both show the same thing. */
 function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?: boolean }) {
+  const { t } = useLanguage();
   const surah = getSurahById(entry.surah);
   return (
     <div className="flex items-start justify-between gap-3 py-2.5">
@@ -339,7 +351,7 @@ function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?
         <p className="text-[12px] font-semibold text-ink">
           {showDate && `${formatDay(entry.date)} · `}
           <span className="underline decoration-2 underline-offset-2">
-            {PORTION_LABELS[entry.portion]}
+            {t(`portion.${entry.portion}`)}
           </span>
         </p>
         <p className="text-[11px] text-ink-muted truncate">
@@ -364,6 +376,7 @@ function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?
    calendar opens that day's complete record — every portion heard that
    day, not just whichever one happens to colour the dot. */
 export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }) {
+  const { t } = useLanguage();
   // The most recent session's month drives the calendar, so opening the
   // page lands on whichever month actually has sessions logged in it.
   const latest = entries[entries.length - 1];
@@ -409,7 +422,7 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
   };
 
   if (!hasAny) {
-    return <EmptyNote>No sessions have been graded yet.</EmptyNote>;
+    return <EmptyNote>{t("common.noSessionsGraded")}</EmptyNote>;
   }
 
   return (
@@ -418,7 +431,7 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
         <button
           type="button"
           onClick={() => shiftMonth(-1)}
-          aria-label="Previous month"
+          aria-label={t("common.previousMonth")}
           className="w-7 h-7 rounded-full flex items-center justify-center text-ink-muted hover:bg-surface-bg-warm hover:text-ink transition"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -429,7 +442,7 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
         <button
           type="button"
           onClick={() => shiftMonth(1)}
-          aria-label="Next month"
+          aria-label={t("common.nextMonth")}
           className="w-7 h-7 rounded-full flex items-center justify-center text-ink-muted hover:bg-surface-bg-warm hover:text-ink transition"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
@@ -453,7 +466,9 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
               aria-pressed={selected}
               aria-label={
                 dayEntries.length > 0
-                  ? `${formatDay(iso)} — ${dayEntries.length} session${dayEntries.length > 1 ? "s" : ""} graded`
+                  ? `${formatDay(iso)} — ${dayEntries.length} ${
+                      dayEntries.length > 1 ? t("common.sessionsGraded") : t("common.sessionGraded")
+                    }`
                   : formatDay(iso)
               }
               className={`flex flex-col items-center justify-center h-8 gap-0.5 rounded-lg transition-colors ${
@@ -488,11 +503,11 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
               onClick={() => setSelectedDate(null)}
               className="text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors"
             >
-              Close
+              {t("common.close")}
             </button>
           </div>
           {selectedEntries.length === 0 ? (
-            <EmptyNote>No session was graded this day.</EmptyNote>
+            <EmptyNote>{t("common.noSessionThisDay")}</EmptyNote>
           ) : (
             <ul className="divide-y divide-surface-border -my-1">
               {selectedEntries.map((e) => (
@@ -509,13 +524,13 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-4">
         {monthEntries.length === 0 ? (
-          <EmptyNote>No sessions logged this month.</EmptyNote>
+          <EmptyNote>{t("common.noSessionsThisMonth")}</EmptyNote>
         ) : (
           DAILY_RATING_ORDER.filter((r) => tally[r] > 0).map((r) => (
             <span key={r} className="inline-flex items-center gap-1.5 text-[12px]">
               <span className={`w-1.5 h-1.5 rounded-full ${DAILY_RATING_DOT[r]}`} />
               <span className="tabular-nums font-semibold text-ink">{tally[r]}</span>
-              <span className="text-ink-muted">{DAILY_RATING_LABELS[r]}</span>
+              <span className="text-ink-muted">{t(RATING_KEY[r])}</span>
             </span>
           ))
         )}
@@ -540,9 +555,10 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
    Was a blue Bootstrap alert on three pages. A gold-edged quote reads as
    someone speaking, which is what it is. */
 export function TeacherNote({ children }: { children: React.ReactNode }) {
+  const { t } = useLanguage();
   return (
     <div className="mt-3 ps-3 border-l-2 border-brand-gold/50">
-      <p className="eyebrow mb-1">Teacher&apos;s note</p>
+      <p className="eyebrow mb-1">{t("common.teachersNote")}</p>
       <p className="text-[13px] text-ink-body font-serif italic leading-snug">{children}</p>
     </div>
   );
