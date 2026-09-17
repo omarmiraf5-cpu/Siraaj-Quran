@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 
 interface School {
@@ -30,6 +30,12 @@ function formatDate(iso: string) {
 export default function PlatformPage() {
   const [schools, setSchools] = useState<School[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The school whose row has its confirm-delete UI open, what's been typed
+  // to confirm it, and whether the delete request for it is in flight.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/platform/schools")
@@ -40,6 +46,35 @@ export default function PlatformPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load schools"));
   }, []);
+
+  const startConfirm = (id: string) => {
+    setConfirmingId(id);
+    setConfirmText("");
+    setDeleteError(null);
+  };
+
+  const cancelConfirm = () => {
+    setConfirmingId(null);
+    setConfirmText("");
+    setDeleteError(null);
+  };
+
+  const deleteSchool = async (school: School) => {
+    setDeletingId(school.id);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/platform/schools/${school.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete school");
+      setSchools((prev) => (prev ?? []).filter((s) => s.id !== school.id));
+      setConfirmingId(null);
+      setConfirmText("");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete school");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const totalStudents = schools?.reduce((sum, s) => sum + s.studentCount, 0) ?? 0;
   const totalTeachers = schools?.reduce((sum, s) => sum + s.teacherCount, 0) ?? 0;
@@ -100,11 +135,13 @@ export default function PlatformPage() {
                     <th className="px-5 py-3 font-semibold">Admin Contact</th>
                     <th className="px-5 py-3 font-semibold">Signed Up</th>
                     <th className="px-5 py-3 font-semibold">Status</th>
+                    <th className="px-5 py-3 font-semibold" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-border">
                   {schools.map((s) => (
-                    <tr key={s.id} className="hover:bg-surface-bg-warm transition-colors">
+                    <Fragment key={s.id}>
+                    <tr className="hover:bg-surface-bg-warm transition-colors">
                       <td className="px-5 py-4">
                         <p className="font-semibold text-ink">{s.name}</p>
                         <p className="text-ink-muted text-xs">
@@ -144,7 +181,61 @@ export default function PlatformPage() {
                           {s.active ? "Active" : "Inactive"}
                         </span>
                       </td>
+                      <td className="px-5 py-4 text-right">
+                        {confirmingId !== s.id && (
+                          <button
+                            type="button"
+                            onClick={() => startConfirm(s.id)}
+                            className="text-[11px] font-semibold text-status-error-text hover:underline"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </td>
                     </tr>
+                    {confirmingId === s.id && (
+                      <tr>
+                        <td colSpan={8} className="px-5 py-4 bg-status-error-bg/40">
+                          <div className="space-y-2.5">
+                            <p className="text-[13px] text-ink">
+                              This permanently deletes <strong>{s.name}</strong> — every student, staff
+                              account, attendance record and message. Their login emails are freed up
+                              too. This can&apos;t be undone.
+                            </p>
+                            <p className="text-[12px] text-ink-muted">
+                              Type <strong>{s.name}</strong> to confirm:
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={confirmText}
+                                onChange={(e) => setConfirmText(e.target.value)}
+                                placeholder={s.name}
+                                className="flex-1 max-w-xs bg-surface-card border border-surface-border rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-status-error-text focus:ring-1 focus:ring-status-error-text/40 transition"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => deleteSchool(s)}
+                                disabled={confirmText !== s.name || deletingId === s.id}
+                                className="px-3.5 py-2 rounded-lg bg-status-error-text text-white text-[12px] font-semibold disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
+                              >
+                                {deletingId === s.id ? "Deleting…" : "Permanently delete"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelConfirm}
+                                className="text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                            {deleteError && (
+                              <p className="text-[12px] text-status-error-text font-semibold">{deleteError}</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
