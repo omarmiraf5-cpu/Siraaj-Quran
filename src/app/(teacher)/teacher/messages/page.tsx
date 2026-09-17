@@ -224,7 +224,7 @@ export default function TeacherMessagesPage() {
                   key={s.id}
                   type="button"
                   onClick={() => setSelected(s.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-3 text-left transition-colors ${
+                  className={`w-full flex items-center gap-3 px-3 py-3 text-start transition-colors ${
                     active ? "bg-surface-bg-warm" : "hover:bg-surface-bg-warm"
                   }`}
                 >

@@ -2,6 +2,7 @@
 
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
 
 function MoonIcon() {
   return (
@@ -35,6 +36,7 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ className = "", variant = "icon" }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme();
+  const { t } = useLanguage();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -50,10 +52,10 @@ export function ThemeToggle({ className = "", variant = "icon" }: ThemeTogglePro
       <button
         onClick={toggle}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${className}`}
-        aria-label="Toggle dark mode"
+        aria-label={t("common.darkMode")}
       >
         {isDark ? <SunIcon /> : <MoonIcon />}
-        {isDark ? "Light" : "Dark"}
+        {isDark ? t("common.light") : t("common.dark")}
       </button>
     );
   }
@@ -64,15 +66,18 @@ export function ThemeToggle({ className = "", variant = "icon" }: ThemeTogglePro
       <button
         onClick={toggle}
         className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all ${className}`}
-        aria-label="Toggle dark mode"
+        aria-label={t("common.darkMode")}
       >
         <span className="flex-shrink-0 opacity-80">
           {isDark ? <SunIcon /> : <MoonIcon />}
         </span>
-        <span className="flex-1 text-left text-sm font-medium">
-          {isDark ? "Light mode" : "Dark mode"}
+        <span className="flex-1 text-start text-sm font-medium">
+          {isDark ? t("common.lightMode") : t("common.darkMode")}
         </span>
-        {/* iOS-style pill switch */}
+        {/* iOS-style pill switch. The knob sits `start-0.5` off, and slides
+            to rest the same 0.5 gap from the opposite (`end`) edge when on
+            — logical rather than a hardcoded left/right pixel value, so it
+            slides toward the start side under RTL instead of always right. */}
         <span
           className={`relative flex-shrink-0 w-9 h-5 rounded-full transition-colors duration-300 ${
             isDark ? "bg-brand-gold" : "bg-white/20"
@@ -80,7 +85,7 @@ export function ThemeToggle({ className = "", variant = "icon" }: ThemeTogglePro
         >
           <span
             className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-300 ${
-              isDark ? "left-[18px]" : "left-0.5"
+              isDark ? "end-0.5" : "start-0.5"
             }`}
           />
         </span>
@@ -93,7 +98,7 @@ export function ThemeToggle({ className = "", variant = "icon" }: ThemeTogglePro
     <button
       onClick={toggle}
       className={`w-8 h-8 rounded-full flex items-center justify-center transition ${className}`}
-      aria-label="Toggle dark mode"
+      aria-label={t("common.darkMode")}
     >
       {isDark ? <SunIcon /> : <MoonIcon />}
     </button>

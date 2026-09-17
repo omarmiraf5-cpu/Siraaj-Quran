@@ -331,7 +331,7 @@ export default function TeacherAwardsPage() {
                         type="button"
                         onClick={() => awardBadge(b.key)}
                         disabled={has}
-                        className={`flex items-start gap-2.5 text-left px-3.5 py-3 rounded-2xl border transition-all ${
+                        className={`flex items-start gap-2.5 text-start px-3.5 py-3 rounded-2xl border transition-all ${
                           has
                             ? "border-surface-border bg-surface-bg-warm opacity-60 cursor-default"
                             : "border-surface-border bg-surface-card hover:border-emerald-600 active:scale-[.98]"

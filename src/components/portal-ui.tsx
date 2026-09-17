@@ -75,20 +75,20 @@ export function Modal({
           {/* z-20 is load-bearing. The title row below is `relative` and comes
               later in the DOM; two positioned siblings with no z-index paint
               in DOM order, so the row was painting over this button and
-              swallowing every click on it. Its `pr-8` only insets the
+              swallowing every click on it. Its `pe-8` only insets the
               content — the row's own box still runs the full width, straight
               across the X. */}
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-4 right-4 z-20 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition"
+            className="absolute top-4 end-4 z-20 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
-          <div className="relative flex items-center gap-3.5 pr-8">
+          <div className="relative flex items-center gap-3.5 pe-8">
             {badge && (
               <span className="w-12 h-12 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-[15px] font-bold text-white flex-shrink-0">
                 {badge}
@@ -160,7 +160,7 @@ export function StatTile({
     <button
       type="button"
       onClick={onClick}
-      className="card-quiet px-4 py-4 text-left cursor-pointer hover:bg-surface-bg-warm hover:-translate-y-0.5 transition-all active:scale-[.98]"
+      className="card-quiet px-4 py-4 text-start cursor-pointer hover:bg-surface-bg-warm hover:-translate-y-0.5 transition-all active:scale-[.98]"
     >
       {body}
     </button>
@@ -541,7 +541,7 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
    someone speaking, which is what it is. */
 export function TeacherNote({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-3 pl-3 border-l-2 border-brand-gold/50">
+    <div className="mt-3 ps-3 border-l-2 border-brand-gold/50">
       <p className="eyebrow mb-1">Teacher&apos;s note</p>
       <p className="text-[13px] text-ink-body font-serif italic leading-snug">{children}</p>
     </div>

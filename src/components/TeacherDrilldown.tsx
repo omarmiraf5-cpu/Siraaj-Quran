@@ -68,7 +68,7 @@ function Row({
       <button
         type="button"
         onClick={onClick}
-        className="w-full flex items-center gap-3 text-left rounded-xl px-2 py-2.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
+        className="w-full flex items-center gap-3 text-start rounded-xl px-2 py-2.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
       >
         {children}
       </button>
@@ -137,7 +137,7 @@ function AttendanceList({ onSelect }: { onSelect: (id: string) => void }) {
           <button
             type="button"
             onClick={() => onSelect(student.id)}
-            className="w-full text-left rounded-xl px-2 py-2 -mx-2 hover:bg-surface-bg-warm transition-colors"
+            className="w-full text-start rounded-xl px-2 py-2 -mx-2 hover:bg-surface-bg-warm transition-colors"
           >
             <div className="flex items-center gap-3">
               <Avatar name={student.name} />
@@ -197,7 +197,7 @@ function AssignmentList({
             <button
               type="button"
               onClick={() => onSelect(a.student_id)}
-              className="w-full text-left rounded-xl px-2 py-2 -mx-2 hover:bg-surface-bg-warm transition-colors"
+              className="w-full text-start rounded-xl px-2 py-2 -mx-2 hover:bg-surface-bg-warm transition-colors"
             >
               <div className="flex items-start gap-3">
                 <Avatar name={name} />
@@ -235,11 +235,11 @@ function AssignmentList({
                 </span>
               </div>
 
-              <div className="flex items-center gap-2.5 mt-2 pl-11">
+              <div className="flex items-center gap-2.5 mt-2 ps-11">
                 <div className="flex-1">
                   <ProgressBar value={a.memorization_level} />
                 </div>
-                <span className="text-[11px] font-semibold text-ink-muted tabular-nums w-8 text-right">
+                <span className="text-[11px] font-semibold text-ink-muted tabular-nums w-8 text-end">
                   {a.memorization_level}%
                 </span>
               </div>

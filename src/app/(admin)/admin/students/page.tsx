@@ -320,7 +320,7 @@ export default function AdminStudentsPage() {
                     type="button"
                     onClick={() => startEditing(s)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-left hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
                   >
                     <span
                       className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${

@@ -127,7 +127,7 @@ export default function PlatformPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-surface-border text-left text-xs text-ink-muted uppercase tracking-wide">
+                  <tr className="border-b border-surface-border text-start text-xs text-ink-muted uppercase tracking-wide">
                     <th className="px-5 py-3 font-semibold">School</th>
                     <th className="px-5 py-3 font-semibold">Plan</th>
                     <th className="px-5 py-3 font-semibold">Students</th>
@@ -181,7 +181,7 @@ export default function PlatformPage() {
                           {s.active ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 text-end">
                         {confirmingId !== s.id && (
                           <button
                             type="button"

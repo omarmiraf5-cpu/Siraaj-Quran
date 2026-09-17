@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // Reached two ways: forced right after signing in with a temporary password
 // (teacher/parent accounts created by an admin or by /api/onboard carry
@@ -14,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function ChangePasswordPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { t } = useLanguage();
 
   const [ready, setReady] = useState(false);
   const [required, setRequired] = useState(false);
@@ -40,11 +42,11 @@ export default function ChangePasswordPage() {
     setError(null);
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("changePassword.tooShort"));
       return;
     }
     if (password !== confirm) {
-      setError("Passwords don't match.");
+      setError(t("changePassword.mismatch"));
       return;
     }
 
@@ -66,7 +68,7 @@ export default function ChangePasswordPage() {
   if (!ready) {
     return (
       <div className="min-h-screen bg-surface-bg flex items-center justify-center">
-        <p className="text-ink-muted text-sm">Loading…</p>
+        <p className="text-ink-muted text-sm">{t("common.loading")}</p>
       </div>
     );
   }
@@ -76,34 +78,38 @@ export default function ChangePasswordPage() {
       <div className="card-quiet w-full max-w-sm p-8 space-y-5">
         <div>
           <h1 className="text-xl font-bold text-ink">
-            {required ? "Set your password" : "Change your password"}
+            {required ? t("changePassword.titleRequired") : t("changePassword.titleVoluntary")}
           </h1>
           <p className="text-ink-muted text-sm mt-1.5">
             {required
-              ? "You're signing in with a temporary password. Choose your own before continuing."
-              : "Choose a new password for your account."}
+              ? t("changePassword.subtitleRequired")
+              : t("changePassword.subtitleVoluntary")}
           </p>
         </div>
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-ink mb-1.5">New password</label>
+            <label className="block text-sm font-semibold text-ink mb-1.5">
+              {t("changePassword.newPassword")}
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
+              placeholder={t("changePassword.newPasswordPlaceholder")}
               autoFocus
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-ink mb-1.5">Confirm password</label>
+            <label className="block text-sm font-semibold text-ink mb-1.5">
+              {t("changePassword.confirmPassword")}
+            </label>
             <input
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Type it again"
+              placeholder={t("changePassword.confirmPlaceholder")}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
@@ -115,7 +121,7 @@ export default function ChangePasswordPage() {
             disabled={saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-50 hover:opacity-90 active:scale-[.98] transition-all"
           >
-            {saving ? "Saving…" : "Set password"}
+            {saving ? t("changePassword.saving") : t("changePassword.submit")}
           </button>
 
           {!required && (
@@ -123,7 +129,7 @@ export default function ChangePasswordPage() {
               href={`/${role}`}
               className="block text-center text-sm font-semibold text-ink-muted hover:text-ink transition-colors"
             >
-              Cancel
+              {t("common.cancel")}
             </Link>
           )}
         </form>

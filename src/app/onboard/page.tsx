@@ -193,7 +193,7 @@ export default function OnboardPage() {
               You&apos;ll add your school&apos;s name, create your admin login, then add your teachers, students, and halaqas.
               Have your roster ready — this takes about 5 minutes.
             </p>
-            <div className="bg-status-info-bg rounded-2xl p-4 text-left">
+            <div className="bg-status-info-bg rounded-2xl p-4 text-start">
               <p className="text-sm text-status-info-text">
                 💡 Each student gets a 4-digit PIN generated automatically — you&apos;ll get a printable list at the end to hand out.
               </p>
@@ -467,7 +467,7 @@ export default function OnboardPage() {
               <p className="text-ink-muted text-sm">
                 Sign in at <span className="font-semibold text-ink">/login</span> with <span className="font-semibold text-ink">{result.adminEmail}</span> and the password you chose.
               </p>
-              <div className="bg-status-info-bg rounded-2xl p-4 text-left space-y-1.5">
+              <div className="bg-status-info-bg rounded-2xl p-4 text-start space-y-1.5">
                 <p className="text-sm font-semibold text-status-info-text">Your students&apos; login link</p>
                 <p className="font-mono text-[12px] text-status-info-text break-all">
                   {origin}/login?school={result.slug}

@@ -306,7 +306,7 @@ export default function AdminPaymentsPage() {
                       setPayAmount("");
                     }}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-left hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
                   >
                     <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
                       {initials(studentName(f.studentId))}
@@ -317,7 +317,7 @@ export default function AdminPaymentsPage() {
                         {f.description} · due {f.dueDate}
                       </p>
                     </div>
-                    <div className="text-right flex-shrink-0">
+                    <div className="text-end flex-shrink-0">
                       <p className="text-[13px] font-semibold text-ink">
                         {money(f.amountPaid)} <span className="text-ink-muted font-normal">/ {money(f.amountDue)}</span>
                       </p>

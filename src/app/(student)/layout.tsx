@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChatWidget } from "@/components/ChatWidget";
 import { ILLUM_CLASS } from "@/components/student-ui";
+import { useLanguage } from "@/components/LanguageProvider";
 import {
   IconHome,
   IconBook,
@@ -22,11 +23,11 @@ import {
 // the bottom of a phone, and the row is already at the width where a thumb
 // starts missing.
 const TABS = [
-  { href: "/student", label: "Home", Icon: IconHome, colour: "saffron" },
-  { href: "/student/quran", label: "Quran", Icon: IconBook, colour: "lapis" },
-  { href: "/student/assignments", label: "Work", Icon: IconPen, colour: "verdigris" },
-  { href: "/student/learn", label: "Learn", Icon: IconPalette, colour: "aubergine" },
-  { href: "/student/attendance", label: "Register", Icon: IconCalendar, colour: "turquoise" },
+  { href: "/student", labelKey: "nav.home", Icon: IconHome, colour: "saffron" },
+  { href: "/student/quran", labelKey: "nav.quran", Icon: IconBook, colour: "lapis" },
+  { href: "/student/assignments", labelKey: "nav.work", Icon: IconPen, colour: "verdigris" },
+  { href: "/student/learn", labelKey: "nav.learn", Icon: IconPalette, colour: "aubergine" },
+  { href: "/student/attendance", labelKey: "nav.register", Icon: IconCalendar, colour: "turquoise" },
 ] as const;
 
 // The Learn tab stays lit while you are inside any of the books it holds.
@@ -34,11 +35,12 @@ const LEARN_PATHS = ["/student/learn", "/student/qaidah", "/student/tajweed", "/
 
 function StudentTabBar() {
   const pathname = usePathname();
+  const { t } = useLanguage();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-card/90 backdrop-blur-xl border-t border-surface-border safe-area-bottom">
+    <nav className="fixed bottom-0 start-0 end-0 z-50 bg-surface-card/90 backdrop-blur-xl border-t border-surface-border safe-area-bottom">
       <div className="max-w-3xl mx-auto flex px-2 py-1.5">
-        {TABS.map(({ href, label, Icon, colour }) => {
+        {TABS.map(({ href, labelKey, Icon, colour }) => {
           const active =
             href === "/student/learn"
               ? LEARN_PATHS.some((p) => pathname.startsWith(p))
@@ -64,7 +66,7 @@ function StudentTabBar() {
                   active ? "text-ink" : "text-ink-muted"
                 }`}
               >
-                {label}
+                {t(labelKey)}
               </span>
             </Link>
           );

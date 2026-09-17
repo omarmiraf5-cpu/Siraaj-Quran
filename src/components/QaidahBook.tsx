@@ -30,7 +30,7 @@ export function QaidahBook() {
               type="button"
               onClick={() => setOpenLesson(isOpen ? null : lesson.id)}
               aria-expanded={isOpen}
-              className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-surface-bg-warm transition-colors"
+              className="w-full flex items-center gap-3.5 p-4 text-start hover:bg-surface-bg-warm transition-colors"
             >
               <span
                 className={`${GRAD_CLASS[colour]} w-11 h-11 rounded-2xl flex items-center justify-center text-white font-bold text-[15px] flex-shrink-0 shadow-sm`}

@@ -5,15 +5,17 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useLanguage } from "@/components/LanguageProvider";
 import { DEMO_ACCOUNTS } from "@/lib/demo";
 import type { Role } from "@/lib/types";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 
-const ROLES: { key: Role; label: string; portal: string }[] = [
-  { key: "parent",  label: "Parent",  portal: "Parent Portal"  },
-  { key: "teacher", label: "Teacher", portal: "Teacher Portal" },
-  { key: "student", label: "Student", portal: "Student Portal" },
-  { key: "admin",   label: "Admin",   portal: "Admin Portal"   },
+const ROLES: { key: Role; labelKey: string; portalKey: string }[] = [
+  { key: "parent",  labelKey: "role.parent",  portalKey: "login.portal.parent"  },
+  { key: "teacher", labelKey: "role.teacher", portalKey: "login.portal.teacher" },
+  { key: "student", labelKey: "role.student", portalKey: "login.portal.student" },
+  { key: "admin",   labelKey: "role.admin",   portalKey: "login.portal.admin"   },
 ];
 
 const DAILY_REFLECTIONS = [
@@ -72,6 +74,7 @@ interface RosterStudent {
 export default function LoginPage() {
   const router   = useRouter();
   const supabase = createClient();
+  const { t }    = useLanguage();
 
   const [role,            setRole]            = useState<Role>("parent");
   const [email,           setEmail]           = useState("");
@@ -121,7 +124,7 @@ export default function LoginPage() {
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setError("Invalid email or password."); setLoading(false); return; }
+    if (error) { setError(t("login.invalidCredentials")); setLoading(false); return; }
     if (data.user?.user_metadata?.must_change_password) {
       router.push("/change-password");
       return;
@@ -153,7 +156,7 @@ export default function LoginPage() {
         .then(({ error }) => {
           setLoading(false);
           if (error) {
-            setError("That PIN didn't work. Try again.");
+            setError(t("login.pinDidntWork"));
             setPin("");
             return;
           }
@@ -165,11 +168,11 @@ export default function LoginPage() {
     if (pin === DEMO_ACCOUNTS.student.pin) {
       localStorage.setItem("demo_user", JSON.stringify(DEMO_ACCOUNTS.student));
       document.cookie = "demo_mode=true; path=/; max-age=86400; SameSite=Lax";
-      const t = setTimeout(() => router.push("/student"), 300);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => router.push("/student"), 300);
+      return () => clearTimeout(timer);
     }
 
-    setError("Wrong PIN. Try 1234.");
+    setError(t("login.wrongPin"));
     setPin("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin, roster, studentId]);
@@ -180,15 +183,18 @@ export default function LoginPage() {
       <div className="absolute inset-0 pattern-lattice pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/25 pointer-events-none" />
 
-      {/* Dark mode toggle — top-right corner */}
-      <div className="fixed top-3 right-3 z-50">
+      {/* Dark mode + language toggles — top corner (end side, so it swaps
+          with the reading direction rather than colliding with the role
+          switcher's mirrored position under Arabic) */}
+      <div className="fixed top-3 end-3 z-50 flex items-center gap-1.5">
+        <LanguageToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
         <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
       </div>
 
       <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center md:items-stretch gap-4 md:gap-0 px-6 py-10 md:py-14">
 
       {/* ── LEFT PANEL — hidden on mobile ── */}
-      <div className="hidden md:flex flex-col items-center justify-center md:w-1/2 px-4 md:pr-10 py-6">
+      <div className="hidden md:flex flex-col items-center justify-center md:w-1/2 px-4 md:pe-10 py-6">
 
         {/* Logo */}
         <div className="w-32 h-32 rounded-2xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark mb-4 flex-shrink-0">
@@ -204,7 +210,7 @@ export default function LoginPage() {
           ديواني
         </p>
         <p className="font-serif text-white/70 text-[13px] tracking-wide mt-3 text-center">
-          Knowledge without borders · education for every community
+          {t("login.tagline")}
         </p>
 
         {/* Divider */}
@@ -220,7 +226,7 @@ export default function LoginPage() {
             ﴿اقْرَأْ وَرَبُّكَ الْأَكْرَمُ ۝ الَّذِي عَلَّمَ بِالْقَلَمِ ۝ عَلَّمَ الْإِنْسَانَ مَا لَمْ يَعْلَمْ﴾
           </p>
           <p className="text-white/45 text-xs font-arabic" dir="rtl" lang="ar">[العلق: ٣–٥]</p>
-          <p className="font-serif text-white/80 text-[15px] leading-relaxed pt-1">
+          <p className="font-serif text-white/80 text-[15px] leading-relaxed pt-1" dir="ltr">
             &ldquo;Read, and your Lord is the Most Generous — Who taught by the pen —
             taught man what he knew not.&rdquo;
           </p>
@@ -232,7 +238,7 @@ export default function LoginPage() {
             قَالَ أَبُو حَيَّانَ الأَنْدَلُسِيُّ فِي البَحْرِ المُحِيطِ:
             «وَلَيْسَ وَرَاءَ التَّكَرُّمِ بِإِفَادَةِ الْفَوَائِدِ الْعِلْمِيَّةِ تَكَرُّمٌ، حَيْثُ قَالَ: ﴿الأَكْرَمُ الَّذِي عَلَّمَ بِالْقَلَمِ عَلَّمَ الإِنْسَانَ مَا لَمْ يَعْلَمْ﴾، فَدَلَّ عَلَى كَمَالِ كَرَمِهِ بِأَنَّ عَلَّمَ عِبَادَهُ مَا لَمْ يَعْلَمُوا، وَنَقَلَهُمْ مِنْ ظُلْمَةِ الْجَهْلِ إِلَى نُورِ الْعِلْمِ»
           </p>
-          <p className="font-serif text-white/70 text-[13px] leading-relaxed border-t border-white/15 pt-2.5">
+          <p className="font-serif text-white/70 text-[13px] leading-relaxed border-t border-white/15 pt-2.5" dir="ltr">
             &ldquo;There is no generosity beyond the generosity of imparting knowledge — for He said:
             ﹛the Most Generous, Who taught by the pen, taught man what he knew not﹜ —
             indicating the perfection of His generosity in teaching His servants what they knew not,
@@ -246,7 +252,7 @@ export default function LoginPage() {
       <div className="hidden md:block w-px bg-gradient-to-b from-transparent via-brand-gold/25 to-transparent mx-2" />
 
       {/* ── RIGHT PANEL — Login Form ── */}
-      <div className="flex flex-col items-center justify-center w-full md:w-1/2 px-2 md:pl-10 py-4">
+      <div className="flex flex-col items-center justify-center w-full md:w-1/2 px-2 md:ps-10 py-4">
 
         {/* Mobile-only compact header */}
         <div className="flex md:hidden flex-col items-center mb-6">
@@ -266,7 +272,7 @@ export default function LoginPage() {
           return (
             <div className="w-full max-w-sm mb-6 text-center space-y-2">
               <p className="font-display text-emerald-400 text-sm uppercase tracking-[0.2em] font-bold">
-                Daily Reflection
+                {t("login.dailyReflection")}
               </p>
               <p
                 className="font-calligraphy text-[30px] text-brand-gold-light leading-[2.1]"
@@ -274,10 +280,10 @@ export default function LoginPage() {
               >
                 {r.arabic}
               </p>
-              <p className="font-serif text-white/85 text-[15px] leading-relaxed">
+              <p className="font-serif text-white/85 text-[15px] leading-relaxed" dir="ltr">
                 &ldquo;{r.english}&rdquo;
               </p>
-              <p className="text-white/50 text-xs tracking-wide">— {r.source}</p>
+              <p className="text-white/50 text-xs tracking-wide" dir="ltr">— {r.source}</p>
             </div>
           );
         })()}
@@ -294,7 +300,7 @@ export default function LoginPage() {
                   : "text-white/70 hover:text-white"
               }`}
             >
-              {r.label}
+              {t(r.labelKey)}
             </button>
           ))}
         </div>
@@ -304,7 +310,7 @@ export default function LoginPage() {
             <div className="space-y-5">
               {schoolName && (
                 <p className="text-center text-white/70 text-sm">
-                  {schoolName} — tap your name, then your PIN
+                  {schoolName} — {t("login.tapNameThenPin")}
                 </p>
               )}
 
@@ -391,23 +397,23 @@ export default function LoginPage() {
           ) : (
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-gold-light/85">
+                <span className="absolute start-4 top-1/2 -translate-y-1/2 text-brand-gold-light/85">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                 </span>
                 <input
-                  type="email" required placeholder="Email address"
+                  type="email" required placeholder={t("login.emailAddress")}
                   value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card pl-11 pr-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
+                  className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
                 />
               </div>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-gold-light/85">
+                <span className="absolute start-4 top-1/2 -translate-y-1/2 text-brand-gold-light/85">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </span>
                 <input
                   type="password" required placeholder="••••••••"
                   value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card pl-11 pr-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
+                  className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
                 />
               </div>
 
@@ -421,15 +427,15 @@ export default function LoginPage() {
                 type="submit" disabled={loading}
                 className="relative w-full overflow-hidden gradient-emerald text-white font-semibold py-3.5 rounded-card shadow-dark hover:opacity-95 hover:shadow-lg active:scale-[.98] transition-all disabled:opacity-60"
               >
-                {loading ? "Signing in…" : `Sign in to ${ROLES.find((r) => r.key === role)?.portal}`}
+                {loading ? t("login.signingIn") : `${t("login.signInTo")} ${t(ROLES.find((r) => r.key === role)?.portalKey ?? "")}`}
               </button>
 
               <p className="text-center text-white/55 text-sm">
-                <a href="#" className="hover:text-brand-gold-light transition">Forgot password?</a>
+                <a href="#" className="hover:text-brand-gold-light transition">{t("login.forgotPassword")}</a>
               </p>
 
               <div className="mt-4 bg-white/5 border border-white/10 rounded-card px-4 py-3">
-                <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-2">Demo — tap to auto-fill</p>
+                <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-2">{t("login.demoAutofill")}</p>
                 <div className="space-y-1.5 text-xs">
                   {(["teacher", "parent", "admin"] as const).map((key) => {
                     const acct = DEMO_ACCOUNTS[key];
@@ -438,9 +444,9 @@ export default function LoginPage() {
                         key={key}
                         type="button"
                         onClick={() => { setEmail(acct.email); setPassword(acct.password); setRole(acct.role); setError(null); }}
-                        className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition text-white/50 hover:text-white/80"
+                        className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition text-white/50 hover:text-white/80"
                       >
-                        <span className="text-white/70 capitalize">{key}:</span> {acct.email} / {acct.password}
+                        <span className="text-white/70">{t(`role.${key}`)}:</span> {acct.email} / {acct.password}
                       </button>
                     );
                   })}

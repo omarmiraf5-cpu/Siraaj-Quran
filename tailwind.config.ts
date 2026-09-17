@@ -60,7 +60,12 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-jakarta)", "system-ui", "sans-serif"],
+        // Jakarta has no Arabic glyphs, so Arabic UI text (nav labels, form
+        // fields, buttons under the ar language setting) falls through to
+        // Noto Sans Arabic automatically — a UI-weight face, not the
+        // literary/Quranic ones below, which stay reserved for verses and
+        // display quotes.
+        sans: ["var(--font-jakarta)", "var(--font-noto-arabic)", "system-ui", "sans-serif"],
         serif: ["var(--font-newsreader)", "Georgia", "serif"],
         display: ["var(--font-newsreader)", "Georgia", "serif"],
         arabic: ["var(--font-amiri)", "serif"],

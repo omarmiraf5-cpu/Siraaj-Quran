@@ -64,7 +64,7 @@ export function ChatWidget({ role }: { role: Role }) {
       {/* Floating toggle button */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-28 right-4 md:right-6 z-50 w-14 h-14 rounded-full gradient-navy shadow-dark flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all ring-2 ring-brand-gold/40"
+        className="fixed bottom-28 end-4 md:end-6 z-50 w-14 h-14 rounded-full gradient-navy shadow-dark flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all ring-2 ring-brand-gold/40"
         aria-label={open ? "Close assistant" : "Open assistant"}
       >
         {open ? (
@@ -76,7 +76,7 @@ export function ChatWidget({ role }: { role: Role }) {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-44 md:bottom-28 right-4 md:right-6 z-50 w-[calc(100vw-2rem)] max-w-sm h-[28rem] max-h-[70vh] bg-surface-card border border-surface-border rounded-card-lg shadow-dark flex flex-col overflow-hidden">
+        <div className="fixed bottom-44 md:bottom-28 end-4 md:end-6 z-50 w-[calc(100vw-2rem)] max-w-sm h-[28rem] max-h-[70vh] bg-surface-card border border-surface-border rounded-card-lg shadow-dark flex flex-col overflow-hidden">
           {/* Header */}
           <div className="gradient-navy px-4 py-3 flex items-center gap-2.5 flex-shrink-0">
             <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-brand-gold flex-shrink-0">

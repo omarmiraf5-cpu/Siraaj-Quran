@@ -13,7 +13,7 @@ export function BottomTabBar({ items }: { items: TabItem[] }) {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface-card border-t border-surface-border flex z-50">
+    <nav className="md:hidden fixed bottom-0 start-0 end-0 bg-surface-card border-t border-surface-border flex z-50">
       {items.map((item) => {
         const active = pathname === item.href;
         return (

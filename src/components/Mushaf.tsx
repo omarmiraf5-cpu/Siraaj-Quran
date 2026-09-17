@@ -171,7 +171,7 @@ function ReciterPicker({
             <button
               key={r.id}
               onClick={() => onSelect(r)}
-              className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-[#2c1f0e] dark:text-[#e8dcc8] hover:bg-[#c4a95a]/20 dark:hover:bg-[#c4a95a]/10 transition active:scale-[.98]"
+              className="w-full text-start px-3 py-2.5 rounded-lg text-sm font-semibold text-[#2c1f0e] dark:text-[#e8dcc8] hover:bg-[#c4a95a]/20 dark:hover:bg-[#c4a95a]/10 transition active:scale-[.98]"
             >
               {r.name}
             </button>
@@ -753,7 +753,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           ))}
         </select>
 
-        <span className="text-[10px] font-semibold text-ink-muted ml-1">Repeat</span>
+        <span className="text-[10px] font-semibold text-ink-muted me-1">Repeat</span>
         <div className="flex items-center gap-0.5">
           {REPEAT_OPTIONS.map((n) => (
             <button

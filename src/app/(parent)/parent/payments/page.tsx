@@ -104,7 +104,7 @@ export default function ParentPaymentsPage() {
                       {childName(f.studentId)} · due {f.dueDate}
                     </p>
                   </div>
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-end flex-shrink-0">
                     <p className="text-[13px] font-semibold text-ink">
                       {money(f.amountPaid)} <span className="text-ink-muted font-normal">/ {money(f.amountDue)}</span>
                     </p>

@@ -5,18 +5,25 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useLanguage } from "@/components/LanguageProvider";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 
 interface NavItem {
   href: string;
-  label: string;
+  /** Key into the translation dictionary, e.g. "nav.dashboard" — not literal text. */
+  labelKey: string;
   icon: React.ReactNode;
 }
 
 interface SidebarNavProps {
   items: NavItem[];
-  role: string;
+  /** Key into the translation dictionary, e.g. "role.teacher". */
+  roleKey: string;
+  /** Overrides the name shown under the role — falls back to the
+      translated role itself (every caller used to pass its own role
+      string here again, which just duplicated `role` in English). */
   userName?: string;
   portalLinks?: NavItem[];
 }
@@ -67,13 +74,15 @@ function Crest({ branding, size, className }: { branding: SchoolBranding; size: 
   );
 }
 
-export function SidebarNav({ items, role, userName = "User", portalLinks }: SidebarNavProps) {
+export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNavProps) {
   const pathname = usePathname();
   const router   = useRouter();
   const supabase = createClient();
   const demoUser = useDemoUser();
   const branding = useSchoolBranding();
-  const displayName = demoUser?.name ?? userName;
+  const { t } = useLanguage();
+  const role = t(roleKey);
+  const displayName = demoUser?.name ?? userName ?? role;
   const [moreOpen, setMoreOpen] = useState(false);
 
   const showOverflow = items.length > MAX_PRIMARY_TABS + 1;
@@ -91,7 +100,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
   return (
     <>
       {/* ── MOBILE TOP BAR ── */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 gradient-navy flex items-center justify-between px-4 h-14 shadow-dark">
+      <header className="md:hidden fixed top-0 start-0 end-0 z-50 gradient-navy flex items-center justify-between px-4 h-14 shadow-dark">
         <div className="flex items-center gap-2.5 min-w-0">
           <Crest
             branding={branding}
@@ -102,11 +111,12 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
           <span className="text-white/30 text-xs font-medium flex-shrink-0">· {role}</span>
         </div>
         <div className="flex items-center gap-1.5">
+          <LanguageToggle variant="icon" className="bg-white/10 text-white/70 hover:bg-white/20" />
           <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
           <button
             onClick={handleSignOut}
             className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 transition"
-            aria-label="Sign out"
+            aria-label={t("common.signOut")}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -118,7 +128,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
       </header>
 
       {/* ── MOBILE BOTTOM TAB BAR ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-brand-navy border-t border-white/10 flex safe-area-bottom">
+      <nav className="md:hidden fixed bottom-0 start-0 end-0 z-50 bg-brand-navy border-t border-white/10 flex safe-area-bottom">
         {primaryItems.map((item) => {
           const active = pathname === item.href;
           return (
@@ -130,7 +140,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
               }`}
             >
               <span className={active ? "text-brand-gold" : ""}>{item.icon}</span>
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           );
         })}
@@ -163,7 +173,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
             onClick={() => setMoreOpen(false)}
             aria-hidden="true"
           />
-          <div className="md:hidden fixed bottom-14 left-0 right-0 z-50 bg-brand-navy border-t border-white/10 rounded-t-2xl shadow-dark p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+          <div className="md:hidden fixed bottom-14 start-0 end-0 z-50 bg-brand-navy border-t border-white/10 rounded-t-2xl shadow-dark p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
             {moreItems.map((item) => {
               const active = pathname === item.href;
               return (
@@ -176,7 +186,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
                   }`}
                 >
                   <span className="flex-shrink-0 opacity-80">{item.icon}</span>
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               );
             })}
@@ -212,9 +222,13 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
           <p className="text-sm font-semibold text-white/90 truncate">{displayName}</p>
         </div>
 
-        {/* Dark mode toggle — top of nav */}
-        <div className="border-t border-white/10 pt-3 pb-1">
+        {/* Dark mode + language toggles — top of nav */}
+        <div className="border-t border-white/10 pt-3 pb-1 space-y-0.5">
           <ThemeToggle
+            variant="labeled"
+            className="text-white/60 hover:text-white hover:bg-white/8"
+          />
+          <LanguageToggle
             variant="labeled"
             className="text-white/60 hover:text-white hover:bg-white/8"
           />
@@ -235,7 +249,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
                 }`}
               >
                 <span className="flex-shrink-0 opacity-80">{item.icon}</span>
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             );
           })}
@@ -251,12 +265,12 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
             <polyline points="16 17 21 12 16 7"/>
             <line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
-          Sign out
+          {t("common.signOut")}
         </button>
 
         {portalLinks && portalLinks.length > 0 && (
           <div className="flex-1 border-t border-white/10 pt-3 mt-2">
-            <p className="text-xs text-white/30 uppercase tracking-wider px-3 mb-1.5">Switch portal</p>
+            <p className="text-xs text-white/30 uppercase tracking-wider px-3 mb-1.5">{t("common.switchPortal")}</p>
             {portalLinks.map((item) => (
               <Link
                 key={item.href}
@@ -264,7 +278,7 @@ export function SidebarNav({ items, role, userName = "User", portalLinks }: Side
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/8 transition-all"
               >
                 <span className="flex-shrink-0 opacity-70">{item.icon}</span>
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             ))}
           </div>

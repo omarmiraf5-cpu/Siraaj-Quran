@@ -691,7 +691,7 @@ export default function QuranAssignmentsPage() {
                   type="button"
                   onClick={() => startEditing(a)}
                   aria-expanded={isOpen}
-                  className="w-full flex items-center gap-3 py-3 text-left hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                  className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
                 >
                   <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
                     {initials(name)}
@@ -716,7 +716,7 @@ export default function QuranAssignmentsPage() {
                   ) : (
                     <div className="w-16 flex-shrink-0 hidden sm:block">
                       <ProgressBar value={a.memorization_level} />
-                      <p className="text-[10px] text-ink-muted text-right mt-1 tabular-nums">
+                      <p className="text-[10px] text-ink-muted text-end mt-1 tabular-nums">
                         {a.memorization_level}%
                       </p>
                     </div>

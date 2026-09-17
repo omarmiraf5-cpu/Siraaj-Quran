@@ -177,7 +177,7 @@ export default function ParentQuranProgressPage() {
                     type="button"
                     onClick={() => setExpanded(isOpen ? null : a.id)}
                     aria-expanded={isOpen}
-                    className="w-full text-left rounded-xl px-2 py-3 -mx-2 hover:bg-surface-bg-warm transition-colors"
+                    className="w-full text-start rounded-xl px-2 py-3 -mx-2 hover:bg-surface-bg-warm transition-colors"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -255,7 +255,7 @@ export default function ParentQuranProgressPage() {
                       <div className="flex-1">
                         <ProgressBar value={a.memorization_level} />
                       </div>
-                      <span className="text-[11px] font-semibold text-ink-muted tabular-nums w-8 text-right">
+                      <span className="text-[11px] font-semibold text-ink-muted tabular-nums w-8 text-end">
                         {a.memorization_level}%
                       </span>
                     </div>

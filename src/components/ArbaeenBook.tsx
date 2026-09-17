@@ -94,7 +94,7 @@ function HadithCard({
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-surface-bg-warm transition-colors"
+        className="w-full flex items-center gap-3.5 p-4 text-start hover:bg-surface-bg-warm transition-colors"
       >
         <span
           className={`${GRAD_CLASS[colour]} w-11 h-11 rounded-2xl flex items-center justify-center text-white font-bold text-[15px] flex-shrink-0 shadow-sm`}
@@ -153,13 +153,19 @@ function HadithCard({
 
           <div className="gold-rule my-4" />
 
-          <p className="text-[12px] text-ink-muted leading-relaxed">{hadith.isnadEn}</p>
-          <p className="font-serif text-[15px] text-ink-body leading-relaxed mt-1.5">
-            {hadith.english}
-          </p>
-          <p className="text-[12px] text-ink-muted leading-relaxed mt-2">
-            {hadith.attributionEn}
-          </p>
+          {/* Explicit ltr: the app's own language setting can be Arabic
+              (dir="rtl" on <html>), but this translation is always English
+              regardless — without this it inherits rtl and the bidi
+              algorithm reorders its punctuation to the wrong ends. */}
+          <div dir="ltr">
+            <p className="text-[12px] text-ink-muted leading-relaxed">{hadith.isnadEn}</p>
+            <p className="font-serif text-[15px] text-ink-body leading-relaxed mt-1.5">
+              {hadith.english}
+            </p>
+            <p className="text-[12px] text-ink-muted leading-relaxed mt-2">
+              {hadith.attributionEn}
+            </p>
+          </div>
         </div>
       )}
     </article>

@@ -254,7 +254,7 @@ export default function TeacherDashboard() {
                     <button
                       type="button"
                       onClick={() => setSelectedStudentId(student.id)}
-                      className="w-full flex items-center gap-3 text-left rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
+                      className="w-full flex items-center gap-3 text-start rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
                     >
                       <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
                         {initials(student.name)}
@@ -350,7 +350,7 @@ export default function TeacherDashboard() {
                       <button
                         type="button"
                         onClick={() => student && setSelectedStudentId(student.id)}
-                        className="w-full flex gap-3 text-left rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
+                        className="w-full flex gap-3 text-start rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
                       >
                         {content}
                       </button>

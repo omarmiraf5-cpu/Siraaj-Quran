@@ -212,7 +212,7 @@ export default function ParentDashboard() {
                       <div className="flex-1">
                         <ProgressBar value={a.memorization_level} />
                       </div>
-                      <span className="text-[11px] font-semibold text-ink-muted tabular-nums w-8 text-right">
+                      <span className="text-[11px] font-semibold text-ink-muted tabular-nums w-8 text-end">
                         {a.memorization_level}%
                       </span>
                     </div>

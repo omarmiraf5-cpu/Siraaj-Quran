@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Newsreader, Amiri, Aref_Ruqaa } from "next/font/google";
+import { Plus_Jakarta_Sans, Newsreader, Amiri, Aref_Ruqaa, Noto_Sans_Arabic } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { LanguageProvider } from "@/components/LanguageProvider";
 import "./globals.css";
 
 /* Loaded here rather than through an @import in globals.css. CSS ignores an
@@ -39,6 +40,20 @@ const arefRuqaa = Aref_Ruqaa({
   display: "swap",
 });
 
+// A UI-weight Arabic sans, distinct from Amiri/Aref Ruqaa above — those two
+// are literary/Quranic display faces, right for the calligraphic verses and
+// quotes they're already used for, wrong for a button label at 13px. Added
+// to the `sans` stack's fallback chain in tailwind.config.ts rather than
+// applied with its own class, so Arabic UI text picks it up automatically
+// wherever the app already uses font-sans (the default), with no per-string
+// dir-checking needed.
+const notoSansArabic = Noto_Sans_Arabic({
+  weight: ["400", "500", "600", "700"],
+  subsets: ["arabic"],
+  variable: "--font-noto-arabic",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Siraaj Quran — Quranic School Portal",
   description:
@@ -54,11 +69,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${jakarta.variable} ${newsreader.variable} ${amiri.variable} ${arefRuqaa.variable}`}
+      className={`${jakarta.variable} ${newsreader.variable} ${amiri.variable} ${arefRuqaa.variable} ${notoSansArabic.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <LanguageProvider>{children}</LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
