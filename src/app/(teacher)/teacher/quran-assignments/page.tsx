@@ -33,6 +33,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, ProgressBar, RatingPill, RecitationHistory } from "@/components/portal-ui";
 import { IconBook, IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
+import { useLanguage } from "@/components/LanguageProvider";
 
 interface Student {
   id: string;
@@ -70,6 +71,7 @@ const LOG_KEY = "demo_recitation_log_v1";
 
 export default function QuranAssignmentsPage() {
   const supabase = createClient();
+  const { language } = useLanguage();
   const surahs = QURAN;
   const [students, setStudents] = useState<Student[]>([]);
   // Full roster (admin-created students merged in), kept for name lookups
@@ -707,7 +709,7 @@ export default function QuranAssignmentsPage() {
                     </p>
                     <p className="text-[11px] text-ink-muted truncate">
                       {rangeLabel}
-                      {a.due_date ? ` · due ${formatDay(a.due_date)}` : ""}
+                      {a.due_date ? ` · due ${formatDay(a.due_date, language)}` : ""}
                     </p>
                   </div>
 

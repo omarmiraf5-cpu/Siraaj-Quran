@@ -483,13 +483,28 @@ export const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 export const MONTHS = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.",
                 "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
 
+const WEEKDAYS_SO = ["Axad", "Isniin", "Talaado", "Arbaco", "Khamiis", "Jimco", "Sabti"];
+const MONTHS_SO = ["Jannaayo", "Febraayo", "Maarso", "Abriil", "Maayo", "Juun",
+                "Luuliyo", "Agoosto", "Sebtembar", "Oktoobar", "Nofembar", "Diisembar"];
+
+const WEEKDAYS_AR = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
 // Built by hand rather than with toLocaleDateString: Node and the browser ship
 // different ICU builds, and the same call returned "Thu, 13 Aug" on the server
 // against "Thu 13 Aug" in the browser, which React reports as a hydration
-// mismatch. Reading the parts in UTC keeps it stable everywhere.
-export function formatDay(iso: string): string {
+// mismatch. Reading the parts in UTC keeps it stable everywhere. `lang`
+// defaults to English so the ~20 call sites that haven't been threaded
+// through with the current language yet keep working unchanged.
+export function formatDay(iso: string, lang: "en" | "so" | "ar" = "en"): string {
   const d = new Date(iso + "T00:00:00Z");
-  return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  const day = d.getUTCDay();
+  const date = d.getUTCDate();
+  const month = d.getUTCMonth();
+  if (lang === "so") return `${WEEKDAYS_SO[day]}, ${date} ${MONTHS_SO[month]}`;
+  if (lang === "ar") return `${WEEKDAYS_AR[day]}، ${date} ${MONTHS_AR[month]}`;
+  return `${WEEKDAYS[day]} ${date} ${MONTHS[month]}`;
 }
 
 // ── Parent ↔ teacher communication ──────────────────────────────────────
@@ -776,6 +791,12 @@ export interface DemoAnnouncement {
   id: string;
   title: string;
   body: string;
+  /** Only set on the seeded samples below, so the demo notice board reads
+      in the current language; a real or admin-created announcement is
+      free text with no key to translate, so it always falls back to
+      `title`/`body` as authored. */
+  titleKey?: string;
+  bodyKey?: string;
   audience: AnnouncementAudience;
   authorName: string;
   pinned: boolean;
@@ -793,7 +814,9 @@ export const DEMO_ANNOUNCEMENTS: DemoAnnouncement[] = [
   {
     id: "a1",
     title: "No classes this Saturday",
+    titleKey: "announcement.noClasses.title",
     body: "There will be no classes this Saturday. Halaqas resume Sunday at the regular time. Jazakumullah khair.",
+    bodyKey: "announcement.noClasses.body",
     audience: "all",
     authorName: "School office",
     pinned: true,
@@ -802,7 +825,9 @@ export const DEMO_ANNOUNCEMENTS: DemoAnnouncement[] = [
   {
     id: "a2",
     title: "Term 1 fees now due",
+    titleKey: "announcement.feesDue.title",
     body: "Term 1 tuition is due by the 15th. Payments can be made at the office before or after halaqa.",
+    bodyKey: "announcement.feesDue.body",
     audience: "parents",
     authorName: "School office",
     pinned: false,
@@ -811,7 +836,9 @@ export const DEMO_ANNOUNCEMENTS: DemoAnnouncement[] = [
   {
     id: "a3",
     title: "Bring your Mushaf every session",
+    titleKey: "announcement.bringMushaf.title",
     body: "Please make sure your Mushaf is with you for every halaqa — we will be revising from it directly.",
+    bodyKey: "announcement.bringMushaf.body",
     audience: "students",
     authorName: "School office",
     pinned: false,

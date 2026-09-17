@@ -19,7 +19,7 @@ import {
 import { useLanguage } from "@/components/LanguageProvider";
 
 export default function ParentAttendancePage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster();
@@ -113,7 +113,7 @@ export default function ParentAttendancePage() {
         <ul className="divide-y divide-surface-border -my-1">
           {days.map((d) => (
             <li key={d.date} className="flex items-center justify-between py-2.5">
-              <span className="text-[13px] text-ink">{formatDay(d.date)}</span>
+              <span className="text-[13px] text-ink">{formatDay(d.date, language)}</span>
               <span
                 className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${ATTENDANCE_STYLES[d.status]}`}
               >

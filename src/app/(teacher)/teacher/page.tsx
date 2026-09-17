@@ -59,7 +59,7 @@ function daysFromReal(iso: string, todayStr: string): number {
 
 export default function TeacherDashboard() {
   const supabase = createClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const demoUser = useDemoUser();
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [drilldown, setDrilldown] = useState<DrilldownView | null>(null);
@@ -184,7 +184,7 @@ export default function TeacherDashboard() {
         eyebrow={t("common.asalaamuAlaykum")}
         title={(isDemo ? demoUser?.name : teacherName) ?? t("role.teacher")}
         meta={[
-          formatDay(today),
+          formatDay(today, language),
           `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`,
           `${review.length} ${t("common.toReview")}`,
         ]}
@@ -223,12 +223,12 @@ export default function TeacherDashboard() {
         <StatTile
           value={review.length}
           label={t("common.toReview")}
-          sub={reviewDue ? `${t("common.oldestDue")} ${formatDay(reviewDue)}` : t("common.allClear")}
+          sub={reviewDue ? `${t("common.oldestDue")} ${formatDay(reviewDue, language)}` : t("common.allClear")}
           onClick={isDemo ? () => setDrilldown("review") : undefined}
         />
         <StatTile
           value={`${avgAttendance}%`}
-          label={t("nav.attendance")}
+          label={t("common.attendanceStat")}
           sub={`${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`}
           onClick={isDemo ? () => setDrilldown("attendance") : undefined}
         />
@@ -239,7 +239,7 @@ export default function TeacherDashboard() {
       <div className="grid md:grid-cols-2 gap-3 items-start">
         {/* Today's register — the outcome and the exceptions, so the teacher
             can see who needs chasing without opening the page. */}
-        <SectionCard title={t("common.todaysRegister")} note={formatDay(today)}>
+        <SectionCard title={t("common.todaysRegister")} note={formatDay(today, language)}>
           <div className="-mt-1 mb-4">
             <AttendanceLegend counts={todayCounts} />
           </div>
@@ -341,7 +341,7 @@ export default function TeacherDashboard() {
                     </div>
                     {a.due_date && (
                       <span className="text-[11px] text-ink-muted flex-shrink-0 whitespace-nowrap">
-                        {formatDay(a.due_date)}
+                        {formatDay(a.due_date, language)}
                       </span>
                     )}
                   </>

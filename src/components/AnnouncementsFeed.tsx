@@ -88,11 +88,13 @@ export function AnnouncementsFeed({
                     {t("common.pinned")}
                   </span>
                 )}
-                <p className="text-[13px] font-semibold text-ink truncate">{a.title}</p>
+                <p className="text-[13px] font-semibold text-ink truncate">
+                  {a.titleKey ? t(a.titleKey) : a.title}
+                </p>
               </div>
-              <p className="text-[13px] text-ink mt-1">{a.body}</p>
+              <p className="text-[13px] text-ink mt-1">{a.bodyKey ? t(a.bodyKey) : a.body}</p>
               <p className="text-[11px] text-ink-muted mt-0.5">
-                {a.authorName} · {a.createdAt}
+                {a.authorName === "School office" ? t("common.schoolOffice") : a.authorName} · {a.createdAt}
               </p>
             </li>
           ))}

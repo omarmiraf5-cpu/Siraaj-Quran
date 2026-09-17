@@ -3,7 +3,6 @@
 import { useStudentTheme } from "@/hooks/useStudentTheme";
 import {
   DEMO_CURRENT_STUDENT,
-  ATTENDANCE_LABELS,
   summariseAttendance,
   formatDay,
   type AttendanceStatus,
@@ -12,6 +11,7 @@ import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { SectionCard, AttendanceStrip, LoadingNote } from "@/components/portal-ui";
 import { ProgressRing, StreakBadge, ILLUM_CLASS } from "@/components/student-ui";
 import { IconCheck, IconClock, IconX, IconNote } from "@/components/icons";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // Each mark gets a colour and a face of its own, so the row reads at a
 // glance instead of as four numbers.
@@ -27,6 +27,7 @@ const MARKS: {
 ];
 
 export default function StudentAttendancePage() {
+  const { t, language } = useLanguage();
   const theme = useStudentTheme();
 
   // RLS gives a signed-in student exactly one row — their own — so the
@@ -45,7 +46,7 @@ export default function StudentAttendancePage() {
   if (!ready) {
     return (
       <div className="px-4 pt-10">
-        <LoadingNote>Loading your register…</LoadingNote>
+        <LoadingNote>{t("common.loadingYourRegister")}</LoadingNote>
       </div>
     );
   }
@@ -58,14 +59,14 @@ export default function StudentAttendancePage() {
       >
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
         <div className="relative flex flex-col items-center">
-          <p className="eyebrow text-white/45">Your register</p>
+          <p className="eyebrow text-white/45">{t("common.yourRegister")}</p>
           <div className="mt-4 rounded-full bg-white/10 p-2 backdrop-blur-sm">
             <div className="rounded-full bg-surface-card p-2">
-              <ProgressRing value={s.rate} colour="saffron" size={104} label="here" />
+              <ProgressRing value={s.rate} colour="saffron" size={104} label={t("common.here")} />
             </div>
           </div>
           <p className="text-[13px] text-white/55 mt-3.5">
-            of the last {s.total} school days
+            {[t("common.last"), s.total, t("common.schoolDays")].filter((x) => x !== "").join(" ")}
           </p>
           {streak > 1 && (
             <div className="mt-4">
@@ -88,24 +89,24 @@ export default function StudentAttendancePage() {
             <p className="text-[22px] font-bold tabular-nums leading-none text-ink">
               {s[m.status]}
             </p>
-            <p className="eyebrow mt-1.5">{ATTENDANCE_LABELS[m.status]}</p>
+            <p className="eyebrow mt-1.5">{t(`common.${m.status}`)}</p>
           </div>
         ))}
       </div>
 
       <div className="animate-rise" style={{ animationDelay: "300ms" }}>
-        <SectionCard title="At a glance" note={`last ${Math.min(14, days.length)} days`}>
+        <SectionCard title={t("common.atAGlance")} note={`${t("common.last")} ${Math.min(14, days.length)} ${t("common.days")}`}>
           <AttendanceStrip days={days} />
           <p className="text-[12px] text-ink-muted mt-3">
             {streak > 1
-              ? `${streak} days in a row without missing. Keep it going.`
-              : "Every day you show up counts."}
+              ? `${streak} ${t("common.daysInARowNoMissing")}`
+              : t("common.everyDayCounts")}
           </p>
         </SectionCard>
       </div>
 
       <div className="animate-rise" style={{ animationDelay: "360ms" }}>
-        <SectionCard title="Day by day" note={`${s.total} days`}>
+        <SectionCard title={t("common.dayByDay")} note={`${s.total} ${t("common.days")}`}>
           <ul className="divide-y divide-surface-border -my-1">
             {days.map((d) => {
               const mark = MARKS.find((m) => m.status === d.status)!;
@@ -114,9 +115,9 @@ export default function StudentAttendancePage() {
                   <span className={`${ILLUM_CLASS[mark.colour]} w-7 h-7 rounded-lg flex-shrink-0`}>
                     {mark.icon}
                   </span>
-                  <span className="text-[13px] text-ink flex-1">{formatDay(d.date)}</span>
+                  <span className="text-[13px] text-ink flex-1">{formatDay(d.date, language)}</span>
                   <span className="text-[11px] font-bold text-ink-muted uppercase tracking-wide">
-                    {ATTENDANCE_LABELS[d.status]}
+                    {t(`common.${d.status}`)}
                   </span>
                 </li>
               );

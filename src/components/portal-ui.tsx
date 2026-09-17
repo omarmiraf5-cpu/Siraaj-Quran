@@ -221,7 +221,7 @@ export function AttendanceStrip({
       than a footnote and wants to be seen across a room. */
   size?: "sm" | "lg";
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const recent = days.slice(0, limit).slice().reverse();
   const bar = size === "lg" ? "h-7 rounded-lg" : "h-1.5 rounded-full";
   return (
@@ -233,7 +233,7 @@ export function AttendanceStrip({
       {recent.map((d) => (
         <span
           key={d.date}
-          title={`${formatDay(d.date)} · ${t(`common.${d.status}`)}`}
+          title={`${formatDay(d.date, language)} · ${t(`common.${d.status}`)}`}
           className={`flex-1 ${bar} ${ATTENDANCE_DOT[d.status]}`}
         />
       ))}
@@ -343,13 +343,13 @@ export function RatingPill({ rating }: { rating: DailyRating }) {
    What was read, and how it went. Shared between the timeline and the
    selected-day detail below, since both show the same thing. */
 function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?: boolean }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const surah = getSurahById(entry.surah);
   return (
     <div className="flex items-start justify-between gap-3 py-2.5">
       <div className="min-w-0">
         <p className="text-[12px] font-semibold text-ink">
-          {showDate && `${formatDay(entry.date)} · `}
+          {showDate && `${formatDay(entry.date, language)} · `}
           <span className="underline decoration-2 underline-offset-2">
             {t(`portion.${entry.portion}`)}
           </span>
@@ -376,7 +376,7 @@ function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?
    calendar opens that day's complete record — every portion heard that
    day, not just whichever one happens to colour the dot. */
 export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   // The most recent session's month drives the calendar, so opening the
   // page lands on whichever month actually has sessions logged in it.
   const latest = entries[entries.length - 1];
@@ -466,10 +466,10 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
               aria-pressed={selected}
               aria-label={
                 dayEntries.length > 0
-                  ? `${formatDay(iso)} — ${dayEntries.length} ${
+                  ? `${formatDay(iso, language)} — ${dayEntries.length} ${
                       dayEntries.length > 1 ? t("common.sessionsGraded") : t("common.sessionGraded")
                     }`
-                  : formatDay(iso)
+                  : formatDay(iso, language)
               }
               className={`flex flex-col items-center justify-center h-8 gap-0.5 rounded-lg transition-colors ${
                 selected ? "bg-brand-navy/10 dark:bg-brand-gold/15" : "hover:bg-surface-bg-warm"
@@ -497,7 +497,7 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
       {selectedDate && (
         <div className="mt-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5">
           <div className="flex items-baseline justify-between mb-1">
-            <p className="eyebrow">{formatDay(selectedDate)}</p>
+            <p className="eyebrow">{formatDay(selectedDate, language)}</p>
             <button
               type="button"
               onClick={() => setSelectedDate(null)}

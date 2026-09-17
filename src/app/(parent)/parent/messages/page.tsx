@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DEMO_TEACHER_NAME, demoMessagesFor, type ThreadMessage } from "@/data/demo";
+import { demoMessagesFor, type ThreadMessage } from "@/data/demo";
 import { usePortalRoster } from "@/hooks/usePortalRoster";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, SegmentedSwitch, EmptyNote, LoadingNote } from "@/components/portal-ui";
@@ -109,13 +109,13 @@ export default function ParentMessagesPage() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // DEMO_TEACHER_NAME is "Ms. Farah" specifically — right for the sample
-  // school, wrong for every real one. A real thread can have more than one
-  // teacher (any teacher at the school can answer), so this names whoever
-  // last replied rather than assuming a single fixed contact.
+  // The demo school's one sample teacher — wrong for every real one. A real
+  // thread can have more than one teacher (any teacher at the school can
+  // answer), so this names whoever last replied rather than assuming a
+  // single fixed contact.
   const teacherLabel =
     mode === "demo"
-      ? DEMO_TEACHER_NAME
+      ? t("common.demoTeacherName")
       : [...messages].reverse().find((m) => m.author === "teacher")?.author_name ??
         t("parent.messages.yourChildsTeacher");
 

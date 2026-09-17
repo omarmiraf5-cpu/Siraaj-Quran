@@ -39,7 +39,7 @@ const OVERRIDES_KEY = "demo_assignment_overrides";
 const LOG_KEY = "demo_recitation_log_v1";
 
 export default function ParentQuranProgressPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster();
@@ -209,7 +209,7 @@ export default function ParentQuranProgressPage() {
                           )}
                         </p>
                         <p className="text-[11px] text-ink-muted mt-0.5">
-                          {t("common.setOn")} {formatDay(a.assigned_at)}
+                          {t("common.setOn")} {formatDay(a.assigned_at, language)}
                           {due && (
                             <>
                               <span className="mx-1.5">·</span>

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   DEMO_STUDENTS,
-  DEMO_TEACHER_NAME,
   demoMessagesFor,
   formatDay,
   initials,
@@ -28,7 +27,7 @@ interface RosterStudent {
 
 export default function TeacherMessagesPage() {
   const supabase = createClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -137,7 +136,7 @@ export default function TeacherMessagesPage() {
         id: `local-${Date.now()}`,
         student_id: selected,
         author: "teacher",
-        author_name: DEMO_TEACHER_NAME,
+        author_name: t("common.demoTeacherName"),
         kind: "message",
         body,
         created_at: new Date().toISOString(),
@@ -238,7 +237,7 @@ export default function TeacherMessagesPage() {
                     <p className="text-[13px] font-semibold text-ink truncate">{s.name}</p>
                     <p className="text-[11px] text-ink-muted truncate" dir="auto">
                       {isAbsence
-                        ? `${t("common.absence")} · ${formatDay(last.absence_date!)}`
+                        ? `${t("common.absence")} · ${formatDay(last.absence_date!, language)}`
                         : last
                           ? last.body
                           : t("common.noMessagesYet")}

@@ -42,7 +42,7 @@ function todayIso() {
 
 export default function TeacherAttendancePage() {
   const supabase = createClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [today, setToday] = useState(DEMO_TODAY);
@@ -208,7 +208,7 @@ export default function TeacherAttendancePage() {
         eyebrow={t("teacher.attendance.eyebrow")}
         title={t("nav.attendance")}
         meta={[
-          formatDay(today),
+          formatDay(today, language),
           `${students.length} ${t("common.students")}`,
           remaining > 0 ? `${remaining} ${t("teacher.attendance.stillToMark")}` : t("teacher.attendance.everyoneMarked"),
         ]}

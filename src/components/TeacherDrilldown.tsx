@@ -13,21 +13,14 @@ import {
   formatDay,
   dueLabel,
   initials,
-  ASSIGNMENT_LABELS,
   ASSIGNMENT_STYLES,
-  PORTION_LABELS,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import { Modal, ProgressBar, EmptyNote, AttendanceStrip } from "@/components/portal-ui";
+import { useLanguage } from "@/components/LanguageProvider";
+import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 
 export type DrilldownView = "students" | "active" | "review" | "attendance";
-
-const TITLES: Record<DrilldownView, { title: string; subtitle: string }> = {
-  students: { title: "All students", subtitle: "Tap a name for their full record" },
-  active: { title: "Active work", subtitle: "Everything not yet completed" },
-  review: { title: "Waiting on you", subtitle: "Marked as needing review" },
-  attendance: { title: "Attendance", subtitle: "This term, weakest first" },
-};
 
 export function TeacherDrilldown({
   view,
@@ -38,6 +31,13 @@ export function TeacherDrilldown({
   onClose: () => void;
   onSelectStudent: (id: string) => void;
 }) {
+  const { t } = useLanguage();
+  const TITLES: Record<DrilldownView, { title: string; subtitle: string }> = {
+    students: { title: t("drilldown.allStudents"), subtitle: t("drilldown.tapForRecord") },
+    active: { title: t("common.activeWork"), subtitle: t("drilldown.everythingNotCompleted") },
+    review: { title: t("drilldown.waitingOnYou"), subtitle: t("drilldown.markedNeedsReview") },
+    attendance: { title: t("common.attendanceStat"), subtitle: t("drilldown.thisTermWeakestFirst") },
+  };
   const { title, subtitle } = TITLES[view];
 
   return (
@@ -85,6 +85,7 @@ function Avatar({ name }: { name: string }) {
 }
 
 function StudentList({ onSelect }: { onSelect: (id: string) => void }) {
+  const { t } = useLanguage();
   const byHalaqa = [...new Set(DEMO_STUDENTS.map((s) => s.halaqa))];
 
   return (
@@ -106,7 +107,11 @@ function StudentList({ onSelect }: { onSelect: (id: string) => void }) {
                       {s.name}
                     </span>
                     <span className="block text-[11px] text-ink-muted">
-                      {open === 0 ? "nothing open" : open === 1 ? "1 open" : `${open} open`}
+                      {open === 0
+                        ? t("common.nothingOpen")
+                        : open === 1
+                          ? t("common.oneOpen")
+                          : `${open} ${t("common.openCount")}`}
                     </span>
                   </span>
                   <span className="text-[12px] font-semibold text-ink-muted tabular-nums flex-shrink-0">
@@ -176,8 +181,9 @@ function AssignmentList({
   assignments: typeof DEMO_ASSIGNMENTS;
   onSelect: (id: string) => void;
 }) {
+  const { t, language } = useLanguage();
   if (assignments.length === 0) {
-    return <EmptyNote>Nothing here — all clear.</EmptyNote>;
+    return <EmptyNote>{t("common.nothingHereAllClear")}</EmptyNote>;
   }
 
   // Soonest due first; undated work sinks to the bottom.
@@ -206,14 +212,14 @@ function AssignmentList({
                     {name}
                     <span className="font-normal text-ink-muted">
                       {" · "}
-                      {PORTION_LABELS[a.portion]}
+                      {t(`portion.${a.portion}`)}
                     </span>
                   </p>
                   <p className="text-[12px] text-ink-body">
                     {surah ? surah.englishName : `Surah ${a.surah}`}
                     <span className="text-ink-muted">
                       {" "}
-                      · ayahs {a.ayah_start}–{a.ayah_end}
+                      · {t("common.ayahs")} {a.ayah_start}–{a.ayah_end}
                     </span>
                   </p>
                   {due && a.due_date && (
@@ -224,14 +230,14 @@ function AssignmentList({
                           : "text-ink-muted"
                       }`}
                     >
-                      {due.text} · {formatDay(a.due_date)}
+                      {due.text} · {formatDay(a.due_date, language)}
                     </p>
                   )}
                 </div>
                 <span
                   className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${ASSIGNMENT_STYLES[a.status]}`}
                 >
-                  {ASSIGNMENT_LABELS[a.status]}
+                  {t(ASSIGNMENT_STATUS_KEY[a.status])}
                 </span>
               </div>
 

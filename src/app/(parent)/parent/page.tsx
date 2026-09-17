@@ -33,7 +33,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
@@ -91,7 +91,7 @@ export default function ParentDashboard() {
         eyebrow={t("common.asalaamuAlaykum")}
         title={demoUser?.name ?? t("role.parent")}
         meta={[
-          formatDay(DEMO_TODAY),
+          formatDay(DEMO_TODAY, language),
           `${child.name.split(" ")[0]} ${t("common.was")} ${
             todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
           } ${t("common.today")}`,
@@ -126,7 +126,7 @@ export default function ParentDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
           value={`${summary.rate}%`}
-          label={t("nav.attendance")}
+          label={t("common.attendanceStat")}
           sub={`${summary.present + summary.late} ${t("common.of")} ${summary.total - summary.excused} ${t("common.days")}`}
         />
         <StatTile
@@ -137,7 +137,7 @@ export default function ParentDashboard() {
         <StatTile
           value={active.length}
           label={t("common.openWork")}
-          sub={nextDue ? `${t("common.nextDue")} ${formatDay(nextDue)}` : t("common.nothingDue")}
+          sub={nextDue ? `${t("common.nextDue")} ${formatDay(nextDue, language)}` : t("common.nothingDue")}
         />
         <StatTile
           value={done.length}

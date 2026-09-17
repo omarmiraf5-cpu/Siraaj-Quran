@@ -39,7 +39,7 @@ type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: 
 
 export default function AdminDashboard() {
   const supabase = createClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [ready, setReady] = useState(false);
 
   const [school, setSchool] = useState({
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
         title={school.name}
         meta={[
           `${school.city}, ${school.province}`,
-          formatDay(DEMO_TODAY),
+          formatDay(DEMO_TODAY, language),
           `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
         ]}
       />
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
         <StatTile value={activeStudentCount} label={t("nav.students")} sub={`${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`} />
         <StatTile value={activeTeachers.length} label={t("nav.teachers")} sub={`${halaqas.length} ${t("nav.halaqas").toLowerCase()}`} />
         <StatTile value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? `${unassignedHalaqas.length} ${t("common.unassigned")}` : t("common.allAssigned")} />
-        <StatTile value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("nav.attendance")} sub={t("common.schoolWide")} />
+        <StatTile value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">

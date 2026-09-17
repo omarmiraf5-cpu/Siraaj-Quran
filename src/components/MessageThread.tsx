@@ -17,7 +17,7 @@ export function MessageThread({
       own messages align right like a familiar chat. */
   viewerRole: MessageAuthor;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   if (messages.length === 0) {
     return <EmptyNote>{t("messages.emptyThread")}</EmptyNote>;
@@ -35,7 +35,7 @@ export function MessageThread({
                   className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"
                   dir="auto"
                 >
-                  {t("messages.absenceReported")} · {m.absence_date && formatDay(m.absence_date)}
+                  {t("messages.absenceReported")} · {m.absence_date && formatDay(m.absence_date, language)}
                 </p>
                 <p className="text-[13px] text-ink-body mt-1" dir="auto">{m.body}</p>
                 <p className="text-[10px] text-ink-muted mt-1">

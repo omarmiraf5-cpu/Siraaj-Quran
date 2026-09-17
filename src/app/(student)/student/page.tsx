@@ -58,7 +58,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 
 export default function StudentDashboard() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const demoUser = useDemoUser();
   const theme = useStudentTheme();
 
@@ -281,7 +281,7 @@ export default function StudentDashboard() {
             </div>
           </div>
           <p className="text-[11px] text-ink-muted mt-4 pt-3 border-t border-surface-border">
-            {formatDay(DEMO_TODAY)}
+            {formatDay(DEMO_TODAY, language)}
             <span className="mx-1.5">·</span>
             {done.length} {t("common.finished").toLowerCase()}
             <span className="mx-1.5">·</span>

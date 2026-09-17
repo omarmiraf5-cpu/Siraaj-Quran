@@ -22,7 +22,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 
 export default function ParentPaymentsPage() {
   const supabase = createClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [ready, setReady] = useState(false);
   const [fees, setFees] = useState<DemoFee[]>([]);
   const [children, setChildren] = useState<DemoStudent[]>([]);
@@ -106,7 +106,7 @@ export default function ParentPaymentsPage() {
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-ink truncate">{f.description}</p>
                     <p className="text-[11px] text-ink-muted truncate">
-                      {childName(f.studentId)} · {t("common.due").toLowerCase()} {formatDay(f.dueDate)}
+                      {childName(f.studentId)} · {t("common.due").toLowerCase()} {formatDay(f.dueDate, language)}
                     </p>
                   </div>
                   <div className="text-end flex-shrink-0">
