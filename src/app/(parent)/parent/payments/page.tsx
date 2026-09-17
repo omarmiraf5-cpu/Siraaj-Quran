@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   DEMO_CHILDREN,
-  DEMO_FEES,
   DEMO_CREATED_FEES_KEY,
   DEMO_FEE_OVERRIDES_KEY,
   allFees,
   feeStatus,
+  formatDay,
   money,
-  FEE_STATUS_LABELS,
   FEE_STATUS_STYLES,
   type DemoFee,
   type FeeOverride,
@@ -19,9 +18,11 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function ParentPaymentsPage() {
   const supabase = createClient();
+  const { t } = useLanguage();
   const [ready, setReady] = useState(false);
   const [fees, setFees] = useState<DemoFee[]>([]);
   const [children, setChildren] = useState<DemoStudent[]>([]);
@@ -67,7 +68,7 @@ export default function ParentPaymentsPage() {
     load().finally(() => setReady(true));
   }, []);
 
-  const childName = (id: string) => children.find((s) => s.id === id)?.name ?? "Your child";
+  const childName = (id: string) => children.find((s) => s.id === id)?.name ?? t("common.yourChild");
 
   const billed = fees.reduce((sum, f) => sum + f.amountDue, 0);
   const paid = fees.reduce((sum, f) => sum + f.amountPaid, 0);
@@ -76,22 +77,26 @@ export default function ParentPaymentsPage() {
   return (
     <div className="max-w-3xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Fees"
-        title="Payments"
-        meta={outstanding > 0 ? [`${money(outstanding)} outstanding`] : ["All paid up"]}
+        eyebrow={t("common.fees")}
+        title={t("nav.payments")}
+        meta={
+          outstanding > 0
+            ? [`${money(outstanding)} ${t("common.outstanding").toLowerCase()}`]
+            : [t("common.allPaidUp")]
+        }
       />
 
       <div className="grid grid-cols-3 gap-3">
-        <StatTile value={money(billed)} label="Billed" sub={`${fees.length} charges`} />
-        <StatTile value={money(paid)} label="Paid" sub="thank you" />
-        <StatTile value={money(outstanding)} label="Outstanding" sub="still owed" />
+        <StatTile value={money(billed)} label={t("common.billed")} sub={`${fees.length} ${t("common.charges")}`} />
+        <StatTile value={money(paid)} label={t("common.paid")} sub={t("common.thankYou")} />
+        <StatTile value={money(outstanding)} label={t("common.outstanding")} sub={t("common.stillOwed")} />
       </div>
 
-      <SectionCard title="Your charges" note={`${fees.length} total`}>
+      <SectionCard title={t("common.yourCharges")} note={`${fees.length} ${t("common.total")}`}>
         {!ready ? (
           <LoadingNote />
         ) : fees.length === 0 ? (
-          <EmptyNote>Nothing has been billed yet.</EmptyNote>
+          <EmptyNote>{t("common.nothingBilledYet")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {fees.map((f) => {
@@ -101,15 +106,15 @@ export default function ParentPaymentsPage() {
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-ink truncate">{f.description}</p>
                     <p className="text-[11px] text-ink-muted truncate">
-                      {childName(f.studentId)} · due {f.dueDate}
+                      {childName(f.studentId)} · {t("common.due").toLowerCase()} {formatDay(f.dueDate)}
                     </p>
                   </div>
                   <div className="text-end flex-shrink-0">
-                    <p className="text-[13px] font-semibold text-ink">
+                    <p className="text-[13px] font-semibold text-ink" dir="ltr">
                       {money(f.amountPaid)} <span className="text-ink-muted font-normal">/ {money(f.amountDue)}</span>
                     </p>
                     <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5 ${FEE_STATUS_STYLES[status]}`}>
-                      {FEE_STATUS_LABELS[status]}
+                      {t(`common.${status}`)}
                     </span>
                   </div>
                 </li>
@@ -119,10 +124,7 @@ export default function ParentPaymentsPage() {
         )}
       </SectionCard>
 
-      <p className="text-[11px] text-ink-muted px-1">
-        Payments are recorded by the school office. If something here looks wrong, send a message
-        and they&apos;ll sort it out.
-      </p>
+      <p className="text-[11px] text-ink-muted px-1">{t("parent.payments.footerNote")}</p>
     </div>
   );
 }

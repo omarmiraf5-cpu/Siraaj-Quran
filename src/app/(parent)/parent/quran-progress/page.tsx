@@ -6,9 +6,7 @@ import { Mushaf } from "@/components/Mushaf";
 import {
   formatDay,
   dueLabel,
-  ASSIGNMENT_LABELS,
   ASSIGNMENT_STYLES,
-  PORTION_LABELS,
   PORTION_ARABIC,
   withOverride,
   recitationLogFor,
@@ -31,6 +29,8 @@ import {
 import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
+import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 
 const OVERRIDES_KEY = "demo_assignment_overrides";
 // Same key the teacher's assignments page writes to — every graded session
@@ -39,6 +39,7 @@ const OVERRIDES_KEY = "demo_assignment_overrides";
 const LOG_KEY = "demo_recitation_log_v1";
 
 export default function ParentQuranProgressPage() {
+  const { t } = useLanguage();
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster();
@@ -96,14 +97,12 @@ export default function ParentQuranProgressPage() {
   if (mode === "loading" || !child) {
     return (
       <div className="max-w-4xl mx-auto space-y-4 pt-2">
-        <PortalHero eyebrow="Quranic progress" title="…" />
-        <SectionCard title="Your children">
+        <PortalHero eyebrow={t("parent.quranProgress.eyebrow")} title="…" />
+        <SectionCard title={t("common.yourChildren")}>
           {mode === "loading" ? (
             <LoadingNote />
           ) : (
-            <EmptyNote>
-              No children are linked to your account yet — the school office can add them.
-            </EmptyNote>
+            <EmptyNote>{t("common.noChildrenLinked")}</EmptyNote>
           )}
         </SectionCard>
       </div>
@@ -122,20 +121,20 @@ export default function ParentQuranProgressPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-4 pt-2">
       <PortalHero
-        eyebrow="Quranic progress"
+        eyebrow={t("parent.quranProgress.eyebrow")}
         title={firstName}
         meta={[
           child.halaqa,
-          `${completed} of ${assignments.length} finished`,
-          `${avg}% memorised`,
+          `${completed} ${t("common.of")} ${assignments.length} ${t("common.finished").toLowerCase()}`,
+          `${avg}% ${t("common.memorised").toLowerCase()}`,
         ]}
       />
 
       {children.length > 1 && (
         <div className="flex items-center gap-3">
-          <span className="eyebrow">Viewing</span>
+          <span className="eyebrow">{t("common.viewing")}</span>
           <SegmentedSwitch
-            label="Select child"
+            label={t("common.selectChild")}
             value={child.id}
             onChange={(v) => {
               setChildId(v);
@@ -146,20 +145,26 @@ export default function ParentQuranProgressPage() {
         </div>
       )}
 
-      {!ready && <LoadingNote>Loading assignments…</LoadingNote>}
+      {!ready && <LoadingNote>{t("common.loadingAssignments")}</LoadingNote>}
 
       <div className="grid grid-cols-3 gap-3">
-        <StatTile value={assignments.length} label="Set" sub="this term" />
-        <StatTile value={completed} label="Finished" sub={`${assignments.length - completed} still open`} />
-        <StatTile value={`${avg}%`} label="Memorised" sub="across all surahs" />
+        <StatTile value={assignments.length} label={t("common.setOn")} sub={t("common.thisTerm")} />
+        <StatTile
+          value={completed}
+          label={t("common.finished")}
+          sub={`${assignments.length - completed} ${t("common.stillOpen")}`}
+        />
+        <StatTile value={`${avg}%`} label={t("common.memorised")} sub={t("common.acrossAllSurahs")} />
       </div>
 
       <SectionCard
-        title="Assignments"
-        note="tap to read the ayahs"
+        title={t("nav.assignments")}
+        note={t("parent.quranProgress.tapToRead")}
       >
         {assignments.length === 0 ? (
-          <EmptyNote>Nothing has been set for {firstName} yet.</EmptyNote>
+          <EmptyNote>
+            {t("common.nothingSetForPrefix")} {firstName} {t("common.yetSuffix")}
+          </EmptyNote>
         ) : (
           <ul className="space-y-1">
             {assignments.map((a) => {
@@ -183,7 +188,7 @@ export default function ParentQuranProgressPage() {
                       <div className="min-w-0">
                         <p className="eyebrow">
                           <span className="underline decoration-2 underline-offset-2 text-ink">
-                            {PORTION_LABELS[a.portion]}
+                            {t(`portion.${a.portion}`)}
                           </span>
                           <span
                             className="font-arabic text-[13px] normal-case tracking-normal ms-2"
@@ -204,7 +209,7 @@ export default function ParentQuranProgressPage() {
                           )}
                         </p>
                         <p className="text-[11px] text-ink-muted mt-0.5">
-                          Set {formatDay(a.assigned_at)}
+                          {t("common.setOn")} {formatDay(a.assigned_at)}
                           {due && (
                             <>
                               <span className="mx-1.5">·</span>
@@ -223,7 +228,7 @@ export default function ParentQuranProgressPage() {
                         <span
                           className={`text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap ${ASSIGNMENT_STYLES[a.status]}`}
                         >
-                          {ASSIGNMENT_LABELS[a.status]}
+                          {t(ASSIGNMENT_STATUS_KEY[a.status])}
                         </span>
                         <span
                           className={`text-ink-muted transition-transform ${isOpen ? "rotate-90" : ""}`}
@@ -278,7 +283,7 @@ export default function ParentQuranProgressPage() {
                           onClick={() => setExpanded(null)}
                           className="text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors"
                         >
-                          Close
+                          {t("common.close")}
                         </button>
                       </div>
                       <Mushaf
@@ -300,17 +305,16 @@ export default function ParentQuranProgressPage() {
       </SectionCard>
 
       <SectionCard
-        title="This month"
-        note="every session, graded"
+        title={t("common.thisMonth")}
+        note={t("parent.quranProgress.everySessionGraded")}
       >
         <RecitationHistory entries={recitationLogFor(child.id, log)} />
       </SectionCard>
 
       <section className="card-quiet px-6 py-7 text-center">
-        <p className="eyebrow">A word of encouragement</p>
+        <p className="eyebrow">{t("common.wordOfEncouragement")}</p>
         <p className="font-serif text-[15px] text-ink-body italic mt-3 max-w-md mx-auto leading-relaxed">
-          Reciting a little with {firstName} each evening does more than a long
-          session once a week. Ask them to teach you what they learned today.
+          {t("common.recitingWithPrefix")} {firstName} {t("common.recitingWithSuffix")}
         </p>
       </section>
     </div>

@@ -9,11 +9,10 @@ import {
   formatDay,
   dueLabel,
   initials,
-  ASSIGNMENT_LABELS,
   ASSIGNMENT_STYLES,
-  PORTION_LABELS,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
+import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { PortalHero, HeroButtonPrimary, HeroButtonGhost } from "@/components/PortalHero";
 import {
@@ -30,9 +29,11 @@ import {
 import { IconBook, IconChart, IconCalendar, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
+  const { t } = useLanguage();
 
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
@@ -72,14 +73,12 @@ export default function ParentDashboard() {
   if (mode === "loading" || !child) {
     return (
       <div className="max-w-4xl mx-auto space-y-4 pt-2">
-        <PortalHero eyebrow="Asalaamu alaykum" title={demoUser?.name ?? "Parent"} />
-        <SectionCard title="Your children">
+        <PortalHero eyebrow={t("common.asalaamuAlaykum")} title={demoUser?.name ?? t("role.parent")} />
+        <SectionCard title={t("common.yourChildren")}>
           {mode === "loading" ? (
             <LoadingNote />
           ) : (
-            <EmptyNote>
-              No children are linked to your account yet — the school office can add them.
-            </EmptyNote>
+            <EmptyNote>{t("common.noChildrenLinked")}</EmptyNote>
           )}
         </SectionCard>
       </div>
@@ -89,20 +88,22 @@ export default function ParentDashboard() {
   return (
     <div className="max-w-4xl mx-auto space-y-4 pt-2">
       <PortalHero
-        eyebrow="Asalaamu alaykum"
-        title={demoUser?.name ?? "Parent"}
+        eyebrow={t("common.asalaamuAlaykum")}
+        title={demoUser?.name ?? t("role.parent")}
         meta={[
           formatDay(DEMO_TODAY),
-          `${child.name.split(" ")[0]} was ${todayStatus ?? "not marked"} today`,
-          active.length === 1 ? "1 piece of work open" : `${active.length} pieces of work open`,
+          `${child.name.split(" ")[0]} ${t("common.was")} ${
+            todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
+          } ${t("common.today")}`,
+          active.length === 1 ? t("common.pieceOfWorkOpenOne") : `${active.length} ${t("common.pieceOfWorkOpenOther")}`,
         ]}
         actions={
           <>
             <HeroButtonPrimary href="/parent/quran-progress" icon={<IconChart />}>
-              Progress
+              {t("nav.progress")}
             </HeroButtonPrimary>
             <HeroButtonGhost href="/parent/attendance" icon={<IconCalendar />}>
-              Attendance
+              {t("nav.attendance")}
             </HeroButtonGhost>
           </>
         }
@@ -111,9 +112,9 @@ export default function ParentDashboard() {
       {/* Which child. A parent with one child never sees this. */}
       {children.length > 1 && (
         <div className="flex items-center gap-3">
-          <span className="eyebrow">Viewing</span>
+          <span className="eyebrow">{t("common.viewing")}</span>
           <SegmentedSwitch
-            label="Select child"
+            label={t("common.selectChild")}
             value={child?.id ?? ""}
             onChange={setChildId}
             options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
@@ -125,23 +126,23 @@ export default function ParentDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
           value={`${summary.rate}%`}
-          label="Attendance"
-          sub={`${summary.present + summary.late} of ${summary.total - summary.excused} days`}
+          label={t("nav.attendance")}
+          sub={`${summary.present + summary.late} ${t("common.of")} ${summary.total - summary.excused} ${t("common.days")}`}
         />
         <StatTile
           value={`${memorisation}%`}
-          label="Memorised"
-          sub={`across ${assignments.length} surahs`}
+          label={t("common.memorised")}
+          sub={`${t("common.across")} ${assignments.length} ${t("common.surahs")}`}
         />
         <StatTile
           value={active.length}
-          label="Open work"
-          sub={nextDue ? `next due ${formatDay(nextDue)}` : "nothing due"}
+          label={t("common.openWork")}
+          sub={nextDue ? `${t("common.nextDue")} ${formatDay(nextDue)}` : t("common.nothingDue")}
         />
         <StatTile
           value={done.length}
-          label="Completed"
-          sub={done.length ? "well done" : "none yet"}
+          label={t("assignment.completed")}
+          sub={done.length ? t("common.wellDone") : t("common.noneYet")}
         />
       </div>
 
@@ -156,13 +157,13 @@ export default function ParentDashboard() {
       <div className="grid md:grid-cols-2 gap-3 items-start">
         {/* The work itself, not a link to it. */}
         <SectionCard
-          title="Current work"
-          note={`${assignments.length} total`}
+          title={t("common.currentWork")}
+          note={`${assignments.length} ${t("common.total")}`}
         >
           {!ready ? (
             <LoadingNote />
           ) : assignments.length === 0 ? (
-            <EmptyNote>Nothing has been set yet.</EmptyNote>
+            <EmptyNote>{t("common.nothingSetYet")}</EmptyNote>
           ) : (
             <ul className="space-y-4">
               {assignments.map((a) => {
@@ -174,7 +175,7 @@ export default function ParentDashboard() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="eyebrow underline decoration-2 underline-offset-2 text-ink">
-                          {PORTION_LABELS[a.portion]}
+                          {t(`portion.${a.portion}`)}
                         </p>
                         <p className="text-[13px] font-semibold text-ink truncate mt-0.5">
                           {surahEnd ? (
@@ -204,7 +205,7 @@ export default function ParentDashboard() {
                       <span
                         className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${ASSIGNMENT_STYLES[a.status]}`}
                       >
-                        {ASSIGNMENT_LABELS[a.status]}
+                        {t(ASSIGNMENT_STATUS_KEY[a.status])}
                       </span>
                     </div>
 
@@ -228,7 +229,7 @@ export default function ParentDashboard() {
             href="/parent/quran-progress"
             className="group mt-4 inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
           >
-            Open progress
+            {t("common.openProgress")}
             <span className="group-hover:translate-x-0.5 transition-transform">
               <IconArrow size={14} />
             </span>
@@ -236,7 +237,10 @@ export default function ParentDashboard() {
         </SectionCard>
 
         {/* Attendance, summarised the way a parent reads it. */}
-        <SectionCard title="Attendance" note={`last ${summary.total} days`}>
+        <SectionCard
+          title={t("nav.attendance")}
+          note={[t("common.last"), summary.total, t("common.days")].filter((x) => x !== "").join(" ")}
+        >
           <div className="flex items-end justify-between gap-3">
             <div>
               <p className="text-[34px] font-bold text-ink tabular-nums leading-none">
@@ -244,10 +248,10 @@ export default function ParentDashboard() {
               </p>
               <p className="text-[12px] text-ink-muted mt-1.5">
                 {summary.rate >= 95
-                  ? "Excellent — thank you for your support."
+                  ? t("parent.attendance.excellent")
                   : summary.rate >= 85
-                    ? "Good, with a little room to improve."
-                    : "Below the school's 85% target."}
+                    ? t("parent.attendance.good")
+                    : t("parent.attendance.belowTarget")}
               </p>
             </div>
             <span
@@ -274,8 +278,8 @@ export default function ParentDashboard() {
           {needsReview.length > 0 && (
             <p className="text-[12px] text-ink-body mt-4 pt-4 border-t border-surface-border">
               {needsReview.length === 1
-                ? "One piece of work is waiting on the teacher's review."
-                : `${needsReview.length} pieces of work are waiting on the teacher's review.`}
+                ? t("common.oneWorkNeedsReview")
+                : `${needsReview.length} ${t("common.worksNeedReview")}`}
             </p>
           )}
 
@@ -283,7 +287,7 @@ export default function ParentDashboard() {
             href="/parent/attendance"
             className="group mt-4 inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
           >
-            Open attendance
+            {t("common.openAttendance")}
             <span className="group-hover:translate-x-0.5 transition-transform">
               <IconArrow size={14} />
             </span>
@@ -300,9 +304,9 @@ export default function ParentDashboard() {
           <IconBook size={19} />
         </span>
         <span className="flex-1 min-w-0">
-          <span className="block page-title text-[15px]">Mushaf</span>
+          <span className="block page-title text-[15px]">{t("nav.mushaf")}</span>
           <span className="block text-[12px] text-ink-muted">
-            Read along with {child.name.split(" ")[0]}, and play any ayah aloud.
+            {t("common.readAlongWith")} {child.name.split(" ")[0]}, {t("common.playAyahAloud")}
           </span>
         </span>
         <span className="text-ink-muted group-hover:translate-x-0.5 group-hover:text-ink transition-all flex-shrink-0">
@@ -311,7 +315,7 @@ export default function ParentDashboard() {
       </Link>
 
       <section className="card-quiet px-6 py-8 text-center">
-        <p className="eyebrow">Daily reflection</p>
+        <p className="eyebrow">{t("common.dailyReflection")}</p>
         <p
           className="font-calligraphy text-[28px] md:text-[34px] text-ink mt-4 leading-[2.1]"
           dir="rtl"
@@ -320,10 +324,10 @@ export default function ParentDashboard() {
           وَقُل رَّبِّ زِدْنِي عِلْمًا
         </p>
         <div className="gold-rule w-20 mx-auto my-5" />
-        <p className="font-serif text-[15px] text-ink-body italic">
+        <p className="font-serif text-[15px] text-ink-body italic" dir="ltr">
           &ldquo;And say: My Lord, increase me in knowledge.&rdquo;
         </p>
-        <p className="text-[11px] text-ink-muted mt-2">Surah Ta-Ha, 114</p>
+        <p className="text-[11px] text-ink-muted mt-2" dir="ltr">Surah Ta-Ha, 114</p>
       </section>
     </div>
   );
