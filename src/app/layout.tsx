@@ -55,9 +55,9 @@ const notoSansArabic = Noto_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "Siraaj Quran — Quranic School Portal",
+  title: "MyDiiwaan — Quran School Portal",
   description:
-    "Siraaj Quran is a Quranic school management portal featuring Tajweed color coding, assignments, and progress tracking.",
+    "MyDiiwaan is a Quranic school management portal featuring Tajweed color coding, assignments, and progress tracking.",
   icons: { icon: "/crest.jpg" },
 };
 
