@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/components/LanguageProvider";
 import { DEMO_ACCOUNTS } from "@/lib/demo";
+import { SHOW_DEMO_LOGINS } from "@/lib/demoMode";
 import type { Role } from "@/lib/types";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 
@@ -113,9 +114,15 @@ export default function LoginPage() {
 
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedPass = password.trim();
-    const demoAccount = Object.values(DEMO_ACCOUNTS).find(
-      (a) => "email" in a && a.email === trimmedEmail && "password" in a && a.password === trimmedPass
-    );
+    // Only the showcase deployment accepts the sample logins. Everywhere
+    // else they fall straight through to Supabase and fail like any other
+    // wrong password — otherwise the sample credentials would quietly be
+    // working accounts on a real school's site.
+    const demoAccount = SHOW_DEMO_LOGINS
+      ? Object.values(DEMO_ACCOUNTS).find(
+          (a) => "email" in a && a.email === trimmedEmail && "password" in a && a.password === trimmedPass
+        )
+      : undefined;
     if (demoAccount) {
       localStorage.setItem("demo_user", JSON.stringify(demoAccount));
       document.cookie = "demo_mode=true; path=/; max-age=86400; SameSite=Lax";
@@ -165,7 +172,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (pin === DEMO_ACCOUNTS.student.pin) {
+    if (SHOW_DEMO_LOGINS && pin === DEMO_ACCOUNTS.student.pin) {
       localStorage.setItem("demo_user", JSON.stringify(DEMO_ACCOUNTS.student));
       document.cookie = "demo_mode=true; path=/; max-age=86400; SameSite=Lax";
       const timer = setTimeout(() => router.push("/student"), 300);
@@ -434,24 +441,26 @@ export default function LoginPage() {
                 <a href="#" className="hover:text-brand-gold-light transition">{t("login.forgotPassword")}</a>
               </p>
 
-              <div className="mt-4 bg-white/5 border border-white/10 rounded-card px-4 py-3">
-                <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-2">{t("login.demoAutofill")}</p>
-                <div className="space-y-1.5 text-xs">
-                  {(["teacher", "parent", "admin"] as const).map((key) => {
-                    const acct = DEMO_ACCOUNTS[key];
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => { setEmail(acct.email); setPassword(acct.password); setRole(acct.role); setError(null); }}
-                        className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition text-white/50 hover:text-white/80"
-                      >
-                        <span className="text-white/70">{t(`role.${key}`)}:</span> {acct.email} / {acct.password}
-                      </button>
-                    );
-                  })}
+              {SHOW_DEMO_LOGINS && (
+                <div className="mt-4 bg-white/5 border border-white/10 rounded-card px-4 py-3">
+                  <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-2">{t("login.demoAutofill")}</p>
+                  <div className="space-y-1.5 text-xs">
+                    {(["teacher", "parent", "admin"] as const).map((key) => {
+                      const acct = DEMO_ACCOUNTS[key];
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => { setEmail(acct.email); setPassword(acct.password); setRole(acct.role); setError(null); }}
+                          className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition text-white/50 hover:text-white/80"
+                        >
+                          <span className="text-white/70">{t(`role.${key}`)}:</span> {acct.email} / {acct.password}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </form>
           )}
         </div>
