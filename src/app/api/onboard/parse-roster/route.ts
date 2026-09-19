@@ -23,6 +23,12 @@ interface ParsedStudent {
   name: string;
   age: number | null;
   halaqa: string;
+  // Most schools already keep a parent contact next to each child, so the
+  // roster they upload can build the parent accounts too. Two siblings
+  // carrying the same parent email become one parent with two children —
+  // grouping happens on the client, which owns the parent list.
+  parentName: string;
+  parentEmail: string;
 }
 
 function matchColumn(headers: string[], patterns: RegExp[]): number {
@@ -37,6 +43,17 @@ const NAME_PATTERNS = [/^(full[ _-]?name|student[ _-]?name|name)$/i];
 const AGE_PATTERNS = [/^age$/i];
 const GRADE_PATTERNS = [/^grade$/i];
 const HALAQA_PATTERNS = [/^(halaqa|class|group|section)$/i];
+// Ordered: the more specific header wins, so a sheet with both "Parent
+// Email" and a bare "Email" column doesn't mistake the student's own
+// address for the parent's.
+const PARENT_NAME_PATTERNS = [
+  /^(parent|guardian)[ _-]?(full[ _-]?)?name$/i,
+  /^(parent|guardian|father|mother)$/i,
+];
+const PARENT_EMAIL_PATTERNS = [
+  /^(parent|guardian)[ _-]?e[ _-]?mail( address)?$/i,
+  /^e[ _-]?mail( address)?$/i,
+];
 
 function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings: string[] } {
   const warnings: string[] = [];
@@ -47,6 +64,8 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
   const ageCol = matchColumn(headers, AGE_PATTERNS);
   const gradeCol = matchColumn(headers, GRADE_PATTERNS);
   const halaqaCol = matchColumn(headers, HALAQA_PATTERNS);
+  const parentNameCol = matchColumn(headers, PARENT_NAME_PATTERNS);
+  const parentEmailCol = matchColumn(headers, PARENT_EMAIL_PATTERNS);
 
   if (nameCol === -1) {
     const found = headers.filter(Boolean).join(", ");
@@ -73,7 +92,19 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
     }
 
     const halaqa = halaqaCol !== -1 ? String(row[halaqaCol] ?? "").trim() : "";
-    students.push({ name, age, halaqa });
+
+    // An email is what actually creates the account, so a parent name with
+    // no address behind it is dropped rather than carried forward as an
+    // account nobody can sign into. A missing name falls back to the
+    // child's — "Yusuf Ali's parent" reads better in a list than a blank.
+    const parentEmail =
+      parentEmailCol !== -1 ? String(row[parentEmailCol] ?? "").trim().toLowerCase() : "";
+    const rawParentName = parentNameCol !== -1 ? String(row[parentNameCol] ?? "").trim() : "";
+    const parentName = parentEmail
+      ? rawParentName || `${name}'s parent`
+      : "";
+
+    students.push({ name, age, halaqa, parentName, parentEmail: parentEmail || "" });
   }
 
   if (ageCol === -1 && gradeCol === -1) {
@@ -81,6 +112,11 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
   }
   if (halaqaCol === -1) {
     warnings.push("No \"Halaqa\" column found — assign each student to a halaqa by hand.");
+  }
+  if (parentEmailCol === -1) {
+    warnings.push(
+      "No \"Parent Email\" column found — add parent accounts on the next step, or later from Admin → Parents."
+    );
   }
 
   return { students, warnings };

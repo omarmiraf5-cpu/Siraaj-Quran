@@ -12,6 +12,11 @@ interface OnboardingData {
   admin: { fullName: string; email: string; password: string };
   teachers: Array<{ name: string; email: string; halaqa: string }>;
   students: Array<{ name: string; age: number; halaqa: string }>;
+  // Children are named by their position in `students` above, not by name:
+  // the students don't have database ids yet while the form is open, and
+  // matching on name afterwards breaks on the two Muhammads every roster
+  // has. Positions are unambiguous and survive identical names.
+  parents?: Array<{ name: string; email: string; studentIndexes: number[] }>;
 }
 
 const AVATAR_COLORS = ["bg-subject-blue", "bg-subject-teal", "bg-subject-purple", "bg-subject-orange", "bg-subject-pink"];
@@ -70,17 +75,35 @@ export async function POST(request: NextRequest) {
     // account this time, since it was already created by the first attempt.
     const teacherList = data.teachers ?? [];
     const studentList = data.students ?? [];
+    const parentList = data.parents ?? [];
 
     const emails = [
       data.admin.email.trim().toLowerCase(),
       ...teacherList.map((t) => t.email.trim().toLowerCase()),
+      ...parentList.map((p) => p.email.trim().toLowerCase()),
     ];
     const duplicateWithinSubmission = emails.find((e, i) => emails.indexOf(e) !== i);
     if (duplicateWithinSubmission) {
       return NextResponse.json(
-        { error: `"${duplicateWithinSubmission}" is used more than once — each admin and teacher needs a different email.` },
+        { error: `"${duplicateWithinSubmission}" is used more than once — each admin, teacher, and parent needs a different email.` },
         { status: 400 }
       );
+    }
+
+    // Checked before anything is created, for the same reason the email
+    // collision above is: a parent pointing at a student who isn't in the
+    // submission would otherwise surface only after the whole school had
+    // been built and then torn back down again.
+    for (const parent of parentList) {
+      const bad = (parent.studentIndexes ?? []).find(
+        (i) => !Number.isInteger(i) || i < 0 || i >= studentList.length
+      );
+      if (bad !== undefined) {
+        return NextResponse.json(
+          { error: `Parent "${parent.name}" is linked to a student who isn't on the list — remove and re-add them.` },
+          { status: 400 }
+        );
+      }
     }
     const { data: alreadyRegistered } = await admin.from("profiles").select("email").in("email", emails);
     if (alreadyRegistered && alreadyRegistered.length > 0) {
@@ -176,6 +199,9 @@ export async function POST(request: NextRequest) {
     }
 
     const studentPins: Array<{ name: string; halaqa: string; pin: string }> = [];
+    // Parallel to studentList, so a parent's studentIndexes resolve straight
+    // into real row ids once every student exists.
+    const studentRowIds: string[] = [];
     for (const student of studentList) {
       const { data: studentRow, error: studentError } = await admin
         .from("students")
@@ -216,6 +242,58 @@ export async function POST(request: NextRequest) {
       }
 
       studentPins.push({ name: student.name, halaqa: student.halaqa, pin });
+      studentRowIds.push(studentRow.id as string);
+    }
+
+    // Parents come last, once every student has a real id to be linked to.
+    // The link rows go in through the service-role client rather than the
+    // caller's session the way /api/admin/accounts does it — during signup
+    // there is no session at all, the admin account was created seconds ago
+    // and nobody has signed into it yet.
+    const parentLogins: Array<{
+      name: string;
+      email: string;
+      password: string;
+      children: string[];
+    }> = [];
+    for (const parent of parentList) {
+      const email = parent.email.trim().toLowerCase();
+      const password = `Temp${randomPin()}${randomPin()}!`;
+      const { data: parentAuth, error: parentError } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          role: "parent",
+          full_name: parent.name.trim(),
+          school_id: schoolId,
+          must_change_password: true,
+        },
+      });
+      if (parentError) throw new Error(`Parent "${parent.name}" failed: ${parentError.message}`);
+      createdUserIds.push(parentAuth.user.id);
+
+      // Deduped because (parent_id, student_id) is the table's primary key —
+      // the same child ticked twice would abort the whole insert.
+      const childIndexes = Array.from(new Set(parent.studentIndexes ?? []));
+      if (childIndexes.length > 0) {
+        const { error: linkError } = await admin.from("parent_students").insert(
+          childIndexes.map((i) => ({
+            parent_id: parentAuth.user.id,
+            student_id: studentRowIds[i],
+          }))
+        );
+        if (linkError) {
+          throw new Error(`Linking children to "${parent.name}" failed: ${linkError.message}`);
+        }
+      }
+
+      parentLogins.push({
+        name: parent.name.trim(),
+        email,
+        password,
+        children: childIndexes.map((i) => studentList[i].name.trim()),
+      });
     }
 
     return NextResponse.json(
@@ -226,6 +304,7 @@ export async function POST(request: NextRequest) {
         adminEmail: data.admin.email,
         teachers: teacherLogins,
         students: studentPins,
+        parents: parentLogins,
       },
       { status: 201 }
     );
