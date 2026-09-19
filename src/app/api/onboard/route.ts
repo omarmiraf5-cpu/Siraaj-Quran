@@ -49,6 +49,13 @@ function randomPin() {
 export async function POST(request: NextRequest) {
   const admin = createAdminClient();
 
+  // Tracked so a failure partway through can be unwound below — otherwise a
+  // school that fails on, say, its third teacher is left half-created, and
+  // simply retrying the same submission hits "already registered" on the
+  // admin account instead of a clean second attempt.
+  let schoolId: string | undefined;
+  const createdUserIds: string[] = [];
+
   try {
     const data: OnboardingData = await request.json();
 
@@ -105,7 +112,7 @@ export async function POST(request: NextRequest) {
       .single();
     if (schoolError) throw new Error(`School creation failed: ${schoolError.message}`);
 
-    const schoolId = school.id as string;
+    schoolId = school.id as string;
 
     // handle_new_user() (schema.sql) auto-inserts the matching profiles row
     // from this metadata the moment the auth user exists, so admin/teacher
@@ -117,6 +124,7 @@ export async function POST(request: NextRequest) {
       user_metadata: { role: "admin", full_name: data.admin.fullName.trim(), school_id: schoolId },
     });
     if (adminError) throw new Error(`Admin account failed: ${adminError.message}`);
+    createdUserIds.push(adminAuth.user.id);
 
     // Each teacher's temporary password goes back to the caller with them.
     // It used to be generated here and discarded, which left every teacher a
@@ -142,6 +150,7 @@ export async function POST(request: NextRequest) {
         },
       });
       if (teacherError) throw new Error(`Teacher "${teacher.name}" failed: ${teacherError.message}`);
+      createdUserIds.push(teacherAuth.user.id);
       teacherIdByHalaqa[teacher.halaqa] = teacherAuth.user.id;
       teacherLogins.push({ name: teacher.name.trim(), email, password });
     }
@@ -190,12 +199,20 @@ export async function POST(request: NextRequest) {
         user_metadata: { role: "student", full_name: student.name.trim(), school_id: schoolId },
       });
       if (studentAuthError) throw new Error(`Student login for "${student.name}" failed: ${studentAuthError.message}`);
+      createdUserIds.push(studentAuth.user.id);
 
-      await admin.from("students").update({ pin, profile_id: studentAuth.user.id }).eq("id", studentRow.id);
+      const { error: linkError } = await admin
+        .from("students")
+        .update({ pin, profile_id: studentAuth.user.id })
+        .eq("id", studentRow.id);
+      if (linkError) throw new Error(`Linking login for "${student.name}" failed: ${linkError.message}`);
 
       const classId = classIdByHalaqa[student.halaqa];
       if (classId) {
-        await admin.from("class_enrollments").insert({ class_id: classId, student_id: studentRow.id });
+        const { error: enrollError } = await admin
+          .from("class_enrollments")
+          .insert({ class_id: classId, student_id: studentRow.id });
+        if (enrollError) throw new Error(`Enrolling "${student.name}" in "${student.halaqa}" failed: ${enrollError.message}`);
       }
 
       studentPins.push({ name: student.name, halaqa: student.halaqa, pin });
@@ -214,6 +231,23 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Onboarding error:", error);
+
+    // Best-effort unwind so the admin can just fix the one bad field and
+    // resubmit, instead of getting stuck on "already registered" for an
+    // account this same failed attempt created. Deleting the school first
+    // cascades away its profiles/classes/students rows; auth users aren't
+    // tied to the school row, so they're removed separately.
+    try {
+      if (schoolId) {
+        await admin.from("schools").delete().eq("id", schoolId);
+      }
+      for (const userId of createdUserIds) {
+        await admin.auth.admin.deleteUser(userId);
+      }
+    } catch (cleanupError) {
+      console.error("Onboarding cleanup after a failed attempt also failed:", cleanupError);
+    }
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Onboarding failed" },
       { status: 400 }
