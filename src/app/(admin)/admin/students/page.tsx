@@ -140,7 +140,10 @@ export default function AdminStudentsPage() {
       return;
     }
 
-    if (!schoolId) return;
+    if (!schoolId) {
+      setFormError("Your account isn't linked to a school yet — contact support.");
+      return;
+    }
     setSaving(true);
     setFormError(null);
     try {
