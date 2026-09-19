@@ -178,8 +178,24 @@ export default function QuranAssignmentsPage() {
     setLoading(true);
 
     try {
-      if (!selectedStudent || !selectedSurah || !ayahStart || !ayahEnd) {
-        throw new Error("Please fill in all required fields");
+      // Named individually rather than as one "fill in all required fields":
+      // with the student picker at the top of a long form, the field that's
+      // actually missing is usually scrolled out of view by the time the
+      // message appears.
+      const missing = [
+        !selectedStudent && (students.length === 0 ? null : "a student"),
+        !selectedSurah && "a surah",
+        !ayahStart && "the starting ayah",
+        !ayahEnd && "the ending ayah",
+      ].filter(Boolean) as string[];
+
+      if (!selectedStudent && students.length === 0) {
+        throw new Error(
+          "There are no students to assign to yet — add them in the admin portal first."
+        );
+      }
+      if (missing.length > 0) {
+        throw new Error(`Still needed: ${missing.join(", ")}.`);
       }
 
       const surahEndValue = parseInt(spansSurah && endSurah ? endSurah : selectedSurah);
