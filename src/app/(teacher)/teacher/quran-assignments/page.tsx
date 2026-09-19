@@ -30,7 +30,7 @@ import type { HifzPortion, QuranicAssignment, DailyRating } from "@/hooks/useQur
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, ProgressBar, RatingPill, RecitationHistory } from "@/components/portal-ui";
+import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote } from "@/components/portal-ui";
 import { IconBook, IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -99,6 +99,8 @@ export default function QuranAssignmentsPage() {
   const [success, setSuccess] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [demoCreated, setDemoCreated] = useState<QuranicAssignment[]>([]);
+  const [realAssignments, setRealAssignments] = useState<QuranicAssignment[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftRating, setDraftRating] = useState<DailyRating | null>(null);
@@ -133,16 +135,36 @@ export default function QuranAssignmentsPage() {
           return;
         }
 
-        const { data: studentData } = await supabase
+        const { data: studentData, error: studentError } = await supabase
           .from("students")
           .select("id, full_name")
           .order("full_name");
+        if (studentError) throw studentError;
 
         if (studentData) {
           setStudents(studentData);
         }
+
+        // This school's own assignments. Without loading them, the list
+        // below fell back to the sample data for everyone, so a school that
+        // had just signed up opened this page to twenty-one invented
+        // assignments belonging to a student called "Student".
+        const { data: assignmentData, error: assignmentError } = await supabase
+          .from("quranic_assignments")
+          .select(
+            "id, student_id, teacher_id, surah, ayah_start, surah_end, ayah_end, portion, assigned_at, due_date, status, memorization_level, daily_rating, teacher_notes, student_notes, created_at, updated_at"
+          )
+          .order("assigned_at", { ascending: false });
+        if (assignmentError) throw assignmentError;
+
+        setRealAssignments((assignmentData ?? []) as QuranicAssignment[]);
       } catch (err) {
         console.error("Error loading data:", err);
+        setLoadError(
+          err instanceof Error
+            ? `Couldn't load assignments: ${err.message}`
+            : "Couldn't load assignments"
+        );
       }
     };
 
@@ -220,6 +242,18 @@ export default function QuranAssignmentsPage() {
           const data = await res.json();
           throw new Error(data.error || "Failed to create assignment");
         }
+
+        // Re-read so the new assignment appears in the list below straight
+        // away. The demo branch above updates its own state in memory; this
+        // one had nothing to update until the list started showing real
+        // rows, and would otherwise look like the save hadn't worked.
+        const { data: refreshed } = await supabase
+          .from("quranic_assignments")
+          .select(
+            "id, student_id, teacher_id, surah, ayah_start, surah_end, ayah_end, portion, assigned_at, due_date, status, memorization_level, daily_rating, teacher_notes, student_notes, created_at, updated_at"
+          )
+          .order("assigned_at", { ascending: false });
+        setRealAssignments((refreshed ?? []) as QuranicAssignment[]);
       }
 
       setSuccess(true);
@@ -270,10 +304,12 @@ export default function QuranAssignmentsPage() {
   const canPreview = selectedSurah && ayahStart && ayahEnd;
 
   // Newest first, so an assignment just created shows at the top of the list
-  // below rather than getting lost among the sample data.
-  const allAssignments = [...demoCreated, ...DEMO_ASSIGNMENTS].map((a) =>
-    withOverride(a, overrides)
-  );
+  // below rather than getting lost among the rest. The sample assignments
+  // belong to demo mode only — a real school sees its own work or an empty
+  // list, never invented rows attributed to its teachers.
+  const allAssignments = (
+    isDemo ? [...demoCreated, ...DEMO_ASSIGNMENTS] : realAssignments
+  ).map((a) => withOverride(a, overrides));
 
   const startEditing = (a: QuranicAssignment) => {
     setEditingId(a.id === editingId ? null : a.id);
@@ -676,6 +712,12 @@ export default function QuranAssignmentsPage() {
         title="Current assignments"
         note={`${allAssignments.length} across all students · tap to grade`}
       >
+        {loadError && (
+          <p className="text-xs font-semibold text-red-700 dark:text-red-400 py-2">{loadError}</p>
+        )}
+        {!loadError && allAssignments.length === 0 && (
+          <EmptyNote>No assignments yet — set the first one above.</EmptyNote>
+        )}
         <ul className="divide-y divide-surface-border -my-1">
           {allAssignments.map((a) => {
             const surah = getSurahById(a.surah);
