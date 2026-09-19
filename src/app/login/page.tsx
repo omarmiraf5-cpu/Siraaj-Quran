@@ -130,7 +130,14 @@ export default function LoginPage() {
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // The trimmed values, not the raw fields: a temporary password arrives
+    // by copy and paste often enough to pick up a trailing space, and a
+    // phone keyboard will capitalise the first letter of an email address
+    // on its own. Both failed here as "invalid email or password".
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password: trimmedPass,
+    });
     if (error) { setError(t("login.invalidCredentials")); setLoading(false); return; }
     if (data.user?.user_metadata?.must_change_password) {
       router.push("/change-password");
@@ -409,6 +416,7 @@ export default function LoginPage() {
                 </span>
                 <input
                   type="email" required placeholder={t("login.emailAddress")}
+                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   value={email} onChange={(e) => setEmail(e.target.value)}
                   className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
                 />
