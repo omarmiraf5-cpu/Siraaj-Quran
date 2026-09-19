@@ -351,7 +351,7 @@ export default function LoginPage() {
                     </button>
                   ))}
                 </div>
-              ) : (
+              ) : SHOW_DEMO_LOGINS ? (
                 <div className="flex justify-center gap-3">
                   {STUDENT_AVATARS.map((av) => (
                     <button
@@ -367,6 +367,14 @@ export default function LoginPage() {
                     </button>
                   ))}
                 </div>
+              ) : (
+                // A child's roster only loads from the ?school= link their
+                // school hands out. Showing the sample avatars here instead
+                // gave a real child five strangers to choose from and a PIN
+                // that could never work, with nothing explaining why.
+                <p className="text-center text-white/70 text-sm leading-relaxed px-4">
+                  {t("login.needSchoolLink")}
+                </p>
               )}
 
               {selectedAvatar && (
