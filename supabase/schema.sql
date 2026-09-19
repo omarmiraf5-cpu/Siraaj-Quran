@@ -200,17 +200,31 @@ create table if not exists parent_students (
   primary key (parent_id, student_id)
 );
 alter table parent_students enable row level security;
+
+-- security definer, for the same reason my_role()/my_school_id() above are:
+-- students' policies need to ask parent_students a question, and
+-- parent_students' policies need to ask students one. Written as plain
+-- subqueries those two re-enter each other's RLS forever, and Postgres
+-- aborts the whole query with `42P17 infinite recursion detected in policy
+-- for relation "students"`. Reading through a definer function answers the
+-- question without re-applying the other table's policies.
+create or replace function my_children_student_ids()
+returns setof uuid
+language sql security definer stable set search_path = public
+as $$ select student_id from parent_students where parent_id = auth.uid() $$;
+
+create or replace function student_school_id(sid uuid)
+returns uuid
+language sql security definer stable set search_path = public
+as $$ select school_id from students where id = sid $$;
+
 drop policy if exists "Parents can read own links" on parent_students;
 create policy "Parents can read own links" on parent_students
   for select using (parent_id = auth.uid());
 drop policy if exists "Admins can manage parent links" on parent_students;
 create policy "Admins can manage parent links" on parent_students
   for all using (
-    exists (
-      select 1 from students s
-      join profiles p on p.school_id = s.school_id
-      where s.id = parent_students.student_id and p.id = auth.uid() and p.role = 'admin'
-    )
+    student_school_id(student_id) = my_school_id() and my_role() = 'admin'
   );
 
 -- Depends on parent_students existing, so it's defined here rather than
@@ -218,9 +232,7 @@ create policy "Admins can manage parent links" on parent_students
 -- schools' policies above).
 drop policy if exists "Parents can read own children" on students;
 create policy "Parents can read own children" on students
-  for select using (
-    id in (select student_id from parent_students where parent_id = auth.uid())
-  );
+  for select using (id in (select my_children_student_ids()));
 
 -- ══════════════════════════════════════
 -- Classes
@@ -265,19 +277,40 @@ create table if not exists class_enrollments (
   primary key (class_id, student_id)
 );
 alter table class_enrollments enable row level security;
+
+-- Same definer treatment as the students/parent_students pair above, and
+-- for the same cycle: classes' policies ask class_enrollments who is
+-- enrolled, class_enrollments' policies ask classes who owns the class.
+-- Left as plain subqueries, an admin simply listing halaqas gets
+-- `42P17 infinite recursion detected in policy for relation "classes"`
+-- and the list comes back as an error rather than as rows.
+create or replace function my_enrolled_class_ids()
+returns setof uuid
+language sql security definer stable set search_path = public
+as $$
+  select ce.class_id
+  from class_enrollments ce
+  join students s on s.id = ce.student_id
+  where s.profile_id = auth.uid()
+$$;
+
+create or replace function my_taught_class_ids()
+returns setof uuid
+language sql security definer stable set search_path = public
+as $$ select id from classes where teacher_id = auth.uid() $$;
+
+create or replace function class_school_id(cid uuid)
+returns uuid
+language sql security definer stable set search_path = public
+as $$ select school_id from classes where id = cid $$;
+
 drop policy if exists "Teachers can read enrollments for own classes" on class_enrollments;
 create policy "Teachers can read enrollments for own classes" on class_enrollments
-  for select using (
-    class_id in (select id from classes where teacher_id = auth.uid())
-  );
+  for select using (class_id in (select my_taught_class_ids()));
 drop policy if exists "Admins can manage enrollments" on class_enrollments;
 create policy "Admins can manage enrollments" on class_enrollments
   for all using (
-    exists (
-      select 1 from classes c
-      join profiles p on p.school_id = c.school_id
-      where c.id = class_enrollments.class_id and p.id = auth.uid() and p.role = 'admin'
-    )
+    class_school_id(class_id) = my_school_id() and my_role() = 'admin'
   );
 
 -- Depends on class_enrollments existing, so it's defined here rather than
@@ -285,13 +318,7 @@ create policy "Admins can manage enrollments" on class_enrollments
 -- schools' and students' policies above).
 drop policy if exists "Students can read enrolled classes" on classes;
 create policy "Students can read enrolled classes" on classes
-  for select using (
-    id in (
-      select class_id from class_enrollments ce
-      join students s on s.id = ce.student_id
-      where s.profile_id = auth.uid()
-    )
-  );
+  for select using (id in (select my_enrolled_class_ids()));
 
 -- ══════════════════════════════════════
 -- Lessons
