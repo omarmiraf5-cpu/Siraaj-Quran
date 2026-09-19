@@ -1,5 +1,12 @@
 -- MyDiiwaan School Portal — Supabase Schema
--- Run this in the Supabase SQL editor to set up the database
+-- Run this in the Supabase SQL editor to set up the database.
+--
+-- Safe to re-run in full against an existing database to catch it up on
+-- anything added since it was first set up: every statement is guarded
+-- (if not exists / or replace / drop-then-create), including every policy
+-- below, none of which Postgres lets you write as "create policy if not
+-- exists" — without the matching drop first, a second run would fail on
+-- the first one it hit instead of quietly reconciling the rest.
 
 -- Enable RLS globally
 alter default privileges in schema public grant all on tables to postgres, anon, authenticated, service_role;
@@ -63,8 +70,10 @@ alter table profiles add column if not exists is_platform_admin boolean not null
 -- constraint before an admin ever gets the chance to assign their real
 -- role and school via a follow-up update.
 alter table profiles alter column school_id drop not null;
+drop policy if exists "Users can read own profile" on profiles;
 create policy "Users can read own profile" on profiles
   for select using (auth.uid() = id);
+drop policy if exists "Users can update own profile" on profiles;
 create policy "Users can update own profile" on profiles
   for update using (auth.uid() = id);
 -- security definer + a pinned search_path so these run as the function
@@ -86,14 +95,17 @@ returns uuid
 language sql security definer stable set search_path = public
 as $$ select school_id from profiles where id = auth.uid() $$;
 
+drop policy if exists "Admins can read all school profiles" on profiles;
 create policy "Admins can read all school profiles" on profiles
   for select using (
     school_id = my_school_id() and my_role() = 'admin'
   );
+drop policy if exists "Admins can insert profiles in their school" on profiles;
 create policy "Admins can insert profiles in their school" on profiles
   for insert with check (
     school_id = my_school_id() and my_role() = 'admin'
   );
+drop policy if exists "Admins can update profiles in their school" on profiles;
 create policy "Admins can update profiles in their school" on profiles
   for update using (
     school_id = my_school_id() and my_role() = 'admin'
@@ -103,10 +115,12 @@ create policy "Admins can update profiles in their school" on profiles
 -- and role), so they're defined here rather than right after the schools
 -- table — a policy's USING clause is resolved against real tables at
 -- creation time and can't forward-reference one defined later in the file.
+drop policy if exists "Authenticated users can read their school" on schools;
 create policy "Authenticated users can read their school" on schools
   for select using (
     id in (select school_id from profiles where id = auth.uid())
   );
+drop policy if exists "Admins can update own school" on schools;
 create policy "Admins can update own school" on schools
   for update using (
     id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -154,12 +168,15 @@ create table if not exists students (
   created_at      timestamptz default now()
 );
 alter table students enable row level security;
+drop policy if exists "Admins and teachers can read students in their school" on students;
 create policy "Admins and teachers can read students in their school" on students
   for select using (
     school_id in (select school_id from profiles where id = auth.uid() and role in ('admin', 'teacher'))
   );
+drop policy if exists "Student can read own record" on students;
 create policy "Student can read own record" on students
   for select using (profile_id = auth.uid());
+drop policy if exists "Admins can manage students" on students;
 create policy "Admins can manage students" on students
   for all using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -183,8 +200,10 @@ create table if not exists parent_students (
   primary key (parent_id, student_id)
 );
 alter table parent_students enable row level security;
+drop policy if exists "Parents can read own links" on parent_students;
 create policy "Parents can read own links" on parent_students
   for select using (parent_id = auth.uid());
+drop policy if exists "Admins can manage parent links" on parent_students;
 create policy "Admins can manage parent links" on parent_students
   for all using (
     exists (
@@ -197,6 +216,7 @@ create policy "Admins can manage parent links" on parent_students
 -- Depends on parent_students existing, so it's defined here rather than
 -- alongside students' other policies (same forward-reference reason as
 -- schools' policies above).
+drop policy if exists "Parents can read own children" on students;
 create policy "Parents can read own children" on students
   for select using (
     id in (select student_id from parent_students where parent_id = auth.uid())
@@ -226,8 +246,10 @@ alter table classes enable row level security;
 -- generic-curriculum shape of this table.
 alter table classes add column if not exists schedule text;
 alter table classes alter column teacher_id drop not null;
+drop policy if exists "Teachers can read own classes" on classes;
 create policy "Teachers can read own classes" on classes
   for select using (teacher_id = auth.uid());
+drop policy if exists "Admins can manage all classes" on classes;
 create policy "Admins can manage all classes" on classes
   for all using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -243,10 +265,12 @@ create table if not exists class_enrollments (
   primary key (class_id, student_id)
 );
 alter table class_enrollments enable row level security;
+drop policy if exists "Teachers can read enrollments for own classes" on class_enrollments;
 create policy "Teachers can read enrollments for own classes" on class_enrollments
   for select using (
     class_id in (select id from classes where teacher_id = auth.uid())
   );
+drop policy if exists "Admins can manage enrollments" on class_enrollments;
 create policy "Admins can manage enrollments" on class_enrollments
   for all using (
     exists (
@@ -259,6 +283,7 @@ create policy "Admins can manage enrollments" on class_enrollments
 -- Depends on class_enrollments existing, so it's defined here rather than
 -- alongside classes' other policies (same forward-reference reason as
 -- schools' and students' policies above).
+drop policy if exists "Students can read enrolled classes" on classes;
 create policy "Students can read enrolled classes" on classes
   for select using (
     id in (
@@ -288,13 +313,16 @@ create table if not exists lessons (
   created_at   timestamptz default now()
 );
 alter table lessons enable row level security;
+drop policy if exists "School members can read published lessons" on lessons;
 create policy "School members can read published lessons" on lessons
   for select using (
     published_at is not null and
     school_id in (select school_id from profiles where id = auth.uid())
   );
+drop policy if exists "Teachers can manage own lessons" on lessons;
 create policy "Teachers can manage own lessons" on lessons
   for all using (teacher_id = auth.uid());
+drop policy if exists "Admins can manage all lessons" on lessons;
 create policy "Admins can manage all lessons" on lessons
   for all using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -316,10 +344,12 @@ create table if not exists assignments (
   created_at   timestamptz default now()
 );
 alter table assignments enable row level security;
+drop policy if exists "School members can read assignments" on assignments;
 create policy "School members can read assignments" on assignments
   for select using (
     school_id in (select school_id from profiles where id = auth.uid())
   );
+drop policy if exists "Teachers can manage own assignments" on assignments;
 create policy "Teachers can manage own assignments" on assignments
   for all using (teacher_id = auth.uid());
 
@@ -399,18 +429,22 @@ begin
   end if;
 end $$;
 alter table quranic_assignments enable row level security;
+drop policy if exists "Teachers can manage own quranic assignments" on quranic_assignments;
 create policy "Teachers can manage own quranic assignments" on quranic_assignments
   for all using (teacher_id = auth.uid());
+drop policy if exists "Students can read own quranic assignments" on quranic_assignments;
 create policy "Students can read own quranic assignments" on quranic_assignments
   for select using (
     student_id in (select id from students where profile_id = auth.uid())
   );
+drop policy if exists "Parents can read children quranic assignments" on quranic_assignments;
 create policy "Parents can read children quranic assignments" on quranic_assignments
   for select using (
     student_id in (
       select student_id from parent_students where parent_id = auth.uid()
     )
   );
+drop policy if exists "Admins can manage quranic assignments" on quranic_assignments;
 create policy "Admins can manage quranic assignments" on quranic_assignments
   for all using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -432,14 +466,17 @@ create table if not exists submissions (
   unique (assignment_id, student_id)
 );
 alter table submissions enable row level security;
+drop policy if exists "Teachers can manage submissions for own assignments" on submissions;
 create policy "Teachers can manage submissions for own assignments" on submissions
   for all using (
     assignment_id in (select id from assignments where teacher_id = auth.uid())
   );
+drop policy if exists "Students can read own submissions" on submissions;
 create policy "Students can read own submissions" on submissions
   for select using (
     student_id in (select id from students where profile_id = auth.uid())
   );
+drop policy if exists "Parents can read children submissions" on submissions;
 create policy "Parents can read children submissions" on submissions
   for select using (
     student_id in (
@@ -478,18 +515,22 @@ begin
     add constraint attendance_status_check
     check (status in ('present', 'late', 'absent', 'excused'));
 end $$;
+drop policy if exists "Teachers can manage attendance for own classes" on attendance;
 create policy "Teachers can manage attendance for own classes" on attendance
   for all using (teacher_id = auth.uid());
+drop policy if exists "Admins can read all attendance" on attendance;
 create policy "Admins can read all attendance" on attendance
   for select using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
   );
+drop policy if exists "Parents can read children attendance" on attendance;
 create policy "Parents can read children attendance" on attendance
   for select using (
     student_id in (
       select student_id from parent_students where parent_id = auth.uid()
     )
   );
+drop policy if exists "Students can read own attendance" on attendance;
 create policy "Students can read own attendance" on attendance
   for select using (
     student_id in (select id from students where profile_id = auth.uid())
@@ -511,10 +552,12 @@ create table if not exists fees (
   created_at   timestamptz default now()
 );
 alter table fees enable row level security;
+drop policy if exists "Admins can manage fees" on fees;
 create policy "Admins can manage fees" on fees
   for all using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
   );
+drop policy if exists "Parents can read own children fees" on fees;
 create policy "Parents can read own children fees" on fees
   for select using (
     student_id in (
@@ -541,18 +584,22 @@ create table if not exists subject_grades (
   unique (student_id, subject, term, school_year)
 );
 alter table subject_grades enable row level security;
+drop policy if exists "Teachers can manage grades" on subject_grades;
 create policy "Teachers can manage grades" on subject_grades
   for all using (teacher_id = auth.uid());
+drop policy if exists "Admins can read all grades" on subject_grades;
 create policy "Admins can read all grades" on subject_grades
   for select using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
   );
+drop policy if exists "Parents can read own children grades" on subject_grades;
 create policy "Parents can read own children grades" on subject_grades
   for select using (
     student_id in (
       select student_id from parent_students where parent_id = auth.uid()
     )
   );
+drop policy if exists "Students can read own grades" on subject_grades;
 create policy "Students can read own grades" on subject_grades
   for select using (
     student_id in (select id from students where profile_id = auth.uid())
@@ -572,10 +619,12 @@ create table if not exists announcements (
   created_at timestamptz default now()
 );
 alter table announcements enable row level security;
+drop policy if exists "School members can read announcements" on announcements;
 create policy "School members can read announcements" on announcements
   for select using (
     school_id in (select school_id from profiles where id = auth.uid())
   );
+drop policy if exists "Admins can manage announcements" on announcements;
 create policy "Admins can manage announcements" on announcements
   for all using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -606,16 +655,19 @@ alter table messages enable row level security;
 -- assignments all already treat "any teacher at this school" as enough —
 -- so a school that skipped that setup had a teacher who could never see a
 -- parent's messages at all: the class_enrollments join was always empty.
+drop policy if exists "Teachers can manage messages in their school" on messages;
 create policy "Teachers can manage messages in their school" on messages
   for all using (
     (school_id = my_school_id() and my_role() in ('admin', 'teacher'))
     or author_id = auth.uid()
   );
+drop policy if exists "Parents can read and send messages for own children" on messages;
 create policy "Parents can read and send messages for own children" on messages
   for all using (
     student_id in (select student_id from parent_students where parent_id = auth.uid())
     or author_id = auth.uid()
   );
+drop policy if exists "Admins can read all messages" on messages;
 create policy "Admins can read all messages" on messages
   for select using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -665,16 +717,20 @@ begin
   end if;
 end $$;
 alter table recitation_log enable row level security;
+drop policy if exists "Teachers can manage recitation log for own students" on recitation_log;
 create policy "Teachers can manage recitation log for own students" on recitation_log
   for all using (teacher_id = auth.uid());
+drop policy if exists "Students can read own recitation log" on recitation_log;
 create policy "Students can read own recitation log" on recitation_log
   for select using (
     student_id in (select id from students where profile_id = auth.uid())
   );
+drop policy if exists "Parents can read children recitation log" on recitation_log;
 create policy "Parents can read children recitation log" on recitation_log
   for select using (
     student_id in (select student_id from parent_students where parent_id = auth.uid())
   );
+drop policy if exists "Admins can read all recitation log" on recitation_log;
 create policy "Admins can read all recitation log" on recitation_log
   for select using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -697,16 +753,20 @@ create table if not exists student_stars (
   created_at  timestamptz default now()
 );
 alter table student_stars enable row level security;
+drop policy if exists "Teachers can manage stars for own students" on student_stars;
 create policy "Teachers can manage stars for own students" on student_stars
   for all using (teacher_id = auth.uid());
+drop policy if exists "Students can read own stars" on student_stars;
 create policy "Students can read own stars" on student_stars
   for select using (
     student_id in (select id from students where profile_id = auth.uid())
   );
+drop policy if exists "Parents can read children stars" on student_stars;
 create policy "Parents can read children stars" on student_stars
   for select using (
     student_id in (select student_id from parent_students where parent_id = auth.uid())
   );
+drop policy if exists "Admins can read all stars" on student_stars;
 create policy "Admins can read all stars" on student_stars
   for select using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
@@ -724,16 +784,20 @@ create table if not exists student_badges (
   unique (student_id, badge)
 );
 alter table student_badges enable row level security;
+drop policy if exists "Teachers can manage badges for own students" on student_badges;
 create policy "Teachers can manage badges for own students" on student_badges
   for all using (teacher_id = auth.uid());
+drop policy if exists "Students can read own badges" on student_badges;
 create policy "Students can read own badges" on student_badges
   for select using (
     student_id in (select id from students where profile_id = auth.uid())
   );
+drop policy if exists "Parents can read children badges" on student_badges;
 create policy "Parents can read children badges" on student_badges
   for select using (
     student_id in (select student_id from parent_students where parent_id = auth.uid())
   );
+drop policy if exists "Admins can read all badges" on student_badges;
 create policy "Admins can read all badges" on student_badges
   for select using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
