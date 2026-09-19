@@ -44,6 +44,35 @@ export default function AdminParentsPage() {
   const [newChildIds, setNewChildIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+
+  // The school's own way back when a parent loses the temporary password
+  // they were given — the same thing the Teachers page offers, so neither
+  // has to come back to whoever holds the database.
+  const resetPassword = async (p: ParentRow) => {
+    if (isDemo) {
+      setNote("Sample data — there's no real account to reset.");
+      return;
+    }
+    setResettingId(p.id);
+    setNote(null);
+    try {
+      const res = await fetch("/api/admin/accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: p.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't reset the password");
+      setNote(
+        `New temporary password for ${data.full_name || p.name}: ${data.temp_password} — share it with them. They'll set their own the next time they sign in.`
+      );
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "Couldn't reset the password");
+    } finally {
+      setResettingId(null);
+    }
+  };
 
   const loadReal = async () => {
     const { data: profileRows } = await supabase
@@ -271,6 +300,14 @@ export default function AdminParentsPage() {
                       : " · no child linked"}
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => resetPassword(p)}
+                  disabled={resettingId === p.id}
+                  className="text-[11px] font-semibold text-ink-muted hover:text-ink px-2 py-1 flex-shrink-0 transition-colors disabled:opacity-50"
+                >
+                  {resettingId === p.id ? "Resetting…" : "Reset password"}
+                </button>
               </li>
             ))}
           </ul>

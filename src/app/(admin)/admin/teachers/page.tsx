@@ -41,6 +41,8 @@ export default function AdminTeachersPage() {
   const [draftName, setDraftName] = useState("");
   const [draftEmail, setDraftEmail] = useState("");
   const [draftActive, setDraftActive] = useState(true);
+  const [resetting, setResetting] = useState(false);
+  const [resetNote, setResetNote] = useState<string | null>(null);
 
   // Real halaqas, for showing each teacher's assignment(s) — kept as a
   // separate loader so the demo path can reuse it unchanged.
@@ -153,6 +155,35 @@ export default function AdminTeachersPage() {
     setDraftName(t.name);
     setDraftEmail(t.email);
     setDraftActive(t.active !== false);
+    setResetNote(null);
+  };
+
+  // A teacher's temporary password is shown once, when the account is made.
+  // This is the school's own way back from losing it, so a forgotten
+  // password doesn't have to travel to whoever holds the database.
+  const resetPassword = async (t: DemoTeacher) => {
+    if (isDemo) {
+      setResetNote("Sample data — there's no real account to reset.");
+      return;
+    }
+    setResetting(true);
+    setResetNote(null);
+    try {
+      const res = await fetch("/api/admin/accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: t.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't reset the password");
+      setResetNote(
+        `New temporary password for ${data.full_name || t.name}: ${data.temp_password} — share it with them. They'll set their own the next time they sign in.`
+      );
+    } catch (err) {
+      setResetNote(err instanceof Error ? err.message : "Couldn't reset the password");
+    } finally {
+      setResetting(false);
+    }
   };
 
   const saveEdit = async (t: DemoTeacher) => {
@@ -337,6 +368,20 @@ export default function AdminTeachersPage() {
                         >
                           Cancel
                         </button>
+                      </div>
+
+                      <div className="pt-3 border-t border-surface-border">
+                        <button
+                          type="button"
+                          onClick={() => resetPassword(t)}
+                          disabled={resetting}
+                          className="text-[13px] font-semibold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
+                        >
+                          {resetting ? "Resetting…" : "Reset password"}
+                        </button>
+                        {resetNote && (
+                          <p className="text-[11px] text-ink mt-2 leading-relaxed break-words">{resetNote}</p>
+                        )}
                       </div>
                     </div>
                   )}

@@ -437,8 +437,12 @@ export default function LoginPage() {
                 {loading ? t("login.signingIn") : `${t("login.signInTo")} ${t(ROLES.find((r) => r.key === role)?.portalKey ?? "")}`}
               </button>
 
-              <p className="text-center text-white/55 text-sm">
-                <a href="#" className="hover:text-brand-gold-light transition">{t("login.forgotPassword")}</a>
+              {/* Plain text, not a link: there's no self-service reset, and
+                  a link that goes nowhere reads as a broken page. A school's
+                  own admin issues a new temporary password from the Teachers
+                  or Parents page. */}
+              <p className="text-center text-white/55 text-xs leading-relaxed px-4">
+                {t("login.forgotPassword")}
               </p>
 
               {SHOW_DEMO_LOGINS && (
