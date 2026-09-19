@@ -46,16 +46,22 @@ export default function AdminHalaqasPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftSchedule, setDraftSchedule] = useState("");
   const [draftTeacherId, setDraftTeacherId] = useState("");
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("classes")
       .select("id, name, teacher_id, schedule")
       .order("name");
+    // Surfaced rather than swallowed: a failure here is indistinguishable
+    // from a school with no halaqas yet, which sent us hunting through
+    // permissions and account links for something the error said outright.
+    if (error) throw new Error(`Couldn't load halaqas: ${error.message}`);
     return (data ?? []).map((c) => ({
       id: c.id,
       name: c.name,
@@ -139,7 +145,9 @@ export default function AdminHalaqasPage() {
         loadRealStudents().then(setStudents),
       ]);
     };
-    load().finally(() => setReady(true));
+    load()
+      .catch((err) => setLoadError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setReady(true));
   }, []);
 
   const addHalaqa = async (e: React.FormEvent) => {
@@ -243,6 +251,12 @@ export default function AdminHalaqasPage() {
           </button>
         }
       />
+
+      {loadError && (
+        <div className="card-quiet p-4 border border-red-300 dark:border-red-900">
+          <p className="text-xs font-semibold text-red-700 dark:text-red-400">{loadError}</p>
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={addHalaqa} className="card-quiet p-5 space-y-4">
