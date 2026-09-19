@@ -1,0 +1,412 @@
+import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  computePlanProgress,
+  todayISO,
+  type Milestone,
+} from "@/lib/yearlyPlan";
+import {
+  MILESTONES,
+  PLANS,
+  PLAN_STATUSES,
+  UNITS,
+  MAX_TEXT,
+  MAX_TITLE,
+  badDate,
+  badInt,
+  badText,
+  decodeMilestone,
+  decodePlan,
+  isFailure,
+  loadPlan,
+  milestoneTextColumns,
+  newId,
+  planTextColumns,
+  refreshAlerts,
+  requireCaller,
+  requireEncryption,
+  requireTeacher,
+  routeError,
+} from "@/lib/yearlyPlanServer";
+
+/**
+ * Yearly plans: read one in full, list the school's, create, or update.
+ *
+ * Plan content is encrypted at rest, so unlike the rest of the portal this
+ * cannot be read straight from Supabase in the browser — the browser would
+ * get ciphertext. Every read and write goes through here, where the key
+ * lives. Row-level security still does the access control: these handlers
+ * use the caller's own session, so a parent's GET is narrowed to their own
+ * children by the policy, not by a filter written here.
+ */
+
+// GET /api/yearly-plans?student_id=…   → that student's plan, in full
+// GET /api/yearly-plans?scope=school   → an index for the teacher's picker
+export async function GET(req: NextRequest) {
+  const blocked = requireEncryption();
+  if (blocked) return blocked;
+
+  const supabase = await createClient();
+  const caller = await requireCaller(supabase);
+  if (isFailure(caller)) return caller.error;
+
+  const { searchParams } = new URL(req.url);
+  const studentId = searchParams.get("student_id");
+  const scope = searchParams.get("scope");
+  const today = todayISO();
+
+  try {
+    if (scope === "school") {
+      if (caller.role !== "teacher" && caller.role !== "admin") {
+        return NextResponse.json(
+          { error: "Only a teacher or admin can list the school's plans" },
+          { status: 403 }
+        );
+      }
+      const { data: rows, error } = await supabase
+        .from(PLANS)
+        .select("*")
+        .order("academic_year", { ascending: false });
+      if (error) throw error;
+
+      // Milestones for every plan in one read rather than per plan: a
+      // school with 200 plans would otherwise be 200 round trips to draw
+      // one list.
+      const planIds = (rows ?? []).map((r) => r.id as string);
+      const byPlan = new Map<string, Milestone[]>();
+      if (planIds.length > 0) {
+        const { data: msRows, error: msError } = await supabase
+          .from(MILESTONES)
+          .select("*")
+          .in("plan_id", planIds)
+          .order("sequence");
+        if (msError) throw msError;
+        for (const row of msRows ?? []) {
+          const list = byPlan.get(row.plan_id as string) ?? [];
+          list.push(decodeMilestone(row));
+          byPlan.set(row.plan_id as string, list);
+        }
+      }
+
+      const plans = (rows ?? []).map((row) => {
+        const plan = decodePlan(row);
+        const milestones = byPlan.get(plan.id) ?? [];
+        // The index deliberately carries no progress *entries*: the pace
+        // headline only needs the milestones' own totals, and pulling every
+        // plan's full history to draw a list would be the expensive part.
+        const p = computePlanProgress(plan, milestones, [], today);
+        return {
+          id: plan.id,
+          student_id: plan.student_id,
+          academic_year: plan.academic_year,
+          status: plan.status,
+          title: plan.title,
+          unit: plan.unit,
+          starts_on: plan.starts_on,
+          ends_on: plan.ends_on,
+          milestone_count: milestones.length,
+          percent_complete: Math.round(p.percentComplete),
+          percent_expected: Math.round(p.percentExpected),
+          pace: p.pace,
+          overdue_count: p.overdueMilestones.length,
+        };
+      });
+
+      return NextResponse.json({ plans });
+    }
+
+    if (!studentId) {
+      return NextResponse.json(
+        { error: "student_id is required (or scope=school)" },
+        { status: 400 }
+      );
+    }
+
+    // Newest year first, so a student carrying last year's archived plan
+    // still opens on the current one.
+    const { data: rows, error } = await supabase
+      .from(PLANS)
+      .select("*")
+      .eq("student_id", studentId)
+      .order("academic_year", { ascending: false });
+    if (error) throw error;
+    if (!rows || rows.length === 0) {
+      // Also the answer when the plan exists but belongs to someone else's
+      // child: RLS returned nothing, and saying "not yours" rather than
+      // "none" would confirm the other family's plan exists.
+      return NextResponse.json({ plan: null, milestones: [], entries: [], alerts: [] });
+    }
+
+    const preferred =
+      rows.find((r) => r.status === "active") ?? rows.find((r) => r.status === "draft") ?? rows[0];
+
+    const loaded = await loadPlan(supabase, preferred.id as string);
+    if (!loaded) {
+      return NextResponse.json({ plan: null, milestones: [], entries: [], alerts: [] });
+    }
+
+    const alerts = await refreshAlerts(
+      supabase,
+      loaded,
+      preferred.school_id as string,
+      today
+    );
+    const progress = computePlanProgress(loaded.plan, loaded.milestones, loaded.entries, today);
+
+    return NextResponse.json({
+      ...loaded,
+      alerts,
+      progress,
+      today,
+      // So a teacher can switch between a student's years without a second
+      // request; content stays encrypted until one is actually opened.
+      other_years: rows
+        .filter((r) => r.id !== preferred.id)
+        .map((r) => ({
+          id: r.id as string,
+          academic_year: r.academic_year as string,
+          status: r.status as string,
+        })),
+    });
+  } catch (error) {
+    return routeError("load the yearly plan", error);
+  }
+}
+
+// POST /api/yearly-plans — create a plan, optionally with its milestones.
+export async function POST(req: NextRequest) {
+  const blocked = requireEncryption();
+  if (blocked) return blocked;
+
+  const supabase = await createClient();
+  const caller = await requireTeacher(supabase);
+  if (isFailure(caller)) return caller.error;
+
+  try {
+    const body = await req.json();
+    const {
+      student_id,
+      academic_year,
+      starts_on,
+      ends_on,
+      unit = "ayah",
+      status = "active",
+      title,
+      notes,
+      milestones = [],
+    } = body ?? {};
+
+    if (!student_id) {
+      return NextResponse.json({ error: "student_id is required" }, { status: 400 });
+    }
+    if (typeof academic_year !== "string" || !academic_year.trim()) {
+      return NextResponse.json({ error: "academic_year is required" }, { status: 400 });
+    }
+    if (!UNITS.includes(unit)) {
+      return NextResponse.json(
+        { error: `unit must be one of: ${UNITS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+    if (!PLAN_STATUSES.includes(status)) {
+      return NextResponse.json(
+        { error: `status must be one of: ${PLAN_STATUSES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+    const dateProblem = badDate(starts_on, "starts_on") ?? badDate(ends_on, "ends_on");
+    if (dateProblem) return NextResponse.json({ error: dateProblem }, { status: 400 });
+    if (starts_on >= ends_on) {
+      return NextResponse.json(
+        { error: "The plan's end date must come after its start date" },
+        { status: 400 }
+      );
+    }
+    const textProblem =
+      badText(title, "title", MAX_TITLE) ?? badText(notes, "notes", MAX_TEXT);
+    if (textProblem) return NextResponse.json({ error: textProblem }, { status: 400 });
+
+    if (!Array.isArray(milestones)) {
+      return NextResponse.json({ error: "milestones must be a list" }, { status: 400 });
+    }
+    if (milestones.length > 52) {
+      return NextResponse.json(
+        { error: "A plan can hold at most 52 milestones" },
+        { status: 400 }
+      );
+    }
+
+    // The student must be in the caller's own school. RLS on yearly_plans
+    // would refuse the insert anyway, but it would refuse it as a policy
+    // violation after the row had been built — this names the actual
+    // problem, and refuses before anything is written.
+    const { data: student, error: studentError } = await supabase
+      .from("students")
+      .select("id, school_id")
+      .eq("id", student_id)
+      .maybeSingle();
+    if (studentError) throw studentError;
+    if (!student) {
+      return NextResponse.json({ error: "No such student in your school" }, { status: 404 });
+    }
+    if (student.school_id !== caller.school_id) {
+      return NextResponse.json(
+        { error: "That student belongs to a different school" },
+        { status: 403 }
+      );
+    }
+
+    const planId = newId();
+    const { error: insertError } = await supabase.from(PLANS).insert({
+      id: planId,
+      student_id,
+      teacher_id: caller.id,
+      school_id: caller.school_id,
+      academic_year: academic_year.trim(),
+      starts_on,
+      ends_on,
+      unit,
+      status,
+      ...planTextColumns(planId, title ?? null, notes ?? null),
+    });
+    if (insertError) throw insertError;
+
+    if (milestones.length > 0) {
+      const rows = [];
+      for (let i = 0; i < milestones.length; i++) {
+        const m = milestones[i];
+        const problem =
+          badDate(m.starts_on, `milestone ${i + 1} starts_on`) ??
+          badDate(m.due_on, `milestone ${i + 1} due_on`) ??
+          badInt(m.target_units ?? 0, `milestone ${i + 1} target_units`) ??
+          badText(m.title, `milestone ${i + 1} title`, MAX_TITLE) ??
+          badText(m.description, `milestone ${i + 1} description`, MAX_TEXT);
+        if (problem) {
+          // Unwind the plan so the teacher can fix the one bad row and
+          // resubmit, instead of hitting "already has a plan for that year"
+          // on their second attempt.
+          await supabase.from(PLANS).delete().eq("id", planId);
+          return NextResponse.json({ error: problem }, { status: 400 });
+        }
+        if (m.due_on < m.starts_on) {
+          await supabase.from(PLANS).delete().eq("id", planId);
+          return NextResponse.json(
+            { error: `Milestone ${i + 1} is due before it starts` },
+            { status: 400 }
+          );
+        }
+        const id = newId();
+        rows.push({
+          id,
+          plan_id: planId,
+          sequence: i + 1,
+          starts_on: m.starts_on,
+          due_on: m.due_on,
+          target_units: m.target_units ?? 0,
+          ...milestoneTextColumns(id, m.title ?? null, m.description ?? null),
+        });
+      }
+      const { error: msError } = await supabase.from(MILESTONES).insert(rows);
+      if (msError) {
+        await supabase.from(PLANS).delete().eq("id", planId);
+        throw msError;
+      }
+    }
+
+    const loaded = await loadPlan(supabase, planId);
+    return NextResponse.json({ ...loaded }, { status: 201 });
+  } catch (error) {
+    return routeError("create the yearly plan", error);
+  }
+}
+
+// PATCH /api/yearly-plans — edit the plan itself (not its milestones).
+export async function PATCH(req: NextRequest) {
+  const blocked = requireEncryption();
+  if (blocked) return blocked;
+
+  const supabase = await createClient();
+  const caller = await requireTeacher(supabase);
+  if (isFailure(caller)) return caller.error;
+
+  try {
+    const body = await req.json();
+    const { id, title, notes, status, starts_on, ends_on, unit, academic_year } = body ?? {};
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+    const { data: existing, error: readError } = await supabase
+      .from(PLANS)
+      .select("id, school_id, starts_on, ends_on")
+      .eq("id", id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!existing) return NextResponse.json({ error: "No such plan" }, { status: 404 });
+
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    if (status !== undefined) {
+      if (!PLAN_STATUSES.includes(status)) {
+        return NextResponse.json(
+          { error: `status must be one of: ${PLAN_STATUSES.join(", ")}` },
+          { status: 400 }
+        );
+      }
+      patch.status = status;
+    }
+    if (unit !== undefined) {
+      if (!UNITS.includes(unit)) {
+        return NextResponse.json(
+          { error: `unit must be one of: ${UNITS.join(", ")}` },
+          { status: 400 }
+        );
+      }
+      patch.unit = unit;
+    }
+    if (academic_year !== undefined) {
+      if (typeof academic_year !== "string" || !academic_year.trim()) {
+        return NextResponse.json({ error: "academic_year cannot be empty" }, { status: 400 });
+      }
+      patch.academic_year = academic_year.trim();
+    }
+    if (starts_on !== undefined) {
+      const problem = badDate(starts_on, "starts_on");
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      patch.starts_on = starts_on;
+    }
+    if (ends_on !== undefined) {
+      const problem = badDate(ends_on, "ends_on");
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      patch.ends_on = ends_on;
+    }
+    // Checked against whichever side is not being changed, so moving only
+    // the start date past the existing end is caught here rather than by
+    // the column constraint.
+    const nextStart = (patch.starts_on as string) ?? existing.starts_on;
+    const nextEnd = (patch.ends_on as string) ?? existing.ends_on;
+    if (nextStart >= nextEnd) {
+      return NextResponse.json(
+        { error: "The plan's end date must come after its start date" },
+        { status: 400 }
+      );
+    }
+
+    const textProblem =
+      badText(title, "title", MAX_TITLE) ?? badText(notes, "notes", MAX_TEXT);
+    if (textProblem) return NextResponse.json({ error: textProblem }, { status: 400 });
+    Object.assign(patch, planTextColumns(id, title, notes));
+
+    const { error: updateError } = await supabase.from(PLANS).update(patch).eq("id", id);
+    if (updateError) throw updateError;
+
+    const loaded = await loadPlan(supabase, id);
+    if (!loaded) return NextResponse.json({ error: "No such plan" }, { status: 404 });
+    const alerts = await refreshAlerts(supabase, loaded, existing.school_id as string);
+    return NextResponse.json({
+      ...loaded,
+      alerts,
+      progress: computePlanProgress(loaded.plan, loaded.milestones, loaded.entries),
+    });
+  } catch (error) {
+    return routeError("update the yearly plan", error);
+  }
+}

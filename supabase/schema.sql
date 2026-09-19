@@ -831,6 +831,241 @@ create policy "Admins can read all badges" on student_badges
   );
 
 -- ══════════════════════════════════════
+-- Individualized yearly Qur'an plan
+-- ══════════════════════════════════════
+-- A yearly plan is the long arc a teacher sets for one student: where the
+-- child should be by Ramadan, where by the end of the year. It is split
+-- into milestones with their own dates and targets, and progress is
+-- recorded against those milestones rather than against the year as a
+-- whole — which is what makes "is this child behind?" answerable at all.
+-- One running total against one end date can only say whether the year is
+-- on course; the milestone schedule is what says whether this month is.
+--
+-- ── On the _enc columns ──────────────────────────────────────────────
+-- Every field carrying what a teacher actually wrote about a child — plan
+-- titles, milestone descriptions, progress remarks, the text of an alert —
+-- is stored as ciphertext, encrypted by the application (src/lib/
+-- planCrypto.ts) before it is ever sent to Postgres. They are text columns
+-- because that is what an AES-256-GCM envelope serialises to. Nothing in
+-- the database can read them, and neither can anyone holding a database
+-- backup or a leaked service-role key without also holding
+-- PLAN_ENCRYPTION_KEY, which lives only in the server's environment.
+--
+-- The structural columns around them are deliberately NOT encrypted:
+-- student_id, school_id, the dates, the unit counts, the status enums.
+-- Three reasons, in order of weight:
+--   1. RLS is the access control for this module, and a policy cannot read
+--      through ciphertext. Encrypting student_id would leave no way for a
+--      policy to scope a row to a parent's own child, and the only thing
+--      protecting it would be application code remembering to filter.
+--   2. Progress and pace are computed from dates and integers. Encrypted,
+--      every one would have to be pulled into Node and decrypted before a
+--      single comparison — no ordering, no date ranges, no usable index.
+--   3. They carry no content on their own. "42 ayahs by 2026-03-01" hung
+--      off an opaque row id says nothing about a child; the sentence the
+--      teacher wrote beside it does, and that sentence is encrypted.
+-- If a deployment needs the dates hidden too, that is a real change and
+-- not a config flag: it costs the RLS policies below and all SQL-side
+-- ordering, and the progress sweep becomes a full decrypt of every plan.
+
+create table if not exists yearly_plans (
+  id                uuid primary key default gen_random_uuid(),
+  student_id        uuid not null references students(id) on delete cascade,
+  teacher_id        uuid not null references profiles(id) on delete cascade,
+  school_id         uuid not null references schools(id) on delete cascade,
+  -- Plain label like '2025-2026'. Kept clear so a school can list which
+  -- years it has on file without decrypting every plan it owns.
+  academic_year     text not null,
+  starts_on         date not null,
+  ends_on           date not null,
+  -- What the targets below are counted in. A hifz plan counts ayahs; a
+  -- qaidah plan counts pages or lessons.
+  unit              text not null default 'ayah'
+                    check (unit in ('ayah', 'page', 'line', 'surah', 'juz', 'lesson')),
+  status            text not null default 'draft'
+                    check (status in ('draft', 'active', 'completed', 'archived')),
+  -- Encrypted: the teacher's own words.
+  title_enc         text,
+  notes_enc         text,
+  created_at        timestamptz default now(),
+  updated_at        timestamptz default now(),
+  -- A year ending before it starts would make every pace calculation below
+  -- divide by a negative span, so it is refused at the column.
+  constraint yearly_plans_dates_ordered check (ends_on > starts_on),
+  -- One plan per student per year. A student may carry an archived plan
+  -- from last year and a draft for next at the same time, so uniqueness is
+  -- on the pair rather than on student_id alone.
+  constraint yearly_plans_one_per_year unique (student_id, academic_year)
+);
+alter table yearly_plans enable row level security;
+
+create table if not exists yearly_plan_milestones (
+  id                uuid primary key default gen_random_uuid(),
+  plan_id           uuid not null references yearly_plans(id) on delete cascade,
+  -- Position in the plan, 1-based. Ordering by due_on alone breaks when two
+  -- milestones share a date, which happens whenever a teacher splits a
+  -- month into a memorisation goal and a revision goal.
+  sequence          int not null check (sequence >= 1),
+  starts_on         date not null,
+  due_on            date not null,
+  -- How many units this milestone adds — not a running total. The plan's
+  -- total is the sum, so editing one milestone cannot silently desync the
+  -- rest from a stored grand total.
+  target_units      int not null default 0 check (target_units >= 0),
+  -- How many the teacher has signed off. Not capped against target_units
+  -- here: a child reciting further than the milestone asked is a real
+  -- thing, and the pace maths clamps it where clamping matters rather than
+  -- refusing the write and losing the fact.
+  completed_units   int not null default 0 check (completed_units >= 0),
+  status            text not null default 'pending'
+                    check (status in ('pending', 'in_progress', 'completed', 'missed')),
+  completed_on      date,
+  -- Encrypted: the teacher's own words.
+  title_enc         text,
+  description_enc   text,
+  created_at        timestamptz default now(),
+  updated_at        timestamptz default now(),
+  constraint yearly_plan_milestones_dates_ordered check (due_on >= starts_on),
+  constraint yearly_plan_milestones_seq_unique unique (plan_id, sequence)
+);
+alter table yearly_plan_milestones enable row level security;
+
+-- Every progress update a teacher records, kept rather than overwritten:
+-- milestones.completed_units is the current figure, this is how it got
+-- there. "When did she start falling behind?" is answered from here.
+create table if not exists yearly_plan_progress (
+  id                uuid primary key default gen_random_uuid(),
+  milestone_id      uuid not null references yearly_plan_milestones(id) on delete cascade,
+  -- Denormalised from the milestone so a plan's whole history is one
+  -- indexed read. Reached through the milestone it would be a join, and the
+  -- RLS policy on the far side would be re-derived per row.
+  plan_id           uuid not null references yearly_plans(id) on delete cascade,
+  teacher_id        uuid not null references profiles(id) on delete cascade,
+  recorded_on       date not null default current_date,
+  -- The milestone's completed_units as of this entry, not a delta: a
+  -- teacher correcting yesterday's figure downwards is ordinary, and deltas
+  -- would record that as an awkward negative row.
+  units_after       int not null check (units_after >= 0),
+  note_enc          text,
+  created_at        timestamptz default now()
+);
+alter table yearly_plan_progress enable row level security;
+
+-- Alerts are persisted rather than recomputed for display only, for two
+-- reasons: a parent should see the same banner the teacher sees, and "this
+-- child has been behind since February" is a fact about a date, which needs
+-- somewhere to live. Clearing is a resolved_on timestamp rather than a
+-- delete, so the history survives a child catching back up.
+create table if not exists yearly_plan_alerts (
+  id                uuid primary key default gen_random_uuid(),
+  plan_id           uuid not null references yearly_plans(id) on delete cascade,
+  student_id        uuid not null references students(id) on delete cascade,
+  school_id         uuid not null references schools(id) on delete cascade,
+  code              text not null
+                    check (code in ('behind_schedule', 'milestone_overdue', 'no_recent_progress', 'ending_incomplete')),
+  level             text not null default 'warning' check (level in ('info', 'warning', 'critical')),
+  triggered_on      date not null default current_date,
+  resolved_on       date,
+  acknowledged_at   timestamptz,
+  detail_enc        text,
+  created_at        timestamptz default now(),
+  -- One alert per plan per kind per day. Without this the sweep would add a
+  -- fresh row every time a parent opened the page.
+  constraint yearly_plan_alerts_one_open unique (plan_id, code, triggered_on)
+);
+alter table yearly_plan_alerts enable row level security;
+
+-- ── RLS helpers ──────────────────────────────────────────────────────
+-- Security definer for the same reason as the helpers further up: a
+-- milestone's policy has to ask its plan a question, and asking it as a
+-- plain subquery re-enters yearly_plans' own policies, which ask students,
+-- which ask parent_students. Postgres gives up on that with
+-- `42P17 infinite recursion detected in policy for relation "yearly_plans"`.
+create or replace function plan_student_id(pid uuid)
+returns uuid
+language sql security definer stable set search_path = public
+as $$ select student_id from yearly_plans where id = pid $$;
+
+create or replace function plan_school_id(pid uuid)
+returns uuid
+language sql security definer stable set search_path = public
+as $$ select school_id from yearly_plans where id = pid $$;
+
+create or replace function milestone_plan_id(mid uuid)
+returns uuid
+language sql security definer stable set search_path = public
+as $$ select plan_id from yearly_plan_milestones where id = mid $$;
+
+-- ── yearly_plans ─────────────────────────────────────────────────────
+-- Teachers reach any plan in their own school, not only ones they wrote:
+-- halaqas get reassigned mid-year, and a plan whose author has left has to
+-- stay editable by whoever took the class over. The school boundary is the
+-- one that actually matters, and it is enforced here rather than trusted to
+-- the client.
+drop policy if exists "Teachers can manage plans in their school" on yearly_plans;
+create policy "Teachers can manage plans in their school" on yearly_plans
+  for all using (school_id = my_school_id() and my_role() in ('teacher', 'admin'));
+
+drop policy if exists "Parents can read own children plans" on yearly_plans;
+create policy "Parents can read own children plans" on yearly_plans
+  for select using (student_id in (select my_children_student_ids()));
+
+drop policy if exists "Students can read own plan" on yearly_plans;
+create policy "Students can read own plan" on yearly_plans
+  for select using (
+    student_id in (select id from students where profile_id = auth.uid())
+  );
+
+-- ── yearly_plan_milestones ───────────────────────────────────────────
+drop policy if exists "Teachers can manage milestones in their school" on yearly_plan_milestones;
+create policy "Teachers can manage milestones in their school" on yearly_plan_milestones
+  for all using (plan_school_id(plan_id) = my_school_id() and my_role() in ('teacher', 'admin'));
+
+drop policy if exists "Parents can read own children milestones" on yearly_plan_milestones;
+create policy "Parents can read own children milestones" on yearly_plan_milestones
+  for select using (plan_student_id(plan_id) in (select my_children_student_ids()));
+
+drop policy if exists "Students can read own milestones" on yearly_plan_milestones;
+create policy "Students can read own milestones" on yearly_plan_milestones
+  for select using (
+    plan_student_id(plan_id) in (select id from students where profile_id = auth.uid())
+  );
+
+-- ── yearly_plan_progress ─────────────────────────────────────────────
+drop policy if exists "Teachers can manage progress in their school" on yearly_plan_progress;
+create policy "Teachers can manage progress in their school" on yearly_plan_progress
+  for all using (plan_school_id(plan_id) = my_school_id() and my_role() in ('teacher', 'admin'));
+
+drop policy if exists "Parents can read own children progress" on yearly_plan_progress;
+create policy "Parents can read own children progress" on yearly_plan_progress
+  for select using (plan_student_id(plan_id) in (select my_children_student_ids()));
+
+drop policy if exists "Students can read own plan progress" on yearly_plan_progress;
+create policy "Students can read own plan progress" on yearly_plan_progress
+  for select using (
+    plan_student_id(plan_id) in (select id from students where profile_id = auth.uid())
+  );
+
+-- ── yearly_plan_alerts ───────────────────────────────────────────────
+drop policy if exists "Teachers can manage plan alerts in their school" on yearly_plan_alerts;
+create policy "Teachers can manage plan alerts in their school" on yearly_plan_alerts
+  for all using (school_id = my_school_id() and my_role() in ('teacher', 'admin'));
+
+drop policy if exists "Parents can read own children plan alerts" on yearly_plan_alerts;
+create policy "Parents can read own children plan alerts" on yearly_plan_alerts
+  for select using (student_id in (select my_children_student_ids()));
+
+-- A parent may update their own child's alert rows, but the only column the
+-- application ever sets from a parent request is acknowledged_at — that is
+-- what dismissing the banner writes. Postgres has no column-level grant
+-- inside a policy, so that narrowing lives in the API route; this policy's
+-- job is the row boundary, and it holds whatever the route does.
+drop policy if exists "Parents can acknowledge own children plan alerts" on yearly_plan_alerts;
+create policy "Parents can acknowledge own children plan alerts" on yearly_plan_alerts
+  for update using (student_id in (select my_children_student_ids()))
+  with check (student_id in (select my_children_student_ids()));
+
+-- ══════════════════════════════════════
 -- Indexes for performance
 -- ══════════════════════════════════════
 create index if not exists idx_profiles_school   on profiles(school_id);
@@ -855,3 +1090,17 @@ create index if not exists idx_recitation_log_student on recitation_log(student_
 create index if not exists idx_recitation_log_date on recitation_log(session_date);
 create index if not exists idx_student_stars_student on student_stars(student_id);
 create index if not exists idx_student_badges_student on student_badges(student_id);
+create index if not exists idx_yearly_plans_student on yearly_plans(student_id);
+create index if not exists idx_yearly_plans_school on yearly_plans(school_id);
+-- The teacher portal's default view is "active plans in my school", and the
+-- alert sweep walks the same set.
+create index if not exists idx_yearly_plans_school_status on yearly_plans(school_id, status);
+-- Milestones are always read as a plan's ordered list, never individually.
+create index if not exists idx_yearly_plan_milestones_plan on yearly_plan_milestones(plan_id, sequence);
+create index if not exists idx_yearly_plan_milestones_due on yearly_plan_milestones(due_on);
+create index if not exists idx_yearly_plan_progress_plan on yearly_plan_progress(plan_id, recorded_on);
+create index if not exists idx_yearly_plan_progress_milestone on yearly_plan_progress(milestone_id);
+-- Partial: the only alerts anyone queries are the open ones. A school that
+-- has run for years accumulates resolved rows this index never carries.
+create index if not exists idx_yearly_plan_alerts_open
+  on yearly_plan_alerts(student_id, code) where resolved_on is null;

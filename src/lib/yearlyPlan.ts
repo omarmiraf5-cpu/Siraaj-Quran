@@ -1,0 +1,668 @@
+/**
+ * Progress and pace for an individualized yearly Qur'an plan.
+ *
+ * Pure functions with no Supabase, no crypto and no React, for two
+ * reasons: the same numbers have to come out on the server (where alerts
+ * are persisted) and in the browser (where the parent's dial is drawn), and
+ * a discrepancy between the two would be invisible and maddening. Keeping
+ * the maths in one dependency-free place also means it can be tested
+ * directly against a table of dates rather than through a running app.
+ *
+ * ── How "behind" is decided ──────────────────────────────────────────
+ * Not by comparing today's total against the year's end target — that only
+ * ever says whether the finish line is reachable, which stays true until
+ * it suddenly isn't, usually in May. It is decided against the milestone
+ * schedule: each milestone contributes its target linearly across its own
+ * window, so at any date there is a figure for where the child was
+ * supposed to be. A child behind in November shows as behind in November.
+ */
+
+/**
+ * What a field reads as when the database held something but this
+ * deployment could not open it — a row written under a key that has since
+ * been rotated away, or a tampered envelope.
+ *
+ * Declared here, in the module with no Node dependencies, rather than in
+ * planCrypto: the UI has to recognise it to render "unreadable" instead of
+ * the marker itself, and importing planCrypto from a client component
+ * would pull node:crypto — and the key's own env var — toward the browser
+ * bundle. planCrypto re-exports it.
+ *
+ * U+FFFD rather than NUL: the value is serialised into JSON responses, and
+ * NUL bytes make that payload binary to every proxy and log along the way.
+ */
+export const UNREADABLE = "�unreadable�";
+
+/** Display form for any decrypted field. */
+export function readable(value: string | null | undefined, fallback = "—"): string {
+  if (value == null || value === "") return fallback;
+  if (value === UNREADABLE) return "⚠ unreadable";
+  return value;
+}
+
+export type PlanUnit = "ayah" | "page" | "line" | "surah" | "juz" | "lesson";
+export type PlanStatus = "draft" | "active" | "completed" | "archived";
+export type MilestoneStatus = "pending" | "in_progress" | "completed" | "missed";
+export type PaceStatus = "not_started" | "ahead" | "on_track" | "at_risk" | "behind" | "complete";
+export type AlertCode =
+  | "behind_schedule"
+  | "milestone_overdue"
+  | "no_recent_progress"
+  | "ending_incomplete";
+export type AlertLevel = "info" | "warning" | "critical";
+
+/** A milestone as the app holds it: content already decrypted. */
+export interface Milestone {
+  id: string;
+  sequence: number;
+  starts_on: string; // YYYY-MM-DD
+  due_on: string; // YYYY-MM-DD
+  target_units: number;
+  completed_units: number;
+  status: MilestoneStatus;
+  completed_on: string | null;
+  title: string | null;
+  description: string | null;
+}
+
+export interface Plan {
+  id: string;
+  student_id: string;
+  academic_year: string;
+  starts_on: string;
+  ends_on: string;
+  unit: PlanUnit;
+  status: PlanStatus;
+  title: string | null;
+  notes: string | null;
+}
+
+export interface ProgressEntry {
+  id: string;
+  milestone_id: string;
+  recorded_on: string;
+  units_after: number;
+  note: string | null;
+}
+
+export interface PlanAlert {
+  code: AlertCode;
+  level: AlertLevel;
+  title: string;
+  detail: string;
+}
+
+/* ── Tunables ──────────────────────────────────────────────────────────
+   Collected here rather than inlined, because a school that runs an
+   intensive summer programme will want them different from one running a
+   weekend madrasah, and hunting thresholds through three files is how they
+   end up inconsistent. */
+export const PACE = {
+  /** At or above this share of expected, the child is ahead. */
+  aheadRatio: 1.05,
+  /** At or above this, on track. */
+  onTrackRatio: 0.95,
+  /** At or above this, at risk. Below it, behind. */
+  atRiskRatio: 0.85,
+  /** Days without any recorded progress before that becomes an alert. */
+  staleAfterDays: 21,
+  /** How close to the end date "ending soon" starts meaning something. */
+  endingSoonDays: 60,
+  /** Projected finish below this share of the total is worth flagging. */
+  endingShortfallRatio: 0.9,
+} as const;
+
+/* ── Dates ─────────────────────────────────────────────────────────────
+   Plan dates are calendar days, never instants. Parsing "2026-03-01" with
+   `new Date(...)` gives midnight UTC, which in Edmonton is the evening of
+   28 February — enough to shift a milestone into the wrong month and make
+   a child look a day behind at the turn of every month. Anchoring at UTC
+   noon keeps the day stable whichever side of UTC the school sits. */
+export function parseDay(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0));
+}
+
+export function toISODate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+export function daysBetween(from: string, to: string): number {
+  return Math.round((parseDay(to).getTime() - parseDay(from).getTime()) / 86_400_000);
+}
+
+export function addDays(iso: string, days: number): string {
+  const d = parseDay(iso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return toISODate(d);
+}
+
+/** Today as a plan-shaped date string, in the viewer's own timezone —
+ *  a parent in Toronto and one in Vancouver should both see their own
+ *  "today", not UTC's. */
+export function todayISO(now: Date = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+/* ── Expected progress ─────────────────────────────────────────────── */
+
+/**
+ * Where a milestone expects the child to be on a given day. Before it
+ * opens, nothing; after it closes, all of it; in between, straight-line.
+ *
+ * Straight-line rather than anything cleverer on purpose: a teacher who
+ * wants the pace to step rather than slope says so by writing two
+ * milestones, and a curve nobody asked for would make "why does it say
+ * I'm behind?" unanswerable.
+ */
+export function expectedUnitsForMilestone(m: Milestone, onDate: string): number {
+  const span = daysBetween(m.starts_on, m.due_on);
+  const elapsed = daysBetween(m.starts_on, onDate);
+  // Checked before the elapsed<=0 branch, not after: a milestone that opens
+  // and closes on the same day has a zero-day span AND zero elapsed on its
+  // own due date, so testing elapsed first would report nothing expected on
+  // the very day the whole thing falls due. It is all-or-nothing, and
+  // dividing by the zero span below would be a NaN through every total.
+  if (span <= 0) return elapsed >= 0 ? m.target_units : 0;
+  if (elapsed <= 0) return 0;
+  if (elapsed >= span) return m.target_units;
+  return (m.target_units * elapsed) / span;
+}
+
+/** Where the whole plan expects the child to be on a given day. */
+export function expectedUnitsOn(milestones: Milestone[], onDate: string): number {
+  return milestones.reduce((sum, m) => sum + expectedUnitsForMilestone(m, onDate), 0);
+}
+
+/* ── Actual progress ───────────────────────────────────────────────── */
+
+/**
+ * What a milestone stood at on a given day, reconstructed from the log.
+ *
+ * `units_after` is an absolute figure rather than a delta, so the answer is
+ * simply the newest entry on or before that day — which also means a
+ * teacher correcting a number downwards is handled with no special case.
+ * With no entry at or before the date, the milestone had not been touched
+ * yet, which is 0 rather than its current figure.
+ */
+export function actualUnitsForMilestoneOn(
+  milestone: Milestone,
+  entries: ProgressEntry[],
+  onDate: string
+): number {
+  let best: ProgressEntry | null = null;
+  for (const e of entries) {
+    if (e.milestone_id !== milestone.id) continue;
+    if (daysBetween(e.recorded_on, onDate) < 0) continue; // recorded after onDate
+    if (!best || daysBetween(best.recorded_on, e.recorded_on) >= 0) best = e;
+  }
+  return best ? best.units_after : 0;
+}
+
+/**
+ * The plan's total on a given day. For today or later this trusts the
+ * milestones' own completed_units rather than replaying the log: that is
+ * the live figure, and a teacher who edits a milestone directly (rather
+ * than through the progress form) would otherwise not show up at all.
+ */
+export function actualUnitsOn(
+  milestones: Milestone[],
+  entries: ProgressEntry[],
+  onDate: string,
+  today: string = todayISO()
+): number {
+  if (daysBetween(today, onDate) >= 0) {
+    return milestones.reduce((sum, m) => sum + m.completed_units, 0);
+  }
+  return milestones.reduce(
+    (sum, m) => sum + actualUnitsForMilestoneOn(m, entries, onDate),
+    0
+  );
+}
+
+/* ── The summary everything else reads ─────────────────────────────── */
+
+export interface PlanProgress {
+  /** Sum of every milestone's target. */
+  totalUnits: number;
+  /** Where the child actually is. */
+  actualUnits: number;
+  /** Where the schedule says they should be today. */
+  expectedUnits: number;
+  /** Positive when ahead, negative when behind. */
+  varianceUnits: number;
+  /** actual ÷ total, 0–100. */
+  percentComplete: number;
+  /** expected ÷ total, 0–100 — where the marker on the bar goes. */
+  percentExpected: number;
+  /** actual ÷ expected. 1 is exactly on schedule. */
+  paceRatio: number;
+  pace: PaceStatus;
+  /** False when the plan has no targets to measure against yet. */
+  measurable: boolean;
+  daysTotal: number;
+  daysElapsed: number;
+  daysRemaining: number;
+  /** Where this pace lands by the end date, if nothing changes. */
+  projectedUnits: number;
+  /** Units per week needed from today to finish on time. 0 when done. */
+  requiredPerWeek: number;
+  /** Units per week actually achieved so far. */
+  currentPerWeek: number;
+  /** Milestones past due and not finished. */
+  overdueMilestones: Milestone[];
+  /** Days since the last recorded progress, null if never. */
+  daysSinceProgress: number | null;
+}
+
+export function computePlanProgress(
+  plan: Plan,
+  milestones: Milestone[],
+  entries: ProgressEntry[] = [],
+  today: string = todayISO()
+): PlanProgress {
+  const totalUnits = milestones.reduce((s, m) => s + m.target_units, 0);
+  const actualUnits = milestones.reduce((s, m) => s + m.completed_units, 0);
+  const expectedRaw = expectedUnitsOn(milestones, today);
+  const expectedUnits = Math.round(expectedRaw * 100) / 100;
+
+  const daysTotal = Math.max(1, daysBetween(plan.starts_on, plan.ends_on));
+  const daysElapsed = clamp(daysBetween(plan.starts_on, today), 0, daysTotal);
+  const daysRemaining = Math.max(0, daysBetween(today, plan.ends_on));
+
+  const measurable = totalUnits > 0;
+  const percentComplete = measurable ? clamp((actualUnits / totalUnits) * 100, 0, 100) : 0;
+  const percentExpected = measurable ? clamp((expectedRaw / totalUnits) * 100, 0, 100) : 0;
+
+  // Before the schedule expects anything, a ratio is meaningless — dividing
+  // by zero to decide a child is infinitely ahead on day one is worse than
+  // saying the plan hasn't started.
+  const paceRatio = expectedRaw > 0 ? actualUnits / expectedRaw : 1;
+
+  const overdueMilestones = milestones.filter(
+    (m) =>
+      daysBetween(m.due_on, today) > 0 &&
+      m.status !== "completed" &&
+      m.completed_units < m.target_units
+  );
+
+  let pace: PaceStatus;
+  if (!measurable || daysBetween(plan.starts_on, today) < 0) {
+    pace = "not_started";
+  } else if (actualUnits >= totalUnits) {
+    pace = "complete";
+  } else if (expectedRaw <= 0) {
+    pace = "not_started";
+  } else if (paceRatio >= PACE.aheadRatio) {
+    pace = "ahead";
+  } else if (paceRatio >= PACE.onTrackRatio) {
+    pace = "on_track";
+  } else if (paceRatio >= PACE.atRiskRatio) {
+    pace = "at_risk";
+  } else {
+    pace = "behind";
+  }
+
+  // A child can sit at 98% of the expected total while having skipped a
+  // whole milestone, because running ahead on one covers for the other.
+  // The headline should not read "on track" in that case.
+  if (overdueMilestones.length > 0 && (pace === "on_track" || pace === "ahead")) {
+    pace = "at_risk";
+  }
+
+  const currentPerWeek = daysElapsed > 0 ? (actualUnits / daysElapsed) * 7 : 0;
+  const projectedUnits =
+    daysElapsed > 0 ? Math.round((actualUnits / daysElapsed) * daysTotal) : actualUnits;
+  const remainingUnits = Math.max(0, totalUnits - actualUnits);
+  const requiredPerWeek =
+    remainingUnits === 0 ? 0 : daysRemaining > 0 ? (remainingUnits / daysRemaining) * 7 : remainingUnits;
+
+  // Future-dated entries are ignored rather than counted as recent work.
+  // A session recorded for next March has not happened, and treating it as
+  // the newest entry would silence the stale-plan alert for months — which
+  // is exactly the case where a mistyped year needs to be noticed. Ignored,
+  // it leaves daysSinceProgress null and the alert fires.
+  let daysSinceProgress: number | null = null;
+  for (const e of entries) {
+    const age = daysBetween(e.recorded_on, today);
+    if (age < 0) continue;
+    if (daysSinceProgress === null || age < daysSinceProgress) daysSinceProgress = age;
+  }
+
+  return {
+    totalUnits,
+    actualUnits,
+    expectedUnits,
+    varianceUnits: Math.round((actualUnits - expectedRaw) * 100) / 100,
+    percentComplete,
+    percentExpected,
+    paceRatio,
+    pace,
+    measurable,
+    daysTotal,
+    daysElapsed,
+    daysRemaining,
+    projectedUnits,
+    requiredPerWeek: Math.round(requiredPerWeek * 10) / 10,
+    currentPerWeek: Math.round(currentPerWeek * 10) / 10,
+    overdueMilestones,
+    daysSinceProgress,
+  };
+}
+
+/* ── Period slices, for the month / week filter ────────────────────── */
+
+export type PeriodGrain = "year" | "month" | "week";
+
+export interface PeriodSlice {
+  key: string;
+  label: string;
+  from: string;
+  to: string;
+  /** How much the schedule expects to be covered inside this window. */
+  expectedUnits: number;
+  /** How much was actually recorded inside it. */
+  actualUnits: number;
+  /** Milestones whose deadline falls in the window. */
+  dueMilestones: Milestone[];
+  /** Milestones live at any point during it, deadline or not. */
+  activeMilestones: Milestone[];
+  /** True for the window containing today. */
+  isCurrent: boolean;
+  /** True once the window has passed. */
+  isPast: boolean;
+}
+
+/** How much the schedule expects to be covered strictly inside a window —
+ *  the difference between the cumulative curve at each end. */
+export function expectedUnitsBetween(milestones: Milestone[], from: string, to: string): number {
+  return Math.max(0, expectedUnitsOn(milestones, to) - expectedUnitsOn(milestones, from));
+}
+
+/** How much was actually recorded inside a window, per milestone, from the
+ *  log — the same difference-of-two-points trick, which keeps downward
+ *  corrections behaving sensibly. */
+export function actualUnitsBetween(
+  milestones: Milestone[],
+  entries: ProgressEntry[],
+  from: string,
+  to: string,
+  today: string = todayISO()
+): number {
+  return Math.max(
+    0,
+    actualUnitsOn(milestones, entries, to, today) -
+      actualUnitsOn(milestones, entries, from, today)
+  );
+}
+
+function monthLabel(iso: string, locale: string): string {
+  return parseDay(iso).toLocaleDateString(locale, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function dayLabel(iso: string, locale: string): string {
+  return parseDay(iso).toLocaleDateString(locale, {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function startOfMonth(iso: string): string {
+  return iso.slice(0, 7) + "-01";
+}
+
+function endOfMonth(iso: string): string {
+  const d = parseDay(iso);
+  return toISODate(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 12)));
+}
+
+/** Monday of the week containing the date. Weeks start on Monday because
+ *  that is how a school timetable reads; Sunday-start would split every
+ *  weekend madrasah across two buckets. */
+function startOfWeek(iso: string): string {
+  const d = parseDay(iso);
+  const dow = (d.getUTCDay() + 6) % 7; // Monday = 0
+  return addDays(iso, -dow);
+}
+
+/**
+ * Cuts the plan into windows at the requested grain.
+ *
+ * A milestone lands in the window its deadline falls in — "September's
+ * goal" is the one due in September, which is how a teacher describes it
+ * and how a parent asks about it. Expected and actual are pro-rated across
+ * the window instead, so a milestone spanning three months still shows a
+ * third of its work in each; bucketing those by deadline as well would
+ * make two months look empty and the third impossible.
+ */
+export function slicePlan(
+  plan: Plan,
+  milestones: Milestone[],
+  entries: ProgressEntry[],
+  grain: PeriodGrain,
+  today: string = todayISO(),
+  locale = "en-CA"
+): PeriodSlice[] {
+  if (grain === "year") {
+    return [
+      {
+        key: plan.academic_year,
+        label: plan.academic_year,
+        from: plan.starts_on,
+        to: plan.ends_on,
+        expectedUnits: expectedUnitsOn(milestones, today),
+        actualUnits: actualUnitsOn(milestones, entries, today, today),
+        dueMilestones: [...milestones].sort((a, b) => a.sequence - b.sequence),
+        activeMilestones: [...milestones].sort((a, b) => a.sequence - b.sequence),
+        isCurrent: daysBetween(plan.starts_on, today) >= 0 && daysBetween(today, plan.ends_on) >= 0,
+        isPast: daysBetween(plan.ends_on, today) > 0,
+      },
+    ];
+  }
+
+  const slices: PeriodSlice[] = [];
+  const step = grain === "month" ? 0 : 7;
+  let cursor = grain === "month" ? startOfMonth(plan.starts_on) : startOfWeek(plan.starts_on);
+  // Bounded rather than while(true): a malformed plan with a thousand-year
+  // span should render nothing useful, not hang the browser.
+  const maxSlices = grain === "month" ? 36 : 160;
+
+  for (let i = 0; i < maxSlices; i++) {
+    const from = cursor;
+    const to = grain === "month" ? endOfMonth(cursor) : addDays(cursor, 6);
+    if (daysBetween(plan.ends_on, from) > 0) break;
+
+    const dueMilestones = milestones
+      .filter((m) => daysBetween(from, m.due_on) >= 0 && daysBetween(m.due_on, to) >= 0)
+      .sort((a, b) => a.sequence - b.sequence);
+    const activeMilestones = milestones
+      .filter((m) => daysBetween(m.starts_on, to) >= 0 && daysBetween(from, m.due_on) >= 0)
+      .sort((a, b) => a.sequence - b.sequence);
+
+    slices.push({
+      key: from,
+      label:
+        grain === "month"
+          ? monthLabel(from, locale)
+          : `${dayLabel(from, locale)} – ${dayLabel(to, locale)}`,
+      from,
+      to,
+      // Measured from the day before the window opens, so work done on its
+      // first day counts inside it rather than being attributed to the
+      // window that just closed.
+      expectedUnits: expectedUnitsBetween(milestones, addDays(from, -1), to),
+      actualUnits: actualUnitsBetween(milestones, entries, addDays(from, -1), to, today),
+      dueMilestones,
+      activeMilestones,
+      isCurrent: daysBetween(from, today) >= 0 && daysBetween(today, to) >= 0,
+      isPast: daysBetween(to, today) > 0,
+    });
+
+    cursor = grain === "month" ? addDays(endOfMonth(cursor), 1) : addDays(cursor, step);
+  }
+
+  return slices;
+}
+
+/* ── Alerts ────────────────────────────────────────────────────────── */
+
+const unitWord = (n: number, unit: PlanUnit) => {
+  const rounded = Math.round(n);
+  const plural = rounded === 1 ? unit : `${unit}s`;
+  return `${rounded} ${plural}`;
+};
+
+/**
+ * Decides which alerts a plan is currently raising. Pure — it reports what
+ * is true today and says nothing about what is already stored; reconciling
+ * this list against the rows in yearly_plan_alerts (raising the new ones,
+ * resolving the ones that have cleared) is the API route's job, in
+ * syncPlanAlerts.
+ */
+export function evaluateAlerts(
+  plan: Plan,
+  milestones: Milestone[],
+  entries: ProgressEntry[] = [],
+  today: string = todayISO()
+): PlanAlert[] {
+  const alerts: PlanAlert[] = [];
+
+  // A draft nobody has activated, or an archived year, is not behind on
+  // anything. Raising alerts on those would train everyone to ignore them.
+  if (plan.status !== "active") return alerts;
+  if (daysBetween(plan.starts_on, today) < 0) return alerts;
+
+  const p = computePlanProgress(plan, milestones, entries, today);
+  if (!p.measurable) return alerts;
+
+  if (p.pace === "behind" || p.pace === "at_risk") {
+    const short = Math.max(0, p.expectedUnits - p.actualUnits);
+    alerts.push({
+      code: "behind_schedule",
+      level: p.pace === "behind" ? "critical" : "warning",
+      title: p.pace === "behind" ? "Behind schedule" : "Slipping behind",
+      detail:
+        `Expected ${unitWord(p.expectedUnits, plan.unit)} by today, recorded ` +
+        `${unitWord(p.actualUnits, plan.unit)} — a shortfall of ${unitWord(short, plan.unit)}. ` +
+        `Finishing on time now needs about ${p.requiredPerWeek} ${plan.unit}s a week, ` +
+        `against ${p.currentPerWeek} so far.`,
+    });
+  }
+
+  if (p.overdueMilestones.length > 0) {
+    const first = p.overdueMilestones[0];
+    const late = daysBetween(first.due_on, today);
+    alerts.push({
+      code: "milestone_overdue",
+      level: p.overdueMilestones.length >= 2 ? "critical" : "warning",
+      title:
+        p.overdueMilestones.length === 1
+          ? "A milestone has passed its date"
+          : `${p.overdueMilestones.length} milestones have passed their dates`,
+      detail:
+        `"${first.title ?? `Milestone ${first.sequence}`}" was due ${first.due_on} ` +
+        `(${late} day${late === 1 ? "" : "s"} ago) at ` +
+        `${first.completed_units} of ${first.target_units} ${plan.unit}s.`,
+    });
+  }
+
+  if (p.daysSinceProgress === null || p.daysSinceProgress >= PACE.staleAfterDays) {
+    alerts.push({
+      code: "no_recent_progress",
+      level: "warning",
+      title: "No progress recorded recently",
+      detail:
+        p.daysSinceProgress === null
+          ? "Nothing has been recorded against this plan since it was created."
+          : `The last entry was ${p.daysSinceProgress} days ago. The pace figures above are ` +
+            `only as current as the last time a teacher recorded a session.`,
+    });
+  }
+
+  if (
+    p.daysRemaining <= PACE.endingSoonDays &&
+    p.daysRemaining > 0 &&
+    p.projectedUnits < p.totalUnits * PACE.endingShortfallRatio
+  ) {
+    alerts.push({
+      code: "ending_incomplete",
+      level: "warning",
+      title: "On course to finish short",
+      detail:
+        `${p.daysRemaining} days left. At the current pace this plan lands at about ` +
+        `${unitWord(p.projectedUnits, plan.unit)} of ${unitWord(p.totalUnits, plan.unit)}.`,
+    });
+  }
+
+  return alerts;
+}
+
+/* ── Presentation helpers ──────────────────────────────────────────── */
+
+export const PACE_LABEL: Record<PaceStatus, string> = {
+  not_started: "Not started",
+  ahead: "Ahead of schedule",
+  on_track: "On track",
+  at_risk: "Slipping",
+  behind: "Behind schedule",
+  complete: "Complete",
+};
+
+/** Milestone titles are optional — a teacher generating twelve monthly
+ *  milestones in one click shouldn't have to name all twelve. */
+export function milestoneTitle(m: Milestone): string {
+  if (m.title === UNREADABLE) return "⚠ unreadable";
+  return m.title?.trim() || `Milestone ${m.sequence}`;
+}
+
+export function milestonePercent(m: Milestone): number {
+  if (m.target_units <= 0) return m.status === "completed" ? 100 : 0;
+  return clamp((m.completed_units / m.target_units) * 100, 0, 100);
+}
+
+/**
+ * Builds an evenly spaced set of milestones across a plan's span — the
+ * "generate monthly milestones" button. A teacher can then rename, retarget
+ * or delete any of them; this only saves the typing of twelve near-identical
+ * date pairs, which is the part nobody does carefully by hand.
+ *
+ * The remainder is spread one unit at a time across the earliest segments
+ * rather than dumped on the last, so the final month isn't quietly harder
+ * than the rest.
+ */
+export function generateMilestoneSkeleton(
+  startsOn: string,
+  endsOn: string,
+  segments: number,
+  totalUnits: number
+): Array<Pick<Milestone, "sequence" | "starts_on" | "due_on" | "target_units">> {
+  const count = Math.max(1, Math.min(52, Math.floor(segments)));
+  const span = Math.max(1, daysBetween(startsOn, endsOn));
+  const base = Math.floor(Math.max(0, totalUnits) / count);
+  const remainder = Math.max(0, totalUnits) - base * count;
+
+  const out: Array<Pick<Milestone, "sequence" | "starts_on" | "due_on" | "target_units">> = [];
+  for (let i = 0; i < count; i++) {
+    const from = i === 0 ? startsOn : addDays(startsOn, Math.round((span * i) / count) + 1);
+    const to = i === count - 1 ? endsOn : addDays(startsOn, Math.round((span * (i + 1)) / count));
+    out.push({
+      sequence: i + 1,
+      starts_on: from,
+      due_on: to,
+      target_units: base + (i < remainder ? 1 : 0),
+    });
+  }
+  return out;
+}
