@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, LoadingNote } from "@/components/portal-ui";
 import {
+  DailyWorkPanel,
   MilestoneMushafModal,
   MilestoneNavigator,
   MilestoneRow,
@@ -26,8 +27,10 @@ import {
   targetInAyahs,
   ayahsRemaining,
   formatPosition,
+  weeklyMilestonesFromDailyRate,
   type Direction,
 } from "@/lib/mushafPlan";
+import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
 import {
   addDays,
   formatApprox,
@@ -63,6 +66,11 @@ interface PlanDto {
   status: "draft" | "active" | "completed" | "archived";
   title: string | null;
   notes: string | null;
+  start_surah: number | null;
+  start_ayah: number | null;
+  direction: Direction | null;
+  daily_new_amount: number | null;
+  daily_review_amount: number | null;
 }
 interface AlertDto {
   id: string;
@@ -145,6 +153,8 @@ export default function TeacherYearlyPlanPage() {
     unit: "juz" as PlanUnit,
     starts_on: "",
     ends_on: "",
+    dailyNewAmount: 0,
+    dailyReviewAmount: 0,
   });
 
   useEffect(() => {
@@ -217,7 +227,34 @@ export default function TeacherYearlyPlanPage() {
     startSurah: 114,
     startAyah: 1,
     touchedStart: false,
+    // A steady pace instead of a year's total split into a chosen number
+    // of segments — "1 page a day" rather than "5 juz across 10 pieces".
+    // Off by default: most plans still read more naturally as a target
+    // and a deadline than as a rate.
+    dailyMode: false,
+    dailyNewAmount: 1,
+    dailyReviewAmount: 0,
   }));
+
+  /* ── The school's own calendar ───────────────────────────────────────
+     Which weekdays carry instruction and which specific dates are closed
+     — fetched once, school-wide, not per student. A daily-rate plan's
+     milestones and its "this week" panel both need it; every other part
+     of this page works fine on the plain five-day default while it loads
+     or if a school never set one up. */
+  const [schoolCal, setSchoolCal] = useState<SchoolCalendar>(DEFAULT_CALENDAR);
+  useEffect(() => {
+    if (mode !== "real") return;
+    fetch("/api/school-calendar")
+      .then((r) => r.json())
+      .then((b) => {
+        if (!Array.isArray(b?.weekdays)) return;
+        setSchoolCal(
+          buildCalendar(b.weekdays, (b.closedDates ?? []).map((d: { date: string }) => d.date))
+        );
+      })
+      .catch(() => {});
+  }, [mode]);
 
   /* ── Where the student already is ──────────────────────────────────
      Read from the daily lessons the teacher already records, so a plan
@@ -277,10 +314,38 @@ export default function TeacherYearlyPlanPage() {
   }, [draft.direction, draft.touchedStart, detected]);
 
   // "lesson" counts sessions, not text, so it has no mushaf span to walk.
-  const canAnchor = draft.anchor && draft.unit !== "lesson" && startFrom !== null;
+  // A daily rate has no meaning without a position to walk from, so it
+  // forces anchoring on regardless of the checkbox — there is no
+  // count-only fallback for "1 page a day" the way there is for a target.
+  const canAnchor =
+    (draft.anchor || draft.dailyMode) && draft.unit !== "lesson" && startFrom !== null;
 
   const skeleton = useMemo<DraftMilestone[]>(() => {
     if (draft.starts_on >= draft.ends_on) return [];
+
+    if (draft.dailyMode) {
+      if (!canAnchor || !startFrom) return [];
+      const segs = weeklyMilestonesFromDailyRate(
+        startFrom,
+        draft.direction,
+        draft.unit,
+        draft.dailyNewAmount,
+        draft.starts_on,
+        draft.ends_on,
+        schoolCal
+      );
+      return segs.map((s, i) => ({
+        sequence: i + 1,
+        starts_on: s.starts_on,
+        due_on: s.due_on,
+        target_units: s.target_units,
+        from_surah: s.from_surah,
+        from_ayah: s.from_ayah,
+        to_surah: s.to_surah,
+        to_ayah: s.to_ayah,
+        label: s.label,
+      }));
+    }
 
     const dates = generateMilestoneSkeleton(
       draft.starts_on,
@@ -312,11 +377,14 @@ export default function TeacherYearlyPlanPage() {
       label: ranges[i]?.label ?? null,
     }));
   }, [draft.starts_on, draft.ends_on, draft.segments, draft.totalUnits, draft.unit,
-      draft.direction, canAnchor, startFrom]);
+      draft.direction, draft.dailyMode, draft.dailyNewAmount, canAnchor, startFrom, schoolCal]);
 
-  /** True when the year's target reaches past the end of the mushaf. */
+  /** True when the year's target reaches past the end of the mushaf. Only
+   *  meaningful for a fixed target — a daily rate simply stops producing
+   *  milestones once dailySchedule runs off the end of the mushaf, which
+   *  reads as a short plan rather than an error. */
   const overshoots = useMemo(() => {
-    if (!canAnchor || !startFrom) return false;
+    if (draft.dailyMode || !canAnchor || !startFrom) return false;
     return targetInAyahs(startFrom, draft.direction, draft.unit, draft.totalUnits)
       > ayahsRemaining(startFrom, draft.direction);
   }, [canAnchor, startFrom, draft.direction, draft.unit, draft.totalUnits]);
@@ -341,6 +409,8 @@ export default function TeacherYearlyPlanPage() {
           start_surah: canAnchor ? startFrom!.surah : null,
           start_ayah: canAnchor ? startFrom!.ayah : null,
           direction: canAnchor ? draft.direction : null,
+          daily_new_amount: draft.dailyMode ? draft.dailyNewAmount : null,
+          daily_review_amount: draft.dailyMode && draft.dailyReviewAmount > 0 ? draft.dailyReviewAmount : null,
           milestones: skeleton,
         }),
       });
@@ -541,6 +611,8 @@ export default function TeacherYearlyPlanPage() {
       unit: plan.unit,
       starts_on: plan.starts_on,
       ends_on: plan.ends_on,
+      dailyNewAmount: plan.daily_new_amount ?? 0,
+      dailyReviewAmount: plan.daily_review_amount ?? 0,
     });
     setConfirmingDelete(false);
     setEditingPlan(true);
@@ -564,6 +636,15 @@ export default function TeacherYearlyPlanPage() {
           unit: editDraft.unit,
           starts_on: editDraft.starts_on,
           ends_on: editDraft.ends_on,
+          // Only a plan with a mushaf position can carry a daily rate at
+          // all — omitted for one that doesn't, rather than sent as null,
+          // so there is nothing here for the server to reject.
+          ...(plan.start_surah != null
+            ? {
+                daily_new_amount: editDraft.dailyNewAmount > 0 ? editDraft.dailyNewAmount : null,
+                daily_review_amount: editDraft.dailyReviewAmount > 0 ? editDraft.dailyReviewAmount : null,
+              }
+            : {}),
         }),
       });
       const body = await res.json();
@@ -716,7 +797,13 @@ export default function TeacherYearlyPlanPage() {
               <label className={label}>Counted in</label>
               <select
                 value={draft.unit}
-                onChange={(e) => setDraft({ ...draft, unit: e.target.value as PlanUnit })}
+                onChange={(e) => {
+                  const unit = e.target.value as PlanUnit;
+                  // "lesson" counts sessions, not text, so a daily rate —
+                  // which has to walk a mushaf position — has nothing to
+                  // work from and drops back to a plain target.
+                  setDraft({ ...draft, unit, dailyMode: unit === "lesson" ? false : draft.dailyMode });
+                }}
                 className={input}
               >
                 {UNITS.map((u) => (
@@ -744,30 +831,93 @@ export default function TeacherYearlyPlanPage() {
                 className={input}
               />
             </div>
-            <div>
-              <label className={label}>Total for the year</label>
-              <input
-                type="number"
-                min={0}
-                step="0.25"
-                value={draft.totalUnits}
-                onChange={(e) => setDraft({ ...draft, totalUnits: Number(e.target.value) })}
-                className={input}
-              />
+
+            <div className="sm:col-span-2">
+              <label className={label}>Pace</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, dailyMode: false })}
+                  className={`flex-1 text-[13px] font-semibold py-2.5 rounded-xl border transition ${
+                    !draft.dailyMode
+                      ? "bg-brand-navy text-white border-brand-navy"
+                      : "border-surface-border text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  A target for the year
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, dailyMode: true, anchor: true })}
+                  disabled={draft.unit === "lesson"}
+                  className={`flex-1 text-[13px] font-semibold py-2.5 rounded-xl border transition disabled:opacity-40 ${
+                    draft.dailyMode
+                      ? "bg-brand-navy text-white border-brand-navy"
+                      : "border-surface-border text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  A steady daily rate
+                </button>
+              </div>
             </div>
-            <div>
-              <label className={label}>Split into</label>
-              <input
-                type="number"
-                min={1}
-                max={52}
-                value={draft.segments}
-                onChange={(e) =>
-                  setDraft({ ...draft, segments: Math.max(1, Math.min(52, Number(e.target.value))) })
-                }
-                className={input}
-              />
-            </div>
+
+            {draft.dailyMode ? (
+              <>
+                <div>
+                  <label className={label}>New material per instructional day</label>
+                  <input
+                    type="number"
+                    min={0.01}
+                    step="0.25"
+                    value={draft.dailyNewAmount}
+                    onChange={(e) => setDraft({ ...draft, dailyNewAmount: Number(e.target.value) })}
+                    className={input}
+                  />
+                </div>
+                <div>
+                  <label className={label}>Review per instructional day (optional)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    value={draft.dailyReviewAmount}
+                    onChange={(e) => setDraft({ ...draft, dailyReviewAmount: Number(e.target.value) })}
+                    className={input}
+                  />
+                  <p className="text-[11.5px] text-ink-muted mt-1">
+                    A flat daily amount — this doesn&apos;t track which pages, only how much.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className={label}>Total for the year</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.25"
+                    value={draft.totalUnits}
+                    onChange={(e) => setDraft({ ...draft, totalUnits: Number(e.target.value) })}
+                    className={input}
+                  />
+                </div>
+                <div>
+                  <label className={label}>Split into</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={52}
+                    value={draft.segments}
+                    onChange={(e) =>
+                      setDraft({ ...draft, segments: Math.max(1, Math.min(52, Number(e.target.value))) })
+                    }
+                    className={input}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="sm:col-span-2">
               <label className={label}>Notes for the year</label>
               <textarea
@@ -783,19 +933,25 @@ export default function TeacherYearlyPlanPage() {
           {/* ── Where in the mushaf to start ─────────────────────── */}
           {draft.unit !== "lesson" && (
             <div className="mt-1 rounded-xl border border-surface-border p-4">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={draft.anchor}
-                  onChange={(e) => setDraft({ ...draft, anchor: e.target.checked })}
-                  className="w-4 h-4 accent-emerald-600 flex-shrink-0"
-                />
-                <span className="text-[14px] font-semibold text-ink">
-                  Build the plan from where the student is in the mushaf
-                </span>
-              </label>
+              {draft.dailyMode ? (
+                <p className="text-[14px] font-semibold text-ink">
+                  A daily rate always starts from a position in the mushaf
+                </p>
+              ) : (
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={draft.anchor}
+                    onChange={(e) => setDraft({ ...draft, anchor: e.target.checked })}
+                    className="w-4 h-4 accent-emerald-600 flex-shrink-0"
+                  />
+                  <span className="text-[14px] font-semibold text-ink">
+                    Build the plan from where the student is in the mushaf
+                  </span>
+                </label>
+              )}
 
-              {draft.anchor && (
+              {(draft.anchor || draft.dailyMode) && (
                 <div className="mt-4 space-y-4">
                   {detecting && (
                     <p className="text-[12.5px] text-ink-muted">
@@ -896,6 +1052,27 @@ export default function TeacherYearlyPlanPage() {
                       milestones will be short.
                     </p>
                   )}
+
+                  {draft.dailyMode &&
+                    (skeleton.length > 0 ? (
+                      <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
+                        This creates {skeleton.length} weekly milestone{skeleton.length === 1 ? "" : "s"},
+                        totaling about{" "}
+                        {formatUnits(
+                          skeleton.reduce((s, m) => s + m.target_units, 0),
+                          draft.unit
+                        )}{" "}
+                        by {draft.ends_on}
+                        {draft.dailyReviewAmount > 0 &&
+                          ` — plus ${formatUnits(draft.dailyReviewAmount, draft.unit)} of review every instructional day, not tracked by position`}
+                        .
+                      </p>
+                    ) : (
+                      <p className="text-[12.5px] text-status-error-text">
+                        No instructional days fall in this span yet — check the start and end
+                        dates, or the school calendar under Admin.
+                      </p>
+                    ))}
                 </div>
               )}
             </div>
@@ -1105,6 +1282,37 @@ export default function TeacherYearlyPlanPage() {
                       className={input}
                     />
                   </div>
+                  {plan.start_surah != null && (
+                    <>
+                      <div>
+                        <label className={label}>New material per instructional day</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.25"
+                          value={editDraft.dailyNewAmount}
+                          onChange={(e) =>
+                            setEditDraft({ ...editDraft, dailyNewAmount: Number(e.target.value) })
+                          }
+                          className={input}
+                        />
+                        <p className="text-[11.5px] text-ink-muted mt-1">0 turns the daily rate off.</p>
+                      </div>
+                      <div>
+                        <label className={label}>Review per instructional day</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.5"
+                          value={editDraft.dailyReviewAmount}
+                          onChange={(e) =>
+                            setEditDraft({ ...editDraft, dailyReviewAmount: Number(e.target.value) })
+                          }
+                          className={input}
+                        />
+                      </div>
+                    </>
+                  )}
                   <div className="sm:col-span-2">
                     <label className={label}>Notes for the year</label>
                     <textarea
@@ -1165,6 +1373,8 @@ export default function TeacherYearlyPlanPage() {
               </div>
             )}
           </SectionCard>
+
+          <DailyWorkPanel plan={plan} cal={schoolCal} />
 
           <SectionCard title="Milestones" note={`${milestones.length} segments`}>
             {milestones.length === 0 ? (

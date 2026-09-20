@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalHero } from "@/components/PortalHero";
 import { LoadingNote, SectionCard, SegmentedSwitch } from "@/components/portal-ui";
 import {
+  DailyWorkPanel,
   MilestoneMushafModal,
   MilestoneRow,
   PaceBar,
@@ -14,6 +15,7 @@ import {
   PlanFigure,
   paceColor,
 } from "@/components/yearly-plan-ui";
+import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
 import { usePortalRoster } from "@/hooks/usePortalRoster";
 import {
   formatApprox,
@@ -117,6 +119,24 @@ export default function ParentYearlyPlanPage() {
     if (mode !== "real" || !childId) return;
     load(childId);
   }, [mode, childId, load]);
+
+  // The school's own calendar, for the same "this week's work" panel the
+  // teacher page reads it for. Fetched once, not per child — a family with
+  // two children at the same school sees the same instructional days for
+  // both.
+  const [schoolCal, setSchoolCal] = useState<SchoolCalendar>(DEFAULT_CALENDAR);
+  useEffect(() => {
+    if (mode !== "real") return;
+    fetch("/api/school-calendar")
+      .then((r) => r.json())
+      .then((b) => {
+        if (!Array.isArray(b?.weekdays)) return;
+        setSchoolCal(
+          buildCalendar(b.weekdays, (b.closedDates ?? []).map((d: { date: string }) => d.date))
+        );
+      })
+      .catch(() => {});
+  }, [mode]);
 
   const plan = payload?.plan ?? null;
   const milestones = useMemo(() => payload?.milestones ?? [], [payload]);
@@ -330,6 +350,8 @@ export default function ParentYearlyPlanPage() {
               </>
             )}
           </SectionCard>
+
+          <DailyWorkPanel plan={plan} cal={schoolCal} />
 
           <SectionCard
             title="Break it down"

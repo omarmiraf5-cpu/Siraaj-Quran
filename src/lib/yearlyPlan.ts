@@ -86,6 +86,12 @@ export interface Plan {
   start_surah: number | null;
   start_ayah: number | null;
   direction: "forward" | "hifz" | null;
+  /** A steady per-instructional-day pace, in `unit` — "1 page a day" rather
+   *  than a year's total split evenly. Null on a plan made the other way. */
+  daily_new_amount: number | null;
+  /** A daily review amount, also in `unit`. Carries no position of its own
+   *  — see dailySchedule's own note on why review isn't walked. */
+  daily_review_amount: number | null;
 }
 
 export interface ProgressEntry {
@@ -471,7 +477,7 @@ function endOfMonth(iso: string): string {
 /** Monday of the week containing the date. Weeks start on Monday because
  *  that is how a school timetable reads; Sunday-start would split every
  *  weekend madrasah across two buckets. */
-function startOfWeek(iso: string): string {
+export function startOfWeek(iso: string): string {
   const d = parseDay(iso);
   const dow = (d.getUTCDay() + 6) % 7; // Monday = 0
   return addDays(iso, -dow);

@@ -7,12 +7,16 @@ import {
   formatUnits,
   milestoneTitle,
   readable,
+  addDays,
+  startOfWeek,
+  todayISO,
   type Milestone,
   type PaceStatus,
   type PlanUnit,
 } from "@/lib/yearlyPlan";
-import { formatRange } from "@/lib/mushafPlan";
-import { Modal } from "@/components/portal-ui";
+import { formatRange, dailySchedule, type Direction, type Position } from "@/lib/mushafPlan";
+import type { SchoolCalendar } from "@/lib/schoolCalendar";
+import { Modal, SectionCard, EmptyNote } from "@/components/portal-ui";
 import { Mushaf } from "@/components/Mushaf";
 import { getSurahById } from "@/data/mushaf-index";
 
@@ -709,5 +713,130 @@ export function PlanFigure({
       </p>
       <p className="eyebrow mt-2 leading-tight">{label}</p>
     </div>
+  );
+}
+
+function weekdayLabel(iso: string): string {
+  return new Date(iso + "T12:00:00Z").toLocaleDateString("en-CA", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/**
+ * "1 page a day" made concrete: the week containing today, one row per
+ * calendar day, each showing exactly what a daily-rate plan expects for
+ * that day — or "No class" for a weekend or a listed closure, which is
+ * the point of asking the school for its calendar in the first place.
+ *
+ * Only for a plan actually built this way — daily_new_amount and a mushaf
+ * anchor both set. A plan made the other way (a year's total split into
+ * milestones) has no per-day position to walk, and this renders nothing
+ * for it rather than a panel with an empty range in every row.
+ *
+ * Review carries no position of its own — see dailySchedule's own note —
+ * so it shows as a flat "+ N pages review" on every instructional day
+ * rather than a range, which is an honest picture of what is actually
+ * tracked rather than an invented one of which pages those are.
+ */
+export function DailyWorkPanel({
+  plan,
+  cal,
+  today = todayISO(),
+}: {
+  plan: {
+    starts_on: string;
+    ends_on: string;
+    unit: PlanUnit;
+    start_surah: number | null;
+    start_ayah: number | null;
+    direction: Direction | null;
+    daily_new_amount: number | null;
+    daily_review_amount: number | null;
+  };
+  cal: SchoolCalendar;
+  today?: string;
+}) {
+  if (
+    plan.daily_new_amount == null ||
+    plan.start_surah == null ||
+    plan.start_ayah == null ||
+    plan.direction == null
+  ) {
+    return null;
+  }
+  const start: Position = { surah: plan.start_surah, ayah: plan.start_ayah };
+  const direction = plan.direction;
+
+  // The week containing today, clamped into the plan's own span — a plan
+  // that has not started yet shows its first week rather than a week with
+  // nothing scheduled at all, and a finished plan shows its last one.
+  const anchorDay = today < plan.starts_on ? plan.starts_on : today > plan.ends_on ? plan.ends_on : today;
+  const weekStart = startOfWeek(anchorDay);
+  const weekEnd = addDays(weekStart, 6);
+
+  const rows = dailySchedule(
+    start,
+    direction,
+    plan.unit,
+    plan.daily_new_amount,
+    plan.starts_on,
+    weekStart,
+    weekEnd,
+    cal
+  );
+  const byDate = new Map(rows.map((r) => [r.date, r]));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  return (
+    <SectionCard
+      title="This week's work"
+      note={
+        plan.daily_review_amount
+          ? `+ ${formatUnits(plan.daily_review_amount, plan.unit)} review daily`
+          : undefined
+      }
+    >
+      {rows.length === 0 ? (
+        <EmptyNote>No instructional days fall in this week.</EmptyNote>
+      ) : (
+        <ul className="divide-y divide-surface-border -my-1">
+          {days.map((d) => {
+            const row = byDate.get(d);
+            const isToday = d === today;
+            const inSpan = d >= plan.starts_on && d <= plan.ends_on;
+            return (
+              <li
+                key={d}
+                className={`flex items-center justify-between gap-3 py-2.5 ${
+                  isToday ? "bg-brand-gold/10 -mx-2.5 px-2.5 rounded-lg" : ""
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide">
+                    {weekdayLabel(d)}
+                    {isToday && <span className="text-brand-navy dark:text-brand-gold"> · Today</span>}
+                  </p>
+                  {row ? (
+                    <p className="text-[13px] text-ink mt-0.5 font-medium">{row.label}</p>
+                  ) : (
+                    <p className="text-[13px] text-ink-muted mt-0.5 italic">
+                      {inSpan ? "No class" : "Outside the plan's dates"}
+                    </p>
+                  )}
+                </div>
+                {row && plan.daily_review_amount ? (
+                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-bg-warm text-ink-muted flex-shrink-0 whitespace-nowrap">
+                    + {formatUnits(plan.daily_review_amount, plan.unit)} review
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </SectionCard>
   );
 }

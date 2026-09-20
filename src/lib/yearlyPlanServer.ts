@@ -165,6 +165,8 @@ export function decodePlan(row: Record<string, unknown>): Plan {
     start_surah: num(row.start_surah),
     start_ayah: num(row.start_ayah),
     direction: (row.direction as Plan["direction"]) ?? null,
+    daily_new_amount: num(row.daily_new_amount),
+    daily_review_amount: num(row.daily_review_amount),
   };
 }
 

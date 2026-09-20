@@ -1,4 +1,7 @@
 import { JUZ_START_PAGES, SURAHS, TOTAL_PAGES, getSurahById } from "@/data/mushaf-index";
+import { addDays } from "@/lib/planDates";
+import { isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
+import { startOfWeek } from "@/lib/yearlyPlan";
 
 /**
  * Turning "five juz this year" into "Al-Mulk 1–30, then Al-Qalam 1–52, …"
@@ -427,4 +430,169 @@ export function formatPosition(p: Position): string {
   const s = getSurahById(p.surah);
   if (!s) return "";
   return `${s.englishName} ${p.ayah}`;
+}
+
+/* ── Daily rate ────────────────────────────────────────────────────────
+   "1 page a day" instead of a year's total split evenly across a chosen
+   number of segments. Review has no version of this walk: it is a plain
+   daily amount the teacher assigns from already-covered ground, not a
+   second position moving through the mushaf, so it never appears here —
+   only as a number the daily breakdown displays alongside each day. */
+
+export interface DailyPortion {
+  date: string;
+  from: Position;
+  to: Position;
+  /** Ayahs actually walked this day. Varies with how dense the surah is
+   *  per page; `dailyAmount` itself, in the plan's own unit, does not. */
+  ayahs: number;
+  label: string;
+}
+
+/**
+ * One row per instructional day in [from, to], walking forward from
+ * `start` at a steady `dailyAmount`-per-day pace.
+ *
+ * Days before `from` are still walked, just not returned — so a "this
+ * week" call made in January starts the cursor from wherever a full
+ * term's worth of that pace actually lands, not from the plan's own
+ * anchor recomputed as if this week were day one. The same "expected
+ * by today" idea `expectedUnitsForMilestone` already applies to a unit
+ * count, applied here to a mushaf position instead.
+ *
+ * Non-instructional days (the weekend, a listed closure) are left out of
+ * the result and do not move the cursor: there is nothing to assign on a
+ * day the student is not at school.
+ *
+ * Bounded at 1200 calendar days — a little over three school years — so a
+ * malformed multi-year span fails by stopping rather than by hanging.
+ */
+export function dailySchedule(
+  start: Position,
+  direction: Direction,
+  unit: string,
+  dailyAmount: number,
+  planStartsOn: string,
+  from: string,
+  to: string,
+  cal: SchoolCalendar
+): DailyPortion[] {
+  if (dailyAmount <= 0 || to < planStartsOn) return [];
+  const out: DailyPortion[] = [];
+  let cursor: Position | null = start;
+  let day = planStartsOn;
+  // How many instructional days have been walked so far. Each day's ayah
+  // count comes from the *difference* between two cumulative totals
+  // measured from the plan's own fixed anchor — the same running-total
+  // trick segmentMushaf uses — rather than by asking targetInAyahs for
+  // one page from wherever the cursor currently sits. Re-anchoring at the
+  // cursor every day would re-trigger ayahsForPages' current-page
+  // rounding on every single call instead of once, and that rounding is
+  // sized for a whole year's target, not for one page: called this way it
+  // overstates a single day by roughly a full extra page, and thirty days
+  // of that is not a rounding error any more.
+  let instructionalDaysSoFar = 0;
+
+  for (let guard = 0; guard < 1200 && cursor && day <= to; guard++) {
+    if (isInstructionalDay(day, cal)) {
+      const before = targetInAyahs(start, direction, unit, instructionalDaysSoFar * dailyAmount);
+      const after = targetInAyahs(start, direction, unit, (instructionalDaysSoFar + 1) * dailyAmount);
+      instructionalDaysSoFar++;
+      const ayahs = Math.round(after) - Math.round(before);
+      if (ayahs <= 0) break;
+      const blocks = walk(cursor, direction, ayahs);
+      if (blocks.length === 0) break;
+      const firstBlock = blocks[0];
+      const lastBlock = blocks[blocks.length - 1];
+      if (day >= from) {
+        out.push({
+          date: day,
+          from: { surah: firstBlock.from_surah, ayah: firstBlock.from_ayah },
+          to: { surah: lastBlock.to_surah, ayah: lastBlock.to_ayah },
+          ayahs: blocks.reduce((s, b) => s + b.ayahs, 0),
+          label: formatRange(
+            { surah: firstBlock.from_surah, ayah: firstBlock.from_ayah },
+            { surah: lastBlock.to_surah, ayah: lastBlock.to_ayah }
+          ),
+        });
+      }
+      cursor = nextPosition({ surah: lastBlock.to_surah, ayah: lastBlock.to_ayah }, direction);
+    }
+    day = addDays(day, 1);
+  }
+  return out;
+}
+
+export interface DailyRateSegment {
+  starts_on: string;
+  due_on: string;
+  target_units: number;
+  from_surah: number;
+  from_ayah: number;
+  to_surah: number;
+  to_ayah: number;
+  label: string;
+}
+
+/**
+ * Milestones for a daily-rate plan: one per calendar week that holds at
+ * least one instructional day, sized to however many of that week's days
+ * actually carry instruction — a four-day week because of a holiday gets
+ * four days' worth, not a fifth of an ordinary week's.
+ *
+ * Built by grouping `dailySchedule`'s own rows rather than walking the
+ * mushaf a second time in weekly jumps, so a milestone's boundary and a
+ * daily breakdown's row can never disagree about where one day's portion
+ * ends and the next begins.
+ *
+ * A milestone's own starts_on/due_on are the first and last *instructional*
+ * day it actually covers, not the calendar week's Monday and Sunday —
+ * the schedule has nothing to say about the weekend in between, and a
+ * "due" date nothing is due on would just be confusing on the milestone
+ * list.
+ */
+export function weeklyMilestonesFromDailyRate(
+  start: Position,
+  direction: Direction,
+  unit: string,
+  dailyAmount: number,
+  planStartsOn: string,
+  planEndsOn: string,
+  cal: SchoolCalendar
+): DailyRateSegment[] {
+  const days = dailySchedule(start, direction, unit, dailyAmount, planStartsOn, planStartsOn, planEndsOn, cal);
+  if (days.length === 0) return [];
+
+  const out: DailyRateSegment[] = [];
+  let weekKey = startOfWeek(days[0].date);
+  let bucket: DailyPortion[] = [];
+
+  const flush = () => {
+    if (bucket.length === 0) return;
+    const first = bucket[0];
+    const last = bucket[bucket.length - 1];
+    out.push({
+      starts_on: first.date,
+      due_on: last.date,
+      target_units: Math.round(dailyAmount * bucket.length * 100) / 100,
+      from_surah: first.from.surah,
+      from_ayah: first.from.ayah,
+      to_surah: last.to.surah,
+      to_ayah: last.to.ayah,
+      label: formatRange(first.from, last.to),
+    });
+  };
+
+  for (const d of days) {
+    const k = startOfWeek(d.date);
+    if (k !== weekKey) {
+      flush();
+      weekKey = k;
+      bucket = [];
+    }
+    bucket.push(d);
+  }
+  flush();
+
+  return out;
 }

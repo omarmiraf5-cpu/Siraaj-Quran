@@ -207,6 +207,8 @@ export async function POST(req: NextRequest) {
       start_surah = null,
       start_ayah = null,
       direction = null,
+      daily_new_amount = null,
+      daily_review_amount = null,
       milestones = [],
     } = body ?? {};
 
@@ -248,6 +250,15 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // A daily rate needs a mushaf position to walk from — without one
+    // there is nowhere for "1 page a day" to start counting.
+    const dailyProblem =
+      badQuantity(daily_new_amount, "daily_new_amount", 0.01, 1000) ??
+      badQuantity(daily_review_amount, "daily_review_amount", 0.01, 1000) ??
+      (daily_new_amount != null && (start_surah == null || direction == null)
+        ? "A daily new-material rate needs a starting position and direction"
+        : null);
+    if (dailyProblem) return NextResponse.json({ error: dailyProblem }, { status: 400 });
 
     if (!Array.isArray(milestones)) {
       return NextResponse.json({ error: "milestones must be a list" }, { status: 400 });
@@ -293,6 +304,8 @@ export async function POST(req: NextRequest) {
       start_surah,
       start_ayah,
       direction,
+      daily_new_amount,
+      daily_review_amount,
       ...planTextColumns(planId, title ?? null, notes ?? null),
     });
     if (insertError) throw insertError;
@@ -363,12 +376,23 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, title, notes, status, starts_on, ends_on, unit, academic_year } = body ?? {};
+    const {
+      id,
+      title,
+      notes,
+      status,
+      starts_on,
+      ends_on,
+      unit,
+      academic_year,
+      daily_new_amount,
+      daily_review_amount,
+    } = body ?? {};
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
     const { data: existing, error: readError } = await supabase
       .from(PLANS)
-      .select("id, school_id, starts_on, ends_on")
+      .select("id, school_id, starts_on, ends_on, start_surah, direction")
       .eq("id", id)
       .maybeSingle();
     if (readError) throw readError;
@@ -393,6 +417,24 @@ export async function PATCH(req: NextRequest) {
         );
       }
       patch.unit = unit;
+    }
+    if (daily_new_amount !== undefined || daily_review_amount !== undefined) {
+      const dailyProblem =
+        (daily_new_amount !== undefined
+          ? badQuantity(daily_new_amount, "daily_new_amount", 0.01, 1000)
+          : null) ??
+        (daily_review_amount !== undefined
+          ? badQuantity(daily_review_amount, "daily_review_amount", 0.01, 1000)
+          : null);
+      if (dailyProblem) return NextResponse.json({ error: dailyProblem }, { status: 400 });
+      if (daily_new_amount != null && existing.start_surah == null) {
+        return NextResponse.json(
+          { error: "A daily new-material rate needs a starting position — this plan has none" },
+          { status: 400 }
+        );
+      }
+      if (daily_new_amount !== undefined) patch.daily_new_amount = daily_new_amount;
+      if (daily_review_amount !== undefined) patch.daily_review_amount = daily_review_amount;
     }
     if (academic_year !== undefined) {
       if (typeof academic_year !== "string" || !academic_year.trim()) {

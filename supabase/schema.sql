@@ -1027,6 +1027,16 @@ alter table yearly_plan_alerts enable row level security;
 alter table yearly_plans add column if not exists start_surah int;
 alter table yearly_plans add column if not exists start_ayah int;
 alter table yearly_plans add column if not exists direction text;
+-- A steady per-instructional-day pace ("1 page a day"), as an alternative
+-- to typing a year's total and letting it apportion evenly. Null on every
+-- plan made the other way — nothing here reads differently until a value
+-- is actually set. Review carries no mushaf position of its own: it is a
+-- daily amount the teacher chooses which pages to spend on, not a second
+-- walk through the text.
+alter table yearly_plans add column if not exists daily_new_amount numeric(8,2)
+  check (daily_new_amount is null or daily_new_amount > 0);
+alter table yearly_plans add column if not exists daily_review_amount numeric(8,2)
+  check (daily_review_amount is null or daily_review_amount > 0);
 alter table yearly_plan_milestones add column if not exists from_surah int;
 alter table yearly_plan_milestones add column if not exists from_ayah int;
 alter table yearly_plan_milestones add column if not exists to_surah int;
