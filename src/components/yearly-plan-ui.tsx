@@ -836,7 +836,7 @@ export function DailyWorkPanel({
       }
     >
       {rows.length === 0 ? (
-        <EmptyNote>No instructional days fall in this week.</EmptyNote>
+        <EmptyNote>No school days fall in this week.</EmptyNote>
       ) : (
         <ul className="divide-y divide-surface-border -my-1">
           {days.map((d) => {
@@ -936,7 +936,7 @@ export function FullYearScheduleModal({
   return (
     <Modal
       title="The whole year, day by day"
-      subtitle={`${rows.length} instructional day${rows.length === 1 ? "" : "s"}, about ${formatUnits(
+      subtitle={`${rows.length} school day${rows.length === 1 ? "" : "s"}, about ${formatUnits(
         dailyAmount,
         plan.unit
       )} each`}
@@ -944,7 +944,7 @@ export function FullYearScheduleModal({
       onClose={onClose}
     >
       {rows.length === 0 ? (
-        <EmptyNote>No instructional days fall in this plan's dates.</EmptyNote>
+        <EmptyNote>No school days fall in this plan's dates.</EmptyNote>
       ) : (
         <div className="space-y-6 max-h-[65vh] overflow-y-auto">
           {months.map((m) => (

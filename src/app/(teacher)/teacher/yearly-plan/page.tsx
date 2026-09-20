@@ -93,6 +93,33 @@ interface PlanPayload {
 
 const UNITS: PlanUnit[] = ["ayah", "page", "line", "surah", "juz", "lesson"];
 
+/** Quick-pick daily amounts, in whichever unit is chosen — a teacher taps
+ *  one instead of typing a number. Only for the units an everyday amount
+ *  actually makes sense in; juz/surah/lesson fall back to typing a
+ *  number, since "a third of a juz a day" isn't a button anyone taps. */
+const QUICK_DAILY_AMOUNTS: Partial<Record<PlanUnit, Array<{ value: number; label: string }>>> = {
+  page: [
+    { value: 0.25, label: "¼ page" },
+    { value: 0.5, label: "½ page" },
+    { value: 0.75, label: "¾ page" },
+    { value: 1, label: "1 page" },
+    { value: 1.5, label: "1½ pages" },
+    { value: 2, label: "2 pages" },
+  ],
+  line: [
+    { value: 5, label: "5 lines" },
+    { value: 10, label: "10 lines" },
+    { value: 15, label: "15 lines" },
+  ],
+  ayah: [
+    { value: 1, label: "1 ayah" },
+    { value: 2, label: "2 ayahs" },
+    { value: 3, label: "3 ayahs" },
+    { value: 5, label: "5 ayahs" },
+    { value: 10, label: "10 ayahs" },
+  ],
+};
+
 /** What the create form builds and posts. The mushaf fields are null on a
  *  plain count-only plan, which is why they are declared rather than left
  *  to be narrowed out of a union at each use. */
@@ -127,6 +154,52 @@ function defaultYear(): { academic_year: string; starts_on: string; ends_on: str
     starts_on: `${y}-09-01`,
     ends_on: `${y + 1}-06-30`,
   };
+}
+
+/** A row of tap-to-pick amounts for whichever unit is selected, plus a
+ *  plain number box underneath for anything not on the list — buttons
+ *  for the common case, typing still there for everything else. */
+function AmountButtons({
+  unit,
+  value,
+  onChange,
+}: {
+  unit: PlanUnit;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const presets = QUICK_DAILY_AMOUNTS[unit];
+  return (
+    <div>
+      {presets && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {presets.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => onChange(p.value)}
+              className={`px-3.5 py-2 rounded-full text-[13px] font-semibold transition-all ${
+                value === p.value
+                  ? "bg-brand-navy text-white"
+                  : "bg-surface-card border border-surface-border text-ink-muted hover:text-ink"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <input
+        type="number"
+        min={0}
+        step="0.25"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        placeholder={presets ? "Or type your own amount" : undefined}
+        className={input}
+      />
+    </div>
+  );
 }
 
 export default function TeacherYearlyPlanPage() {
@@ -216,7 +289,7 @@ export default function TeacherYearlyPlanPage() {
     ...defaultYear(),
     title: "",
     notes: "",
-    unit: "juz" as PlanUnit,
+    unit: "page" as PlanUnit,
     totalUnits: 5,
     segments: 10,
     anchor: true,
@@ -229,11 +302,11 @@ export default function TeacherYearlyPlanPage() {
     startSurah: 114,
     startAyah: 1,
     touchedStart: false,
-    // A steady pace instead of a year's total split into a chosen number
-    // of segments — "1 page a day" rather than "5 juz across 10 pieces".
-    // Off by default: most plans still read more naturally as a target
-    // and a deadline than as a rate.
-    dailyMode: false,
+    // "How much he does each day" is the default, not "a total for the
+    // year": it's the one a teacher can answer without doing any maths
+    // first, and everything else — the total, the schedule — is worked
+    // out from it rather than the other way around.
+    dailyMode: true,
     dailyNewAmount: 1,
     dailyReviewAmount: 0,
   }));
@@ -836,19 +909,8 @@ export default function TeacherYearlyPlanPage() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className={label}>Pace</label>
+              <label className={label}>How much he does</label>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDraft({ ...draft, dailyMode: false })}
-                  className={`flex-1 text-[13px] font-semibold py-2.5 rounded-xl border transition ${
-                    !draft.dailyMode
-                      ? "bg-brand-navy text-white border-brand-navy"
-                      : "border-surface-border text-ink-muted hover:text-ink"
-                  }`}
-                >
-                  A target for the year
-                </button>
                 <button
                   type="button"
                   onClick={() => setDraft({ ...draft, dailyMode: true, anchor: true })}
@@ -859,36 +921,41 @@ export default function TeacherYearlyPlanPage() {
                       : "border-surface-border text-ink-muted hover:text-ink"
                   }`}
                 >
-                  A steady daily rate
+                  How much each day
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, dailyMode: false })}
+                  className={`flex-1 text-[13px] font-semibold py-2.5 rounded-xl border transition ${
+                    !draft.dailyMode
+                      ? "bg-brand-navy text-white border-brand-navy"
+                      : "border-surface-border text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  A total for the year
                 </button>
               </div>
             </div>
 
             {draft.dailyMode ? (
               <>
-                <div>
-                  <label className={label}>New material per instructional day</label>
-                  <input
-                    type="number"
-                    min={0.01}
-                    step="0.25"
+                <div className="sm:col-span-2">
+                  <label className={label}>New memorization, each day at school</label>
+                  <AmountButtons
+                    unit={draft.unit}
                     value={draft.dailyNewAmount}
-                    onChange={(e) => setDraft({ ...draft, dailyNewAmount: Number(e.target.value) })}
-                    className={input}
+                    onChange={(v) => setDraft({ ...draft, dailyNewAmount: v })}
                   />
                 </div>
-                <div>
-                  <label className={label}>Review per instructional day (optional)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.5"
+                <div className="sm:col-span-2">
+                  <label className={label}>Review, each day (optional)</label>
+                  <AmountButtons
+                    unit={draft.unit}
                     value={draft.dailyReviewAmount}
-                    onChange={(e) => setDraft({ ...draft, dailyReviewAmount: Number(e.target.value) })}
-                    className={input}
+                    onChange={(v) => setDraft({ ...draft, dailyReviewAmount: v })}
                   />
                   <p className="text-[11.5px] text-ink-muted mt-1">
-                    A flat daily amount — this doesn&apos;t track which pages, only how much.
+                    Just an amount, not exact pages — leave at 0 for none.
                   </p>
                 </div>
               </>
@@ -906,7 +973,7 @@ export default function TeacherYearlyPlanPage() {
                   />
                 </div>
                 <div>
-                  <label className={label}>Split into</label>
+                  <label className={label}>How many check-ins across the year</label>
                   <input
                     type="number"
                     min={1}
@@ -917,6 +984,9 @@ export default function TeacherYearlyPlanPage() {
                     }
                     className={input}
                   />
+                  <p className="text-[11.5px] text-ink-muted mt-1">
+                    e.g. 10 means a new goal roughly every month.
+                  </p>
                 </div>
               </>
             )}
@@ -937,9 +1007,7 @@ export default function TeacherYearlyPlanPage() {
           {draft.unit !== "lesson" && (
             <div className="mt-1 rounded-xl border border-surface-border p-4">
               {draft.dailyMode ? (
-                <p className="text-[14px] font-semibold text-ink">
-                  A daily rate always starts from a position in the mushaf
-                </p>
+                <p className="text-[14px] font-semibold text-ink">Start from where he already is</p>
               ) : (
                 <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
@@ -949,7 +1017,7 @@ export default function TeacherYearlyPlanPage() {
                     className="w-4 h-4 accent-emerald-600 flex-shrink-0"
                   />
                   <span className="text-[14px] font-semibold text-ink">
-                    Build the plan from where the student is in the mushaf
+                    Start from where he already is
                   </span>
                 </label>
               )}
@@ -980,7 +1048,7 @@ export default function TeacherYearlyPlanPage() {
                   )}
 
                   <div>
-                    <label className={label}>Working through the mushaf</label>
+                    <label className={label}>Which way</label>
                     <select
                       value={draft.direction}
                       onChange={(e) =>
@@ -998,7 +1066,7 @@ export default function TeacherYearlyPlanPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className={label}>Plan starts at surah</label>
+                      <label className={label}>Starting surah</label>
                       <select
                         value={draft.startSurah}
                         onChange={(e) => {
@@ -1050,9 +1118,8 @@ export default function TeacherYearlyPlanPage() {
 
                   {overshoots && (
                     <p className="text-[12.5px] text-status-error-text bg-status-error-bg rounded-lg px-3 py-2">
-                      {formatUnits(draft.totalUnits, draft.unit)} is more than remains from here in
-                      this direction. The plan will stop at the end of the mushaf and the last
-                      milestones will be short.
+                      {formatUnits(draft.totalUnits, draft.unit)} is more than he has left in this
+                      direction — he&apos;ll finish everything before the year is up.
                     </p>
                   )}
 
@@ -1062,35 +1129,33 @@ export default function TeacherYearlyPlanPage() {
                       switch to the daily-rate pace just to see this. */}
                   {!draft.dailyMode && !overshoots && canAnchor && startFrom && draft.totalUnits > 0 && (
                     <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
-                      That works out to about{" "}
+                      That&apos;s about{" "}
                       {formatUnits(
                         impliedDailyRate(draft.totalUnits, draft.starts_on, draft.ends_on, schoolCal),
                         draft.unit
                       )}{" "}
-                      a day, from {draft.starts_on} to {draft.ends_on} on your school&apos;s
-                      instructional days. Once saved, the plan page shows the exact day-by-day
-                      breakdown.
+                      a day, on the days he&apos;s at school, from {draft.starts_on} to {draft.ends_on}.
+                      Once saved, the plan page shows exactly what to do each day.
                     </p>
                   )}
 
                   {draft.dailyMode &&
                     (skeleton.length > 0 ? (
                       <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
-                        This creates {skeleton.length} weekly milestone{skeleton.length === 1 ? "" : "s"},
-                        totaling about{" "}
+                        By {draft.ends_on} that&apos;s about{" "}
                         {formatUnits(
                           skeleton.reduce((s, m) => s + m.target_units, 0),
                           draft.unit
                         )}{" "}
-                        by {draft.ends_on}
+                        in total
                         {draft.dailyReviewAmount > 0 &&
-                          ` — plus ${formatUnits(draft.dailyReviewAmount, draft.unit)} of review every instructional day, not tracked by position`}
-                        .
+                          `, plus ${formatUnits(draft.dailyReviewAmount, draft.unit)} of review every day he&apos;s at school`}
+                        . The plan page will show exactly what to do each day.
                       </p>
                     ) : (
                       <p className="text-[12.5px] text-status-error-text">
-                        No instructional days fall in this span yet — check the start and end
-                        dates, or the school calendar under Admin.
+                        He isn&apos;t at school on any day in these dates — check the start and
+                        end dates, or the school&apos;s calendar under Admin.
                       </p>
                     ))}
                 </div>
@@ -1100,14 +1165,24 @@ export default function TeacherYearlyPlanPage() {
 
           {skeleton.length > 0 && (
             <div className="mt-5 rounded-xl border border-surface-border bg-surface-bg-warm px-4 py-3">
-              <p className="eyebrow">Milestones this will create</p>
+              <p className="eyebrow">What this creates</p>
               <p className="text-[13px] text-ink-body mt-1.5 leading-relaxed">
-                {skeleton.length} evenly spaced segments of{" "}
-                <span className="font-semibold">
-                  {formatUnits(skeleton[0].target_units, draft.unit)}
-                </span>{" "}
-                each, from {skeleton[0].starts_on} to {skeleton[skeleton.length - 1].due_on}. Rename,
-                retarget or delete any of them afterwards.
+                {draft.dailyMode ? (
+                  <>
+                    {skeleton.length} weekly goals, from {skeleton[0].starts_on} to{" "}
+                    {skeleton[skeleton.length - 1].due_on} — each one sized to how many days he&apos;s
+                    actually at school that week.
+                  </>
+                ) : (
+                  <>
+                    {skeleton.length} evenly spaced check-ins of{" "}
+                    <span className="font-semibold">
+                      {formatUnits(skeleton[0].target_units, draft.unit)}
+                    </span>{" "}
+                    each, from {skeleton[0].starts_on} to {skeleton[skeleton.length - 1].due_on}.
+                  </>
+                )}{" "}
+                Rename, retarget or delete any of them afterwards.
               </p>
               {canAnchor && skeleton.some((m) => m.label) && (
                 <ol className="mt-3 divide-y divide-surface-border border-t border-surface-border">
@@ -1304,31 +1379,21 @@ export default function TeacherYearlyPlanPage() {
                   </div>
                   {plan.start_surah != null && (
                     <>
-                      <div>
-                        <label className={label}>New material per instructional day</label>
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.25"
+                      <div className="sm:col-span-2">
+                        <label className={label}>New memorization, each day at school</label>
+                        <AmountButtons
+                          unit={editDraft.unit}
                           value={editDraft.dailyNewAmount}
-                          onChange={(e) =>
-                            setEditDraft({ ...editDraft, dailyNewAmount: Number(e.target.value) })
-                          }
-                          className={input}
+                          onChange={(v) => setEditDraft({ ...editDraft, dailyNewAmount: v })}
                         />
-                        <p className="text-[11.5px] text-ink-muted mt-1">0 turns the daily rate off.</p>
+                        <p className="text-[11.5px] text-ink-muted mt-1">0 turns this off.</p>
                       </div>
-                      <div>
-                        <label className={label}>Review per instructional day</label>
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.5"
+                      <div className="sm:col-span-2">
+                        <label className={label}>Review, each day</label>
+                        <AmountButtons
+                          unit={editDraft.unit}
                           value={editDraft.dailyReviewAmount}
-                          onChange={(e) =>
-                            setEditDraft({ ...editDraft, dailyReviewAmount: Number(e.target.value) })
-                          }
-                          className={input}
+                          onChange={(v) => setEditDraft({ ...editDraft, dailyReviewAmount: v })}
                         />
                       </div>
                     </>
