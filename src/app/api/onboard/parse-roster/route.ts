@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import ExcelJS from "exceljs";
 import mammoth from "mammoth";
+import { matchColumn, parseCsv, parseXlsx } from "@/lib/parseDelimited";
 
 // Reads a school's existing roster out of a spreadsheet or Word document so
 // an admin isn't stuck typing every student in by hand during onboarding.
@@ -9,13 +9,12 @@ import mammoth from "mammoth";
 // returns rows, never touches the database, so there's nothing here for
 // that to expose.
 //
-// Deliberately not using the popular "xlsx" (SheetJS) package: its
-// npm-published build has open prototype-pollution and ReDoS advisories
-// with no fix available through npm (SheetJS only ships the patched build
-// through their own CDN). exceljs covers .xlsx without that baggage; a
-// hand-rolled parser below covers .csv without any dependency at all.
-// Legacy binary .xls isn't supported as a result — callers are asked to
-// save as .xlsx or .csv instead.
+// CSV/XLSX parsing lives in @/lib/parseDelimited — shared with the school
+// calendar upload, so quoted-CSV-field handling exists in exactly one
+// place rather than being retyped a second time with its own chance of a
+// subtly different bug. This route still owns .docx, which nothing else
+// needs. Legacy binary .xls isn't supported — callers are asked to save
+// as .xlsx or .csv instead.
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // A roster is a few hundred rows at most.
 
@@ -29,14 +28,6 @@ interface ParsedStudent {
   // grouping happens on the client, which owns the parent list.
   parentName: string;
   parentEmail: string;
-}
-
-function matchColumn(headers: string[], patterns: RegExp[]): number {
-  for (const pattern of patterns) {
-    const i = headers.findIndex((h) => pattern.test(h.trim()));
-    if (i !== -1) return i;
-  }
-  return -1;
 }
 
 const NAME_PATTERNS = [/^(full[ _-]?name|student[ _-]?name|name)$/i];
@@ -120,67 +111,6 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
   }
 
   return { students, warnings };
-}
-
-// Handles quoted fields (commas/newlines/escaped quotes inside a value),
-// which a plain String.split(",") would break on.
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += c;
-      }
-      continue;
-    }
-    if (c === '"') {
-      inQuotes = true;
-    } else if (c === ",") {
-      row.push(field);
-      field = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(field);
-      field = "";
-      if (row.some((f) => f !== "")) rows.push(row);
-      row = [];
-    } else {
-      field += c;
-    }
-  }
-  if (field !== "" || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows;
-}
-
-async function parseXlsx(buffer: ArrayBuffer): Promise<string[][]> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
-  const sheet = workbook.worksheets[0];
-  if (!sheet) return [];
-  const rows: string[][] = [];
-  sheet.eachRow((row) => {
-    const cells: string[] = [];
-    row.eachCell({ includeEmpty: true }, (cell) => {
-      cells.push(cell.text ?? "");
-    });
-    rows.push(cells);
-  });
-  return rows;
 }
 
 async function parseDocx(buffer: ArrayBuffer): Promise<string[][]> {

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, LoadingNote } from "@/components/portal-ui";
 import {
+  MilestoneMushafModal,
+  MilestoneNavigator,
   MilestoneRow,
   PaceBar,
   PaceChip,
@@ -400,6 +402,28 @@ export default function TeacherYearlyPlanPage() {
     setRecording(m.id);
     setEntry({ units_after: m.completed_units, note: "" });
   };
+
+  /* ── Stepping through the plan ───────────────────────────────────────
+     Which milestone the navigator is on, and which one (if any) has the
+     real mushaf open over it. Kept apart from `recording` above: opening
+     the mushaf to check a range shouldn't close an in-progress entry, and
+     the two panels can be open at once without conflict. */
+  const [focusedMilestoneId, setFocusedMilestoneId] = useState<string | null>(null);
+  const [mushafMilestone, setMushafMilestone] = useState<Milestone | null>(null);
+
+  useEffect(() => {
+    if (milestones.length === 0) {
+      setFocusedMilestoneId(null);
+      return;
+    }
+    // Defaults to the first milestone — literally the beginning of the
+    // plan — and otherwise holds still: a milestone added or removed
+    // elsewhere shouldn't silently walk the teacher's place in the list
+    // forward or back to a different one.
+    setFocusedMilestoneId((prev) =>
+      prev && milestones.some((m) => m.id === prev) ? prev : milestones[0].id
+    );
+  }, [milestones]);
 
   const submitProgress = async () => {
     if (!recording) return;
@@ -872,7 +896,17 @@ export default function TeacherYearlyPlanPage() {
                 body="A plan without milestones has no schedule to measure against, so nothing can be marked ahead or behind. Add the first segment below."
               />
             ) : (
-              <ul className="divide-y divide-surface-border">
+              <>
+                {milestones.length > 1 && (
+                  <MilestoneNavigator
+                    milestones={milestones}
+                    today={today}
+                    focusedId={focusedMilestoneId}
+                    onFocus={setFocusedMilestoneId}
+                    onViewMushaf={setMushafMilestone}
+                  />
+                )}
+                <ul className="divide-y divide-surface-border">
                 {milestones.map((m) => (
                   <MilestoneRow
                     key={m.id}
@@ -880,6 +914,7 @@ export default function TeacherYearlyPlanPage() {
                     unit={plan.unit}
                     today={today}
                     onRecord={() => openRecord(m)}
+                    onViewMushaf={setMushafMilestone}
                   >
                     {recording === m.id && (
                       <div className="mt-3.5 rounded-xl border border-surface-border bg-surface-bg-warm p-4">
@@ -933,7 +968,8 @@ export default function TeacherYearlyPlanPage() {
                     </button>
                   </MilestoneRow>
                 ))}
-              </ul>
+                </ul>
+              </>
             )}
 
             <div className="gold-rule my-5" />
@@ -986,6 +1022,8 @@ export default function TeacherYearlyPlanPage() {
           </SectionCard>
         </>
       )}
+
+      <MilestoneMushafModal milestone={mushafMilestone} onClose={() => setMushafMilestone(null)} />
     </div>
   );
 }

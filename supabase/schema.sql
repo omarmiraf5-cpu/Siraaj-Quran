@@ -1177,3 +1177,75 @@ create index if not exists idx_yearly_plan_progress_milestone on yearly_plan_pro
 -- has run for years accumulates resolved rows this index never carries.
 create index if not exists idx_yearly_plan_alerts_open
   on yearly_plan_alerts(student_id, code) where resolved_on is null;
+
+-- ══════════════════════════════════════
+-- School calendar
+-- ══════════════════════════════════════
+-- What "expected by today" means depends on how many school days have
+-- actually happened, not how many calendar days have gone by. Without
+-- this, a plan's pace curve runs across weekends and holidays exactly
+-- like a Tuesday — every yearly plan reads as further behind on a Monday
+-- morning than it really is, and the gap never closes because the same
+-- error repeats every week of the year.
+--
+-- Two independent pieces, because they answer different questions and
+-- change on different schedules. Which weekdays carry Quran instruction
+-- at all is a standing fact about the timetable — most schools set it
+-- once and rarely touch it again, which is why it lives as one row of
+-- flags on the school itself rather than as a table a query has to
+-- aggregate. Which specific dates are closed (Eid, winter break, a PD
+-- day) is a list that grows all year, so those are individual rows a
+-- calendar upload or a form can add to without touching anything else.
+
+-- A student not in class for Qur'an on a Friday because that block is
+-- given to PE is the same, calendar-wise, as the school being closed on
+-- Saturday: the day simply carries no expected progress. Modelled as a
+-- weekday flag rather than a special "PE day" concept, because the
+-- pace engine only ever needs one answer — was there Qur'an instruction
+-- this day — and a school that later moves PE to a different weekday
+-- changes one flag rather than a schema.
+--
+-- 1 = Monday .. 7 = Sunday (ISO 8601), so the array reads left-to-right
+-- the way a week does on a page. Defaults to the ordinary five-day week;
+-- a school unchecks Friday for PE, or any other day their timetable
+-- gives to something other than Qur'an.
+alter table schools add column if not exists instructional_weekdays int[] not null default '{1,2,3,4,5}';
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'schools_instructional_weekdays_valid'
+  ) then
+    alter table schools add constraint schools_instructional_weekdays_valid
+      check (instructional_weekdays <@ array[1,2,3,4,5,6,7]);
+  end if;
+end $$;
+
+-- One row per closed calendar date — a multi-week break is expanded into
+-- one row per day at the point it is added, rather than stored as a
+-- range, so every query that asks "is this date closed" is a single
+-- indexed lookup instead of a range-containment check repeated across a
+-- school year of dates.
+create table if not exists school_calendar_days (
+  id         uuid primary key default gen_random_uuid(),
+  school_id  uuid not null references schools(id) on delete cascade,
+  date       date not null,
+  -- Not encrypted, and deliberately so: unlike the yearly-plan content
+  -- above, a label like "Eid al-Fitr" or "Winter break" describes the
+  -- school's own timetable, not a child, and the pace engine has to be
+  -- able to order and filter these rows the same way it does dates
+  -- elsewhere in this module.
+  label      text,
+  created_at timestamptz default now(),
+  constraint school_calendar_days_unique unique (school_id, date)
+);
+alter table school_calendar_days enable row level security;
+
+drop policy if exists "Authenticated users can read their school's calendar" on school_calendar_days;
+create policy "Authenticated users can read their school's calendar" on school_calendar_days
+  for select using (school_id = my_school_id());
+drop policy if exists "Admins can manage their school's calendar" on school_calendar_days;
+create policy "Admins can manage their school's calendar" on school_calendar_days
+  for all using (school_id = my_school_id() and my_role() = 'admin');
+
+create index if not exists idx_school_calendar_days_school_date
+  on school_calendar_days(school_id, date);

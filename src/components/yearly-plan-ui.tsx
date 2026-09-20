@@ -12,6 +12,9 @@ import {
   type PlanUnit,
 } from "@/lib/yearlyPlan";
 import { formatRange } from "@/lib/mushafPlan";
+import { Modal } from "@/components/portal-ui";
+import { Mushaf } from "@/components/Mushaf";
+import { getSurahById } from "@/data/mushaf-index";
 
 /**
  * The yearly-plan module's own visual language.
@@ -392,6 +395,12 @@ export function mushafRange(m: Milestone): string {
   );
 }
 
+/** Shared by the row and the navigator, so "overdue" can't drift into two
+ *  different answers depending on which one is asked. */
+export function isOverdue(m: Milestone, today: string): boolean {
+  return m.due_on < today && m.status !== "completed" && m.completed_units < m.target_units;
+}
+
 /* ── Milestone row ─────────────────────────────────────────────────────
    One segment of the plan: its number, its window, its bar, its figures.
    The sequence number is set in the serif display face and given its own
@@ -402,19 +411,21 @@ export function MilestoneRow({
   unit,
   today,
   onRecord,
+  onViewMushaf,
   children,
 }: {
   milestone: Milestone;
   unit: PlanUnit;
   today: string;
   onRecord?: () => void;
+  /** Opens the real mushaf, highlighted to this milestone's stored range.
+   *  Omitted entirely — not just hidden — when the milestone has no range,
+   *  since a plain-count plan (qaidah, lessons) has nothing to show. */
+  onViewMushaf?: (m: Milestone) => void;
   children?: React.ReactNode;
 }) {
   const pct = milestonePercent(milestone);
-  const overdue =
-    milestone.due_on < today &&
-    milestone.status !== "completed" &&
-    milestone.completed_units < milestone.target_units;
+  const overdue = isOverdue(milestone, today);
   const done = milestone.status === "completed";
   const pace: PaceStatus = done ? "complete" : overdue ? "behind" : "on_track";
 
@@ -463,7 +474,7 @@ export function MilestoneRow({
           </span>
         </div>
 
-        {(overdue || done || onRecord) && (
+        {(overdue || done || onRecord || (onViewMushaf && mushafRange(milestone))) && (
           <div className="mt-2.5 flex items-center gap-3 flex-wrap">
             {done && (
               <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-brand-gold-dark">
@@ -484,12 +495,194 @@ export function MilestoneRow({
                 Record progress
               </button>
             )}
+            {onViewMushaf && mushafRange(milestone) && (
+              <button
+                type="button"
+                onClick={() => onViewMushaf(milestone)}
+                className="text-[11px] font-bold uppercase tracking-[0.1em] text-brand-navy dark:text-brand-gold hover:underline"
+              >
+                View in Mushaf
+              </button>
+            )}
           </div>
         )}
 
         {children}
       </div>
     </li>
+  );
+}
+
+/* ── Mushaf view ───────────────────────────────────────────────────────
+   The real, illustrated mushaf reader — the same component the teacher
+   already sees live while writing a daily assignment, and the parent
+   sees on the Mushaf tab — opened here on demand with a milestone's
+   stored range lit up. It is not embedded in the row itself: it carries
+   its own reciter and audio controls, real width, and Arabic type at a
+   size that would overwhelm a list of fifty rows if any of them could be
+   showing one at once. One modal, opened by whichever row or navigator
+   control asks for it, is the version that stays out of the way until
+   asked for. */
+export function MilestoneMushafModal({
+  milestone,
+  onClose,
+}: {
+  milestone: Milestone | null;
+  onClose: () => void;
+}) {
+  if (
+    !milestone ||
+    milestone.from_surah == null ||
+    milestone.from_ayah == null ||
+    milestone.to_surah == null ||
+    milestone.to_ayah == null
+  ) {
+    return null;
+  }
+
+  const range = mushafRange(milestone);
+  return (
+    <Modal
+      title={range || milestoneTitle(milestone)}
+      subtitle={`${milestone.starts_on} — ${milestone.due_on}`}
+      wide
+      onClose={onClose}
+    >
+      <Mushaf
+        // Opens on the range's own starting surah, the same convention
+        // the assignment form's live preview uses — a teacher who needs
+        // the exact opening page for a surah spanning several can still
+        // turn to it from here.
+        initialPage={getSurahById(milestone.from_surah)?.startPage ?? 1}
+        highlightedRange={{
+          surah: milestone.from_surah,
+          start: milestone.from_ayah,
+          surahEnd: milestone.to_surah,
+          end: milestone.to_ayah,
+        }}
+      />
+    </Modal>
+  );
+}
+
+/* ── Milestone navigator ──────────────────────────────────────────────
+   Steps a teacher from the first milestone to the last without scrolling
+   the full list: Prev/Next, a live counter, and a strip of every
+   milestone's number they can jump to directly. Colour follows the same
+   rule as the row it stands above — gold once done, the alert tone once
+   overdue — so the strip reads as a spine of the plan's progress even
+   before anything below it is opened. */
+export function MilestoneNavigator({
+  milestones,
+  today,
+  focusedId,
+  onFocus,
+  onViewMushaf,
+}: {
+  milestones: Milestone[];
+  today: string;
+  focusedId: string | null;
+  onFocus: (id: string) => void;
+  onViewMushaf?: (m: Milestone) => void;
+}) {
+  if (milestones.length === 0) return null;
+
+  const index = Math.max(
+    0,
+    milestones.findIndex((m) => m.id === focusedId)
+  );
+  const focused = milestones[index] ?? milestones[0];
+  const goTo = (i: number) => {
+    const clamped = Math.max(0, Math.min(milestones.length - 1, i));
+    onFocus(milestones[clamped].id);
+  };
+
+  return (
+    <div className="mb-5">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => goTo(index - 1)}
+          disabled={index === 0}
+          aria-label="Previous milestone"
+          className="flex-shrink-0 p-2 rounded-lg border border-surface-border text-ink-muted hover:text-ink disabled:opacity-30 disabled:pointer-events-none transition"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="rtl:rotate-180">
+            <path d="M15 18 9 12l6-6" />
+          </svg>
+        </button>
+
+        <div className="flex-1 min-w-0 text-center">
+          <p className="eyebrow">
+            Milestone {index + 1} of {milestones.length}
+          </p>
+          <p className="page-title text-[15px] truncate mt-0.5">
+            {focused.title?.trim() ? milestoneTitle(focused) : mushafRange(focused) || milestoneTitle(focused)}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => goTo(index + 1)}
+          disabled={index === milestones.length - 1}
+          aria-label="Next milestone"
+          className="flex-shrink-0 p-2 rounded-lg border border-surface-border text-ink-muted hover:text-ink disabled:opacity-30 disabled:pointer-events-none transition"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="rtl:rotate-180">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+
+      {onViewMushaf && mushafRange(focused) && (
+        <div className="flex justify-center mt-2">
+          <button
+            type="button"
+            onClick={() => onViewMushaf(focused)}
+            className="text-[11px] font-bold uppercase tracking-[0.1em] text-brand-navy dark:text-brand-gold hover:underline"
+          >
+            View in Mushaf
+          </button>
+        </div>
+      )}
+
+      {/* The jump strip. Horizontally scrollable rather than wrapping: a
+          52-milestone plan wrapped onto its own rows would push the Prev/
+          Next controls an unpredictable distance down the page depending
+          on plan length, and a single scrollable line keeps the layout
+          the same size for a 4-milestone plan and a 40-milestone one. */}
+      <div
+        role="tablist"
+        aria-label="Jump to a milestone"
+        className="mt-3 flex gap-1.5 overflow-x-auto pb-1"
+      >
+        {milestones.map((m, i) => {
+          const done = m.status === "completed";
+          const overdue = isOverdue(m, today);
+          const isFocused = m.id === focused.id;
+          const tone = done ? GOLD_DARK : overdue ? ALERT : undefined;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={isFocused}
+              aria-label={`Milestone ${i + 1}${done ? ", completed" : overdue ? ", past due" : ""}`}
+              title={mushafRange(m) || milestoneTitle(m)}
+              onClick={() => goTo(i)}
+              className={`flex-shrink-0 w-8 h-8 rounded-full text-[12px] font-bold tabular-nums flex items-center justify-center border transition ${
+                isFocused
+                  ? "border-brand-navy ring-2 ring-brand-navy/25 dark:ring-brand-gold/30"
+                  : "border-surface-border hover:border-ink-muted"
+              }`}
+              style={tone ? { color: tone, background: `${tone}14` } : undefined}
+            >
+              {m.sequence}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

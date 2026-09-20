@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalHero } from "@/components/PortalHero";
 import { LoadingNote, SectionCard, SegmentedSwitch } from "@/components/portal-ui";
 import {
+  MilestoneMushafModal,
   MilestoneRow,
   PaceBar,
   PaceChip,
@@ -69,6 +70,7 @@ export default function ParentYearlyPlanPage() {
   const [grain, setGrain] = useState<PeriodGrain>("year");
   const [periodIndex, setPeriodIndex] = useState<number | null>(null);
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
+  const [mushafMilestone, setMushafMilestone] = useState<Milestone | null>(null);
   const today = todayISO();
 
   useEffect(() => {
@@ -448,7 +450,13 @@ export default function ParentYearlyPlanPage() {
                       .filter((e) => e.milestone_id === m.id && e.note)
                       .slice(-2);
                     return (
-                      <MilestoneRow key={m.id} milestone={m} unit={plan.unit} today={today}>
+                      <MilestoneRow
+                        key={m.id}
+                        milestone={m}
+                        unit={plan.unit}
+                        today={today}
+                        onViewMushaf={setMushafMilestone}
+                      >
                         {notes.length > 0 && (
                           <div className="mt-3 space-y-1.5">
                             {notes.map((n) => (
@@ -470,6 +478,8 @@ export default function ParentYearlyPlanPage() {
           </SectionCard>
         </>
       )}
+
+      <MilestoneMushafModal milestone={mushafMilestone} onClose={() => setMushafMilestone(null)} />
     </div>
   );
 }

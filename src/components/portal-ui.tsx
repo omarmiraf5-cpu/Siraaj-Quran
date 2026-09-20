@@ -40,6 +40,7 @@ export function Modal({
   title,
   subtitle,
   badge,
+  wide,
   onClose,
   children,
 }: {
@@ -47,6 +48,11 @@ export function Modal({
   subtitle?: string;
   /** Usually initials, shown in a circle beside the title. */
   badge?: string;
+  /** The one exception to the fixed dialog width — for content with its
+   *  own real layout (a two-page mushaf spread, its reciter controls)
+   *  rather than a form or a message. Every existing call site omits this
+   *  and keeps the narrower default. */
+  wide?: boolean;
   onClose: () => void;
   children: React.ReactNode;
 }) {
@@ -76,7 +82,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-surface-card border border-surface-border rounded-[18px] shadow-2xl animate-slide-up"
+        className={`relative w-full ${wide ? "max-w-4xl" : "max-w-md"} max-h-[85vh] overflow-y-auto bg-surface-card border border-surface-border rounded-[18px] shadow-2xl animate-slide-up`}
       >
         <div className="gradient-navy rounded-t-[18px] px-6 py-5 relative overflow-hidden sticky top-0 z-10">
           <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />

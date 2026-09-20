@@ -124,39 +124,12 @@ export const PACE = {
 } as const;
 
 /* ── Dates ─────────────────────────────────────────────────────────────
-   Plan dates are calendar days, never instants. Parsing "2026-03-01" with
-   `new Date(...)` gives midnight UTC, which in Edmonton is the evening of
-   28 February — enough to shift a milestone into the wrong month and make
-   a child look a day behind at the turn of every month. Anchoring at UTC
-   noon keeps the day stable whichever side of UTC the school sits. */
-export function parseDay(iso: string): Date {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0));
-}
-
-export function toISODate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-export function daysBetween(from: string, to: string): number {
-  return Math.round((parseDay(to).getTime() - parseDay(from).getTime()) / 86_400_000);
-}
-
-export function addDays(iso: string, days: number): string {
-  const d = parseDay(iso);
-  d.setUTCDate(d.getUTCDate() + days);
-  return toISODate(d);
-}
-
-/** Today as a plan-shaped date string, in the viewer's own timezone —
- *  a parent in Toronto and one in Vancouver should both see their own
- *  "today", not UTC's. */
-export function todayISO(now: Date = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+   Moved to planDates.ts so schoolCalendar.ts can use the same arithmetic
+   without the two modules importing each other; re-exported here so every
+   existing `from "@/lib/yearlyPlan"` import keeps working unchanged. */
+export { parseDay, toISODate, daysBetween, addDays, todayISO } from "@/lib/planDates";
+import { parseDay, toISODate, daysBetween, addDays, todayISO } from "@/lib/planDates";
+import { countInstructionalDays, type SchoolCalendar } from "@/lib/schoolCalendar";
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
@@ -173,7 +146,16 @@ function clamp(n: number, lo: number, hi: number): number {
  * milestones, and a curve nobody asked for would make "why does it say
  * I'm behind?" unanswerable.
  */
-export function expectedUnitsForMilestone(m: Milestone, onDate: string): number {
+/**
+ * `cal` is optional and changes nothing about the shape of the answer —
+ * only what a "day" counts as. Omitted, this apportions by raw calendar
+ * days exactly as before. Supplied, it apportions by instructional days
+ * instead: a milestone whose six-week window includes a two-week break
+ * expects nothing across that break, the same way a teacher who wrote the
+ * due date around it intended, rather than treating Eid as an ordinary
+ * Tuesday of steady progress.
+ */
+export function expectedUnitsForMilestone(m: Milestone, onDate: string, cal?: SchoolCalendar): number {
   const span = daysBetween(m.starts_on, m.due_on);
   const elapsed = daysBetween(m.starts_on, onDate);
   // Checked before the elapsed<=0 branch, not after: a milestone that opens
@@ -184,12 +166,21 @@ export function expectedUnitsForMilestone(m: Milestone, onDate: string): number 
   if (span <= 0) return elapsed >= 0 ? m.target_units : 0;
   if (elapsed <= 0) return 0;
   if (elapsed >= span) return m.target_units;
-  return (m.target_units * elapsed) / span;
+  if (!cal) return (m.target_units * elapsed) / span;
+
+  const spanDays = countInstructionalDays(m.starts_on, m.due_on, cal);
+  const elapsedDays = countInstructionalDays(m.starts_on, onDate, cal);
+  // A window with no instructional days inside it at all — rare, but a
+  // milestone entirely swallowed by a single long break is possible —
+  // has nothing to apportion by day count; fall back to the calendar-day
+  // fraction already computed above rather than dividing by zero.
+  if (spanDays <= 0) return (m.target_units * elapsed) / span;
+  return (m.target_units * Math.min(elapsedDays, spanDays)) / spanDays;
 }
 
 /** Where the whole plan expects the child to be on a given day. */
-export function expectedUnitsOn(milestones: Milestone[], onDate: string): number {
-  return milestones.reduce((sum, m) => sum + expectedUnitsForMilestone(m, onDate), 0);
+export function expectedUnitsOn(milestones: Milestone[], onDate: string, cal?: SchoolCalendar): number {
+  return milestones.reduce((sum, m) => sum + expectedUnitsForMilestone(m, onDate, cal), 0);
 }
 
 /* ── Actual progress ───────────────────────────────────────────────── */
@@ -277,16 +268,34 @@ export function computePlanProgress(
   plan: Plan,
   milestones: Milestone[],
   entries: ProgressEntry[] = [],
-  today: string = todayISO()
+  today: string = todayISO(),
+  cal?: SchoolCalendar
 ): PlanProgress {
   const totalUnits = milestones.reduce((s, m) => s + m.target_units, 0);
   const actualUnits = milestones.reduce((s, m) => s + m.completed_units, 0);
-  const expectedRaw = expectedUnitsOn(milestones, today);
+  const expectedRaw = expectedUnitsOn(milestones, today, cal);
   const expectedUnits = Math.round(expectedRaw * 100) / 100;
 
-  const daysTotal = Math.max(1, daysBetween(plan.starts_on, plan.ends_on));
-  const daysElapsed = clamp(daysBetween(plan.starts_on, today), 0, daysTotal);
-  const daysRemaining = Math.max(0, daysBetween(today, plan.ends_on));
+  // "Days" mean instructional days once a calendar is supplied. A parent
+  // asking how many days are left wants school days, not a raw span that
+  // counts a fortnight of Eid holiday the same as a fortnight of classes
+  // — and a per-week rate divided across that raw span understates how
+  // much is really needed once school resumes. Omitted, this is exactly
+  // the calendar-day math it always was.
+  const daysTotal = cal
+    ? Math.max(1, countInstructionalDays(plan.starts_on, plan.ends_on, cal))
+    : Math.max(1, daysBetween(plan.starts_on, plan.ends_on));
+  const daysElapsed = cal
+    ? clamp(countInstructionalDays(plan.starts_on, today, cal), 0, daysTotal)
+    : clamp(daysBetween(plan.starts_on, today), 0, daysTotal);
+  const daysRemaining = cal
+    ? Math.max(0, countInstructionalDays(today, plan.ends_on, cal))
+    : Math.max(0, daysBetween(today, plan.ends_on));
+  // A "week" is however many of the calendar's own weekdays carry
+  // instruction — 5 for the ordinary school week, fewer for a school
+  // that also gives up, say, Friday to PE — so "per week" stays the same
+  // comparable unit a calendar-less plan already reports it in.
+  const daysPerWeek = cal ? Math.max(1, cal.weekdays.length) : 7;
 
   const measurable = totalUnits > 0;
   const percentComplete = measurable ? clamp((actualUnits / totalUnits) * 100, 0, 100) : 0;
@@ -328,22 +337,37 @@ export function computePlanProgress(
     pace = "at_risk";
   }
 
-  const currentPerWeek = daysElapsed > 0 ? (actualUnits / daysElapsed) * 7 : 0;
+  const currentPerWeek = daysElapsed > 0 ? (actualUnits / daysElapsed) * daysPerWeek : 0;
   const projectedUnits =
     daysElapsed > 0 ? Math.round((actualUnits / daysElapsed) * daysTotal) : actualUnits;
   const remainingUnits = Math.max(0, totalUnits - actualUnits);
   const requiredPerWeek =
-    remainingUnits === 0 ? 0 : daysRemaining > 0 ? (remainingUnits / daysRemaining) * 7 : remainingUnits;
+    remainingUnits === 0
+      ? 0
+      : daysRemaining > 0
+        ? (remainingUnits / daysRemaining) * daysPerWeek
+        : remainingUnits;
 
   // Future-dated entries are ignored rather than counted as recent work.
   // A session recorded for next March has not happened, and treating it as
   // the newest entry would silence the stale-plan alert for months — which
   // is exactly the case where a mistyped year needs to be noticed. Ignored,
   // it leaves daysSinceProgress null and the alert fires.
+  //
+  // Measured in instructional days once a calendar exists, for the same
+  // reason as above: a class that graded right up to winter break and
+  // resumes the day it ends should not read as three weeks silent —
+  // school itself was closed for almost all of that gap.
   let daysSinceProgress: number | null = null;
   for (const e of entries) {
-    const age = daysBetween(e.recorded_on, today);
-    if (age < 0) continue;
+    // The sign check has to run on raw calendar days regardless of cal:
+    // countInstructionalDays returns 0, not negative, for a `from` that
+    // is after `to` — it was never designed to report direction, only a
+    // count — so checking its result directly would stop skipping a
+    // future-dated entry and instead read it as "0 days since progress".
+    const rawAge = daysBetween(e.recorded_on, today);
+    if (rawAge < 0) continue;
+    const age = cal ? countInstructionalDays(e.recorded_on, today, cal) : rawAge;
     if (daysSinceProgress === null || age < daysSinceProgress) daysSinceProgress = age;
   }
 
@@ -393,8 +417,13 @@ export interface PeriodSlice {
 
 /** How much the schedule expects to be covered strictly inside a window —
  *  the difference between the cumulative curve at each end. */
-export function expectedUnitsBetween(milestones: Milestone[], from: string, to: string): number {
-  return Math.max(0, expectedUnitsOn(milestones, to) - expectedUnitsOn(milestones, from));
+export function expectedUnitsBetween(
+  milestones: Milestone[],
+  from: string,
+  to: string,
+  cal?: SchoolCalendar
+): number {
+  return Math.max(0, expectedUnitsOn(milestones, to, cal) - expectedUnitsOn(milestones, from, cal));
 }
 
 /** How much was actually recorded inside a window, per milestone, from the
@@ -464,7 +493,8 @@ export function slicePlan(
   entries: ProgressEntry[],
   grain: PeriodGrain,
   today: string = todayISO(),
-  locale = "en-CA"
+  locale = "en-CA",
+  cal?: SchoolCalendar
 ): PeriodSlice[] {
   if (grain === "year") {
     return [
@@ -473,7 +503,7 @@ export function slicePlan(
         label: plan.academic_year,
         from: plan.starts_on,
         to: plan.ends_on,
-        expectedUnits: expectedUnitsOn(milestones, today),
+        expectedUnits: expectedUnitsOn(milestones, today, cal),
         actualUnits: actualUnitsOn(milestones, entries, today, today),
         dueMilestones: [...milestones].sort((a, b) => a.sequence - b.sequence),
         activeMilestones: [...milestones].sort((a, b) => a.sequence - b.sequence),
@@ -513,7 +543,7 @@ export function slicePlan(
       // Measured from the day before the window opens, so work done on its
       // first day counts inside it rather than being attributed to the
       // window that just closed.
-      expectedUnits: expectedUnitsBetween(milestones, addDays(from, -1), to),
+      expectedUnits: expectedUnitsBetween(milestones, addDays(from, -1), to, cal),
       actualUnits: actualUnitsBetween(milestones, entries, addDays(from, -1), to, today),
       dueMilestones,
       activeMilestones,
@@ -546,7 +576,8 @@ export function evaluateAlerts(
   plan: Plan,
   milestones: Milestone[],
   entries: ProgressEntry[] = [],
-  today: string = todayISO()
+  today: string = todayISO(),
+  cal?: SchoolCalendar
 ): PlanAlert[] {
   const alerts: PlanAlert[] = [];
 
@@ -555,7 +586,7 @@ export function evaluateAlerts(
   if (plan.status !== "active") return alerts;
   if (daysBetween(plan.starts_on, today) < 0) return alerts;
 
-  const p = computePlanProgress(plan, milestones, entries, today);
+  const p = computePlanProgress(plan, milestones, entries, today, cal);
   if (!p.measurable) return alerts;
 
   if (p.pace === "behind" || p.pace === "at_risk") {
