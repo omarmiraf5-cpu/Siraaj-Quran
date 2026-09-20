@@ -17,6 +17,7 @@ import { useSchoolRoster } from "@/hooks/usePortalRoster";
 import { SURAHS, getSurahById } from "@/data/mushaf-index";
 import {
   DIRECTION_LABEL,
+  firstPosition,
   isValidPosition,
   nextPosition,
   segmentMushaf,
@@ -168,8 +169,14 @@ export default function TeacherYearlyPlanPage() {
     segments: 10,
     anchor: true,
     direction: "hifz" as Direction,
-    lastSurah: 78,
-    lastAyah: 40,
+    // Where the plan begins — not where the student ended. Asking for the
+    // start directly avoids a default like "last memorised An-Naba 40",
+    // which was an invented position for any student the app has no
+    // lessons for. With nothing on file this is simply the first surah in
+    // the chosen direction.
+    startSurah: 114,
+    startAyah: 1,
+    touchedStart: false,
   }));
 
   /* ── Where the student already is ──────────────────────────────────
@@ -187,12 +194,18 @@ export default function TeacherYearlyPlanPage() {
     let cancelled = false;
     setDetecting(true);
     setDetected(null);
-    fetch(`/api/yearly-plans/position?student_id=${encodeURIComponent(studentId)}`)
+    fetch(`/api/quran-position?student_id=${encodeURIComponent(studentId)}`)
       .then((r) => r.json())
       .then((b) => {
         if (cancelled || !b?.position) return;
         setDetected({ ...b.position, surah_name: b.surah_name, lessons: b.lessons, source: b.source });
-        setDraft((d) => ({ ...d, lastSurah: b.position.surah, lastAyah: b.position.ayah }));
+        // The student's own recorded order wins over this form's default,
+        // so a plan cannot quietly be built the opposite way from the
+        // child's daily lessons.
+        const dir: Direction = b.direction ?? "hifz";
+        const from = nextPosition({ surah: b.position.surah, ayah: b.position.ayah }, dir)
+          ?? firstPosition(dir);
+        setDraft((d) => ({ ...d, direction: dir, startSurah: from.surah, startAyah: from.ayah }));
       })
       // A failure here costs the suggestion, not the form: the teacher
       // can still set the position by hand, so it is not worth an error
@@ -203,12 +216,25 @@ export default function TeacherYearlyPlanPage() {
   }, [mode, studentId]);
 
   const startFrom = useMemo(() => {
-    const last = { surah: draft.lastSurah, ayah: draft.lastAyah };
-    if (!isValidPosition(last)) return null;
-    // The stored position is the last ayah memorised; the plan begins at
-    // the one after it, which depends on the direction.
-    return nextPosition(last, draft.direction);
-  }, [draft.lastSurah, draft.lastAyah, draft.direction]);
+    const p = { surah: draft.startSurah, ayah: draft.startAyah };
+    return isValidPosition(p) ? p : null;
+  }, [draft.startSurah, draft.startAyah]);
+
+  // Follow the direction while the teacher hasn't set a start themselves:
+  // switching to "Al-Baqarah and down" with An-Nas still in the box would
+  // otherwise generate a one-surah plan.
+  useEffect(() => {
+    if (draft.touchedStart) return;
+    const from = detected
+      ? nextPosition({ surah: detected.surah, ayah: detected.ayah }, draft.direction)
+      : null;
+    const fallback = from ?? firstPosition(draft.direction);
+    setDraft((d) =>
+      d.startSurah === fallback.surah && d.startAyah === fallback.ayah
+        ? d
+        : { ...d, startSurah: fallback.surah, startAyah: fallback.ayah }
+    );
+  }, [draft.direction, draft.touchedStart, detected]);
 
   // "lesson" counts sessions, not text, so it has no mushaf span to walk.
   const canAnchor = draft.anchor && draft.unit !== "lesson" && startFrom !== null;
@@ -280,6 +306,17 @@ export default function TeacherYearlyPlanPage() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Could not create the plan");
+      // Remember the order on the student, so the assignment form offers
+      // the same one tomorrow. Best-effort: the plan is already created,
+      // and failing to save a preference should not report as a failure
+      // to create it.
+      if (canAnchor) {
+        fetch("/api/quran-position", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ student_id: studentId, direction: draft.direction }),
+        }).catch(() => {});
+      }
       await load(studentId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the plan");
@@ -578,14 +615,14 @@ export default function TeacherYearlyPlanPage() {
                         {detected.surah_name} {detected.ayah}
                       </span>{" "}
                       — read from {detected.lessons} lesson
-                      {detected.lessons === 1 ? "" : "s"} on file. Change it below if that is not
-                      where they actually are.
+                      {detected.lessons === 1 ? "" : "s"} on file, so the plan starts at the ayah
+                      after it. Change it below if that is not where they actually are.
                     </p>
                   )}
                   {!detecting && !detected && (
                     <p className="text-[12.5px] text-ink-muted">
-                      No Qur&apos;an lessons recorded for this student yet, so there is nothing to
-                      read a position from. Set where they are by hand.
+                      No Qur&apos;an lessons recorded for this student yet, so the plan starts at
+                      the beginning of this direction. Set it by hand if they are further on.
                     </p>
                   )}
 
@@ -608,16 +645,19 @@ export default function TeacherYearlyPlanPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className={label}>Last surah memorised</label>
+                      <label className={label}>Plan starts at surah</label>
                       <select
-                        value={draft.lastSurah}
+                        value={draft.startSurah}
                         onChange={(e) => {
                           const surah = Number(e.target.value);
                           const max = getSurahById(surah)?.ayahs ?? 1;
                           // Clamped, because moving from Al-Baqarah (286)
                           // to Al-Kawthar (3) would otherwise leave an
                           // ayah number that does not exist.
-                          setDraft({ ...draft, lastSurah: surah, lastAyah: Math.min(draft.lastAyah, max) });
+                          setDraft({
+                            ...draft, touchedStart: true, startSurah: surah,
+                            startAyah: Math.min(draft.startAyah, max),
+                          });
                         }}
                         className={input}
                       >
@@ -629,13 +669,15 @@ export default function TeacherYearlyPlanPage() {
                       </select>
                     </div>
                     <div>
-                      <label className={label}>…up to ayah</label>
+                      <label className={label}>…from ayah</label>
                       <input
                         type="number"
                         min={1}
-                        max={getSurahById(draft.lastSurah)?.ayahs ?? 1}
-                        value={draft.lastAyah}
-                        onChange={(e) => setDraft({ ...draft, lastAyah: Number(e.target.value) })}
+                        max={getSurahById(draft.startSurah)?.ayahs ?? 1}
+                        value={draft.startAyah}
+                        onChange={(e) =>
+                          setDraft({ ...draft, touchedStart: true, startAyah: Number(e.target.value) })
+                        }
                         className={input}
                       />
                     </div>

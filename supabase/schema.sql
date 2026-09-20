@@ -165,9 +165,24 @@ create table if not exists students (
   school_id       uuid not null references schools(id) on delete cascade,
   profile_id      uuid references profiles(id),
   active          boolean not null default true,
+  -- Which way this child works through the mushaf. Most hifz students go
+  -- 'hifz': An-Nas and up, 114 toward Al-Baqarah, while ayahs still run
+  -- 1→n inside each surah. Others go 'forward': Al-Baqarah and down.
+  --
+  -- On the student rather than on each plan or assignment, because it is
+  -- a fact about how the child studies, not about one year or one lesson.
+  -- Keeping a copy in both places is how a plan ends up generating
+  -- backwards while the daily lessons run forwards. Yearly plans still
+  -- record the direction they were built under, for history.
+  --
+  -- Null until somebody sets it, so an existing school is not silently
+  -- assigned an order nobody chose.
+  hifz_direction  text check (hifz_direction in ('forward', 'hifz')),
   created_at      timestamptz default now()
 );
 alter table students enable row level security;
+-- Migration for rosters created before the direction was tracked.
+alter table students add column if not exists hifz_direction text;
 drop policy if exists "Admins and teachers can read students in their school" on students;
 create policy "Admins and teachers can read students in their school" on students
   for select using (

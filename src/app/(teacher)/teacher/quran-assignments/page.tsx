@@ -34,6 +34,14 @@ import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote } fr
 import { IconBook, IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { useLanguage } from "@/components/LanguageProvider";
+import {
+  DIRECTION_HINT,
+  DIRECTION_LABEL,
+  formatPosition,
+  nextPosition,
+  walk,
+  type Direction,
+} from "@/lib/mushafPlan";
 
 interface Student {
   id: string;
@@ -92,6 +100,17 @@ export default function QuranAssignmentsPage() {
   // the teacher to look up boundaries by hand.
   const [juzStart, setJuzStart] = useState("1");
   const [juzCount, setJuzCount] = useState("1");
+  // Which way this student works through the mushaf, and where they had
+  // reached — read once per student from /api/quran-position, which is
+  // the same source the yearly plan uses. Two features guessing this
+  // independently is how a plan ends up running the opposite way from the
+  // daily lessons feeding it.
+  const [direction, setDirection] = useState<Direction>("hifz");
+  const [directionKnown, setDirectionKnown] = useState(false);
+  const [lastPosition, setLastPosition] = useState<{ surah: number; ayah: number } | null>(null);
+  const [lastSurahName, setLastSurahName] = useState<string>("");
+  const [nextCount, setNextCount] = useState("10");
+  const [savingDirection, setSavingDirection] = useState(false);
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -303,6 +322,82 @@ export default function QuranAssignmentsPage() {
   // the student originally memorised it in.
   const endSurahOptions = QURAN.filter((s) => s.id >= (parseInt(selectedSurah) || 0));
 
+  useEffect(() => {
+    if (!selectedStudent || isDemo) {
+      setLastPosition(null);
+      setDirectionKnown(false);
+      return;
+    }
+    let cancelled = false;
+    setLastPosition(null);
+    setLastSurahName("");
+    setDirectionKnown(false);
+    fetch(`/api/quran-position?student_id=${encodeURIComponent(selectedStudent)}`)
+      .then((r) => r.json())
+      .then((b) => {
+        if (cancelled) return;
+        if (b?.direction) {
+          setDirection(b.direction);
+          setDirectionKnown(true);
+        }
+        if (b?.position) {
+          setLastPosition(b.position);
+          setLastSurahName(b.surah_name ?? "");
+        }
+      })
+      // Losing the suggestion costs the shortcut, not the form — every
+      // field below still works by hand, so this is not worth an error
+      // banner over a page the teacher can use regardless.
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setDirectionKnown((k) => k || true); });
+    return () => { cancelled = true; };
+  }, [selectedStudent, isDemo]);
+
+  const saveDirection = async (next: Direction) => {
+    setDirection(next);
+    if (!selectedStudent || isDemo) return;
+    setSavingDirection(true);
+    try {
+      await fetch("/api/quran-position", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: selectedStudent, direction: next }),
+      });
+    } catch {
+      // Same reasoning as above: the choice still applies to this form.
+    } finally {
+      setSavingDirection(false);
+    }
+  };
+
+  /** Where the next lesson starts — the ayah after the last one recorded,
+   *  which in "An-Nas and up" order may be the start of the *previous*
+   *  surah. */
+  const resumeAt = lastPosition ? nextPosition(lastPosition, direction) : null;
+
+  /** Fills the fields below with the next portion, the same way the juz'
+   *  quick-fill does for muraajah. */
+  const applyNextPortion = () => {
+    if (!resumeAt) return;
+    const count = Math.max(1, Math.min(300, parseInt(nextCount, 10) || 1));
+    const blocks = walk(resumeAt, direction, count);
+    if (blocks.length === 0) return;
+    const first = blocks[0];
+    const last = blocks[blocks.length - 1];
+    setSelectedSurah(String(first.from_surah));
+    setAyahStart(String(first.from_ayah));
+    setAyahEnd(String(last.to_ayah));
+    // A portion that runs into a second surah has to say so, or the end
+    // ayah would be read against the wrong surah's length.
+    if (last.to_surah !== first.from_surah) {
+      setSpansSurah(true);
+      setEndSurah(String(last.to_surah));
+    } else {
+      setSpansSurah(false);
+      setEndSurah("");
+    }
+  };
+
   const applyJuzRange = () => {
     const range = getJuzRange(parseInt(juzStart), parseInt(juzCount) || 1, (s) => getSurahById(s)?.ayahs ?? 0);
     setSelectedSurah(String(range.surahStart));
@@ -474,6 +569,83 @@ export default function QuranAssignmentsPage() {
             </div>
             <p className="text-xs text-ink-muted mt-2">{PORTION_BLURB[portion]}</p>
           </div>
+
+          {/* The new lesson's mirror of the juz' quick-fill below: rather
+              than a quantity of revision, it is "carry on from where they
+              stopped". Which way that goes is the student's own setting,
+              shared with the yearly plan. */}
+          {portion === "new" && !isDemo && selectedStudent && (
+            <div className="rounded-2xl border border-brand-navy/25 bg-brand-navy/[.04] dark:bg-white/[.03] p-3.5">
+              <p className="text-sm font-semibold text-ink mb-2">Continue from their last lesson</p>
+
+              <label className="block">
+                <span className="block text-[11px] text-ink-muted mb-1">
+                  Works through the mushaf
+                </span>
+                <select
+                  value={direction}
+                  onChange={(e) => saveDirection(e.target.value as Direction)}
+                  disabled={savingDirection}
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition disabled:opacity-50"
+                >
+                  {(["hifz", "forward"] as const).map((d) => (
+                    <option key={d} value={d}>
+                      {DIRECTION_LABEL[d]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-[11px] text-ink-muted mt-1.5">
+                {DIRECTION_HINT[direction]} Saved on the student, so the yearly plan uses the same
+                order.
+              </p>
+
+              {lastPosition ? (
+                <>
+                  <div className="flex items-end gap-2 mt-3">
+                    <label className="w-28 flex-shrink-0">
+                      <span className="block text-[11px] text-ink-muted mb-1">Ayahs</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="300"
+                        value={nextCount}
+                        onChange={(e) => setNextCount(e.target.value)}
+                        className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink text-center tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={applyNextPortion}
+                      disabled={!resumeAt}
+                      className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] disabled:opacity-40 transition-all"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-ink-muted mt-2">
+                    Last recorded: <span className="font-semibold text-ink">
+                      {lastSurahName} {lastPosition.ayah}
+                    </span>
+                    {resumeAt ? (
+                      <>
+                        {" · "}next starts at{" "}
+                        <span className="font-semibold text-ink">{formatPosition(resumeAt)}</span>
+                      </>
+                    ) : (
+                      " · nothing follows it in this direction"
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="text-[11px] text-ink-muted mt-3">
+                  {directionKnown
+                    ? "No new-lesson assignments on file yet, so there is nothing to continue from. Set the surah and ayahs below."
+                    : "Checking their recorded lessons…"}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Muraajah is usually set as a quantity — a juz', two juz' —
               rather than by hunting down exact ayah numbers, so give that

@@ -41,10 +41,29 @@ export const TOTAL_AYAHS = SURAHS.reduce((sum, s) => sum + s.ayahs, 0); // 6236
  *  Kept for display ("about 20 pages a juz"), never for arithmetic. */
 export const AVERAGE_PAGES_PER_JUZ = TOTAL_PAGES / 30;
 
+/** Named the way a teacher says it out loud, not the way a developer
+ *  would: "An-Nas and up" is what gets said in a staff room, and
+ *  "hifz order" is a term half of them would read two ways. */
 export const DIRECTION_LABEL: Record<Direction, string> = {
-  hifz: "Hifz order — An-Nas back toward Al-Baqarah",
-  forward: "Mushaf order — Al-Baqarah forward to An-Nas",
+  hifz: "An-Nas and up — 114 toward Al-Baqarah",
+  forward: "Al-Baqarah and down — 2 toward An-Nas",
 };
+
+/** One line for a form's help text. */
+export const DIRECTION_HINT: Record<Direction, string> = {
+  hifz: "The usual hifz order: start at the short surahs and work up the mushaf.",
+  forward: "Straight through the mushaf from the beginning.",
+};
+
+/**
+ * Where a plan begins for a student with nothing on file yet — the first
+ * surah in this direction. An-Nas for the usual hifz order; Al-Baqarah,
+ * not Al-Fatihah, going the other way, since Al-Fatihah is already known
+ * by anyone starting a memorisation plan.
+ */
+export function firstPosition(direction: Direction): Position {
+  return direction === "hifz" ? { surah: 114, ayah: 1 } : { surah: 2, ayah: 1 };
+}
 
 /** Surah ids in the order this direction works through them. */
 export function surahOrder(direction: Direction): number[] {
