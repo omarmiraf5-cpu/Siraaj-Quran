@@ -78,6 +78,7 @@ interface PlanPayload {
   entries: Array<{ id: string; milestone_id: string; recorded_on: string; units_after: number; note: string | null }>;
   alerts: AlertDto[];
   progress?: PlanProgress;
+  other_years?: Array<{ id: string; academic_year: string; status: PlanDto["status"] }>;
 }
 
 const UNITS: PlanUnit[] = ["ayah", "page", "line", "surah", "juz", "lesson"];
@@ -128,18 +129,38 @@ export default function TeacherYearlyPlanPage() {
   const [saving, setSaving] = useState(false);
   const today = todayISO();
 
+  // Which of the student's plans is on screen, when it isn't whichever one
+  // GET would prefer on its own — set only by clicking an "other year" pill.
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  // Building a further plan for this student without losing the one
+  // already on screen: the create form reopens, and cancelling it returns
+  // to the plan that was showing rather than to a blank roster pick.
+  const [creatingNew, setCreatingNew] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [editDraft, setEditDraft] = useState({
+    title: "",
+    notes: "",
+    academic_year: "",
+    unit: "juz" as PlanUnit,
+    starts_on: "",
+    ends_on: "",
+  });
+
   useEffect(() => {
     if (!studentId && students.length > 0) setStudentId(students[0].id);
   }, [students, studentId]);
 
   const student = students.find((s) => s.id === studentId) ?? null;
 
-  const load = useCallback(async (id: string) => {
+  const load = useCallback(async (id: string, planId?: string | null) => {
     setLoading(true);
     setError(null);
     setErrorCode(null);
     try {
-      const res = await fetch(`/api/yearly-plans?student_id=${encodeURIComponent(id)}`);
+      const qs = new URLSearchParams({ student_id: id });
+      if (planId) qs.set("plan_id", planId);
+      const res = await fetch(`/api/yearly-plans?${qs.toString()}`);
       const body = await res.json();
       if (!res.ok) {
         setErrorCode(body?.code ?? null);
@@ -167,6 +188,10 @@ export default function TeacherYearlyPlanPage() {
 
   useEffect(() => {
     if (mode !== "real" || !studentId) return;
+    setSelectedPlanId(null);
+    setCreatingNew(false);
+    setEditingPlan(false);
+    setConfirmingDelete(false);
     load(studentId);
   }, [mode, studentId, load]);
 
@@ -332,6 +357,8 @@ export default function TeacherYearlyPlanPage() {
           body: JSON.stringify({ student_id: studentId, direction: draft.direction }),
         }).catch(() => {});
       }
+      setCreatingNew(false);
+      setSelectedPlanId(null);
       await load(studentId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the plan");
@@ -470,6 +497,114 @@ export default function TeacherYearlyPlanPage() {
     }
   };
 
+  /* ── Another plan, switching years, editing, deleting ──────────────
+     All four read the same "other_years" list GET already returns, and
+     none of them touch a plan's milestones — that stays the Milestones
+     card's job. */
+
+  const switchPlan = (id: string) => {
+    if (!studentId) return;
+    setEditingPlan(false);
+    setConfirmingDelete(false);
+    setSelectedPlanId(id);
+    load(studentId, id);
+  };
+
+  const startNewPlan = () => {
+    setEditingPlan(false);
+    setConfirmingDelete(false);
+    // A fresh default year, bumped forward until it clears every year this
+    // student already has a plan for — otherwise the single most likely
+    // first click ("+ New plan" right after finishing this year's) lands
+    // on the one combination the server is guaranteed to refuse.
+    const taken = new Set([
+      ...(plan ? [plan.academic_year] : []),
+      ...(payload?.other_years?.map((y) => y.academic_year) ?? []),
+    ]);
+    let y = defaultYear();
+    for (let guard = 0; guard < 20 && taken.has(y.academic_year); guard++) {
+      const [a] = y.academic_year.split("-").map(Number);
+      y = { academic_year: `${a + 1}-${a + 2}`, starts_on: `${a + 1}-09-01`, ends_on: `${a + 2}-06-30` };
+    }
+    setDraft((d) => ({ ...d, ...y, title: "", notes: "", touchedStart: false }));
+    setCreatingNew(true);
+  };
+
+  const cancelNewPlan = () => setCreatingNew(false);
+
+  const startEdit = () => {
+    if (!plan) return;
+    setEditDraft({
+      title: plan.title ?? "",
+      notes: plan.notes ?? "",
+      academic_year: plan.academic_year,
+      unit: plan.unit,
+      starts_on: plan.starts_on,
+      ends_on: plan.ends_on,
+    });
+    setConfirmingDelete(false);
+    setEditingPlan(true);
+  };
+
+  const cancelEdit = () => setEditingPlan(false);
+
+  const saveEdit = async () => {
+    if (!plan) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/yearly-plans", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: plan.id,
+          title: editDraft.title || null,
+          notes: editDraft.notes || null,
+          academic_year: editDraft.academic_year,
+          unit: editDraft.unit,
+          starts_on: editDraft.starts_on,
+          ends_on: editDraft.ends_on,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Could not update the plan");
+      setPayload(body);
+      setEditingPlan(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update the plan");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Two clicks, not a browser confirm() popup: the first turns this
+   *  button into "Yes, delete it", so undoing a slip is just clicking
+   *  anywhere else, and the destructive click always reads as delete
+   *  rather than as a native dialog's generic OK. */
+  const deletePlan = async () => {
+    if (!plan) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/yearly-plans?id=${encodeURIComponent(plan.id)}`, {
+        method: "DELETE",
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Could not delete the plan");
+      setConfirmingDelete(false);
+      setSelectedPlanId(null);
+      if (studentId) await load(studentId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete the plan");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   /* ── Render ──────────────────────────────────────────────────────── */
 
   if (mode === "loading") {
@@ -544,8 +679,21 @@ export default function TeacherYearlyPlanPage() {
 
       {loading && <LoadingNote>Loading the plan…</LoadingNote>}
 
-      {!loading && payload && !plan && (
-        <SectionCard title="Create a yearly plan">
+      {!loading && payload && (!plan || creatingNew) && (
+        <SectionCard
+          title={plan ? "New yearly plan" : "Create a yearly plan"}
+          note={
+            plan ? (
+              <button
+                type="button"
+                onClick={cancelNewPlan}
+                className="text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
+              >
+                ← Back to {plan.academic_year}
+              </button>
+            ) : undefined
+          }
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className={label}>Plan title</label>
@@ -887,6 +1035,135 @@ export default function TeacherYearlyPlanPage() {
                 </button>
               ))}
             </div>
+
+            {payload?.other_years && payload.other_years.length > 0 && (
+              <div className="flex items-center gap-2.5 flex-wrap mt-3.5">
+                <span className="eyebrow">Other years</span>
+                {payload.other_years.map((y) => (
+                  <button
+                    key={y.id}
+                    type="button"
+                    onClick={() => switchPlan(y.id)}
+                    disabled={saving}
+                    className="text-[12px] font-semibold px-3 py-1.5 rounded-full border border-surface-border text-ink-muted hover:text-ink hover:border-ink-muted transition disabled:opacity-40"
+                  >
+                    {y.academic_year} · {y.status}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="gold-rule my-5" />
+            {editingPlan ? (
+              <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className={label}>Plan title</label>
+                    <input
+                      value={editDraft.title}
+                      onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })}
+                      className={input}
+                    />
+                  </div>
+                  <div>
+                    <label className={label}>Academic year</label>
+                    <input
+                      value={editDraft.academic_year}
+                      onChange={(e) => setEditDraft({ ...editDraft, academic_year: e.target.value })}
+                      className={input}
+                    />
+                  </div>
+                  <div>
+                    <label className={label}>Counted in</label>
+                    <select
+                      value={editDraft.unit}
+                      onChange={(e) => setEditDraft({ ...editDraft, unit: e.target.value as PlanUnit })}
+                      className={input}
+                    >
+                      {UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {unitLabel(2, u)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={label}>Starts</label>
+                    <input
+                      type="date"
+                      value={editDraft.starts_on}
+                      onChange={(e) => setEditDraft({ ...editDraft, starts_on: e.target.value })}
+                      className={input}
+                    />
+                  </div>
+                  <div>
+                    <label className={label}>Ends</label>
+                    <input
+                      type="date"
+                      value={editDraft.ends_on}
+                      onChange={(e) => setEditDraft({ ...editDraft, ends_on: e.target.value })}
+                      className={input}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={label}>Notes for the year</label>
+                    <textarea
+                      value={editDraft.notes}
+                      onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })}
+                      rows={3}
+                      className={input}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2.5 mt-4">
+                  <button
+                    onClick={saveEdit}
+                    disabled={
+                      saving || !editDraft.academic_year.trim() || editDraft.starts_on >= editDraft.ends_on
+                    }
+                    className={primary}
+                  >
+                    {saving ? "Saving…" : "Save changes"}
+                  </button>
+                  <button onClick={cancelEdit} disabled={saving} className={ghost}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <button onClick={startEdit} className={ghost}>
+                  Edit plan
+                </button>
+                <button onClick={startNewPlan} className={ghost}>
+                  + New plan
+                </button>
+                <button
+                  onClick={deletePlan}
+                  disabled={saving}
+                  className={`text-[13px] font-semibold py-2.5 px-5 rounded-xl border transition-all active:scale-[.98] disabled:opacity-40 ${
+                    confirmingDelete
+                      ? "bg-red-600 border-red-600 text-white hover:bg-red-700"
+                      : "border-surface-border text-status-error-text hover:bg-status-error-bg"
+                  }`}
+                >
+                  {saving && confirmingDelete
+                    ? "Deleting…"
+                    : confirmingDelete
+                      ? "Yes, delete this plan"
+                      : "Delete plan"}
+                </button>
+                {confirmingDelete && (
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={saving}
+                    className="text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard title="Milestones" note={`${milestones.length} segments`}>

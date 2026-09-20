@@ -55,6 +55,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const studentId = searchParams.get("student_id");
   const scope = searchParams.get("scope");
+  // Picks out one specific plan among the student's years, for switching
+  // away from whichever one GET would otherwise prefer. Omitted or not
+  // found among this student's own rows, this falls back to that same
+  // preferred choice — a stale id from a plan that was since deleted
+  // degrades to the ordinary view instead of a dead end.
+  const planId = searchParams.get("plan_id");
   const today = todayISO();
 
   try {
@@ -140,7 +146,10 @@ export async function GET(req: NextRequest) {
     }
 
     const preferred =
-      rows.find((r) => r.status === "active") ?? rows.find((r) => r.status === "draft") ?? rows[0];
+      (planId && rows.find((r) => r.id === planId)) ??
+      rows.find((r) => r.status === "active") ??
+      rows.find((r) => r.status === "draft") ??
+      rows[0];
 
     const loaded = await loadPlan(supabase, preferred.id as string);
     if (!loaded) {
@@ -431,5 +440,43 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (error) {
     return routeError("update the yearly plan", error);
+  }
+}
+
+// DELETE /api/yearly-plans?id=… — remove a plan outright: every milestone,
+// progress entry and alert under it cascades with it (on delete cascade,
+// in the schema). Meant for the plan that was set up wrong or for the
+// wrong year, not for closing out a finished one — that is what the
+// "archived" status is for, and it keeps the year's history.
+export async function DELETE(req: NextRequest) {
+  const blocked = requireEncryption();
+  if (blocked) return blocked;
+
+  const supabase = await createClient();
+  const caller = await requireTeacher(supabase);
+  if (isFailure(caller)) return caller.error;
+
+  const id = new URL(req.url).searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  try {
+    // RLS already scopes this to the caller's own school, so a missing row
+    // here means either it never existed or it belongs to someone else's
+    // school — the same "not found" either way, for the same reason a
+    // parent's GET does not distinguish the two.
+    const { data: existing, error: readError } = await supabase
+      .from(PLANS)
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!existing) return NextResponse.json({ error: "No such plan" }, { status: 404 });
+
+    const { error } = await supabase.from(PLANS).delete().eq("id", id);
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return routeError("delete the yearly plan", error);
   }
 }
