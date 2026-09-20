@@ -518,11 +518,11 @@ export function slicePlan(
 
 /* ── Alerts ────────────────────────────────────────────────────────── */
 
-const unitWord = (n: number, unit: PlanUnit) => {
-  const rounded = Math.round(n);
-  const plural = rounded === 1 ? unit : `${unit}s`;
-  return `${rounded} ${plural}`;
-};
+// Alert text rounds to whole units on purpose: "a shortfall of 0.37 juz"
+// is a worse sentence than "a shortfall of 0.4 juz", and neither helps a
+// parent more than the milestone list underneath already does.
+const unitWord = (n: number, unit: PlanUnit) =>
+  `${formatApprox(n)} ${unitLabel(n, unit)}`;
 
 /**
  * Decides which alerts a plan is currently raising. Pure — it reports what
@@ -556,8 +556,9 @@ export function evaluateAlerts(
       detail:
         `Expected ${unitWord(p.expectedUnits, plan.unit)} by today, recorded ` +
         `${unitWord(p.actualUnits, plan.unit)} — a shortfall of ${unitWord(short, plan.unit)}. ` +
-        `Finishing on time now needs about ${p.requiredPerWeek} ${plan.unit}s a week, ` +
-        `against ${p.currentPerWeek} so far.`,
+        `Finishing on time now needs about ${formatApprox(p.requiredPerWeek)} ` +
+        `${unitLabel(p.requiredPerWeek, plan.unit)} a week, against ` +
+        `${formatApprox(p.currentPerWeek)} so far.`,
     });
   }
 
@@ -574,7 +575,7 @@ export function evaluateAlerts(
       detail:
         `"${first.title ?? `Milestone ${first.sequence}`}" was due ${first.due_on} ` +
         `(${late} day${late === 1 ? "" : "s"} ago) at ` +
-        `${first.completed_units} of ${first.target_units} ${plan.unit}s.`,
+        `${formatQuantity(first.completed_units)} of ${formatUnits(first.target_units, plan.unit)}.`,
     });
   }
 
@@ -610,6 +611,47 @@ export function evaluateAlerts(
 }
 
 /* ── Presentation helpers ──────────────────────────────────────────── */
+
+/**
+ * A quantity as a reader expects it: 2 rather than 2.00, 0.5 rather than
+ * 0.50. Targets are stored to two decimals so that half a juz a month is
+ * expressible, but almost every figure on screen is a whole number and
+ * printing trailing zeros on all of them would be noise.
+ */
+export function formatQuantity(n: number): string {
+  const rounded = Math.round(n * 100) / 100;
+  return String(rounded);
+}
+
+/**
+ * For figures that are *derived* rather than stored — today's expected
+ * total, a projected finish, a per-week rate, a month's slice. These come
+ * out of interpolation, so their decimals are an artefact of the maths
+ * rather than something a teacher typed.
+ *
+ * Ten is the line: below it a tenth still carries meaning (half a juz a
+ * month is the whole point of allowing fractions), above it "38.9 ayahs
+ * expected" is worse than "39" for every reader.
+ */
+export function formatApprox(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 10) return String(Math.round(n));
+  return String(Math.round(n * 10) / 10);
+}
+
+/**
+ * The unit with its count. "juz" is invariant — a plan for five ajzāʾ
+ * reads as "5 juz" in every school that would use this, and "5 juzs" is
+ * simply wrong. The rest take a plain -s.
+ */
+export function formatUnits(n: number, unit: PlanUnit): string {
+  return `${formatQuantity(n)} ${unitLabel(n, unit)}`;
+}
+
+export function unitLabel(n: number, unit: PlanUnit): string {
+  if (unit === "juz") return "juz";
+  return Math.round(n * 100) / 100 === 1 ? unit : `${unit}s`;
+}
 
 export const PACE_LABEL: Record<PaceStatus, string> = {
   not_started: "Not started",
@@ -650,8 +692,19 @@ export function generateMilestoneSkeleton(
 ): Array<Pick<Milestone, "sequence" | "starts_on" | "due_on" | "target_units">> {
   const count = Math.max(1, Math.min(52, Math.floor(segments)));
   const span = Math.max(1, daysBetween(startsOn, endsOn));
-  const base = Math.floor(Math.max(0, totalUnits) / count);
-  const remainder = Math.max(0, totalUnits) - base * count;
+  const total = Math.max(0, totalUnits);
+
+  // Split to two decimals rather than to whole units. Five juz across ten
+  // months is half a juz a month; rounded to integers the remainder used
+  // to pile into the earliest segments, giving one juz a month from
+  // September to January and zero afterwards — a plan that reads
+  // "complete" in February when the school meant June.
+  //
+  // Cumulative rather than per-segment, so the two-decimal rounding cannot
+  // drift: each target is the difference between two rounded running
+  // totals, which makes the segments sum to exactly `total` however
+  // awkwardly it divides.
+  const at = (i: number) => Math.round(((total * i) / count) * 100) / 100;
 
   const out: Array<Pick<Milestone, "sequence" | "starts_on" | "due_on" | "target_units">> = [];
   for (let i = 0; i < count; i++) {
@@ -661,7 +714,7 @@ export function generateMilestoneSkeleton(
       sequence: i + 1,
       starts_on: from,
       due_on: to,
-      target_units: base + (i < remainder ? 1 : 0),
+      target_units: Math.round((at(i + 1) - at(i)) * 100) / 100,
     });
   }
   return out;

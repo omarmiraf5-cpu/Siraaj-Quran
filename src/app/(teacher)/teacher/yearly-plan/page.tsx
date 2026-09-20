@@ -16,8 +16,12 @@ import {
 import { useSchoolRoster } from "@/hooks/usePortalRoster";
 import {
   addDays,
+  formatApprox,
+  formatQuantity,
+  formatUnits,
   generateMilestoneSkeleton,
   readable,
+  unitLabel,
   todayISO,
   type Milestone,
   type PlanUnit,
@@ -383,7 +387,7 @@ export default function TeacherYearlyPlanPage() {
               >
                 {UNITS.map((u) => (
                   <option key={u} value={u}>
-                    {u}s
+                    {unitLabel(2, u)}
                   </option>
                 ))}
               </select>
@@ -411,6 +415,7 @@ export default function TeacherYearlyPlanPage() {
               <input
                 type="number"
                 min={0}
+                step="0.25"
                 value={draft.totalUnits}
                 onChange={(e) => setDraft({ ...draft, totalUnits: Number(e.target.value) })}
                 className={input}
@@ -445,9 +450,9 @@ export default function TeacherYearlyPlanPage() {
             <div className="mt-5 rounded-xl border border-surface-border bg-surface-bg-warm px-4 py-3">
               <p className="eyebrow">Milestones this will create</p>
               <p className="text-[13px] text-ink-body mt-1.5 leading-relaxed">
-                {skeleton.length} evenly spaced segments of about{" "}
+                {skeleton.length} evenly spaced segments of{" "}
                 <span className="font-semibold">
-                  {skeleton[0].target_units} {draft.unit}s
+                  {formatUnits(skeleton[0].target_units, draft.unit)}
                 </span>{" "}
                 each, from {skeleton[0].starts_on} to {skeleton[skeleton.length - 1].due_on}. Rename,
                 retarget or delete any of them afterwards.
@@ -507,13 +512,13 @@ export default function TeacherYearlyPlanPage() {
               <div className="flex-1 min-w-0 w-full">
                 <div className="flex flex-wrap gap-y-4">
                   <PlanFigure
-                    value={`${progress.actualUnits}`}
-                    label={`${plan.unit}s done`}
+                    value={formatQuantity(progress.actualUnits)}
+                    label={`${unitLabel(2, plan.unit)} done`}
                     tone={paceColor(progress.pace)}
                   />
-                  <PlanFigure value={`${Math.round(progress.expectedUnits)}`} label="expected by today" />
-                  <PlanFigure value={`${progress.totalUnits}`} label="total for the year" />
-                  <PlanFigure value={`${progress.daysRemaining}`} label="days left" />
+                  <PlanFigure value={formatApprox(progress.expectedUnits)} label="expected by today" />
+                  <PlanFigure value={formatQuantity(progress.totalUnits)} label="total for the year" />
+                  <PlanFigure value={progress.daysRemaining} label="days left" />
                 </div>
                 <div className="mt-5">
                   <PaceBar
@@ -523,10 +528,11 @@ export default function TeacherYearlyPlanPage() {
                   />
                   <p className="text-[12px] text-ink-muted mt-2.5 leading-relaxed">
                     {progress.varianceUnits >= 0
-                      ? `${Math.round(progress.varianceUnits)} ${plan.unit}s ahead of the schedule.`
-                      : `${Math.abs(Math.round(progress.varianceUnits))} ${plan.unit}s short of the schedule.`}{" "}
-                    Running at {progress.currentPerWeek} {plan.unit}s a week; finishing on time needs{" "}
-                    {progress.requiredPerWeek}.
+                      ? `${formatApprox(progress.varianceUnits)} ${unitLabel(progress.varianceUnits, plan.unit)} ahead of the schedule.`
+                      : `${formatApprox(Math.abs(progress.varianceUnits))} ${unitLabel(progress.varianceUnits, plan.unit)} short of the schedule.`}{" "}
+                    Running at {formatApprox(progress.currentPerWeek)}{" "}
+                    {unitLabel(progress.currentPerWeek, plan.unit)} a week; finishing on time
+                    needs {formatApprox(progress.requiredPerWeek)}.
                   </p>
                 </div>
               </div>
@@ -582,11 +588,12 @@ export default function TeacherYearlyPlanPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-3">
                           <div>
                             <label className={label}>
-                              {plan.unit}s done in total
+                              {unitLabel(2, plan.unit)} done in total
                             </label>
                             <input
                               type="number"
                               min={0}
+                              step="0.25"
                               value={entry.units_after}
                               onChange={(e) =>
                                 setEntry({ ...entry, units_after: Number(e.target.value) })
@@ -663,6 +670,7 @@ export default function TeacherYearlyPlanPage() {
               <input
                 type="number"
                 min={0}
+                step="0.25"
                 value={newMilestone.target_units}
                 onChange={(e) =>
                   setNewMilestone({ ...newMilestone, target_units: Number(e.target.value) })

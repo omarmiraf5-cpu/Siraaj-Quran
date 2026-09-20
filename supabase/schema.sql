@@ -911,12 +911,19 @@ create table if not exists yearly_plan_milestones (
   -- How many units this milestone adds — not a running total. The plan's
   -- total is the sum, so editing one milestone cannot silently desync the
   -- rest from a stored grand total.
-  target_units      int not null default 0 check (target_units >= 0),
+  -- Numeric, not int: five juz across ten months is half a juz a month,
+  -- and whole numbers cannot say that. Rounded to whole units, the
+  -- remainder piles into the earliest segments — a 5-juz year came out as
+  -- one juz a month from September to January and nothing afterwards,
+  -- which then read as "complete" from February while the school meant
+  -- June. Two decimals covers quarter- and half-unit targets without
+  -- inviting float noise into the pace arithmetic.
+  target_units      numeric(8,2) not null default 0 check (target_units >= 0),
   -- How many the teacher has signed off. Not capped against target_units
   -- here: a child reciting further than the milestone asked is a real
   -- thing, and the pace maths clamps it where clamping matters rather than
   -- refusing the write and losing the fact.
-  completed_units   int not null default 0 check (completed_units >= 0),
+  completed_units   numeric(8,2) not null default 0 check (completed_units >= 0),
   status            text not null default 'pending'
                     check (status in ('pending', 'in_progress', 'completed', 'missed')),
   completed_on      date,
@@ -945,7 +952,7 @@ create table if not exists yearly_plan_progress (
   -- The milestone's completed_units as of this entry, not a delta: a
   -- teacher correcting yesterday's figure downwards is ordinary, and deltas
   -- would record that as an awkward negative row.
-  units_after       int not null check (units_after >= 0),
+  units_after       numeric(8,2) not null check (units_after >= 0),
   note_enc          text,
   created_at        timestamptz default now()
 );
@@ -974,6 +981,22 @@ create table if not exists yearly_plan_alerts (
   constraint yearly_plan_alerts_one_open unique (plan_id, code, triggered_on)
 );
 alter table yearly_plan_alerts enable row level security;
+
+-- `create table if not exists` above leaves an existing table alone, so a
+-- deployment that applied the first cut of this module still has int
+-- quantity columns. Widening them is safe and keeps every stored value.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'yearly_plan_milestones' and column_name = 'target_units'
+      and data_type = 'integer'
+  ) then
+    alter table yearly_plan_milestones alter column target_units type numeric(8,2);
+    alter table yearly_plan_milestones alter column completed_units type numeric(8,2);
+    alter table yearly_plan_progress   alter column units_after type numeric(8,2);
+  end if;
+end $$;
 
 -- ── RLS helpers ──────────────────────────────────────────────────────
 -- Security definer for the same reason as the helpers further up: a

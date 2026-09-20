@@ -3,6 +3,8 @@
 import {
   PACE_LABEL,
   milestonePercent,
+  formatQuantity,
+  formatUnits,
   milestoneTitle,
   readable,
   type Milestone,
@@ -434,8 +436,7 @@ export function MilestoneRow({
         <div className="mt-3 flex items-center gap-3">
           <PaceBar percentComplete={pct} pace={pace} height={6} showNotch={false} />
           <span className="text-[12px] text-ink-muted tabular-nums whitespace-nowrap flex-shrink-0">
-            {milestone.completed_units} / {milestone.target_units} {unit}
-            {milestone.target_units === 1 ? "" : "s"}
+            {formatQuantity(milestone.completed_units)} / {formatUnits(milestone.target_units, unit)}
           </span>
         </div>
 

@@ -8,7 +8,7 @@ import {
   PLANS,
   PROGRESS,
   badDate,
-  badInt,
+  badQuantity,
   badText,
   isFailure,
   loadPlan,
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!milestone_id) {
       return NextResponse.json({ error: "milestone_id is required" }, { status: 400 });
     }
-    const unitProblem = badInt(units_after, "units_after");
+    const unitProblem = badQuantity(units_after, "units_after");
     if (unitProblem) return NextResponse.json({ error: unitProblem }, { status: 400 });
     if (units_after == null) {
       return NextResponse.json({ error: "units_after is required" }, { status: 400 });
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     });
     if (logError) throw logError;
 
-    const target = (milestone.target_units as number) ?? 0;
+    const target = Number(milestone.target_units ?? 0);
     // Completion is inferred from the numbers unless the teacher says
     // otherwise: hitting the target is the ordinary way a milestone
     // finishes, and making them tick a box as well would leave plans full

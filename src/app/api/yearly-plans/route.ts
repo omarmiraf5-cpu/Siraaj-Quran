@@ -13,7 +13,7 @@ import {
   MAX_TEXT,
   MAX_TITLE,
   badDate,
-  badInt,
+  badQuantity,
   badText,
   decodeMilestone,
   decodePlan,
@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
         const problem =
           badDate(m.starts_on, `milestone ${i + 1} starts_on`) ??
           badDate(m.due_on, `milestone ${i + 1} due_on`) ??
-          badInt(m.target_units ?? 0, `milestone ${i + 1} target_units`) ??
+          badQuantity(m.target_units ?? 0, `milestone ${i + 1} target_units`) ??
           badText(m.title, `milestone ${i + 1} title`, MAX_TITLE) ??
           badText(m.description, `milestone ${i + 1} description`, MAX_TEXT);
         if (problem) {

@@ -15,8 +15,12 @@ import {
 } from "@/components/yearly-plan-ui";
 import { usePortalRoster } from "@/hooks/usePortalRoster";
 import {
+  formatApprox,
+  formatQuantity,
+  formatUnits,
   readable,
   slicePlan,
+  unitLabel,
   todayISO,
   type Milestone,
   type PeriodGrain,
@@ -253,15 +257,15 @@ export default function ParentYearlyPlanPage() {
               <div className="flex-1 min-w-0 w-full">
                 <div className="flex flex-wrap gap-y-4">
                   <PlanFigure
-                    value={progress.actualUnits}
-                    label={`${plan.unit}s done`}
+                    value={formatQuantity(progress.actualUnits)}
+                    label={`${unitLabel(2, plan.unit)} done`}
                     tone={paceColor(progress.pace)}
                   />
                   <PlanFigure
-                    value={Math.round(progress.expectedUnits)}
+                    value={formatApprox(progress.expectedUnits)}
                     label="expected by today"
                   />
-                  <PlanFigure value={progress.totalUnits} label="the whole year" />
+                  <PlanFigure value={formatQuantity(progress.totalUnits)} label="the whole year" />
                   <PlanFigure value={progress.daysRemaining} label="days left" />
                 </div>
                 <div className="mt-5">
@@ -275,14 +279,10 @@ export default function ParentYearlyPlanPage() {
                       thing a parent actually wants to know is the gap. */}
                   <p className="text-[12.5px] text-ink-body mt-2.5 leading-relaxed">
                     {progress.varianceUnits >= 0
-                      ? `${child?.name ?? "Your child"} is ${Math.round(
-                          progress.varianceUnits
-                        )} ${plan.unit}s ahead of where the plan expects them today.`
-                      : `${child?.name ?? "Your child"} is ${Math.abs(
-                          Math.round(progress.varianceUnits)
-                        )} ${plan.unit}s short of where the plan expects them today.`}{" "}
-                    At the current pace the year finishes at about {progress.projectedUnits} of{" "}
-                    {progress.totalUnits}.
+                      ? `${child?.name ?? "Your child"} is ${`${formatApprox(progress.varianceUnits)} ${unitLabel(progress.varianceUnits, plan.unit)}`} ahead of where the plan expects them today.`
+                      : `${child?.name ?? "Your child"} is ${`${formatApprox(Math.abs(progress.varianceUnits))} ${unitLabel(progress.varianceUnits, plan.unit)}`} short of where the plan expects them today.`}{" "}
+                    At the current pace the year finishes at about{" "}
+                    {formatApprox(progress.projectedUnits)} of {formatQuantity(progress.totalUnits)}.
                   </p>
                 </div>
               </div>
@@ -351,13 +351,13 @@ export default function ParentYearlyPlanPage() {
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
                   <p className="text-[13px] text-ink-body">
                     <span className="font-semibold text-ink tabular-nums">
-                      {Math.round(slice.actualUnits)}
+                      {formatApprox(slice.actualUnits)}
                     </span>{" "}
                     of{" "}
                     <span className="font-semibold text-ink tabular-nums">
-                      {Math.round(slice.expectedUnits)}
+                      {formatApprox(slice.expectedUnits)}
                     </span>{" "}
-                    {plan.unit}s expected in this {grain}
+                    {unitLabel(2, plan.unit)} expected in this {grain}
                   </p>
                   <span className="eyebrow">
                     {slice.from} — {slice.to}

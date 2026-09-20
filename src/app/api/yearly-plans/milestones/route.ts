@@ -8,7 +8,7 @@ import {
   MAX_TITLE,
   PLANS,
   badDate,
-  badInt,
+  badQuantity,
   badText,
   isFailure,
   loadPlan,
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     const problem =
       badDate(starts_on, "starts_on") ??
       badDate(due_on, "due_on") ??
-      badInt(target_units, "target_units") ??
+      badQuantity(target_units, "target_units") ??
       badText(title, "title", MAX_TITLE) ??
       badText(description, "description", MAX_TEXT);
     if (problem) return NextResponse.json({ error: problem }, { status: 400 });
@@ -176,7 +176,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (target_units !== undefined) {
-      const problem = badInt(target_units, "target_units");
+      const problem = badQuantity(target_units, "target_units");
       if (problem) return NextResponse.json({ error: problem }, { status: 400 });
       patch.target_units = target_units;
     }

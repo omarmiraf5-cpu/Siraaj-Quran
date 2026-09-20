@@ -162,8 +162,12 @@ export function decodeMilestone(row: Record<string, unknown>): Milestone {
     sequence: row.sequence as number,
     starts_on: row.starts_on as string,
     due_on: row.due_on as string,
-    target_units: row.target_units as number,
-    completed_units: row.completed_units as number,
+    // Coerced rather than cast: these are numeric(8,2) columns, and a
+    // Postgres driver is free to hand a numeric back as a string to avoid
+    // float loss. A silent string here would turn every sum in the pace
+    // maths into concatenation — "40" + "12" = "4012" ahead of schedule.
+    target_units: Number(row.target_units ?? 0),
+    completed_units: Number(row.completed_units ?? 0),
     status: row.status as Milestone["status"],
     completed_on: (row.completed_on as string | null) ?? null,
     title: decryptField(row.title_enc as string | null, fieldContext(MILESTONES, id, "title_enc")),
@@ -180,7 +184,7 @@ export function decodeProgress(row: Record<string, unknown>): ProgressEntry {
     id,
     milestone_id: row.milestone_id as string,
     recorded_on: row.recorded_on as string,
-    units_after: row.units_after as number,
+    units_after: Number(row.units_after ?? 0),
     note: decryptField(row.note_enc as string | null, fieldContext(PROGRESS, id, "note_enc")),
   };
 }
@@ -263,6 +267,27 @@ export function badInt(value: unknown, label: string, min = 0, max = 100_000): s
     return `${label} must be a whole number`;
   }
   if (value < min || value > max) return `${label} must be between ${min} and ${max}`;
+  return null;
+}
+
+/**
+ * A unit quantity. Fractional on purpose — five juz across ten months is
+ * half a juz a month, and a whole-number-only target cannot express that
+ * without dumping the remainder into the first few segments.
+ *
+ * Capped at two decimals to match the numeric(8,2) columns: a value with
+ * more would be silently rounded by Postgres, so the figure the teacher
+ * typed and the figure stored would differ with nothing saying so.
+ */
+export function badQuantity(value: unknown, label: string, min = 0, max = 100_000): string | null {
+  if (value == null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return `${label} must be a number`;
+  }
+  if (value < min || value > max) return `${label} must be between ${min} and ${max}`;
+  if (Math.round(value * 100) / 100 !== value) {
+    return `${label} can have at most two decimal places`;
+  }
   return null;
 }
 
