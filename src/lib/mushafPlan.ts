@@ -1,6 +1,6 @@
 import { JUZ_START_PAGES, SURAHS, TOTAL_PAGES, getSurahById } from "@/data/mushaf-index";
 import { addDays } from "@/lib/planDates";
-import { isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
+import { countInstructionalDays, isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
 import { startOfWeek } from "@/lib/yearlyPlan";
 
 /**
@@ -521,6 +521,29 @@ export function dailySchedule(
     day = addDays(day, 1);
   }
   return out;
+}
+
+/**
+ * The steady per-instructional-day pace a fixed total works out to across
+ * a date range — the reverse of typing a daily rate directly. A teacher
+ * gives the portion for the year ("5 juz"), this works out what that
+ * actually is a day, the same way `expectedUnitsForMilestone` already
+ * turns a target and a deadline into an expected-by-today figure, just
+ * solved for "per day" instead of "by this date".
+ *
+ * `planStartsOn` and `planEndsOn` are the same date, inclusive on both
+ * ends — unlike countInstructionalDays' own (from, to] convention, which
+ * would silently drop the plan's own first day from the count.
+ */
+export function impliedDailyRate(
+  totalAmount: number,
+  planStartsOn: string,
+  planEndsOn: string,
+  cal: SchoolCalendar
+): number {
+  if (totalAmount <= 0) return 0;
+  const days = countInstructionalDays(addDays(planStartsOn, -1), planEndsOn, cal);
+  return days > 0 ? totalAmount / days : 0;
 }
 
 export interface DailyRateSegment {

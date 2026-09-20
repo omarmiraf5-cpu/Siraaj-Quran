@@ -14,7 +14,13 @@ import {
   type PaceStatus,
   type PlanUnit,
 } from "@/lib/yearlyPlan";
-import { formatRange, dailySchedule, type Direction, type Position } from "@/lib/mushafPlan";
+import {
+  formatRange,
+  dailySchedule,
+  impliedDailyRate,
+  type Direction,
+  type Position,
+} from "@/lib/mushafPlan";
 import type { SchoolCalendar } from "@/lib/schoolCalendar";
 import { Modal, SectionCard, EmptyNote } from "@/components/portal-ui";
 import { Mushaf } from "@/components/Mushaf";
@@ -725,16 +731,51 @@ function weekdayLabel(iso: string): string {
   });
 }
 
+/** The shape both DailyWorkPanel and FullYearScheduleModal need off a
+ *  plan — never the whole Plan type, so a caller can pass one straight
+ *  off an API payload without a cast. */
+interface DailyPacePlan {
+  starts_on: string;
+  ends_on: string;
+  unit: PlanUnit;
+  start_surah: number | null;
+  start_ayah: number | null;
+  direction: Direction | null;
+  daily_new_amount: number | null;
+  daily_review_amount: number | null;
+}
+
+/**
+ * The steady per-day pace this plan actually runs at, however it was
+ * set up: the rate directly, if a teacher typed one, or — for an ordinary
+ * "total for the year" plan — the total worked out across however many
+ * instructional days the plan's own span holds. Either way the rest of
+ * this file only ever needs one number, not two different plan shapes.
+ *
+ * Null when there is nothing to derive a pace from at all: no anchor, or
+ * no rate and no total either (a bare plan with no milestones yet).
+ */
+function dailyPaceOf(plan: DailyPacePlan, cal: SchoolCalendar, totalUnits?: number): number | null {
+  if (plan.start_surah == null || plan.start_ayah == null || plan.direction == null) return null;
+  if (plan.daily_new_amount != null) return plan.daily_new_amount;
+  if (totalUnits && totalUnits > 0) {
+    const rate = impliedDailyRate(totalUnits, plan.starts_on, plan.ends_on, cal);
+    return rate > 0 ? rate : null;
+  }
+  return null;
+}
+
 /**
  * "1 page a day" made concrete: the week containing today, one row per
- * calendar day, each showing exactly what a daily-rate plan expects for
- * that day — or "No class" for a weekend or a listed closure, which is
- * the point of asking the school for its calendar in the first place.
+ * calendar day, each showing exactly what the plan expects for that day —
+ * or "No class" for a weekend or a listed closure, which is the point of
+ * asking the school for its calendar in the first place.
  *
- * Only for a plan actually built this way — daily_new_amount and a mushaf
- * anchor both set. A plan made the other way (a year's total split into
- * milestones) has no per-day position to walk, and this renders nothing
- * for it rather than a panel with an empty range in every row.
+ * Works for a plan set up either way: one with a daily rate typed
+ * directly, or an ordinary "total for the year" plan, whose pace is
+ * worked out from `totalUnits` (pass the plan's own progress.totalUnits —
+ * the sum of its milestones' targets). Renders nothing without a mushaf
+ * anchor or without either a rate or a total to derive one from.
  *
  * Review carries no position of its own — see dailySchedule's own note —
  * so it shows as a flat "+ N pages review" on every instructional day
@@ -744,31 +785,22 @@ function weekdayLabel(iso: string): string {
 export function DailyWorkPanel({
   plan,
   cal,
+  totalUnits,
   today = todayISO(),
+  onViewFullYear,
 }: {
-  plan: {
-    starts_on: string;
-    ends_on: string;
-    unit: PlanUnit;
-    start_surah: number | null;
-    start_ayah: number | null;
-    direction: Direction | null;
-    daily_new_amount: number | null;
-    daily_review_amount: number | null;
-  };
+  plan: DailyPacePlan;
   cal: SchoolCalendar;
+  /** The plan's overall target — progress.totalUnits — used only when the
+   *  plan has no daily_new_amount of its own. */
+  totalUnits?: number;
   today?: string;
+  onViewFullYear?: () => void;
 }) {
-  if (
-    plan.daily_new_amount == null ||
-    plan.start_surah == null ||
-    plan.start_ayah == null ||
-    plan.direction == null
-  ) {
-    return null;
-  }
-  const start: Position = { surah: plan.start_surah, ayah: plan.start_ayah };
-  const direction = plan.direction;
+  const dailyAmount = dailyPaceOf(plan, cal, totalUnits);
+  if (dailyAmount == null) return null;
+  const start: Position = { surah: plan.start_surah!, ayah: plan.start_ayah! };
+  const direction = plan.direction!;
 
   // The week containing today, clamped into the plan's own span — a plan
   // that has not started yet shows its first week rather than a week with
@@ -777,16 +809,7 @@ export function DailyWorkPanel({
   const weekStart = startOfWeek(anchorDay);
   const weekEnd = addDays(weekStart, 6);
 
-  const rows = dailySchedule(
-    start,
-    direction,
-    plan.unit,
-    plan.daily_new_amount,
-    plan.starts_on,
-    weekStart,
-    weekEnd,
-    cal
-  );
+  const rows = dailySchedule(start, direction, plan.unit, dailyAmount, plan.starts_on, weekStart, weekEnd, cal);
   const byDate = new Map(rows.map((r) => [r.date, r]));
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -794,9 +817,22 @@ export function DailyWorkPanel({
     <SectionCard
       title="This week's work"
       note={
-        plan.daily_review_amount
-          ? `+ ${formatUnits(plan.daily_review_amount, plan.unit)} review daily`
-          : undefined
+        <span className="inline-flex items-center gap-3">
+          {plan.daily_review_amount && (
+            <span className="whitespace-nowrap">
+              + {formatUnits(plan.daily_review_amount, plan.unit)} review daily
+            </span>
+          )}
+          {onViewFullYear && (
+            <button
+              type="button"
+              onClick={onViewFullYear}
+              className="font-semibold text-brand-navy dark:text-brand-gold hover:underline whitespace-nowrap"
+            >
+              Whole year →
+            </button>
+          )}
+        </span>
       }
     >
       {rows.length === 0 ? (
@@ -838,5 +874,101 @@ export function DailyWorkPanel({
         </ul>
       )}
     </SectionCard>
+  );
+}
+
+function monthTitle(iso: string): string {
+  return new Date(iso + "T12:00:00Z").toLocaleDateString("en-CA", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/**
+ * The full list DailyWorkPanel's own week is a slice of — every
+ * instructional day from the plan's first to its last, grouped by month
+ * so a school year's worth of rows (a couple of hundred) stays scannable
+ * instead of one undifferentiated scroll.
+ *
+ * Same rules as the week view: "open" decides whether this renders at
+ * all, the same way MilestoneMushafModal reads a nullable milestone —
+ * callers pass their toggle straight through rather than wrapping the
+ * whole element in a condition themselves.
+ */
+export function FullYearScheduleModal({
+  open,
+  plan,
+  cal,
+  totalUnits,
+  onClose,
+}: {
+  open: boolean;
+  plan: DailyPacePlan;
+  cal: SchoolCalendar;
+  totalUnits?: number;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+  const dailyAmount = dailyPaceOf(plan, cal, totalUnits);
+  if (dailyAmount == null) return null;
+  const start: Position = { surah: plan.start_surah!, ayah: plan.start_ayah! };
+
+  const rows = dailySchedule(
+    start,
+    plan.direction!,
+    plan.unit,
+    dailyAmount,
+    plan.starts_on,
+    plan.starts_on,
+    plan.ends_on,
+    cal
+  );
+
+  const months: Array<{ key: string; label: string; rows: typeof rows }> = [];
+  for (const r of rows) {
+    const key = r.date.slice(0, 7);
+    const current = months[months.length - 1];
+    if (current?.key === key) current.rows.push(r);
+    else months.push({ key, label: monthTitle(r.date), rows: [r] });
+  }
+
+  return (
+    <Modal
+      title="The whole year, day by day"
+      subtitle={`${rows.length} instructional day${rows.length === 1 ? "" : "s"}, about ${formatUnits(
+        dailyAmount,
+        plan.unit
+      )} each`}
+      wide
+      onClose={onClose}
+    >
+      {rows.length === 0 ? (
+        <EmptyNote>No instructional days fall in this plan's dates.</EmptyNote>
+      ) : (
+        <div className="space-y-6 max-h-[65vh] overflow-y-auto">
+          {months.map((m) => (
+            <div key={m.key}>
+              <p className="eyebrow mb-2">{m.label}</p>
+              <ul className="divide-y divide-surface-border -my-1">
+                {m.rows.map((r) => (
+                  <li key={r.date} className="flex items-center justify-between gap-3 py-2">
+                    <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide w-24 flex-shrink-0">
+                      {weekdayLabel(r.date)}
+                    </span>
+                    <span className="text-[13px] text-ink flex-1 min-w-0">{r.label}</span>
+                    {plan.daily_review_amount ? (
+                      <span className="text-[11px] text-ink-muted flex-shrink-0 whitespace-nowrap">
+                        + {formatUnits(plan.daily_review_amount, plan.unit)} review
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   );
 }

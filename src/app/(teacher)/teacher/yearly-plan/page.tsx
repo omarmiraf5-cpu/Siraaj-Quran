@@ -5,6 +5,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, LoadingNote } from "@/components/portal-ui";
 import {
   DailyWorkPanel,
+  FullYearScheduleModal,
   MilestoneMushafModal,
   MilestoneNavigator,
   MilestoneRow,
@@ -27,6 +28,7 @@ import {
   targetInAyahs,
   ayahsRemaining,
   formatPosition,
+  impliedDailyRate,
   weeklyMilestonesFromDailyRate,
   type Direction,
 } from "@/lib/mushafPlan";
@@ -507,6 +509,7 @@ export default function TeacherYearlyPlanPage() {
      the two panels can be open at once without conflict. */
   const [focusedMilestoneId, setFocusedMilestoneId] = useState<string | null>(null);
   const [mushafMilestone, setMushafMilestone] = useState<Milestone | null>(null);
+  const [showFullYear, setShowFullYear] = useState(false);
 
   useEffect(() => {
     if (milestones.length === 0) {
@@ -1053,6 +1056,23 @@ export default function TeacherYearlyPlanPage() {
                     </p>
                   )}
 
+                  {/* What "5 juz across the year" actually is a day —
+                      worked out from the school calendar, not asked for.
+                      A teacher who thinks in totals shouldn't have to
+                      switch to the daily-rate pace just to see this. */}
+                  {!draft.dailyMode && !overshoots && canAnchor && startFrom && draft.totalUnits > 0 && (
+                    <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
+                      That works out to about{" "}
+                      {formatUnits(
+                        impliedDailyRate(draft.totalUnits, draft.starts_on, draft.ends_on, schoolCal),
+                        draft.unit
+                      )}{" "}
+                      a day, from {draft.starts_on} to {draft.ends_on} on your school&apos;s
+                      instructional days. Once saved, the plan page shows the exact day-by-day
+                      breakdown.
+                    </p>
+                  )}
+
                   {draft.dailyMode &&
                     (skeleton.length > 0 ? (
                       <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
@@ -1374,7 +1394,12 @@ export default function TeacherYearlyPlanPage() {
             )}
           </SectionCard>
 
-          <DailyWorkPanel plan={plan} cal={schoolCal} />
+          <DailyWorkPanel
+            plan={plan}
+            cal={schoolCal}
+            totalUnits={progress.totalUnits}
+            onViewFullYear={() => setShowFullYear(true)}
+          />
 
           <SectionCard title="Milestones" note={`${milestones.length} segments`}>
             {milestones.length === 0 ? (
@@ -1511,6 +1536,15 @@ export default function TeacherYearlyPlanPage() {
       )}
 
       <MilestoneMushafModal milestone={mushafMilestone} onClose={() => setMushafMilestone(null)} />
+      {plan && (
+        <FullYearScheduleModal
+          open={showFullYear}
+          plan={plan}
+          cal={schoolCal}
+          totalUnits={progress?.totalUnits}
+          onClose={() => setShowFullYear(false)}
+        />
+      )}
     </div>
   );
 }

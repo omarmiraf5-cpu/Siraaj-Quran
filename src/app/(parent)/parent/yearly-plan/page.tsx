@@ -5,6 +5,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { LoadingNote, SectionCard, SegmentedSwitch } from "@/components/portal-ui";
 import {
   DailyWorkPanel,
+  FullYearScheduleModal,
   MilestoneMushafModal,
   MilestoneRow,
   PaceBar,
@@ -73,6 +74,7 @@ export default function ParentYearlyPlanPage() {
   const [periodIndex, setPeriodIndex] = useState<number | null>(null);
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [mushafMilestone, setMushafMilestone] = useState<Milestone | null>(null);
+  const [showFullYear, setShowFullYear] = useState(false);
   const today = todayISO();
 
   useEffect(() => {
@@ -351,7 +353,12 @@ export default function ParentYearlyPlanPage() {
             )}
           </SectionCard>
 
-          <DailyWorkPanel plan={plan} cal={schoolCal} />
+          <DailyWorkPanel
+            plan={plan}
+            cal={schoolCal}
+            totalUnits={progress.totalUnits}
+            onViewFullYear={() => setShowFullYear(true)}
+          />
 
           <SectionCard
             title="Break it down"
@@ -502,6 +509,15 @@ export default function ParentYearlyPlanPage() {
       )}
 
       <MilestoneMushafModal milestone={mushafMilestone} onClose={() => setMushafMilestone(null)} />
+      {plan && (
+        <FullYearScheduleModal
+          open={showFullYear}
+          plan={plan}
+          cal={schoolCal}
+          totalUnits={progress?.totalUnits}
+          onClose={() => setShowFullYear(false)}
+        />
+      )}
     </div>
   );
 }
