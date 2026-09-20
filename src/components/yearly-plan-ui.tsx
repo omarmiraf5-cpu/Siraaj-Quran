@@ -331,33 +331,33 @@ export function PlanAlertBanner({
 }
 
 /* ── Empty state ───────────────────────────────────────────────────────
-   Two squares at 45° to each other — the eight-point khātim that runs
-   through Qur'anic manuscript illumination. Abstract by construction:
-   there is nothing in it but two rotated rectangles and a circle. */
-export function GeometricEmblem({ size = 56, tone = GOLD }: { size?: number; tone?: string }) {
-  const c = 12;
-  const s = 7.4;
+   The MyDiiwaan monogram — the navy shield and gold MD cut out of the
+   full crest.
+
+   The whole crest is not used here for two reasons. It carries two owls,
+   and this module was built to hold no animate imagery anywhere; and at
+   the 56px an empty state gives it, a crest with a banner and two lines
+   of type renders as a dark smudge. The monogram is the same brand mark
+   with neither problem: letterforms and a shield, legible small.
+
+   A plain <img> rather than next/image: it is a fixed-size decorative
+   mark, so the resizing and lazy-loading machinery would cost more than
+   it returns, and next/image's wrapper fights the flex centring here. */
+export function GeometricEmblem({ size = 56 }: { size?: number; tone?: string }) {
   return (
-    <svg
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/mark.png"
+      alt=""
+      aria-hidden
       width={size}
       height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={tone}
-      strokeWidth={0.9}
-      aria-hidden
-      className="opacity-70"
-    >
-      <rect x={c - s} y={c - s} width={s * 2} height={s * 2} />
-      <rect
-        x={c - s}
-        y={c - s}
-        width={s * 2}
-        height={s * 2}
-        transform={`rotate(45 ${c} ${c})`}
-      />
-      <circle cx={c} cy={c} r={3.1} />
-    </svg>
+      // The mark has its own dark ground, so it needs no theme handling —
+      // it reads the same on cream and on near-black. drop-shadow rather
+      // than box-shadow so the rounded corners are respected.
+      style={{ width: size, height: size, filter: "drop-shadow(0 2px 6px rgba(20,24,35,.18))" }}
+      className="flex-shrink-0"
+    />
   );
 }
 
