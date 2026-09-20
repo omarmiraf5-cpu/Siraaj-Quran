@@ -63,6 +63,9 @@ export default function ParentYearlyPlanPage() {
   const [payload, setPayload] = useState<PlanPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Held separately from the message so the page can recognise the
+  // not-configured case without matching on prose.
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [grain, setGrain] = useState<PeriodGrain>("year");
   const [periodIndex, setPeriodIndex] = useState<number | null>(null);
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
@@ -77,13 +80,31 @@ export default function ParentYearlyPlanPage() {
   const load = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
+    setErrorCode(null);
     try {
       const res = await fetch(`/api/yearly-plans?student_id=${encodeURIComponent(id)}`);
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not load the plan");
+      if (!res.ok) {
+        // Server error text is for staff, not for a family. It names
+        // tables, environment variables and policies — a parent reading
+        // "PLAN_ENCRYPTION_KEY is not configured on the server" learns
+        // nothing they can act on and quite a lot they shouldn't see. The
+        // real message goes to the console for whoever is supporting the
+        // school; the parent gets a sentence.
+        console.error("Yearly plan load failed:", body?.error ?? res.status);
+        setErrorCode(body?.code ?? null);
+        setError(
+          body?.code === "encryption_not_configured"
+            ? null
+            : "We couldn't load the plan just now. Please try again in a moment."
+        );
+        setPayload(null);
+        return;
+      }
       setPayload(body);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the plan");
+      console.error("Yearly plan load failed:", err);
+      setError("We couldn't load the plan just now. Please try again in a moment.");
       setPayload(null);
     } finally {
       setLoading(false);
@@ -199,6 +220,15 @@ export default function ParentYearlyPlanPage() {
               </button>
             ))}
           </div>
+        </SectionCard>
+      )}
+
+      {errorCode === "encryption_not_configured" && (
+        <SectionCard title="Yearly plan">
+          <PlanEmptyState
+            title="Not switched on yet"
+            body="Your school hasn't finished setting up yearly plans. Nothing is wrong with your account — this page will fill in once they have."
+          />
         </SectionCard>
       )}
 

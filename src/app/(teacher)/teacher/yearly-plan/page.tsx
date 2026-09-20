@@ -122,6 +122,7 @@ export default function TeacherYearlyPlanPage() {
   const [payload, setPayload] = useState<PlanPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const today = todayISO();
 
@@ -134,10 +135,22 @@ export default function TeacherYearlyPlanPage() {
   const load = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
+    setErrorCode(null);
     try {
       const res = await fetch(`/api/yearly-plans?student_id=${encodeURIComponent(id)}`);
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not load the plan");
+      if (!res.ok) {
+        setErrorCode(body?.code ?? null);
+        // The not-configured case is a setup step, not a fault — it gets
+        // its own panel below rather than a red banner that reads like
+        // something broke.
+        if (body?.code === "encryption_not_configured") {
+          setError(null);
+          setPayload(null);
+          return;
+        }
+        throw new Error(body.error || "Could not load the plan");
+      }
       setPayload(body);
     } catch (err) {
       // Surfaced rather than swallowed: an empty plan and a failed request
@@ -489,6 +502,15 @@ export default function TeacherYearlyPlanPage() {
           </select>
         )}
       </SectionCard>
+
+      {errorCode === "encryption_not_configured" && (
+        <SectionCard title="One setup step left">
+          <PlanEmptyState
+            title="Yearly plans aren't switched on yet"
+            body="Plans are encrypted before they're stored, and this site hasn't been given its encryption key. Ask whoever set the site up to add the plan encryption key to the server settings and redeploy — everything else on this page is ready."
+          />
+        </SectionCard>
+      )}
 
       {error && (
         <p className="text-[13px] text-status-error-text bg-status-error-bg rounded-xl px-4 py-3">
