@@ -12,7 +12,9 @@ import {
   UNITS,
   MAX_TEXT,
   MAX_TITLE,
+  DIRECTIONS,
   badDate,
+  badPosition,
   badQuantity,
   badText,
   decodeMilestone,
@@ -193,6 +195,9 @@ export async function POST(req: NextRequest) {
       status = "active",
       title,
       notes,
+      start_surah = null,
+      start_ayah = null,
+      direction = null,
       milestones = [],
     } = body ?? {};
 
@@ -225,6 +230,15 @@ export async function POST(req: NextRequest) {
     const textProblem =
       badText(title, "title", MAX_TITLE) ?? badText(notes, "notes", MAX_TEXT);
     if (textProblem) return NextResponse.json({ error: textProblem }, { status: 400 });
+
+    const anchorProblem = badPosition(start_surah, start_ayah, "The plan's starting");
+    if (anchorProblem) return NextResponse.json({ error: anchorProblem }, { status: 400 });
+    if (direction != null && !DIRECTIONS.includes(direction)) {
+      return NextResponse.json(
+        { error: `direction must be one of: ${DIRECTIONS.join(", ")}` },
+        { status: 400 }
+      );
+    }
 
     if (!Array.isArray(milestones)) {
       return NextResponse.json({ error: "milestones must be a list" }, { status: 400 });
@@ -267,6 +281,9 @@ export async function POST(req: NextRequest) {
       ends_on,
       unit,
       status,
+      start_surah,
+      start_ayah,
+      direction,
       ...planTextColumns(planId, title ?? null, notes ?? null),
     });
     if (insertError) throw insertError;
@@ -279,6 +296,8 @@ export async function POST(req: NextRequest) {
           badDate(m.starts_on, `milestone ${i + 1} starts_on`) ??
           badDate(m.due_on, `milestone ${i + 1} due_on`) ??
           badQuantity(m.target_units ?? 0, `milestone ${i + 1} target_units`) ??
+          badPosition(m.from_surah ?? null, m.from_ayah ?? null, `Milestone ${i + 1} start`) ??
+          badPosition(m.to_surah ?? null, m.to_ayah ?? null, `Milestone ${i + 1} end`) ??
           badText(m.title, `milestone ${i + 1} title`, MAX_TITLE) ??
           badText(m.description, `milestone ${i + 1} description`, MAX_TEXT);
         if (problem) {
@@ -303,6 +322,10 @@ export async function POST(req: NextRequest) {
           starts_on: m.starts_on,
           due_on: m.due_on,
           target_units: m.target_units ?? 0,
+          from_surah: m.from_surah ?? null,
+          from_ayah: m.from_ayah ?? null,
+          to_surah: m.to_surah ?? null,
+          to_ayah: m.to_ayah ?? null,
           ...milestoneTextColumns(id, m.title ?? null, m.description ?? null),
         });
       }

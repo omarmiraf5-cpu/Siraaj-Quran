@@ -884,6 +884,17 @@ create table if not exists yearly_plans (
                     check (unit in ('ayah', 'page', 'line', 'surah', 'juz', 'lesson')),
   status            text not null default 'draft'
                     check (status in ('draft', 'active', 'completed', 'archived')),
+  -- Where in the mushaf the plan was anchored when it was built, and
+  -- which way through it the student works. Most hifz students go
+  -- backwards — An-Nas up through Juz 30, 29, 28 — while ayahs still run
+  -- 1→n inside each surah, so the direction cannot be inferred from the
+  -- positions alone and has to be recorded.
+  --
+  -- Null on a plan built as a plain count with no mushaf anchor, which
+  -- stays supported: a qaidah or lesson-counted plan has no surah.
+  start_surah       int check (start_surah between 1 and 114),
+  start_ayah        int check (start_ayah >= 1),
+  direction         text check (direction in ('forward', 'hifz')),
   -- Encrypted: the teacher's own words.
   title_enc         text,
   notes_enc         text,
@@ -927,6 +938,19 @@ create table if not exists yearly_plan_milestones (
   status            text not null default 'pending'
                     check (status in ('pending', 'in_progress', 'completed', 'missed')),
   completed_on      date,
+  -- Which stretch of the mushaf this segment covers. Null on a plan that
+  -- is a plain count rather than a walk through the text.
+  --
+  -- NOT encrypted, unlike the wording beside it, and the same call the
+  -- existing quranic_assignments table already makes: a surah and ayah
+  -- number is where a lesson sits in a shared, public text, not something
+  -- written about a child. Keeping it readable is also what lets the
+  -- database order and filter milestones by position at all, which a
+  -- ciphertext column could not.
+  from_surah        int check (from_surah between 1 and 114),
+  from_ayah         int check (from_ayah >= 1),
+  to_surah          int check (to_surah between 1 and 114),
+  to_ayah           int check (to_ayah >= 1),
   -- Encrypted: the teacher's own words.
   title_enc         text,
   description_enc   text,
@@ -981,6 +1005,17 @@ create table if not exists yearly_plan_alerts (
   constraint yearly_plan_alerts_one_open unique (plan_id, code, triggered_on)
 );
 alter table yearly_plan_alerts enable row level security;
+
+-- Columns added after the first cut of this module; `create table if not
+-- exists` above leaves an existing table untouched, so they are added
+-- here for a database that already has it.
+alter table yearly_plans add column if not exists start_surah int;
+alter table yearly_plans add column if not exists start_ayah int;
+alter table yearly_plans add column if not exists direction text;
+alter table yearly_plan_milestones add column if not exists from_surah int;
+alter table yearly_plan_milestones add column if not exists from_ayah int;
+alter table yearly_plan_milestones add column if not exists to_surah int;
+alter table yearly_plan_milestones add column if not exists to_ayah int;
 
 -- `create table if not exists` above leaves an existing table alone, so a
 -- deployment that applied the first cut of this module still has int

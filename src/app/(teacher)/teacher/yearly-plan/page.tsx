@@ -14,6 +14,17 @@ import {
   paceColor,
 } from "@/components/yearly-plan-ui";
 import { useSchoolRoster } from "@/hooks/usePortalRoster";
+import { SURAHS, getSurahById } from "@/data/mushaf-index";
+import {
+  DIRECTION_LABEL,
+  isValidPosition,
+  nextPosition,
+  segmentMushaf,
+  targetInAyahs,
+  ayahsRemaining,
+  formatPosition,
+  type Direction,
+} from "@/lib/mushafPlan";
 import {
   addDays,
   formatApprox,
@@ -67,6 +78,21 @@ interface PlanPayload {
 }
 
 const UNITS: PlanUnit[] = ["ayah", "page", "line", "surah", "juz", "lesson"];
+
+/** What the create form builds and posts. The mushaf fields are null on a
+ *  plain count-only plan, which is why they are declared rather than left
+ *  to be narrowed out of a union at each use. */
+interface DraftMilestone {
+  sequence: number;
+  starts_on: string;
+  due_on: string;
+  target_units: number;
+  from_surah: number | null;
+  from_ayah: number | null;
+  to_surah: number | null;
+  to_ayah: number | null;
+  label: string | null;
+}
 
 const input =
   "w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition";
@@ -137,23 +163,97 @@ export default function TeacherYearlyPlanPage() {
     ...defaultYear(),
     title: "",
     notes: "",
-    unit: "ayah" as PlanUnit,
-    totalUnits: 400,
+    unit: "juz" as PlanUnit,
+    totalUnits: 5,
     segments: 10,
+    anchor: true,
+    direction: "hifz" as Direction,
+    lastSurah: 78,
+    lastAyah: 40,
   }));
 
-  const skeleton = useMemo(
-    () =>
-      draft.starts_on < draft.ends_on
-        ? generateMilestoneSkeleton(
-            draft.starts_on,
-            draft.ends_on,
-            draft.segments,
-            draft.totalUnits
-          )
-        : [],
-    [draft.starts_on, draft.ends_on, draft.segments, draft.totalUnits]
-  );
+  /* ── Where the student already is ──────────────────────────────────
+     Read from the daily lessons the teacher already records, so a plan
+     starts from the child's real position rather than from nothing.
+     Suggested, never applied silently: the form shows it and the teacher
+     confirms or overrides. */
+  const [detected, setDetected] = useState<{
+    surah: number; ayah: number; surah_name: string; lessons: number; source: string;
+  } | null>(null);
+  const [detecting, setDetecting] = useState(false);
+
+  useEffect(() => {
+    if (mode !== "real" || !studentId) return;
+    let cancelled = false;
+    setDetecting(true);
+    setDetected(null);
+    fetch(`/api/yearly-plans/position?student_id=${encodeURIComponent(studentId)}`)
+      .then((r) => r.json())
+      .then((b) => {
+        if (cancelled || !b?.position) return;
+        setDetected({ ...b.position, surah_name: b.surah_name, lessons: b.lessons, source: b.source });
+        setDraft((d) => ({ ...d, lastSurah: b.position.surah, lastAyah: b.position.ayah }));
+      })
+      // A failure here costs the suggestion, not the form: the teacher
+      // can still set the position by hand, so it is not worth an error
+      // banner over a page they can use regardless.
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setDetecting(false); });
+    return () => { cancelled = true; };
+  }, [mode, studentId]);
+
+  const startFrom = useMemo(() => {
+    const last = { surah: draft.lastSurah, ayah: draft.lastAyah };
+    if (!isValidPosition(last)) return null;
+    // The stored position is the last ayah memorised; the plan begins at
+    // the one after it, which depends on the direction.
+    return nextPosition(last, draft.direction);
+  }, [draft.lastSurah, draft.lastAyah, draft.direction]);
+
+  // "lesson" counts sessions, not text, so it has no mushaf span to walk.
+  const canAnchor = draft.anchor && draft.unit !== "lesson" && startFrom !== null;
+
+  const skeleton = useMemo<DraftMilestone[]>(() => {
+    if (draft.starts_on >= draft.ends_on) return [];
+
+    const dates = generateMilestoneSkeleton(
+      draft.starts_on,
+      draft.ends_on,
+      draft.segments,
+      draft.totalUnits
+    );
+    const blank = (d: (typeof dates)[number]): DraftMilestone => ({
+      ...d, from_surah: null, from_ayah: null, to_surah: null, to_ayah: null, label: null,
+    });
+    if (!canAnchor || !startFrom) return dates.map(blank);
+
+    const ayahs = targetInAyahs(startFrom, draft.direction, draft.unit, draft.totalUnits);
+    const ranges = segmentMushaf(
+      startFrom, draft.direction, ayahs, draft.segments, draft.unit, draft.totalUnits
+    );
+    // Zipped by position: the dates come from the calendar and the ranges
+    // from the mushaf, and they are independent splits of the same count.
+    // If the mushaf runs out first — a plan reaching past An-Nas — the
+    // remaining segments keep their dates and simply carry no range,
+    // which reads as an over-long plan rather than a broken one.
+    return dates.map((d, i) => ({
+      ...d,
+      target_units: ranges[i]?.units ?? d.target_units,
+      from_surah: ranges[i]?.from_surah ?? null,
+      from_ayah: ranges[i]?.from_ayah ?? null,
+      to_surah: ranges[i]?.to_surah ?? null,
+      to_ayah: ranges[i]?.to_ayah ?? null,
+      label: ranges[i]?.label ?? null,
+    }));
+  }, [draft.starts_on, draft.ends_on, draft.segments, draft.totalUnits, draft.unit,
+      draft.direction, canAnchor, startFrom]);
+
+  /** True when the year's target reaches past the end of the mushaf. */
+  const overshoots = useMemo(() => {
+    if (!canAnchor || !startFrom) return false;
+    return targetInAyahs(startFrom, draft.direction, draft.unit, draft.totalUnits)
+      > ayahsRemaining(startFrom, draft.direction);
+  }, [canAnchor, startFrom, draft.direction, draft.unit, draft.totalUnits]);
 
   const createPlan = async () => {
     if (!studentId) return;
@@ -172,6 +272,9 @@ export default function TeacherYearlyPlanPage() {
           status: "active",
           title: draft.title || null,
           notes: draft.notes || null,
+          start_surah: canAnchor ? startFrom!.surah : null,
+          start_ayah: canAnchor ? startFrom!.ayah : null,
+          direction: canAnchor ? draft.direction : null,
           milestones: skeleton,
         }),
       });
@@ -446,6 +549,122 @@ export default function TeacherYearlyPlanPage() {
             </div>
           </div>
 
+          {/* ── Where in the mushaf to start ─────────────────────── */}
+          {draft.unit !== "lesson" && (
+            <div className="mt-1 rounded-xl border border-surface-border p-4">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={draft.anchor}
+                  onChange={(e) => setDraft({ ...draft, anchor: e.target.checked })}
+                  className="w-4 h-4 accent-emerald-600 flex-shrink-0"
+                />
+                <span className="text-[14px] font-semibold text-ink">
+                  Build the plan from where the student is in the mushaf
+                </span>
+              </label>
+
+              {draft.anchor && (
+                <div className="mt-4 space-y-4">
+                  {detecting && (
+                    <p className="text-[12.5px] text-ink-muted">
+                      Checking their recorded lessons…
+                    </p>
+                  )}
+                  {!detecting && detected && (
+                    <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
+                      Their last recorded lesson ends at{" "}
+                      <span className="font-semibold">
+                        {detected.surah_name} {detected.ayah}
+                      </span>{" "}
+                      — read from {detected.lessons} lesson
+                      {detected.lessons === 1 ? "" : "s"} on file. Change it below if that is not
+                      where they actually are.
+                    </p>
+                  )}
+                  {!detecting && !detected && (
+                    <p className="text-[12.5px] text-ink-muted">
+                      No Qur&apos;an lessons recorded for this student yet, so there is nothing to
+                      read a position from. Set where they are by hand.
+                    </p>
+                  )}
+
+                  <div>
+                    <label className={label}>Working through the mushaf</label>
+                    <select
+                      value={draft.direction}
+                      onChange={(e) =>
+                        setDraft({ ...draft, direction: e.target.value as Direction })
+                      }
+                      className={input}
+                    >
+                      {(["hifz", "forward"] as const).map((d) => (
+                        <option key={d} value={d}>
+                          {DIRECTION_LABEL[d]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className={label}>Last surah memorised</label>
+                      <select
+                        value={draft.lastSurah}
+                        onChange={(e) => {
+                          const surah = Number(e.target.value);
+                          const max = getSurahById(surah)?.ayahs ?? 1;
+                          // Clamped, because moving from Al-Baqarah (286)
+                          // to Al-Kawthar (3) would otherwise leave an
+                          // ayah number that does not exist.
+                          setDraft({ ...draft, lastSurah: surah, lastAyah: Math.min(draft.lastAyah, max) });
+                        }}
+                        className={input}
+                      >
+                        {SURAHS.map((sr) => (
+                          <option key={sr.id} value={sr.id}>
+                            {sr.id}. {sr.englishName} ({sr.ayahs} ayahs)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={label}>…up to ayah</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={getSurahById(draft.lastSurah)?.ayahs ?? 1}
+                        value={draft.lastAyah}
+                        onChange={(e) => setDraft({ ...draft, lastAyah: Number(e.target.value) })}
+                        className={input}
+                      />
+                    </div>
+                  </div>
+
+                  {startFrom ? (
+                    <p className="text-[12.5px] text-ink-muted">
+                      The plan will begin at{" "}
+                      <span className="font-semibold text-ink">{formatPosition(startFrom)}</span>.
+                    </p>
+                  ) : (
+                    <p className="text-[12.5px] text-status-error-text">
+                      That position is past the end of the mushaf in this direction — there is
+                      nothing after it to plan.
+                    </p>
+                  )}
+
+                  {overshoots && (
+                    <p className="text-[12.5px] text-status-error-text bg-status-error-bg rounded-lg px-3 py-2">
+                      {formatUnits(draft.totalUnits, draft.unit)} is more than remains from here in
+                      this direction. The plan will stop at the end of the mushaf and the last
+                      milestones will be short.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {skeleton.length > 0 && (
             <div className="mt-5 rounded-xl border border-surface-border bg-surface-bg-warm px-4 py-3">
               <p className="eyebrow">Milestones this will create</p>
@@ -457,6 +676,21 @@ export default function TeacherYearlyPlanPage() {
                 each, from {skeleton[0].starts_on} to {skeleton[skeleton.length - 1].due_on}. Rename,
                 retarget or delete any of them afterwards.
               </p>
+              {canAnchor && skeleton.some((m) => m.label) && (
+                <ol className="mt-3 divide-y divide-surface-border border-t border-surface-border">
+                  {skeleton.map((m, i) => (
+                    <li key={i} className="flex items-baseline justify-between gap-3 py-1.5">
+                      <span className="text-[12.5px] text-ink min-w-0">
+                        <span className="text-ink-muted tabular-nums me-2">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        {m.label ?? "—"}
+                      </span>
+                      <span className="eyebrow flex-shrink-0">{m.due_on}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           )}
 

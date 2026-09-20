@@ -63,6 +63,12 @@ export interface Milestone {
   completed_on: string | null;
   title: string | null;
   description: string | null;
+  /** The stretch of the mushaf this segment covers, when the plan was
+   *  anchored to the text rather than set as a plain count. */
+  from_surah: number | null;
+  from_ayah: number | null;
+  to_surah: number | null;
+  to_ayah: number | null;
 }
 
 export interface Plan {
@@ -75,6 +81,11 @@ export interface Plan {
   status: PlanStatus;
   title: string | null;
   notes: string | null;
+  /** Where the plan was anchored and which way through the mushaf it
+   *  runs. Null on an unanchored, count-only plan. */
+  start_surah: number | null;
+  start_ayah: number | null;
+  direction: "forward" | "hifz" | null;
 }
 
 export interface ProgressEntry {

@@ -8,6 +8,7 @@ import {
   MAX_TITLE,
   PLANS,
   badDate,
+  badPosition,
   badQuantity,
   badText,
   isFailure,
@@ -75,13 +76,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { plan_id, starts_on, due_on, target_units = 0, title, description } = body ?? {};
+    const { plan_id, starts_on, due_on, target_units = 0, title, description,
+            from_surah = null, from_ayah = null, to_surah = null, to_ayah = null } = body ?? {};
     if (!plan_id) return NextResponse.json({ error: "plan_id is required" }, { status: 400 });
 
     const problem =
       badDate(starts_on, "starts_on") ??
       badDate(due_on, "due_on") ??
       badQuantity(target_units, "target_units") ??
+      badPosition(from_surah, from_ayah, "Start") ??
+      badPosition(to_surah, to_ayah, "End") ??
       badText(title, "title", MAX_TITLE) ??
       badText(description, "description", MAX_TEXT);
     if (problem) return NextResponse.json({ error: problem }, { status: 400 });
@@ -122,6 +126,10 @@ export async function POST(req: NextRequest) {
       starts_on,
       due_on,
       target_units,
+      from_surah,
+      from_ayah,
+      to_surah,
+      to_ayah,
       ...milestoneTextColumns(id, title ?? null, description ?? null),
     });
     if (insertError) throw insertError;
@@ -143,7 +151,8 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, starts_on, due_on, target_units, title, description, status } = body ?? {};
+    const { id, starts_on, due_on, target_units, title, description, status,
+            from_surah, from_ayah, to_surah, to_ayah } = body ?? {};
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
     const { data: existing, error: readError } = await supabase
@@ -179,6 +188,18 @@ export async function PATCH(req: NextRequest) {
       const problem = badQuantity(target_units, "target_units");
       if (problem) return NextResponse.json({ error: problem }, { status: 400 });
       patch.target_units = target_units;
+    }
+    if (from_surah !== undefined || from_ayah !== undefined) {
+      const problem = badPosition(from_surah ?? null, from_ayah ?? null, "Start");
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      patch.from_surah = from_surah ?? null;
+      patch.from_ayah = from_ayah ?? null;
+    }
+    if (to_surah !== undefined || to_ayah !== undefined) {
+      const problem = badPosition(to_surah ?? null, to_ayah ?? null, "End");
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      patch.to_surah = to_surah ?? null;
+      patch.to_ayah = to_ayah ?? null;
     }
     if (status !== undefined) {
       if (!MILESTONE_STATUSES.includes(status)) {

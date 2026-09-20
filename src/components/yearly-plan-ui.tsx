@@ -11,6 +11,7 @@ import {
   type PaceStatus,
   type PlanUnit,
 } from "@/lib/yearlyPlan";
+import { formatRange } from "@/lib/mushafPlan";
 
 /**
  * The yearly-plan module's own visual language.
@@ -379,6 +380,18 @@ export function PlanEmptyState({
   );
 }
 
+/** The surah span a milestone covers, or "" when the plan is a plain
+ *  count with no mushaf anchor. */
+export function mushafRange(m: Milestone): string {
+  if (m.from_surah == null || m.from_ayah == null || m.to_surah == null || m.to_ayah == null) {
+    return "";
+  }
+  return formatRange(
+    { surah: m.from_surah, ayah: m.from_ayah },
+    { surah: m.to_surah, ayah: m.to_ayah }
+  );
+}
+
 /* ── Milestone row ─────────────────────────────────────────────────────
    One segment of the plan: its number, its window, its bar, its figures.
    The sequence number is set in the serif display face and given its own
@@ -420,12 +433,22 @@ export function MilestoneRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3 flex-wrap">
           <p className="text-[14px] font-semibold text-ink min-w-0">
-            {milestoneTitle(milestone)}
+            {/* The surah range is the title when the teacher hasn't
+                written one: "Al-Mulk 1–30" says more than "Milestone 3",
+                and it is the thing a parent actually looks for. */}
+            {milestone.title?.trim()
+              ? milestoneTitle(milestone)
+              : mushafRange(milestone) || milestoneTitle(milestone)}
           </p>
           <span className="eyebrow flex-shrink-0">
             {milestone.starts_on} — {milestone.due_on}
           </span>
         </div>
+        {milestone.title?.trim() && mushafRange(milestone) && (
+          <p className="text-[12px] text-brand-navy dark:text-brand-gold mt-1 font-medium">
+            {mushafRange(milestone)}
+          </p>
+        )}
 
         {milestone.description && (
           <p className="text-[12.5px] text-ink-muted mt-1.5 leading-relaxed">

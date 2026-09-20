@@ -3,6 +3,8 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSurahById } from "@/data/mushaf-index";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   decryptField,
   encryptField,
@@ -140,6 +142,14 @@ export function newId(): string {
   return randomUUID();
 }
 
+/** Nullable integer out of a row, without turning a real 0 into null or a
+ *  missing column into NaN. */
+function num(v: unknown): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function decodePlan(row: Record<string, unknown>): Plan {
   const id = row.id as string;
   return {
@@ -152,6 +162,9 @@ export function decodePlan(row: Record<string, unknown>): Plan {
     status: row.status as Plan["status"],
     title: decryptField(row.title_enc as string | null, fieldContext(PLANS, id, "title_enc")),
     notes: decryptField(row.notes_enc as string | null, fieldContext(PLANS, id, "notes_enc")),
+    start_surah: num(row.start_surah),
+    start_ayah: num(row.start_ayah),
+    direction: (row.direction as Plan["direction"]) ?? null,
   };
 }
 
@@ -175,6 +188,10 @@ export function decodeMilestone(row: Record<string, unknown>): Milestone {
       row.description_enc as string | null,
       fieldContext(MILESTONES, id, "description_enc")
     ),
+    from_surah: num(row.from_surah),
+    from_ayah: num(row.from_ayah),
+    to_surah: num(row.to_surah),
+    to_ayah: num(row.to_ayah),
   };
 }
 
@@ -291,6 +308,33 @@ export function badQuantity(value: unknown, label: string, min = 0, max = 100_00
   return null;
 }
 
+/**
+ * A surah/ayah pair, checked against the real mushaf rather than against
+ * a range: "Al-Mulk 45" passes a `between 1 and 300` test and is still
+ * four ayahs past the end of the surah.
+ */
+export function badPosition(
+  surah: unknown,
+  ayah: unknown,
+  label: string
+): string | null {
+  if (surah == null && ayah == null) return null;
+  if (typeof surah !== "number" || !Number.isInteger(surah)) {
+    return `${label} surah must be a whole number`;
+  }
+  const meta = getSurahById(surah);
+  if (!meta) return `${label} surah must be between 1 and 114`;
+  if (typeof ayah !== "number" || !Number.isInteger(ayah) || ayah < 1) {
+    return `${label} ayah must be a whole number of at least 1`;
+  }
+  if (ayah > meta.ayahs) {
+    return `${label} ayah ${ayah} is past the end of ${meta.englishName}, which has ${meta.ayahs}`;
+  }
+  return null;
+}
+
+export const DIRECTIONS = ["forward", "hifz"] as const;
+
 /* ── Loading a whole plan ────────────────────────────────────────────── */
 
 export interface LoadedPlan {
@@ -348,13 +392,30 @@ export async function loadPlan(supabase: Db, planId: string): Promise<LoadedPlan
  * that 500s because one alert row could not be written.
  */
 export async function syncPlanAlerts(
-  supabase: Db,
+  _caller: Db,
   planId: string,
   studentId: string,
   schoolId: string,
   current: PlanAlert[],
   today: string = todayISO()
 ): Promise<StoredAlert[]> {
+  // The sweep writes as the service role rather than as whoever happened
+  // to open the page, because raising an alert is a system action, not a
+  // user action.
+  //
+  // Parents have no insert policy on yearly_plan_alerts and must not be
+  // given one — that would let a family write alerts into their own
+  // child's record. But a parent is usually the one who opens the page
+  // first, and without this the very alert they came to see fails to
+  // persist: the banner shows from the in-memory fallback, cannot be
+  // dismissed because there is no row behind it, and never reaches the
+  // teacher's side at all.
+  //
+  // Safe because nothing here is user input. planId, studentId and
+  // schoolId are read off the plan row the caller already fetched through
+  // their own RLS-scoped session — access is proven before this runs —
+  // and the alert text is computed from that same row.
+  const supabase = createAdminClient() as unknown as Db;
   try {
     const { data: openRows, error } = await supabase
       .from(ALERTS)
