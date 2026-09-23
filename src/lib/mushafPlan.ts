@@ -198,13 +198,23 @@ function juzOfPage(page: number): number {
 /**
  * A page target, in ayahs — measured between two points on the page line
  * rather than accumulated surah by surah.
+ *
+ * `pages` counts the page `start` is already on as the first of them: one
+ * page means just that page, in full. The span is [from, from+pages-1]
+ * forward or [from-pages+1, from] in hifz — pages-1 pages *beyond* the
+ * starting one, not pages-worth on top of it. Getting the +1 on the wrong
+ * side here once made "1 page" measure two real pages: correct from the
+ * second page a cursor stood on, because both ends of that difference
+ * carried the same extra page and it cancelled — but wrong on the very
+ * first page anywhere a walk starts, where there is no earlier call for
+ * it to cancel against, and "1 page" quietly became 2.
  */
 export function ayahsForPages(start: Position, direction: Direction, pages: number): number {
   if (pages <= 0) return 0;
   const from = pageOfPosition(start);
   const to = direction === "hifz" ? from - pages : from + pages;
-  const a = ayahsBeforePage(direction === "hifz" ? to : from);
-  const b = ayahsBeforePage(direction === "hifz" ? from + 1 : to + 1);
+  const a = ayahsBeforePage(direction === "hifz" ? to + 1 : from);
+  const b = ayahsBeforePage(direction === "hifz" ? from + 1 : to);
   return Math.max(0, Math.round(Math.abs(b - a)));
 }
 
