@@ -1,4 +1,4 @@
-import { JUZ_START_PAGES, SURAHS, TOTAL_PAGES, getSurahById } from "@/data/mushaf-index";
+import { JUZ_START_PAGES, PAGE_STARTS, SURAHS, TOTAL_PAGES, getSurahById } from "@/data/mushaf-index";
 import { addDays } from "@/lib/planDates";
 import { countInstructionalDays, isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
 import { startOfWeek, type PlanUnit } from "@/lib/yearlyPlan";
@@ -138,44 +138,79 @@ export function endOf(blocks: MushafBlock[]): Position | null {
    How many ayahs a target amounts to, which depends on the unit and, for
    the page-based units, on where in the mushaf you are standing. */
 
-/**
- * How many ayahs of the mushaf lie before a given page.
- *
- * Built by asking each surah what it contributes, rather than by adding up
- * per-surah page spans. Pages are shared — a page routinely carries the
- * end of one surah and the start of the next — so summing every surah's
- * span gives well over 604 and any budget spent that way runs out early.
- * That bug made "30 juz from Al-Fatihah" come to 5,475 ayahs instead of
- * the whole 6,236.
- *
- * Within the surah straddling the page the split is proportional: the
- * index records which pages a surah spans, not which ayah each page break
- * falls on. So a page boundary resolves to within a few ayahs rather than
- * exactly — fine for laying out a year, and the reason a juz target will
- * not land on a textbook juz boundary to the ayah.
- */
-export function ayahsBeforePage(page: number): number {
-  const p = Math.max(1, Math.min(TOTAL_PAGES + 1, page));
+/** Cumulative ayahs from the very start of the mushaf up to (not
+ *  including) a position — what ayahsBeforePage is built from, and the
+ *  exact-position sibling of pageOfPosition's reverse lookup. */
+function ayahsBeforePosition(pos: Position): number {
   let total = 0;
   for (const s of SURAHS) {
-    if (s.endPage < p) {
-      total += s.ayahs;
-    } else if (s.startPage < p) {
-      const span = Math.max(1, s.endPage - s.startPage + 1);
-      total += (s.ayahs * (p - s.startPage)) / span;
-    }
+    if (s.id < pos.surah) total += s.ayahs;
+    else if (s.id === pos.surah) {
+      total += Math.max(0, pos.ayah - 1);
+      break;
+    } else break;
   }
   return total;
 }
 
-/** Roughly which page a position falls on — proportional inside the
- *  surah, for the same reason as above. */
+/** The exact first surah:ayah a page opens on, from the real per-page
+ *  layout data — not approximated. */
+function startOfPage(page: number): Position {
+  const [surah, ayah] = PAGE_STARTS[Math.max(1, Math.min(TOTAL_PAGES, page)) - 1];
+  return { surah, ayah };
+}
+
+/**
+ * How many ayahs of the mushaf lie before a given page.
+ *
+ * Reads PAGE_STARTS — the real per-page layout data, not a proportional
+ * guess — for the whole-page part, and only interpolates for a fractional
+ * page (a "5 lines a day" pace can ask for a fourth of a page), and then
+ * only across the single page it falls on. That is a world apart from the
+ * approximation this replaced, which spread a surah's ayahs evenly across
+ * every page it touches: proportional-by-ayah-count is not proportional
+ * by how much text an ayah actually holds, and on a long surah that drifts
+ * by a page or more — confirmed on An-Nisa, whose ayah 12 the old formula
+ * placed on page 78 when the real mushaf starts it on page 79. That was
+ * never just a display glitch: the same formula sizes every "N pages a
+ * day" plan's actual daily portion.
+ *
+ * page > TOTAL_PAGES (the walk asked for one more page than the mushaf
+ * has) reports the mushaf's own total ayah count, the same as always
+ * asking "how many ayahs lie before the end" — the boundary a plan
+ * running off the last page needs to detect that, not a further guess at
+ * pages that do not exist.
+ */
+export function ayahsBeforePage(page: number): number {
+  const p = Math.max(1, Math.min(TOTAL_PAGES + 1, page));
+  const whole = Math.floor(p);
+  const before = whole > TOTAL_PAGES ? TOTAL_AYAHS : ayahsBeforePosition(startOfPage(whole));
+  const frac = p - whole;
+  if (frac <= 0) return before;
+  const nextWhole = whole + 1;
+  const beforeNext = nextWhole > TOTAL_PAGES ? TOTAL_AYAHS : ayahsBeforePosition(startOfPage(nextWhole));
+  return before + (beforeNext - before) * frac;
+}
+
+/** Exactly which page a position falls on, read off the real per-page
+ *  layout data — the page whose own start is the latest one at or before
+ *  this position. */
 export function pageOfPosition(pos: Position): number {
-  const s = getSurahById(pos.surah);
-  if (!s) return 1;
-  const span = Math.max(1, s.endPage - s.startPage + 1);
-  const through = Math.floor(((pos.ayah - 1) / Math.max(1, s.ayahs)) * span);
-  return Math.min(s.endPage, s.startPage + through);
+  const key = pos.surah * 1000 + pos.ayah;
+  let lo = 0;
+  let hi = PAGE_STARTS.length - 1;
+  let page = 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const [s, a] = PAGE_STARTS[mid];
+    if (s * 1000 + a <= key) {
+      page = mid + 1; // 1-indexed
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return page;
 }
 
 /** First and last page of a juz, from the real boundaries. */
