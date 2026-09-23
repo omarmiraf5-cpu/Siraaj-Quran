@@ -196,14 +196,14 @@ export default function TeacherMessagesPage() {
 
   if (!ready) {
     return (
-      <div className="max-w-5xl mx-auto pt-10">
+      <div className="max-w-7xl mx-auto pt-10">
         <LoadingNote>{t("teacher.messages.loadingMessages")}</LoadingNote>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-8 space-y-4 pt-2">
+    <div className="max-w-7xl mx-auto pb-8 space-y-4 pt-2">
       <PortalHero
         eyebrow={t("teacher.messages.eyebrow")}
         title={t("nav.messages")}

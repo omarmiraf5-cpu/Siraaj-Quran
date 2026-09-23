@@ -38,7 +38,7 @@ function StudentTabBar() {
 
   return (
     <nav className="fixed bottom-0 start-0 end-0 z-50 bg-surface-card/90 backdrop-blur-xl border-t border-surface-border safe-area-bottom">
-      <div className="max-w-3xl mx-auto flex px-2 py-1.5">
+      <div className="max-w-5xl mx-auto flex px-2 py-1.5">
         {TABS.map(({ href, labelKey, Icon, colour }) => {
           const active =
             href === "/student/learn"
@@ -78,7 +78,7 @@ function StudentTabBar() {
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-surface-bg pb-28">
-      <div className="max-w-3xl mx-auto">{children}</div>
+      <div className="max-w-5xl mx-auto">{children}</div>
       <StudentTabBar />
     </div>
   );

@@ -193,7 +193,7 @@ export default function ParentYearlyPlanPage() {
 
   if (mode === "loading") {
     return (
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-6xl">
         <LoadingNote>Loading…</LoadingNote>
       </div>
     );
@@ -201,7 +201,7 @@ export default function ParentYearlyPlanPage() {
 
   if (mode === "demo") {
     return (
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-6xl">
         <PortalHero eyebrow="Parent" title="Yearly plan" />
         <SectionCard title="Sign in to see your child's plan">
           <PlanEmptyState
@@ -220,7 +220,7 @@ export default function ParentYearlyPlanPage() {
   );
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       <PortalHero
         eyebrow="Parent"
         title="Yearly plan"

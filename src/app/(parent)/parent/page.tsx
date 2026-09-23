@@ -72,7 +72,7 @@ export default function ParentDashboard() {
   // to them yet needs telling rather than an empty dashboard.
   if (mode === "loading" || !child) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4 pt-2">
+      <div className="max-w-6xl mx-auto space-y-4 pt-2">
         <PortalHero eyebrow={t("common.asalaamuAlaykum")} title={demoUser?.name ?? t("role.parent")} />
         <SectionCard title={t("common.yourChildren")}>
           {mode === "loading" ? (
@@ -86,7 +86,7 @@ export default function ParentDashboard() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 pt-2">
+    <div className="max-w-6xl mx-auto space-y-4 pt-2">
       <PortalHero
         eyebrow={t("common.asalaamuAlaykum")}
         title={demoUser?.name ?? t("role.parent")}

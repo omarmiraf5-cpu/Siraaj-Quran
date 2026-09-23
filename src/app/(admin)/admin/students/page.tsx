@@ -247,7 +247,7 @@ export default function AdminStudentsPage() {
   const activeCount = students.filter((s) => s.active !== false).length;
 
   return (
-    <div className="max-w-3xl mx-auto pb-20 space-y-4 pt-2">
+    <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow="Roster"
         title="Students"

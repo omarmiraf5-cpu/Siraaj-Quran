@@ -6,7 +6,7 @@ import { PortalHero } from "@/components/PortalHero";
 
 export default function TeacherHadithPage() {
   return (
-    <div className="max-w-3xl mx-auto space-y-4 pt-2">
+    <div className="max-w-5xl mx-auto space-y-4 pt-2">
       <PortalHero
         eyebrow="Al-Arba'un an-Nawawiyyah"
         title="Forty Hadith"

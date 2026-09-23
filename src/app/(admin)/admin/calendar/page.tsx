@@ -161,14 +161,14 @@ export default function AdminCalendarPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto pb-20 pt-2">
+      <div className="max-w-5xl mx-auto pb-20 pt-2">
         <LoadingNote>Loading the school calendar…</LoadingNote>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto pb-20 space-y-4 pt-2">
+    <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow="Scheduling"
         title="School Calendar"

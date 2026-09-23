@@ -196,14 +196,14 @@ export default function TeacherAttendancePage() {
 
   if (!ready) {
     return (
-      <div className="max-w-2xl mx-auto pt-10">
+      <div className="max-w-4xl mx-auto pt-10">
         <LoadingNote>{t("teacher.attendance.loadingRegister")}</LoadingNote>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-28 space-y-4 pt-2">
+    <div className="max-w-4xl mx-auto pb-28 space-y-4 pt-2">
       <PortalHero
         eyebrow={t("teacher.attendance.eyebrow")}
         title={t("nav.attendance")}
@@ -296,7 +296,7 @@ export default function TeacherAttendancePage() {
         <button
           onClick={saveAttendance}
           disabled={marked === 0 || saving}
-          className="w-full max-w-2xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
+          className="w-full max-w-4xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
         >
           {saved && <IconCheck size={16} />}
           {saving

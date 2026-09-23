@@ -192,7 +192,7 @@ export default function AdminParentsPage() {
   const unlinked = parents.filter((p) => p.childIds.length === 0).length;
 
   return (
-    <div className="max-w-3xl mx-auto pb-20 space-y-4 pt-2">
+    <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow="Families"
         title="Parents"

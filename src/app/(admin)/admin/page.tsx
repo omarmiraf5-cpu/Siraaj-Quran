@@ -203,7 +203,7 @@ export default function AdminDashboard() {
   const unassignedHalaqas = halaqas.filter((h) => !h.teacherId);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4 pt-2">
+    <div className="max-w-7xl mx-auto space-y-4 pt-2">
       <PortalHero
         eyebrow={t("common.schoolOverview")}
         title={school.name}

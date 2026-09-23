@@ -359,7 +359,7 @@ export default function OnboardPage() {
     <div className="min-h-screen bg-surface-bg">
       <header className="gradient-navy px-6 py-10 relative overflow-hidden">
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="max-w-2xl mx-auto relative">
+        <div className="max-w-4xl mx-auto relative">
           <h1 className="font-display text-3xl font-bold text-white">
             Set up your school on <span className="gold-foil">MyDiiwaan</span>
           </h1>
@@ -368,7 +368,7 @@ export default function OnboardPage() {
       </header>
 
       {step !== "complete" && (
-        <div className="max-w-2xl mx-auto px-6 pt-6">
+        <div className="max-w-4xl mx-auto px-6 pt-6">
           <div className="flex justify-between">
             {STEPS.map((s, i) => (
               <div key={s} className="flex flex-col items-center flex-1">
@@ -390,7 +390,7 @@ export default function OnboardPage() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-6 py-8">
+      <div className="max-w-4xl mx-auto px-6 py-8">
         {step === "welcome" && (
           <div className="card-quiet p-8 text-center space-y-5">
             <div className="text-5xl">🕌</div>

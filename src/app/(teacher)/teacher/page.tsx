@@ -170,14 +170,14 @@ export default function TeacherDashboard() {
 
   if (!ready) {
     return (
-      <div className="max-w-4xl mx-auto pt-10">
+      <div className="max-w-6xl mx-auto pt-10">
         <LoadingNote>{t("common.loadingDashboard")}</LoadingNote>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 pt-2">
+    <div className="max-w-6xl mx-auto space-y-4 pt-2">
       {/* Greeting — carries the day's actual state and the two things a
           teacher opens this page to do, rather than standing empty. */}
       <PortalHero

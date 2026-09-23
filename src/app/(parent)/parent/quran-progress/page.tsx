@@ -96,7 +96,7 @@ export default function ParentQuranProgressPage() {
 
   if (mode === "loading" || !child) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4 pt-2">
+      <div className="max-w-6xl mx-auto space-y-4 pt-2">
         <PortalHero eyebrow={t("parent.quranProgress.eyebrow")} title="…" />
         <SectionCard title={t("common.yourChildren")}>
           {mode === "loading" ? (
@@ -119,7 +119,7 @@ export default function ParentQuranProgressPage() {
   const firstName = child.name.split(" ")[0];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 pt-2">
+    <div className="max-w-6xl mx-auto space-y-4 pt-2">
       <PortalHero
         eyebrow={t("parent.quranProgress.eyebrow")}
         title={firstName}

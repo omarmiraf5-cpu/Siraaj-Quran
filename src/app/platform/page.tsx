@@ -83,7 +83,7 @@ export default function PlatformPage() {
     <div className="min-h-screen bg-surface-bg">
       <header className="gradient-navy px-6 py-8 relative overflow-hidden">
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="max-w-5xl mx-auto relative flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div className="max-w-7xl mx-auto relative flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <p className="text-white/45 text-xs font-semibold uppercase tracking-widest">Platform</p>
             <h1 className="font-display text-3xl font-bold text-white mt-1">All Schools</h1>
@@ -102,7 +102,7 @@ export default function PlatformPage() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {error && (
           <div className="card-quiet p-6 text-center space-y-2">
             <p className="text-status-error-text font-semibold">{error}</p>

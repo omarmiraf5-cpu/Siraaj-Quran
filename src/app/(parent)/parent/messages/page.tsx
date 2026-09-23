@@ -121,7 +121,7 @@ export default function ParentMessagesPage() {
 
   if (mode === "loading" || !child) {
     return (
-      <div className="max-w-2xl mx-auto space-y-4 pt-2">
+      <div className="max-w-4xl mx-auto space-y-4 pt-2">
         <PortalHero eyebrow={t("parent.messages.eyebrow")} title={t("nav.messages")} />
         <SectionCard title={t("common.yourChildren")}>
           {mode === "loading" ? (
@@ -244,7 +244,7 @@ export default function ParentMessagesPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-28 space-y-4 pt-2">
+    <div className="max-w-4xl mx-auto pb-28 space-y-4 pt-2">
       <PortalHero
         eyebrow={t("parent.messages.eyebrow")}
         title={t("nav.messages")}
@@ -327,7 +327,7 @@ export default function ParentMessagesPage() {
       )}
 
       <div className="fixed bottom-20 md:bottom-0 start-0 end-0 md:start-56 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-surface-card border-t border-surface-border z-30">
-        <div className="max-w-2xl mx-auto flex items-center gap-2">
+        <div className="max-w-4xl mx-auto flex items-center gap-2">
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}

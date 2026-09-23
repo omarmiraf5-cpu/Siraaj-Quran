@@ -35,7 +35,7 @@ export default function ParentAttendancePage() {
 
   if (mode === "loading" || !child) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4 pt-2">
+      <div className="max-w-6xl mx-auto space-y-4 pt-2">
         <PortalHero eyebrow={t("nav.attendance")} title="…" />
         <SectionCard title={t("common.yourChildren")}>
           {mode === "loading" ? (
@@ -54,7 +54,7 @@ export default function ParentAttendancePage() {
     .join(" ");
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 pt-2">
+    <div className="max-w-6xl mx-auto space-y-4 pt-2">
       <PortalHero
         eyebrow={t("nav.attendance")}
         title={firstName}

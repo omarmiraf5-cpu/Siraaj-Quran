@@ -205,7 +205,7 @@ export default function LoginPage() {
         <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
       </div>
 
-      <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center md:items-stretch gap-4 md:gap-0 px-6 py-10 md:py-14">
+      <div className="relative w-full max-w-6xl flex flex-col md:flex-row items-center md:items-stretch gap-4 md:gap-0 px-6 py-10 md:py-14">
 
       {/* ── LEFT PANEL — hidden on mobile ── */}
       <div className="hidden md:flex flex-col items-center justify-center md:w-1/2 px-4 md:pe-10 py-6">
