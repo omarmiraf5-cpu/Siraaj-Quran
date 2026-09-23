@@ -602,23 +602,6 @@ export default function TeacherYearlyPlanPage() {
     }
   };
 
-  const deleteMilestone = async (id: string) => {
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/yearly-plans/milestones?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not remove the milestone");
-      setPayload(body);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove the milestone");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   /* ── Progress ────────────────────────────────────────────────────── */
   const [recording, setRecording] = useState<string | null>(null);
   const [entry, setEntry] = useState({ units_after: 0, note: "" });
@@ -1626,13 +1609,6 @@ export default function TeacherYearlyPlanPage() {
                         </div>
                       </div>
                     )}
-                    <button
-                      onClick={() => deleteMilestone(m.id)}
-                      disabled={saving}
-                      className="text-[11px] font-bold uppercase tracking-[0.1em] text-status-error-text hover:underline disabled:opacity-40 mt-2.5"
-                    >
-                      Remove
-                    </button>
                   </MilestoneRow>
                 ))}
                 </ul>

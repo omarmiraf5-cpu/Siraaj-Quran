@@ -19,7 +19,7 @@ import {
   type PlanAlert,
   type ProgressEntry,
 } from "@/lib/yearlyPlan";
-import { weeklyMilestonesFromDailyRate } from "@/lib/mushafPlan";
+import { nextPosition, weeklyMilestonesFromDailyRate } from "@/lib/mushafPlan";
 import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
 
 /**
@@ -402,13 +402,37 @@ export async function loadCalendarForSchool(supabase: Db, schoolId: string): Pro
 }
 
 /**
+ * True when one milestone doesn't pick up exactly where the one before it
+ * left off — a daily-rate plan's own weekly buckets are built by grouping
+ * a single continuous walk through the mushaf, so consecutive milestones
+ * are never supposed to skip or repeat an ayah, whatever gap in *dates*
+ * a weekend or holiday between them creates. A teacher deleting one
+ * milestone by hand (there being nothing else that could do it) leaves
+ * exactly this kind of hole without moving either of its neighbours'
+ * own dates out of the plan's overall range, which is why this needs its
+ * own check rather than folding into the start/end one below.
+ */
+function hasMilestoneGap(direction: Plan["direction"], milestones: Milestone[]): boolean {
+  for (let i = 0; i < milestones.length - 1; i++) {
+    const a = milestones[i];
+    const b = milestones[i + 1];
+    if (a.to_surah == null || a.to_ayah == null || b.from_surah == null || b.from_ayah == null) continue;
+    const expected = nextPosition({ surah: a.to_surah, ayah: a.to_ayah }, direction!);
+    if (!expected || expected.surah !== b.from_surah || expected.ayah !== b.from_ayah) return true;
+  }
+  return false;
+}
+
+/**
  * Rebuilds a daily-rate plan's stored milestones from its own current
  * fields when they no longer match. The weekly checklist a teacher sees is
  * a mechanical readout of starts_on/ends_on/daily_new_amount — nothing
  * else — so a plan whose dates were edited after its milestones were first
  * generated is left holding rows from a schedule that no longer exists: a
  * milestone dated before the plan's own start, permanently "past due" no
- * matter what today is.
+ * matter what today is. The same rebuild also catches a milestone deleted
+ * by hand, which leaves a hole in the mushaf coverage without necessarily
+ * moving either boundary — see hasMilestoneGap.
  *
  * Only for a plan anchored to the mushaf with a daily rate set — the one
  * kind whose milestones are fully derivable from the plan row alone. Never
@@ -436,7 +460,12 @@ export async function resyncDailyRateMilestones(
 
   const first = milestones[0];
   const last = milestones[milestones.length - 1];
-  const stale = !first || !last || first.starts_on < plan.starts_on || last.due_on > plan.ends_on;
+  const stale =
+    !first ||
+    !last ||
+    first.starts_on < plan.starts_on ||
+    last.due_on > plan.ends_on ||
+    hasMilestoneGap(plan.direction, milestones);
   if (!stale) return milestones;
 
   const hasProgress = milestones.some((m) => m.completed_units > 0) || entries.length > 0;
