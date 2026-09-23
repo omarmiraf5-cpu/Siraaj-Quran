@@ -17,6 +17,7 @@ import {
 import {
   formatRange,
   pageLabel,
+  pageOfPosition,
   dailySchedule,
   impliedDailyRate,
   dailyPaceOf,
@@ -27,7 +28,6 @@ import {
 import type { SchoolCalendar } from "@/lib/schoolCalendar";
 import { Modal, SectionCard, EmptyNote } from "@/components/portal-ui";
 import { Mushaf } from "@/components/Mushaf";
-import { getSurahById } from "@/data/mushaf-index";
 
 /**
  * The yearly-plan module's own visual language.
@@ -592,11 +592,13 @@ export function MilestoneMushafModal({
       onClose={onClose}
     >
       <Mushaf
-        // Opens on the range's own starting surah, the same convention
-        // the assignment form's live preview uses — a teacher who needs
-        // the exact opening page for a surah spanning several can still
-        // turn to it from here.
-        initialPage={getSurahById(milestone.from_surah)?.startPage ?? 1}
+        // The range's own starting page — not the surah's opening page,
+        // which only happens to be the same thing for a milestone that
+        // starts right at the beginning of its surah. Every other
+        // milestone opened on the surah's own first page regardless of
+        // how far into it the milestone actually starts, which is why
+        // "View in Mushaf" always looked like it landed on the wrong day.
+        initialPage={pageOfPosition({ surah: milestone.from_surah, ayah: milestone.from_ayah })}
         highlightedRange={{
           surah: milestone.from_surah,
           start: milestone.from_ayah,
