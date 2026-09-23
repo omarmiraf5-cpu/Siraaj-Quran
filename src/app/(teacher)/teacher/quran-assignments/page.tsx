@@ -126,12 +126,15 @@ export default function QuranAssignmentsPage() {
   const [lastSurahName, setLastSurahName] = useState<string>("");
   const [nextCount, setNextCount] = useState("10");
   const [savingDirection, setSavingDirection] = useState(false);
-  // The student's yearly plan, read alongside their assignments so the
+  // Every student's yearly plan, read alongside their assignments so the
   // same behind-schedule signal the Yearly Plan page shows also shows up
-  // here, where a teacher actually sets the day's work. Null for a
-  // student with no active anchored plan, not just while loading.
-  const [planSummary, setPlanSummary] = useState<PlanSummaryDto | null>(null);
-  const [confirmingSurah, setConfirmingSurah] = useState(false);
+  // here, where a teacher actually sets the day's work — and so opening
+  // this page at all is what catches each student's auto-generated lesson
+  // up, not picking them in the form below. Keyed by student_id; a
+  // student missing from this map has no active anchored plan, not just
+  // one still loading.
+  const [planSummaries, setPlanSummaries] = useState<Record<string, PlanSummaryDto>>({});
+  const [confirmingSurah, setConfirmingSurah] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -183,12 +186,38 @@ export default function QuranAssignmentsPage() {
 
         if (studentData) {
           setStudents(studentData);
+          // Real students weren't fed into `roster` at all here, which
+          // exists solely so the list below can look a name up by id —
+          // every real assignment in it read as belonging to a student
+          // called "Student", the fallback for a lookup that finds no one.
+          setRoster(studentData.map((s) => ({ id: s.id, name: s.full_name, halaqa: "" })));
         }
 
-        // This school's own assignments. Without loading them, the list
-        // below fell back to the sample data for everyone, so a school that
-        // had just signed up opened this page to twenty-one invented
-        // assignments belonging to a student called "Student".
+        // Catches every student's "new" lesson up with their own yearly
+        // plan before the list below is read — the point of automating
+        // this away is that a teacher never has to open the form and pick
+        // a student just to make it happen, so nothing here waits on that.
+        const summaries: Record<string, PlanSummaryDto> = {};
+        await Promise.all(
+          (studentData ?? []).map(async (s) => {
+            try {
+              const r = await fetch(`/api/quranic-assignments?student_id=${encodeURIComponent(s.id)}`);
+              const b = await r.json();
+              if (b?.plan_summary) summaries[s.id] = b.plan_summary;
+            } catch {
+              // One student's sync failing should not stop the rest, or
+              // the list below from loading at all.
+            }
+          })
+        );
+        setPlanSummaries(summaries);
+
+        // This school's own assignments, read after the sync above so a
+        // lesson it just generated shows up on this very first load rather
+        // than needing a second visit. Without loading them at all, the
+        // list below fell back to the sample data for everyone, so a
+        // school that had just signed up opened this page to twenty-one
+        // invented assignments belonging to a student called "Student".
         const { data: assignmentData, error: assignmentError } = await supabase
           .from("quranic_assignments")
           .select(
@@ -374,60 +403,54 @@ export default function QuranAssignmentsPage() {
     return () => { cancelled = true; };
   }, [selectedStudent, isDemo]);
 
-  /** Re-fetching this also re-triggers the server's own catch-up
-   *  generation (see /api/quranic-assignments and autoAssignments.ts) —
-   *  which is exactly what should happen right after a surah confirmation
-   *  clears the one thing that was holding it back. */
-  const loadPlanSummary = () => {
-    if (!selectedStudent || isDemo) {
-      setPlanSummary(null);
-      return () => {};
+  /** Re-fetching a student's own list also re-triggers the server's catch-up
+   *  generation for them (see /api/quranic-assignments and
+   *  autoAssignments.ts) — which is exactly what should happen right after
+   *  a surah confirmation clears the one thing that was holding it back. */
+  const syncOneStudent = async (studentId: string) => {
+    try {
+      const r = await fetch(`/api/quranic-assignments?student_id=${encodeURIComponent(studentId)}`);
+      const b = await r.json();
+      setPlanSummaries((prev) => {
+        const next = { ...prev };
+        if (b?.plan_summary) next[studentId] = b.plan_summary;
+        else delete next[studentId];
+        return next;
+      });
+    } catch {
+      // Losing this costs the banner, not the page — assignments still
+      // load and can still be set by hand.
     }
-    let cancelled = false;
-    fetch(`/api/quranic-assignments?student_id=${encodeURIComponent(selectedStudent)}`)
-      .then((r) => r.json())
-      .then((b) => { if (!cancelled) setPlanSummary(b?.plan_summary ?? null); })
-      // Same reasoning as the position fetch above: losing this costs the
-      // banner, not the page — assignments still load and can still be
-      // set by hand.
-      .catch(() => { if (!cancelled) setPlanSummary(null); });
-    return () => { cancelled = true; };
   };
 
-  useEffect(() => {
-    setPlanSummary(null);
-    return loadPlanSummary();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStudent, isDemo]);
+  const refreshAssignments = async () => {
+    const { data: refreshed } = await supabase
+      .from("quranic_assignments")
+      .select(
+        "id, student_id, teacher_id, surah, ayah_start, surah_end, ayah_end, portion, assigned_at, due_date, status, memorization_level, daily_rating, teacher_notes, student_notes, created_at, updated_at"
+      )
+      .order("assigned_at", { ascending: false });
+    setRealAssignments((refreshed ?? []) as QuranicAssignment[]);
+  };
 
-  const confirmSurah = async () => {
-    if (!selectedStudent || !planSummary?.pending_confirmation) return;
-    setConfirmingSurah(true);
+  const confirmSurah = async (studentId: string, surah: number) => {
+    const key = `${studentId}:${surah}`;
+    setConfirmingSurah(key);
     try {
       await fetch("/api/surah-confirmations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          student_id: selectedStudent,
-          surah: planSummary.pending_confirmation.surah,
-        }),
+        body: JSON.stringify({ student_id: studentId, surah }),
       });
-      loadPlanSummary();
-      // The lesson that was waiting on this can now be generated — refresh
-      // the list underneath, the same query the initial load runs.
-      const { data: refreshed } = await supabase
-        .from("quranic_assignments")
-        .select(
-          "id, student_id, teacher_id, surah, ayah_start, surah_end, ayah_end, portion, assigned_at, due_date, status, memorization_level, daily_rating, teacher_notes, student_notes, created_at, updated_at"
-        )
-        .order("assigned_at", { ascending: false });
-      setRealAssignments((refreshed ?? []) as QuranicAssignment[]);
+      // The lesson that was waiting on this can now be generated.
+      await syncOneStudent(studentId);
+      await refreshAssignments();
     } catch {
       // The confirmation may or may not have gone through; the banner
       // simply stays until the next successful load resolves it either
       // way, rather than guessing here.
     } finally {
-      setConfirmingSurah(false);
+      setConfirmingSurah((k) => (k === key ? null : k));
     }
   };
 
@@ -583,38 +606,53 @@ export default function QuranAssignmentsPage() {
         ]}
       />
 
-      {selectedStudent && planSummary?.alerts.map((a) => (
-        <PlanAlertBanner key={a.code} level={a.level} title={a.title} detail={a.detail} />
-      ))}
+      {Object.entries(planSummaries).flatMap(([studentId, summary]) => {
+        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? "A student";
+        return summary.alerts.map((a) => (
+          <PlanAlertBanner
+            key={`${studentId}:${a.code}`}
+            level={a.level}
+            title={`${studentLabel}: ${a.title}`}
+            detail={a.detail}
+          />
+        ));
+      })}
 
-      {selectedStudent && planSummary?.pending_confirmation && (
-        <div
-          role="alert"
-          className="rounded-[18px] border px-5 py-4 flex items-start gap-3.5"
-          style={{ borderColor: "#b8860b44", background: "#b8860b0f" }}
-        >
-          <span aria-hidden className="w-[3px] self-stretch rounded-full bg-amber-600" />
-          <AlertGlyph colour="#b8860b" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-bold tracking-tight text-amber-700">
-              Finished {planSummary.pending_confirmation.surah_name} — has he been tested on the whole surah?
-            </p>
-            <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
-              The next lesson moves into a new surah. Confirm he&apos;s been heard reciting all of{" "}
-              {planSummary.pending_confirmation.surah_name} before the plan schedules anything from
-              the next one — until then, no new lesson is generated for him.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={confirmSurah}
-            disabled={confirmingSurah}
-            className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 flex-shrink-0 mt-0.5 whitespace-nowrap"
+      {Object.entries(planSummaries).map(([studentId, summary]) => {
+        if (!summary.pending_confirmation) return null;
+        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? "A student";
+        const { surah, surah_name } = summary.pending_confirmation;
+        const key = `${studentId}:${surah}`;
+        return (
+          <div
+            key={key}
+            role="alert"
+            className="rounded-[18px] border px-5 py-4 flex items-start gap-3.5"
+            style={{ borderColor: "#b8860b44", background: "#b8860b0f" }}
           >
-            {confirmingSurah ? "Saving…" : "Confirm tested"}
-          </button>
-        </div>
-      )}
+            <span aria-hidden className="w-[3px] self-stretch rounded-full bg-amber-600" />
+            <AlertGlyph colour="#b8860b" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold tracking-tight text-amber-700">
+                {studentLabel} finished {surah_name} — has he been tested on the whole surah?
+              </p>
+              <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
+                The next lesson moves into a new surah. Confirm he&apos;s been heard reciting all of{" "}
+                {surah_name} before the plan schedules anything from the next one — until then, no
+                new lesson is generated for him.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => confirmSurah(studentId, surah)}
+              disabled={confirmingSurah === key}
+              className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 flex-shrink-0 mt-0.5 whitespace-nowrap"
+            >
+              {confirmingSurah === key ? "Saving…" : "Confirm tested"}
+            </button>
+          </div>
+        );
+      })}
 
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         {/* Form */}
