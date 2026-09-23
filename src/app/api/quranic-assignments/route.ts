@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { syncAutoAssignments } from "@/lib/autoAssignments";
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
@@ -14,6 +15,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Best-effort: catches this student's "new" lessons up with their
+    // yearly plan before the list below is read, so a teacher never has
+    // to type in by hand what the plan already says to do. Returns null
+    // (and changes nothing about the list) for a student with no active
+    // anchored plan, or when the caller's own session cannot see one —
+    // see autoAssignments.ts for why a failure here never fails this GET.
+    const planSummary = await syncAutoAssignments(supabase, studentId);
+
     const { data, error } = await supabase
       .from("quranic_assignments")
       .select("*")
@@ -22,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ assignments: data });
+    return NextResponse.json({ assignments: data, plan_summary: planSummary });
   } catch (error) {
     console.error("Error fetching assignments:", error);
     return NextResponse.json(

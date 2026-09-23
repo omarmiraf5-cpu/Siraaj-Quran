@@ -19,8 +19,10 @@ import {
   pageLabel,
   dailySchedule,
   impliedDailyRate,
+  dailyPaceOf,
   type Direction,
   type Position,
+  type DailyPacePlan,
 } from "@/lib/mushafPlan";
 import type { SchoolCalendar } from "@/lib/schoolCalendar";
 import { Modal, SectionCard, EmptyNote } from "@/components/portal-ui";
@@ -762,40 +764,6 @@ function weekdayLabel(iso: string): string {
   });
 }
 
-/** The shape both DailyWorkPanel and FullYearScheduleModal need off a
- *  plan — never the whole Plan type, so a caller can pass one straight
- *  off an API payload without a cast. */
-interface DailyPacePlan {
-  starts_on: string;
-  ends_on: string;
-  unit: PlanUnit;
-  start_surah: number | null;
-  start_ayah: number | null;
-  direction: Direction | null;
-  daily_new_amount: number | null;
-  daily_review_amount: number | null;
-}
-
-/**
- * The steady per-day pace this plan actually runs at, however it was
- * set up: the rate directly, if a teacher typed one, or — for an ordinary
- * "total for the year" plan — the total worked out across however many
- * instructional days the plan's own span holds. Either way the rest of
- * this file only ever needs one number, not two different plan shapes.
- *
- * Null when there is nothing to derive a pace from at all: no anchor, or
- * no rate and no total either (a bare plan with no milestones yet).
- */
-function dailyPaceOf(plan: DailyPacePlan, cal: SchoolCalendar, totalUnits?: number): number | null {
-  if (plan.start_surah == null || plan.start_ayah == null || plan.direction == null) return null;
-  if (plan.daily_new_amount != null) return plan.daily_new_amount;
-  if (totalUnits && totalUnits > 0) {
-    const rate = impliedDailyRate(totalUnits, plan.starts_on, plan.ends_on, cal);
-    return rate > 0 ? rate : null;
-  }
-  return null;
-}
-
 /**
  * "1 page a day" made concrete: the week containing today, one row per
  * calendar day, each showing exactly what the plan expects for that day —
@@ -851,7 +819,7 @@ export function DailyWorkPanel({
         <span className="inline-flex items-center gap-3">
           {plan.daily_review_amount && (
             <span className="whitespace-nowrap">
-              + {formatUnits(plan.daily_review_amount, plan.unit)} review daily
+              + {formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit)} review daily
             </span>
           )}
           {onViewFullYear && (
@@ -901,7 +869,7 @@ export function DailyWorkPanel({
                 </div>
                 {row && plan.daily_review_amount ? (
                   <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-bg-warm text-ink-muted flex-shrink-0 whitespace-nowrap">
-                    + {formatUnits(plan.daily_review_amount, plan.unit)} review
+                    + {formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit)} review
                   </span>
                 ) : null}
               </li>
@@ -998,7 +966,7 @@ export function FullYearScheduleModal({
                     </span>
                     {plan.daily_review_amount ? (
                       <span className="text-[11px] text-ink-muted flex-shrink-0 whitespace-nowrap">
-                        + {formatUnits(plan.daily_review_amount, plan.unit)} review
+                        + {formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit)} review
                       </span>
                     ) : null}
                   </li>

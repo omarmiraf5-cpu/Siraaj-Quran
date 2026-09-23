@@ -19,6 +19,8 @@ import {
   type PlanAlert,
   type ProgressEntry,
 } from "@/lib/yearlyPlan";
+import { weeklyMilestonesFromDailyRate } from "@/lib/mushafPlan";
+import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
 
 /**
  * The server half of the yearly-plan module: session and role checks, the
@@ -167,6 +169,7 @@ export function decodePlan(row: Record<string, unknown>): Plan {
     direction: (row.direction as Plan["direction"]) ?? null,
     daily_new_amount: num(row.daily_new_amount),
     daily_review_amount: num(row.daily_review_amount),
+    daily_review_unit: (row.daily_review_unit as Plan["daily_review_unit"]) ?? null,
   };
 }
 
@@ -373,6 +376,123 @@ export async function loadPlan(supabase: Db, planId: string): Promise<LoadedPlan
     milestones: (msRows ?? []).map(decodeMilestone),
     entries: (prRows ?? []).map(decodeProgress),
   };
+}
+
+/* ── Calendar loading ─────────────────────────────────────────────────── */
+
+/**
+ * The school's own calendar, for a route that has to walk a daily
+ * schedule itself rather than just display one a browser already fetched
+ * from /api/school-calendar. Falls back to the plain five-day week — the
+ * same default every other caller uses for a school with none set up —
+ * rather than failing the whole request over it.
+ */
+export async function loadCalendarForSchool(supabase: Db, schoolId: string): Promise<SchoolCalendar> {
+  try {
+    const [{ data: school }, { data: days }] = await Promise.all([
+      supabase.from("schools").select("instructional_weekdays").eq("id", schoolId).maybeSingle(),
+      supabase.from("school_calendar_days").select("date").eq("school_id", schoolId),
+    ]);
+    const weekdays = (school?.instructional_weekdays as number[] | null) ?? DEFAULT_CALENDAR.weekdays;
+    return buildCalendar(weekdays, (days ?? []).map((d) => d.date as string));
+  } catch (error) {
+    console.error("Yearly plan: could not load the school calendar, using the default", error);
+    return DEFAULT_CALENDAR;
+  }
+}
+
+/**
+ * Rebuilds a daily-rate plan's stored milestones from its own current
+ * fields when they no longer match. The weekly checklist a teacher sees is
+ * a mechanical readout of starts_on/ends_on/daily_new_amount — nothing
+ * else — so a plan whose dates were edited after its milestones were first
+ * generated is left holding rows from a schedule that no longer exists: a
+ * milestone dated before the plan's own start, permanently "past due" no
+ * matter what today is.
+ *
+ * Only for a plan anchored to the mushaf with a daily rate set — the one
+ * kind whose milestones are fully derivable from the plan row alone. Never
+ * touches a plan with anything recorded against it (a completed_units
+ * above zero, or a progress entry): that means the schedule has already
+ * been acted on, and silently rebuilding it would erase that history —
+ * the teacher deletes and recreates the plan instead, the same as for any
+ * other change too large to apply automatically.
+ *
+ * Called from both a read (self-healing a plan whose dates were edited
+ * before this existed) and a write (keeping one edited from here on from
+ * ever going stale) — the same "reconcile on read" shape as refreshAlerts,
+ * and safe for the same reason: staleness is judged from rows the caller's
+ * own RLS-scoped session already fetched, not from unchecked input.
+ */
+export async function resyncDailyRateMilestones(
+  supabase: Db,
+  plan: Plan,
+  schoolId: string,
+  milestones: Milestone[],
+  entries: ProgressEntry[]
+): Promise<Milestone[]> {
+  if (plan.start_surah == null || plan.start_ayah == null || plan.direction == null) return milestones;
+  if (plan.daily_new_amount == null || plan.daily_new_amount <= 0) return milestones;
+
+  const first = milestones[0];
+  const last = milestones[milestones.length - 1];
+  const stale = !first || !last || first.starts_on < plan.starts_on || last.due_on > plan.ends_on;
+  if (!stale) return milestones;
+
+  const hasProgress = milestones.some((m) => m.completed_units > 0) || entries.length > 0;
+  if (hasProgress) return milestones;
+
+  try {
+    const cal = await loadCalendarForSchool(supabase, schoolId);
+    const segs = weeklyMilestonesFromDailyRate(
+      { surah: plan.start_surah, ayah: plan.start_ayah },
+      plan.direction,
+      plan.unit,
+      plan.daily_new_amount,
+      plan.starts_on,
+      plan.ends_on,
+      cal
+    );
+
+    const { error: delError } = await supabase.from(MILESTONES).delete().eq("plan_id", plan.id);
+    if (delError) throw delError;
+    if (segs.length === 0) return [];
+
+    const rows = segs.map((s, i) => ({
+      id: newId(),
+      plan_id: plan.id,
+      sequence: i + 1,
+      starts_on: s.starts_on,
+      due_on: s.due_on,
+      target_units: s.target_units,
+      from_surah: s.from_surah,
+      from_ayah: s.from_ayah,
+      to_surah: s.to_surah,
+      to_ayah: s.to_ayah,
+    }));
+    const { error: insError } = await supabase.from(MILESTONES).insert(rows);
+    if (insError) throw insError;
+
+    return rows.map((r): Milestone => ({
+      id: r.id,
+      sequence: r.sequence,
+      starts_on: r.starts_on,
+      due_on: r.due_on,
+      target_units: r.target_units,
+      completed_units: 0,
+      status: "pending",
+      completed_on: null,
+      title: null,
+      description: null,
+      from_surah: r.from_surah,
+      from_ayah: r.from_ayah,
+      to_surah: r.to_surah,
+      to_ayah: r.to_ayah,
+    }));
+  } catch (error) {
+    console.error("Yearly plan: could not rebuild a stale daily-rate schedule", error);
+    return milestones;
+  }
 }
 
 /* ── Alert reconciliation ────────────────────────────────────────────── */

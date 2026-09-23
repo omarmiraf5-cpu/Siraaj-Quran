@@ -1,7 +1,7 @@
 import { JUZ_START_PAGES, SURAHS, TOTAL_PAGES, getSurahById } from "@/data/mushaf-index";
 import { addDays } from "@/lib/planDates";
 import { countInstructionalDays, isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
-import { startOfWeek } from "@/lib/yearlyPlan";
+import { startOfWeek, type PlanUnit } from "@/lib/yearlyPlan";
 
 /**
  * Turning "five juz this year" into "Al-Mulk 1–30, then Al-Qalam 1–52, …"
@@ -564,6 +564,46 @@ export function impliedDailyRate(
   if (totalAmount <= 0) return 0;
   const days = countInstructionalDays(addDays(planStartsOn, -1), planEndsOn, cal);
   return days > 0 ? totalAmount / days : 0;
+}
+
+/**
+ * The shape a daily breakdown or the assignment auto-generator needs off a
+ * plan — never the whole Plan type, so either caller can pass one straight
+ * off an API payload without a cast.
+ */
+export interface DailyPacePlan {
+  starts_on: string;
+  ends_on: string;
+  unit: PlanUnit;
+  start_surah: number | null;
+  start_ayah: number | null;
+  direction: Direction | null;
+  daily_new_amount: number | null;
+  daily_review_amount: number | null;
+  /** The unit `daily_review_amount` is counted in. Read only for display —
+   *  falls back to `unit` where a caller has no value of its own, the same
+   *  way a plan saved before this column existed does. */
+  daily_review_unit: PlanUnit | null;
+}
+
+/**
+ * The steady per-day pace this plan actually runs at, however it was set
+ * up: the rate directly, if a teacher typed one, or — for an ordinary
+ * "total for the year" plan — the total worked out across however many
+ * instructional days the plan's own span holds. Either way, a caller only
+ * ever needs one number, not two different plan shapes.
+ *
+ * Null when there is nothing to derive a pace from at all: no anchor, or
+ * no rate and no total either (a bare plan with no milestones yet).
+ */
+export function dailyPaceOf(plan: DailyPacePlan, cal: SchoolCalendar, totalUnits?: number): number | null {
+  if (plan.start_surah == null || plan.start_ayah == null || plan.direction == null) return null;
+  if (plan.daily_new_amount != null) return plan.daily_new_amount;
+  if (totalUnits && totalUnits > 0) {
+    const rate = impliedDailyRate(totalUnits, plan.starts_on, plan.ends_on, cal);
+    return rate > 0 ? rate : null;
+  }
+  return null;
 }
 
 export interface DailyRateSegment {

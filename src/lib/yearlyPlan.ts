@@ -89,9 +89,14 @@ export interface Plan {
   /** A steady per-instructional-day pace, in `unit` — "1 page a day" rather
    *  than a year's total split evenly. Null on a plan made the other way. */
   daily_new_amount: number | null;
-  /** A daily review amount, also in `unit`. Carries no position of its own
-   *  — see dailySchedule's own note on why review isn't walked. */
+  /** A daily review amount. Carries no position of its own — see
+   *  dailySchedule's own note on why review isn't walked. */
   daily_review_amount: number | null;
+  /** The unit `daily_review_amount` is counted in — independent of the
+   *  plan's own `unit`, since reviewing a whole juz a day is ordinary
+   *  while memorising one is not. Null falls back to the plan's `unit`,
+   *  for a plan saved before this column existed. */
+  daily_review_unit: PlanUnit | null;
 }
 
 export interface ProgressEntry {

@@ -31,6 +31,7 @@ import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote } from "@/components/portal-ui";
+import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
 import { IconBook, IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -46,6 +47,20 @@ import {
 interface Student {
   id: string;
   full_name: string;
+}
+
+// Mirrors AutoAssignSummary in @/lib/autoAssignments — duplicated rather
+// than imported, since that module is server-only and this page is not.
+interface PlanAlertDto {
+  code: string;
+  level: "info" | "warning" | "critical";
+  title: string;
+  detail: string;
+}
+interface PlanSummaryDto {
+  pace: "not_started" | "ahead" | "on_track" | "at_risk" | "behind" | "complete";
+  alerts: PlanAlertDto[];
+  pending_confirmation: { surah: number; surah_name: string } | null;
 }
 
 // Assignments created while browsing without a real Supabase session. This is
@@ -111,6 +126,12 @@ export default function QuranAssignmentsPage() {
   const [lastSurahName, setLastSurahName] = useState<string>("");
   const [nextCount, setNextCount] = useState("10");
   const [savingDirection, setSavingDirection] = useState(false);
+  // The student's yearly plan, read alongside their assignments so the
+  // same behind-schedule signal the Yearly Plan page shows also shows up
+  // here, where a teacher actually sets the day's work. Null for a
+  // student with no active anchored plan, not just while loading.
+  const [planSummary, setPlanSummary] = useState<PlanSummaryDto | null>(null);
+  const [confirmingSurah, setConfirmingSurah] = useState(false);
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -353,6 +374,63 @@ export default function QuranAssignmentsPage() {
     return () => { cancelled = true; };
   }, [selectedStudent, isDemo]);
 
+  /** Re-fetching this also re-triggers the server's own catch-up
+   *  generation (see /api/quranic-assignments and autoAssignments.ts) —
+   *  which is exactly what should happen right after a surah confirmation
+   *  clears the one thing that was holding it back. */
+  const loadPlanSummary = () => {
+    if (!selectedStudent || isDemo) {
+      setPlanSummary(null);
+      return () => {};
+    }
+    let cancelled = false;
+    fetch(`/api/quranic-assignments?student_id=${encodeURIComponent(selectedStudent)}`)
+      .then((r) => r.json())
+      .then((b) => { if (!cancelled) setPlanSummary(b?.plan_summary ?? null); })
+      // Same reasoning as the position fetch above: losing this costs the
+      // banner, not the page — assignments still load and can still be
+      // set by hand.
+      .catch(() => { if (!cancelled) setPlanSummary(null); });
+    return () => { cancelled = true; };
+  };
+
+  useEffect(() => {
+    setPlanSummary(null);
+    return loadPlanSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStudent, isDemo]);
+
+  const confirmSurah = async () => {
+    if (!selectedStudent || !planSummary?.pending_confirmation) return;
+    setConfirmingSurah(true);
+    try {
+      await fetch("/api/surah-confirmations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_id: selectedStudent,
+          surah: planSummary.pending_confirmation.surah,
+        }),
+      });
+      loadPlanSummary();
+      // The lesson that was waiting on this can now be generated — refresh
+      // the list underneath, the same query the initial load runs.
+      const { data: refreshed } = await supabase
+        .from("quranic_assignments")
+        .select(
+          "id, student_id, teacher_id, surah, ayah_start, surah_end, ayah_end, portion, assigned_at, due_date, status, memorization_level, daily_rating, teacher_notes, student_notes, created_at, updated_at"
+        )
+        .order("assigned_at", { ascending: false });
+      setRealAssignments((refreshed ?? []) as QuranicAssignment[]);
+    } catch {
+      // The confirmation may or may not have gone through; the banner
+      // simply stays until the next successful load resolves it either
+      // way, rather than guessing here.
+    } finally {
+      setConfirmingSurah(false);
+    }
+  };
+
   const saveDirection = async (next: Direction) => {
     setDirection(next);
     if (!selectedStudent || isDemo) return;
@@ -495,7 +573,7 @@ export default function QuranAssignmentsPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-20 space-y-4 pt-2">
+    <div className="max-w-6xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow="Set work"
         title="Assignments"
@@ -504,6 +582,39 @@ export default function QuranAssignmentsPage() {
           `${allAssignments.length} set this term`,
         ]}
       />
+
+      {selectedStudent && planSummary?.alerts.map((a) => (
+        <PlanAlertBanner key={a.code} level={a.level} title={a.title} detail={a.detail} />
+      ))}
+
+      {selectedStudent && planSummary?.pending_confirmation && (
+        <div
+          role="alert"
+          className="rounded-[18px] border px-5 py-4 flex items-start gap-3.5"
+          style={{ borderColor: "#b8860b44", background: "#b8860b0f" }}
+        >
+          <span aria-hidden className="w-[3px] self-stretch rounded-full bg-amber-600" />
+          <AlertGlyph colour="#b8860b" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-bold tracking-tight text-amber-700">
+              Finished {planSummary.pending_confirmation.surah_name} — has he been tested on the whole surah?
+            </p>
+            <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
+              The next lesson moves into a new surah. Confirm he&apos;s been heard reciting all of{" "}
+              {planSummary.pending_confirmation.surah_name} before the plan schedules anything from
+              the next one — until then, no new lesson is generated for him.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={confirmSurah}
+            disabled={confirmingSurah}
+            className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 flex-shrink-0 mt-0.5 whitespace-nowrap"
+          >
+            {confirmingSurah ? "Saving…" : "Confirm tested"}
+          </button>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         {/* Form */}

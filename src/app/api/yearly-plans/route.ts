@@ -28,6 +28,7 @@ import {
   requireCaller,
   requireEncryption,
   requireTeacher,
+  resyncDailyRateMilestones,
   routeError,
 } from "@/lib/yearlyPlanServer";
 
@@ -155,6 +156,17 @@ export async function GET(req: NextRequest) {
     if (!loaded) {
       return NextResponse.json({ plan: null, milestones: [], entries: [], alerts: [] });
     }
+    // Self-heals a plan whose dates were edited before its milestones were
+    // rebuilt to match — see resyncDailyRateMilestones. A no-op on every
+    // plan that is already in sync, which is almost all of them almost all
+    // of the time.
+    loaded.milestones = await resyncDailyRateMilestones(
+      supabase,
+      loaded.plan,
+      preferred.school_id as string,
+      loaded.milestones,
+      loaded.entries
+    );
 
     const alerts = await refreshAlerts(
       supabase,
@@ -209,6 +221,7 @@ export async function POST(req: NextRequest) {
       direction = null,
       daily_new_amount = null,
       daily_review_amount = null,
+      daily_review_unit = null,
       milestones = [],
     } = body ?? {};
 
@@ -255,6 +268,9 @@ export async function POST(req: NextRequest) {
     const dailyProblem =
       badQuantity(daily_new_amount, "daily_new_amount", 0.01, 1000) ??
       badQuantity(daily_review_amount, "daily_review_amount", 0.01, 1000) ??
+      (daily_review_unit != null && !UNITS.includes(daily_review_unit)
+        ? `daily_review_unit must be one of: ${UNITS.join(", ")}`
+        : null) ??
       (daily_new_amount != null && (start_surah == null || direction == null)
         ? "A daily new-material rate needs a starting position and direction"
         : null);
@@ -306,6 +322,7 @@ export async function POST(req: NextRequest) {
       direction,
       daily_new_amount,
       daily_review_amount,
+      daily_review_unit,
       ...planTextColumns(planId, title ?? null, notes ?? null),
     });
     if (insertError) throw insertError;
@@ -387,6 +404,7 @@ export async function PATCH(req: NextRequest) {
       academic_year,
       daily_new_amount,
       daily_review_amount,
+      daily_review_unit,
     } = body ?? {};
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
@@ -418,13 +436,16 @@ export async function PATCH(req: NextRequest) {
       }
       patch.unit = unit;
     }
-    if (daily_new_amount !== undefined || daily_review_amount !== undefined) {
+    if (daily_new_amount !== undefined || daily_review_amount !== undefined || daily_review_unit !== undefined) {
       const dailyProblem =
         (daily_new_amount !== undefined
           ? badQuantity(daily_new_amount, "daily_new_amount", 0.01, 1000)
           : null) ??
         (daily_review_amount !== undefined
           ? badQuantity(daily_review_amount, "daily_review_amount", 0.01, 1000)
+          : null) ??
+        (daily_review_unit !== undefined && daily_review_unit != null && !UNITS.includes(daily_review_unit)
+          ? `daily_review_unit must be one of: ${UNITS.join(", ")}`
           : null);
       if (dailyProblem) return NextResponse.json({ error: dailyProblem }, { status: 400 });
       if (daily_new_amount != null && existing.start_surah == null) {
@@ -435,6 +456,7 @@ export async function PATCH(req: NextRequest) {
       }
       if (daily_new_amount !== undefined) patch.daily_new_amount = daily_new_amount;
       if (daily_review_amount !== undefined) patch.daily_review_amount = daily_review_amount;
+      if (daily_review_unit !== undefined) patch.daily_review_unit = daily_review_unit;
     }
     if (academic_year !== undefined) {
       if (typeof academic_year !== "string" || !academic_year.trim()) {
@@ -474,6 +496,16 @@ export async function PATCH(req: NextRequest) {
 
     const loaded = await loadPlan(supabase, id);
     if (!loaded) return NextResponse.json({ error: "No such plan" }, { status: 404 });
+    // Catches the exact case that prompted this: starts_on/ends_on/
+    // daily_new_amount just changed above, and the stored milestones are
+    // whatever they were before that — stale until this rebuilds them.
+    loaded.milestones = await resyncDailyRateMilestones(
+      supabase,
+      loaded.plan,
+      existing.school_id as string,
+      loaded.milestones,
+      loaded.entries
+    );
     const alerts = await refreshAlerts(supabase, loaded, existing.school_id as string);
     return NextResponse.json({
       ...loaded,

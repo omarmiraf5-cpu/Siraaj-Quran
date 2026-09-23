@@ -74,6 +74,7 @@ interface PlanDto {
   direction: Direction | null;
   daily_new_amount: number | null;
   daily_review_amount: number | null;
+  daily_review_unit: PlanUnit | null;
 }
 interface AlertDto {
   id: string;
@@ -120,6 +121,19 @@ const QUICK_DAILY_AMOUNTS: Partial<Record<PlanUnit, Array<{ value: number; label
     { value: 10, label: "10 ayahs" },
   ],
 };
+
+/** Review's own quick picks, fixed rather than keyed by the plan's unit:
+ *  reviewing old ground moves in much bigger steps than memorising new
+ *  ground does, so "1 juz" a day of review is ordinary while "1 juz" of
+ *  new memorization never would be. Each button carries its own unit, not
+ *  just its own amount, since these mix pages and juz. */
+const REVIEW_PRESETS: Array<{ value: number; unit: PlanUnit; label: string }> = [
+  { value: 5, unit: "page", label: "5 pages" },
+  { value: 10, unit: "page", label: "10 pages" },
+  { value: 1, unit: "juz", label: "1 juz" },
+  { value: 2, unit: "juz", label: "2 juz" },
+  { value: 3, unit: "juz", label: "3 juz" },
+];
 
 /** What the create form builds and posts. The mushaf fields are null on a
  *  plain count-only plan, which is why they are declared rather than left
@@ -203,6 +217,41 @@ function AmountButtons({
   );
 }
 
+/** Review's picker: five fixed buttons, each its own amount and unit.
+ *  Tapping the one already chosen clears it back to "no review" — the
+ *  fastest way to turn it off on a phone, with no separate button for it. */
+function ReviewAmountButtons({
+  value,
+  unit,
+  onChange,
+}: {
+  value: number;
+  unit: PlanUnit | null;
+  onChange: (value: number, unit: PlanUnit | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {REVIEW_PRESETS.map((p) => {
+        const active = value === p.value && unit === p.unit;
+        return (
+          <button
+            key={`${p.unit}-${p.value}`}
+            type="button"
+            onClick={() => (active ? onChange(0, null) : onChange(p.value, p.unit))}
+            className={`px-3.5 py-2 rounded-full text-[13px] font-semibold transition-all ${
+              active
+                ? "bg-brand-navy text-white"
+                : "bg-surface-card border border-surface-border text-ink-muted hover:text-ink"
+            }`}
+          >
+            {p.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TeacherYearlyPlanPage() {
   const { mode, students } = useSchoolRoster();
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -231,6 +280,7 @@ export default function TeacherYearlyPlanPage() {
     ends_on: "",
     dailyNewAmount: 0,
     dailyReviewAmount: 0,
+    dailyReviewUnit: null as PlanUnit | null,
   });
 
   useEffect(() => {
@@ -310,6 +360,7 @@ export default function TeacherYearlyPlanPage() {
     dailyMode: true,
     dailyNewAmount: 1,
     dailyReviewAmount: 0,
+    dailyReviewUnit: null as PlanUnit | null,
   }));
 
   /* ── The school's own calendar ───────────────────────────────────────
@@ -487,6 +538,7 @@ export default function TeacherYearlyPlanPage() {
           direction: canAnchor ? draft.direction : null,
           daily_new_amount: draft.dailyMode ? draft.dailyNewAmount : null,
           daily_review_amount: draft.dailyMode && draft.dailyReviewAmount > 0 ? draft.dailyReviewAmount : null,
+          daily_review_unit: draft.dailyMode && draft.dailyReviewAmount > 0 ? draft.dailyReviewUnit : null,
           milestones: skeleton,
         }),
       });
@@ -693,6 +745,7 @@ export default function TeacherYearlyPlanPage() {
       ends_on: plan.ends_on,
       dailyNewAmount: plan.daily_new_amount ?? 0,
       dailyReviewAmount: plan.daily_review_amount ?? 0,
+      dailyReviewUnit: plan.daily_review_unit ?? null,
     });
     setConfirmingDelete(false);
     setEditingPlan(true);
@@ -723,6 +776,7 @@ export default function TeacherYearlyPlanPage() {
             ? {
                 daily_new_amount: editDraft.dailyNewAmount > 0 ? editDraft.dailyNewAmount : null,
                 daily_review_amount: editDraft.dailyReviewAmount > 0 ? editDraft.dailyReviewAmount : null,
+                daily_review_unit: editDraft.dailyReviewAmount > 0 ? editDraft.dailyReviewUnit : null,
               }
             : {}),
         }),
@@ -770,7 +824,7 @@ export default function TeacherYearlyPlanPage() {
 
   if (mode === "loading") {
     return (
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-6xl">
         <LoadingNote>Loading your roster…</LoadingNote>
       </div>
     );
@@ -778,7 +832,7 @@ export default function TeacherYearlyPlanPage() {
 
   if (mode === "demo") {
     return (
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-6xl">
         <PortalHero eyebrow="Teacher" title="Yearly plan" />
         <SectionCard title="Sign in to build a plan">
           <PlanEmptyState
@@ -791,7 +845,7 @@ export default function TeacherYearlyPlanPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       <PortalHero
         eyebrow="Teacher"
         title="Yearly plan"
@@ -953,13 +1007,13 @@ export default function TeacherYearlyPlanPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className={label}>Review, each day (optional)</label>
-                  <AmountButtons
-                    unit={draft.unit}
+                  <ReviewAmountButtons
                     value={draft.dailyReviewAmount}
-                    onChange={(v) => setDraft({ ...draft, dailyReviewAmount: v })}
+                    unit={draft.dailyReviewUnit}
+                    onChange={(v, u) => setDraft({ ...draft, dailyReviewAmount: v, dailyReviewUnit: u })}
                   />
                   <p className="text-[11.5px] text-ink-muted mt-1">
-                    Just an amount, not exact pages — leave at 0 for none.
+                    Old ground he goes back over each day he&apos;s at school. Tap again to turn it off.
                   </p>
                 </div>
               </>
@@ -1153,7 +1207,7 @@ export default function TeacherYearlyPlanPage() {
                         )}{" "}
                         in total
                         {draft.dailyReviewAmount > 0 &&
-                          `, plus ${formatUnits(draft.dailyReviewAmount, draft.unit)} of review every day he&apos;s at school`}
+                          `, plus ${formatUnits(draft.dailyReviewAmount, draft.dailyReviewUnit ?? draft.unit)} of review every day he&apos;s at school`}
                         . The plan page will show exactly what to do each day.
                       </p>
                     ) : (
@@ -1425,11 +1479,12 @@ export default function TeacherYearlyPlanPage() {
                       </div>
                       <div className="sm:col-span-2">
                         <label className={label}>Review, each day</label>
-                        <AmountButtons
-                          unit={editDraft.unit}
+                        <ReviewAmountButtons
                           value={editDraft.dailyReviewAmount}
-                          onChange={(v) => setEditDraft({ ...editDraft, dailyReviewAmount: v })}
+                          unit={editDraft.dailyReviewUnit}
+                          onChange={(v, u) => setEditDraft({ ...editDraft, dailyReviewAmount: v, dailyReviewUnit: u })}
                         />
+                        <p className="text-[11.5px] text-ink-muted mt-1">Tap the selected one again to turn it off.</p>
                       </div>
                     </>
                   )}

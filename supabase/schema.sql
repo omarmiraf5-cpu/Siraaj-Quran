@@ -460,6 +460,29 @@ alter table quranic_assignments
 update quranic_assignments set surah_end = surah where surah_end is null;
 alter table quranic_assignments
   alter column surah_end set not null;
+-- Which of these rows the yearly-plan generator wrote versus a teacher
+-- typed by hand — the generator needs to know how far it already got
+-- without being confused by a manual row a teacher added out of band, and
+-- a manual correction must never look like the schedule caught up on its
+-- own. Every existing row is 'manual' by definition: this column did not
+-- exist for the generator to have written anything yet, which is also why
+-- the uniqueness below is safe to add outright — nothing can already
+-- violate it.
+alter table quranic_assignments
+  add column if not exists source text not null default 'manual';
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'quranic_assignments_source_check'
+  ) then
+    alter table quranic_assignments
+      add constraint quranic_assignments_source_check
+      check (source in ('manual', 'auto'));
+  end if;
+end $$;
+create unique index if not exists quranic_assignments_auto_one_per_day
+  on quranic_assignments(student_id, due_date)
+  where portion = 'new' and source = 'auto';
 do $$
 begin
   if not exists (
@@ -468,6 +491,42 @@ begin
     alter table quranic_assignments
       add constraint quranic_assignments_surah_end_check
       check (surah_end between surah and 114);
+  end if;
+end $$;
+-- The two constraints above (plus the table's own unnamed "surah_end
+-- between surah and 114" and "ayah_end >= ayah_start" checks, from before
+-- either had an explicit name) all assume an *ascending* walk — true for
+-- a "forward" lesson, false for a "hifz" one, where the walk moves toward
+-- *lower* surah numbers and, inside the surah it lands in, potentially a
+-- lower ayah too. A lesson that starts at Al-Falaq 4 and reaches into
+-- Al-Ikhlas 1 is a normal hifz-direction lesson; the old constraints
+-- rejected it outright, which is exactly what the assignment generator in
+-- autoAssignments.ts hit the first time anything actually produced one.
+-- Dropped and replaced with independent range checks. Safe on a school
+-- already using this table: every constraint below is strictly looser
+-- than what it replaces, so any row that satisfied the old rule already
+-- satisfies the new one.
+alter table quranic_assignments drop constraint if exists quranic_assignments_check;
+alter table quranic_assignments drop constraint if exists quranic_assignments_check1;
+alter table quranic_assignments drop constraint if exists quranic_assignments_surah_end_check;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'quranic_assignments_surah_end_range_check'
+  ) then
+    alter table quranic_assignments
+      add constraint quranic_assignments_surah_end_range_check
+      check (surah_end between 1 and 114);
+  end if;
+end $$;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'quranic_assignments_ayah_end_check'
+  ) then
+    alter table quranic_assignments
+      add constraint quranic_assignments_ayah_end_check
+      check (ayah_end >= 1);
   end if;
 end $$;
 alter table quranic_assignments enable row level security;
@@ -491,6 +550,49 @@ create policy "Admins can manage quranic assignments" on quranic_assignments
   for all using (
     school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
   );
+
+-- A student's "new" lessons can be generated straight from their yearly
+-- plan (see dailySchedule/autoAssignments), which means nothing stops the
+-- walk at the end of a surah on its own — the mushaf just carries on into
+-- the next one. This table is that stop: one row means a teacher has
+-- actually heard the student recite the whole surah, not just its last
+-- day's portion, and the generator refuses to schedule anything in the
+-- next surah until the row exists.
+create table if not exists surah_test_confirmations (
+  id             uuid primary key default gen_random_uuid(),
+  student_id     uuid not null references students(id) on delete cascade,
+  school_id      uuid not null references schools(id) on delete cascade,
+  surah          int not null check (surah between 1 and 114),
+  teacher_id     uuid not null references profiles(id) on delete cascade,
+  confirmed_at   timestamptz not null default now(),
+  notes          text,
+  -- A surah is tested once; a second confirmation would just be a second
+  -- click on the same button, not a second fact.
+  constraint surah_test_confirmations_one_per_surah unique (student_id, surah)
+);
+alter table surah_test_confirmations enable row level security;
+drop policy if exists "Teachers can manage own students' surah confirmations" on surah_test_confirmations;
+create policy "Teachers can manage own students' surah confirmations" on surah_test_confirmations
+  for all using (teacher_id = auth.uid());
+drop policy if exists "Students can read own surah confirmations" on surah_test_confirmations;
+create policy "Students can read own surah confirmations" on surah_test_confirmations
+  for select using (
+    student_id in (select id from students where profile_id = auth.uid())
+  );
+drop policy if exists "Parents can read children surah confirmations" on surah_test_confirmations;
+create policy "Parents can read children surah confirmations" on surah_test_confirmations
+  for select using (
+    student_id in (
+      select student_id from parent_students where parent_id = auth.uid()
+    )
+  );
+drop policy if exists "Admins can manage surah confirmations" on surah_test_confirmations;
+create policy "Admins can manage surah confirmations" on surah_test_confirmations
+  for all using (
+    school_id in (select school_id from profiles where id = auth.uid() and role = 'admin')
+  );
+create index if not exists idx_surah_test_confirmations_student
+  on surah_test_confirmations(student_id);
 
 -- ══════════════════════════════════════
 -- Submissions
@@ -1037,6 +1139,13 @@ alter table yearly_plans add column if not exists daily_new_amount numeric(8,2)
   check (daily_new_amount is null or daily_new_amount > 0);
 alter table yearly_plans add column if not exists daily_review_amount numeric(8,2)
   check (daily_review_amount is null or daily_review_amount > 0);
+-- Review is commonly sized in a much bigger unit than new memorisation —
+-- reviewing a whole juz a day is ordinary, memorising one is not — so it
+-- gets its own unit rather than sharing the plan's `unit` column. Null on
+-- a plan with no review amount set, and on a plan saved before this column
+-- existed, where the UI falls back to the plan's own `unit`.
+alter table yearly_plans add column if not exists daily_review_unit text
+  check (daily_review_unit is null or daily_review_unit in ('ayah', 'page', 'line', 'surah', 'juz', 'lesson'));
 alter table yearly_plan_milestones add column if not exists from_surah int;
 alter table yearly_plan_milestones add column if not exists from_ayah int;
 alter table yearly_plan_milestones add column if not exists to_surah int;
