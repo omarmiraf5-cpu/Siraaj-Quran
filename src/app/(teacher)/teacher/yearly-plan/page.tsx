@@ -582,7 +582,10 @@ export default function TeacherYearlyPlanPage() {
      the mushaf to check a range shouldn't close an in-progress entry, and
      the two panels can be open at once without conflict. */
   const [focusedMilestoneId, setFocusedMilestoneId] = useState<string | null>(null);
-  const [mushafMilestone, setMushafMilestone] = useState<Milestone | null>(null);
+  // A saved milestone (from the row buttons below) or an unsaved draft row
+  // (from the create form's own preview) — MilestoneMushafModal only needs
+  // the range fields either shares, so one modal instance serves both.
+  const [mushafMilestone, setMushafMilestone] = useState<Milestone | DraftMilestone | null>(null);
   const [showFullYear, setShowFullYear] = useState(false);
 
   useEffect(() => {
@@ -1209,7 +1212,15 @@ export default function TeacherYearlyPlanPage() {
                             <span className="text-ink-muted tabular-nums me-2">
                               {String(i + 1).padStart(2, "0")}
                             </span>
-                            {page && <span className="font-semibold">{page}</span>}{" "}
+                            {page ? (
+                              <button
+                                type="button"
+                                onClick={() => setMushafMilestone(m)}
+                                className="font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                              >
+                                {page}
+                              </button>
+                            ) : null}{" "}
                             <span className={page ? "text-ink-muted" : ""}>
                               {page ? `(${m.label})` : (m.label ?? "—")}
                             </span>

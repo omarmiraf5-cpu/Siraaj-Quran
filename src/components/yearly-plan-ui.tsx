@@ -396,7 +396,20 @@ export function PlanEmptyState({
 
 /** The surah span a milestone covers, or "" when the plan is a plain
  *  count with no mushaf anchor. */
-export function mushafRange(m: Milestone): string {
+/** The fields a mushaf range needs off a milestone-shaped object — never
+ *  the full Milestone, so a not-yet-saved draft (the create form's own
+ *  preview rows, which have the same range fields but no id or status
+ *  yet) can be previewed with exactly the same components as a real one. */
+export interface MushafRangeLike {
+  from_surah: number | null;
+  from_ayah: number | null;
+  to_surah: number | null;
+  to_ayah: number | null;
+  starts_on: string;
+  due_on: string;
+}
+
+export function mushafRange(m: MushafRangeLike): string {
   if (m.from_surah == null || m.from_ayah == null || m.to_surah == null || m.to_ayah == null) {
     return "";
   }
@@ -409,7 +422,7 @@ export function mushafRange(m: Milestone): string {
 /** "Page 78" — the actual instruction a teacher gives a student, next to
  *  the Surah/ayah range that says exactly which text that covers. "" for
  *  a plain-count milestone with no mushaf range at all. */
-export function milestonePageLabel(m: Milestone): string {
+export function milestonePageLabel(m: MushafRangeLike): string {
   if (m.from_surah == null || m.from_ayah == null || m.to_surah == null || m.to_ayah == null) {
     return "";
   }
@@ -550,7 +563,9 @@ export function MilestoneMushafModal({
   milestone,
   onClose,
 }: {
-  milestone: Milestone | null;
+  /** A saved Milestone, or an unsaved draft row from the create form's own
+   *  preview — both carry the same range, which is all this needs. */
+  milestone: MushafRangeLike | null;
   onClose: () => void;
 }) {
   if (
@@ -563,10 +578,13 @@ export function MilestoneMushafModal({
     return null;
   }
 
+  // Guaranteed non-empty by the guard above, so there is no unranged
+  // fallback to fall back to here the way a milestone row's own title
+  // needs one.
   const range = mushafRange(milestone);
   return (
     <Modal
-      title={range || milestoneTitle(milestone)}
+      title={range}
       subtitle={`${milestone.starts_on} — ${milestone.due_on}`}
       wide
       onClose={onClose}
