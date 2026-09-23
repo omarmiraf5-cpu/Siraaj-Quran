@@ -442,6 +442,16 @@ export function formatPosition(p: Position): string {
   return `${s.englishName} ${p.ayah}`;
 }
 
+/** "Page 78" or "Pages 78–79" — the number a teacher actually tells a
+ *  student to turn to. A Surah/ayah range on its own still has to be
+ *  looked up against a real mushaf before it means anything to open to;
+ *  the page number is the instruction itself. */
+export function pageLabel(from: Position, to: Position): string {
+  const a = pageOfPosition(from);
+  const b = pageOfPosition(to);
+  return a === b ? `Page ${a}` : `Pages ${a}–${b}`;
+}
+
 /* ── Daily rate ────────────────────────────────────────────────────────
    "1 page a day" instead of a year's total split evenly across a chosen
    number of segments. Review has no version of this walk: it is a plain

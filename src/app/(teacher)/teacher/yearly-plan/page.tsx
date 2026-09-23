@@ -28,6 +28,7 @@ import {
   targetInAyahs,
   ayahsRemaining,
   formatPosition,
+  pageLabel,
   impliedDailyRate,
   weeklyMilestonesFromDailyRate,
   type Direction,
@@ -1185,19 +1186,42 @@ export default function TeacherYearlyPlanPage() {
                 Rename, retarget or delete any of them afterwards.
               </p>
               {canAnchor && skeleton.some((m) => m.label) && (
-                <ol className="mt-3 divide-y divide-surface-border border-t border-surface-border">
-                  {skeleton.map((m, i) => (
-                    <li key={i} className="flex items-baseline justify-between gap-3 py-1.5">
-                      <span className="text-[12.5px] text-ink min-w-0">
-                        <span className="text-ink-muted tabular-nums me-2">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                        {m.label ?? "—"}
-                      </span>
-                      <span className="eyebrow flex-shrink-0">{m.due_on}</span>
-                    </li>
-                  ))}
-                </ol>
+                <>
+                  {draft.dailyMode && (
+                    <p className="text-[11.5px] text-ink-muted mt-3">
+                      Each row below is one week, not one day — the days he&apos;s actually at school
+                      that week, added together. For a single day&apos;s page, see &quot;This week&apos;s
+                      work&quot; on the plan page once it&apos;s saved.
+                    </p>
+                  )}
+                  <ol className="mt-3 divide-y divide-surface-border border-t border-surface-border">
+                    {skeleton.map((m, i) => {
+                      const page =
+                        m.from_surah != null && m.from_ayah != null && m.to_surah != null && m.to_ayah != null
+                          ? pageLabel(
+                              { surah: m.from_surah, ayah: m.from_ayah },
+                              { surah: m.to_surah, ayah: m.to_ayah }
+                            )
+                          : null;
+                      return (
+                        <li key={i} className="flex items-baseline justify-between gap-3 py-1.5">
+                          <span className="text-[12.5px] text-ink min-w-0">
+                            <span className="text-ink-muted tabular-nums me-2">
+                              {String(i + 1).padStart(2, "0")}
+                            </span>
+                            {page && <span className="font-semibold">{page}</span>}{" "}
+                            <span className={page ? "text-ink-muted" : ""}>
+                              {page ? `(${m.label})` : (m.label ?? "—")}
+                            </span>
+                          </span>
+                          <span className="eyebrow flex-shrink-0">
+                            {draft.dailyMode ? `${m.starts_on} – ${m.due_on}` : m.due_on}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </>
               )}
             </div>
           )}

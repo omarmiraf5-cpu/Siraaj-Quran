@@ -16,6 +16,7 @@ import {
 } from "@/lib/yearlyPlan";
 import {
   formatRange,
+  pageLabel,
   dailySchedule,
   impliedDailyRate,
   type Direction,
@@ -405,6 +406,16 @@ export function mushafRange(m: Milestone): string {
   );
 }
 
+/** "Page 78" — the actual instruction a teacher gives a student, next to
+ *  the Surah/ayah range that says exactly which text that covers. "" for
+ *  a plain-count milestone with no mushaf range at all. */
+export function milestonePageLabel(m: Milestone): string {
+  if (m.from_surah == null || m.from_ayah == null || m.to_surah == null || m.to_ayah == null) {
+    return "";
+  }
+  return pageLabel({ surah: m.from_surah, ayah: m.from_ayah }, { surah: m.to_surah, ayah: m.to_ayah });
+}
+
 /** Shared by the row and the navigator, so "overdue" can't drift into two
  *  different answers depending on which one is asked. */
 export function isOverdue(m: Milestone, today: string): boolean {
@@ -465,9 +476,11 @@ export function MilestoneRow({
             {milestone.starts_on} — {milestone.due_on}
           </span>
         </div>
-        {milestone.title?.trim() && mushafRange(milestone) && (
+        {mushafRange(milestone) && (
           <p className="text-[12px] text-brand-navy dark:text-brand-gold mt-1 font-medium">
-            {mushafRange(milestone)}
+            {milestone.title?.trim()
+              ? `${milestonePageLabel(milestone)} — ${mushafRange(milestone)}`
+              : milestonePageLabel(milestone)}
           </p>
         )}
 
@@ -856,7 +869,12 @@ export function DailyWorkPanel({
                     {isToday && <span className="text-brand-navy dark:text-brand-gold"> · Today</span>}
                   </p>
                   {row ? (
-                    <p className="text-[13px] text-ink mt-0.5 font-medium">{row.label}</p>
+                    <>
+                      <p className="text-[13px] text-ink mt-0.5 font-semibold">
+                        {pageLabel(row.from, row.to)}
+                      </p>
+                      <p className="text-[11.5px] text-ink-muted">{row.label}</p>
+                    </>
                   ) : (
                     <p className="text-[13px] text-ink-muted mt-0.5 italic">
                       {inSpan ? "No class" : "Outside the plan's dates"}
@@ -956,7 +974,10 @@ export function FullYearScheduleModal({
                     <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide w-24 flex-shrink-0">
                       {weekdayLabel(r.date)}
                     </span>
-                    <span className="text-[13px] text-ink flex-1 min-w-0">{r.label}</span>
+                    <span className="text-[13px] text-ink flex-1 min-w-0">
+                      <span className="font-semibold">{pageLabel(r.from, r.to)}</span>{" "}
+                      <span className="text-ink-muted">({r.label})</span>
+                    </span>
                     {plan.daily_review_amount ? (
                       <span className="text-[11px] text-ink-muted flex-shrink-0 whitespace-nowrap">
                         + {formatUnits(plan.daily_review_amount, plan.unit)} review
