@@ -588,6 +588,11 @@ export default function QuranAssignmentsPage() {
             }),
           });
         }
+        // The rating also moves the lesson's status, and for a lesson from
+        // the yearly plan, the plan's own progress — so re-read both rather
+        // than leaving the row on its old status and a behind-schedule
+        // banner up that the lesson just cleared.
+        await Promise.all([refreshAssignments(), syncOneStudent(a.student_id)]);
       }
       setEditingId(null);
     } finally {

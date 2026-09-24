@@ -5,9 +5,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { addDays } from "@/lib/planDates";
 import { isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
 import { getSurahById } from "@/data/mushaf-index";
+import { encryptField, fieldContext, isEncryptionConfigured } from "@/lib/planCrypto";
 import {
   dailyPaceOf,
   dailySchedule,
+  formatRange,
   surahName,
   surahOrder,
   type Direction,
@@ -21,11 +23,14 @@ import {
   type PlanAlert,
 } from "@/lib/yearlyPlan";
 import {
+  MILESTONES,
   PLANS,
+  PROGRESS,
   decodePlan,
   isFailure,
   loadCalendarForSchool,
   loadMilestonesAndEntries,
+  newId,
   requireCaller,
   resyncDailyRateMilestones,
   type LoadedPlan,
@@ -329,4 +334,125 @@ function nextInstructionalDay(today: string, cal: SchoolCalendar): string {
     if (isInstructionalDay(day, cal)) return day;
   }
   return today;
+}
+
+/* ── Graded lessons count toward the plan ──────────────────────────────── */
+
+/** What a rating says about a lesson: heard and passed, or heard and to be
+ *  repeated. No rating at all means it has not been heard yet. */
+export function statusForRating(rating: string | null): "completed" | "needs_review" | "assigned" {
+  if (rating == null) return "assigned";
+  return rating === "weak" ? "needs_review" : "completed";
+}
+
+export interface GradedLesson {
+  student_id: string;
+  source: string | null;
+  portion: string;
+  due_date: string | null;
+  status: string;
+  surah: number;
+  ayah_start: number;
+  surah_end: number | null;
+  ayah_end: number;
+}
+
+/**
+ * Carries a graded lesson through to the yearly plan it came from, so a
+ * teacher records the work once — by rating the lesson — instead of again
+ * under "Record progress". A lesson the plan wrote that becomes completed
+ * adds one day's share to the milestone for its week; one that stops being
+ * completed (re-rated Weak, or its rating cleared) takes that share back
+ * off. Re-rating Good as Excellent changes nothing, so saving the same
+ * lesson twice never counts it twice.
+ *
+ * Only for lessons the plan itself generated: a lesson typed in by hand
+ * has no place in the plan's schedule to be counted against. Written as an
+ * ordinary progress entry through the caller's own session, so it appears
+ * in the plan's history and is subject to the same access rules as
+ * recording progress by hand. Never throws — the rating is already saved,
+ * and failing to update the plan should not undo it.
+ */
+export async function creditPlanForLesson(
+  supabase: Db,
+  teacherId: string,
+  before: GradedLesson,
+  after: GradedLesson,
+  today: string = todayISO()
+): Promise<void> {
+  try {
+    if (after.source !== "auto" || after.portion !== "new" || !after.due_date) return;
+    const wasDone = before.status === "completed";
+    const isDone = after.status === "completed";
+    if (wasDone === isDone) return;
+    if (!isEncryptionConfigured()) return;
+
+    const { data: rows, error } = await supabase
+      .from(PLANS)
+      .select("*")
+      .eq("student_id", after.student_id)
+      .eq("status", "active")
+      .order("academic_year", { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    const row = rows?.[0] as ({ id: string; school_id: string } & Record<string, unknown>) | undefined;
+    if (!row) return;
+    const plan = decodePlan(row);
+    if (after.due_date < plan.starts_on || after.due_date > plan.ends_on) return;
+
+    const [{ milestones }, cal] = await Promise.all([
+      loadMilestonesAndEntries(supabase, plan.id),
+      loadCalendarForSchool(supabase, row.school_id),
+    ]);
+    const totalUnits = milestones.reduce((s, m) => s + m.target_units, 0);
+    const share = dailyPaceOf(plan, cal, totalUnits);
+    if (share == null || share <= 0) return;
+
+    // The milestone for the lesson's own week — or, for a lesson dated in
+    // a gap between two, the one before it.
+    const due = after.due_date;
+    const milestone =
+      milestones.find((m) => m.starts_on <= due && due <= m.due_on) ??
+      [...milestones].reverse().find((m) => m.starts_on <= due);
+    if (!milestone) return;
+
+    const target = milestone.target_units;
+    const raw = milestone.completed_units + (isDone ? share : -share);
+    const unitsAfter = Math.round(Math.max(0, target > 0 ? Math.min(target, raw) : raw) * 100) / 100;
+    if (unitsAfter === milestone.completed_units) return;
+
+    const range = formatRange(
+      { surah: after.surah, ayah: after.ayah_start },
+      { surah: after.surah_end ?? after.surah, ayah: after.ayah_end }
+    );
+    const note = isDone
+      ? `Lesson completed on the Assignments page: ${range}`
+      : `Lesson no longer marked completed: ${range}`;
+
+    const entryId = newId();
+    const { error: logError } = await supabase.from(PROGRESS).insert({
+      id: entryId,
+      milestone_id: milestone.id,
+      plan_id: plan.id,
+      teacher_id: teacherId,
+      recorded_on: today,
+      units_after: unitsAfter,
+      note_enc: encryptField(note, fieldContext(PROGRESS, entryId, "note_enc")),
+    });
+    if (logError) throw logError;
+
+    const complete = target > 0 && unitsAfter >= target;
+    const { error: updateError } = await supabase
+      .from(MILESTONES)
+      .update({
+        completed_units: unitsAfter,
+        status: complete ? "completed" : unitsAfter > 0 ? "in_progress" : "pending",
+        completed_on: complete ? today : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", milestone.id);
+    if (updateError) throw updateError;
+  } catch (error) {
+    console.error("Quranic assignments: could not count a graded lesson toward the yearly plan", error);
+  }
 }
