@@ -110,7 +110,9 @@ export default function StudentDashboard() {
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
 
         <div className="relative flex items-center gap-3.5">
-          <Avatar name={displayName} />
+          <Link href="/account" aria-label="My account" className="rounded-full active:scale-95 transition-transform">
+            <Avatar name={displayName} />
+          </Link>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] text-white/55">{t("common.asalaamuAlaykum")}</p>
             <h1 className="page-title text-white text-[26px] leading-tight truncate">
@@ -322,6 +324,13 @@ export default function StudentDashboard() {
         <span className="group-hover:translate-x-0.5 transition-transform">
           <IconArrow size={14} />
         </span>
+      </Link>
+
+      <Link
+        href="/account"
+        className="block text-center text-[11.5px] font-semibold text-ink-muted hover:text-ink transition-colors pb-2"
+      >
+        {t("nav.account")} · {t("common.privacy")}
       </Link>
     </div>
   );

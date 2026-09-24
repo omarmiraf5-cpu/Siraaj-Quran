@@ -1502,3 +1502,67 @@ create policy "Recipients can mark own notifications read" on notifications
 
 create index if not exists idx_notifications_recipient
   on notifications(recipient_id, created_at desc);
+
+-- ── Deleting your own account ─────────────────────────────────────────
+-- The app stores require that people can delete their account from inside
+-- the app. Deleting a teacher's or parent's account removes their login and
+-- their profile, but what they recorded about students — attendance they
+-- took, lessons they set and graded, yearly plans, messages in a child's
+-- thread — belongs to the school and stays. Those references become null
+-- rather than blocking the delete (most had no ON DELETE rule, so it simply
+-- failed) or taking the students' records with it (quranic_assignments and
+-- yearly_plans cascaded, so one departing teacher would have wiped every
+-- lesson and plan they had set). The screens already fall back to "Teacher",
+-- "Parent" or "School office" where a name is gone.
+do $$
+declare
+  r record;
+  c text;
+begin
+  for r in
+    select * from (values
+      ('students', 'profile_id'),
+      ('classes', 'teacher_id'),
+      ('lessons', 'teacher_id'),
+      ('assignments', 'teacher_id'),
+      ('quranic_assignments', 'teacher_id'),
+      ('surah_test_confirmations', 'teacher_id'),
+      ('attendance', 'teacher_id'),
+      ('subject_grades', 'teacher_id'),
+      ('announcements', 'author_id'),
+      ('messages', 'author_id'),
+      ('recitation_log', 'teacher_id'),
+      ('student_stars', 'teacher_id'),
+      ('student_badges', 'teacher_id'),
+      ('yearly_plans', 'teacher_id'),
+      ('yearly_plan_progress', 'teacher_id')
+    ) as t(tbl, col)
+  loop
+    if to_regclass('public.' || r.tbl) is null then
+      continue;
+    end if;
+    for c in
+      select con.conname
+      from pg_constraint con
+      join pg_attribute att on att.attrelid = con.conrelid and att.attnum = any (con.conkey)
+      where con.contype = 'f'
+        and con.conrelid = ('public.' || r.tbl)::regclass
+        and con.confrelid = 'public.profiles'::regclass
+        and att.attname = r.col
+    loop
+      execute format('alter table public.%I drop constraint %I', r.tbl, c);
+    end loop;
+    execute format('alter table public.%I alter column %I drop not null', r.tbl, r.col);
+    execute format(
+      'alter table public.%I add constraint %I foreign key (%I) references public.profiles(id) on delete set null',
+      r.tbl, r.tbl || '_' || r.col || '_fkey', r.col
+    );
+  end loop;
+end $$;
+
+-- The school office is told when someone deletes their account, and when a
+-- student asks for theirs to be deleted (a child's account is the school's
+-- to remove).
+alter table notifications drop constraint if exists notifications_kind_check;
+alter table notifications add constraint notifications_kind_check
+  check (kind in ('absence_streak', 'staff_absence_report', 'account_deleted', 'deletion_request'));

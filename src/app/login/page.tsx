@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -578,6 +579,12 @@ export default function LoginPage() {
               )}
             </form>
           )}
+
+          <p className="mt-6 text-center text-[11.5px] text-white/40">
+            <Link href="/privacy" className="hover:text-white/70">{t("common.privacy")}</Link>
+            <span className="mx-2">·</span>
+            <Link href="/support" className="hover:text-white/70">{t("login.help")}</Link>
+          </p>
         </div>
       </div>
       </div>

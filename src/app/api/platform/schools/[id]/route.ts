@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deleteSchoolAndAccounts } from "@/lib/accountDeletion";
 import { NextResponse } from "next/server";
 
 // Deleting a school this way, rather than leaving it to whoever runs the
@@ -29,44 +30,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const admin = createAdminClient();
-
-  const { data: school } = await admin
-    .from("schools")
-    .select("id, name")
-    .eq("id", schoolId)
-    .single();
-  if (!school) {
-    return NextResponse.json({ error: "School not found" }, { status: 404 });
+  const result = await deleteSchoolAndAccounts(createAdminClient(), schoolId);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
-
-  // Every login this school's people have — admins, teachers, parents, and
-  // any student with a real PIN account — captured before the school row
-  // (and its cascade) removes the profiles pointing to them. auth.users
-  // isn't reachable from a cascade off `schools`, so those accounts would
-  // otherwise survive as orphans with the email permanently "taken".
-  const { data: peopleProfiles, error: profilesError } = await admin
-    .from("profiles")
-    .select("id")
-    .eq("school_id", schoolId);
-  if (profilesError) {
-    return NextResponse.json({ error: profilesError.message }, { status: 500 });
-  }
-
-  const { error: deleteError } = await admin.from("schools").delete().eq("id", schoolId);
-  if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
-  }
-
-  const accountErrors: string[] = [];
-  for (const { id } of peopleProfiles ?? []) {
-    const { error } = await admin.auth.admin.deleteUser(id);
-    if (error) accountErrors.push(error.message);
-  }
-
   return NextResponse.json({
-    deleted: school.name,
-    accountsRemoved: (peopleProfiles?.length ?? 0) - accountErrors.length,
-    accountErrors,
+    deleted: result.deleted,
+    accountsRemoved: result.accountsRemoved,
+    accountErrors: result.accountErrors,
   });
 }

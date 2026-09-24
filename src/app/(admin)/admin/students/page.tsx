@@ -28,6 +28,12 @@ export default function AdminStudentsPage() {
   // sign-in link was just copied.
   const [schoolSlug, setSchoolSlug] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Permanent deletion: which student's confirm box is open, what's been
+  // typed into it, and any error from the attempt.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
 
@@ -253,6 +259,23 @@ export default function AdminStudentsPage() {
     setEditingId(null);
   };
 
+  const deleteStudent = async (s: DemoStudent) => {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/students/${encodeURIComponent(s.id)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Couldn't delete the student");
+      setDeletingId(null);
+      setEditingId(null);
+      await loadRealStudents();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Couldn't delete the student");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   const filtered = students.filter((s) =>
     s.name.toLowerCase().includes(search.trim().toLowerCase())
   );
@@ -469,6 +492,56 @@ export default function AdminStudentsPage() {
                           Cancel
                         </button>
                       </div>
+
+                      {/* Deactivating (above) can be undone. This can't: it
+                          is for a family that has left and asked for the
+                          child's data to be removed, or a child's own
+                          request from their Account page. */}
+                      {!isDemo && (
+                        <div className="border-t border-surface-border pt-3">
+                          {deletingId !== s.id ? (
+                            <button
+                              type="button"
+                              onClick={() => { setDeletingId(s.id); setDeleteText(""); setDeleteError(null); }}
+                              className="text-[12px] font-semibold text-red-700 dark:text-red-300 hover:underline"
+                            >
+                              Delete permanently…
+                            </button>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-[12px] text-ink leading-relaxed">
+                                This deletes {s.name.split(" ")[0]}&apos;s record, attendance, lessons, plans, messages and
+                                sign-in for good. To keep their history, untick Active instead. Type{" "}
+                                <span className="font-semibold">{s.name}</span> to confirm.
+                              </p>
+                              <input
+                                value={deleteText}
+                                onChange={(e) => setDeleteText(e.target.value)}
+                                placeholder={s.name}
+                                className="w-full bg-surface-card border border-red-300 dark:border-red-800/60 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none"
+                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => deleteStudent(s)}
+                                  disabled={deleteBusy || deleteText.trim().toLowerCase() !== s.name.trim().toLowerCase()}
+                                  className="bg-red-700 text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-xl disabled:opacity-40"
+                                >
+                                  {deleteBusy ? "Deleting…" : "Delete permanently"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingId(null)}
+                                  className="text-[12.5px] font-semibold text-ink-muted hover:text-ink px-2"
+                                >
+                                  Keep
+                                </button>
+                              </div>
+                              {deleteError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{deleteError}</p>}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </li>

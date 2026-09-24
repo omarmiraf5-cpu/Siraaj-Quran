@@ -91,7 +91,9 @@ export default function TeacherMessagesPage() {
         // author_name isn't stored on the row itself (just author_id), so
         // it's resolved from profiles in one batch lookup rather than a
         // per-message query.
-        const authorIds = [...new Set((rows ?? []).map((r) => r.author_id))];
+        // A deleted account leaves its messages with no author; those show the
+      // role instead, so there is no name to look up.
+      const authorIds = [...new Set((rows ?? []).map((r) => r.author_id).filter(Boolean))];
         const { data: authorRows } =
           authorIds.length > 0
             ? await supabase.from("profiles").select("id, full_name").in("id", authorIds)

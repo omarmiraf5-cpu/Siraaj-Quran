@@ -72,7 +72,9 @@ export default function ParentMessagesPage() {
         )
         .order("created_at");
 
-      const authorIds = [...new Set((rows ?? []).map((r) => r.author_id))];
+      // A deleted account leaves its messages with no author; those show the
+      // role instead, so there is no name to look up.
+      const authorIds = [...new Set((rows ?? []).map((r) => r.author_id).filter(Boolean))];
       const { data: authorRows } =
         authorIds.length > 0
           ? await supabase.from("profiles").select("id, full_name").in("id", authorIds)

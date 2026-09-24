@@ -282,7 +282,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
 
 interface Notice {
   id: string;
-  kind: "absence_streak" | "staff_absence_report";
+  kind: "absence_streak" | "staff_absence_report" | "account_deleted" | "deletion_request";
   title: string;
   body: string;
   created_at: string;
