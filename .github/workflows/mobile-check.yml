@@ -1,0 +1,67 @@
+# Builds both apps whenever their files change, so a broken native project
+# shows up here rather than on release day. The Android job also leaves a
+# test APK to download from the run page and install on an Android phone.
+name: Mobile apps — build check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - "android/**"
+      - "mobile/**"
+      - "capacitor.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/mobile-*.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android (test APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx cap sync android
+      - name: Build
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyDiiwaan-test-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+  ios:
+    name: iOS (simulator build)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx cap sync ios
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -40
