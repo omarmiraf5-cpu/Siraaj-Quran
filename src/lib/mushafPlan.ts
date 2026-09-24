@@ -502,11 +502,39 @@ export function formatPosition(p: Position): string {
 /** "Page 78" or "Pages 78–79" — the number a teacher actually tells a
  *  student to turn to. A Surah/ayah range on its own still has to be
  *  looked up against a real mushaf before it means anything to open to;
- *  the page number is the instruction itself. */
+ *  the page number is the instruction itself.
+ *
+ *  Pages are listed in the order the student turns to them. Inside one
+ *  surah, or going forward, that is one unbroken run. Hifz order crosses
+ *  surahs backwards, though — the end of Al-Mulk on 564, then the start
+ *  of At-Tahrim on 560 — so that reads "Pages 564, 560": a plain first-to-
+ *  last "564–560" would take in three pages nobody is reading. */
 export function pageLabel(from: Position, to: Position): string {
-  const a = pageOfPosition(from);
-  const b = pageOfPosition(to);
-  return a === b ? `Page ${a}` : `Pages ${a}–${b}`;
+  const step = to.surah < from.surah ? -1 : 1;
+  const pages: number[] = [];
+  const seen = new Set<number>();
+  for (let id = from.surah; step > 0 ? id <= to.surah : id >= to.surah; id += step) {
+    const s = getSurahById(id);
+    if (!s) break;
+    const first = pageOfPosition({ surah: id, ayah: id === from.surah ? from.ayah : 1 });
+    const last = pageOfPosition({ surah: id, ayah: id === to.surah ? to.ayah : s.ayahs });
+    for (let p = first; p <= last; p++) {
+      if (!seen.has(p)) {
+        seen.add(p);
+        pages.push(p);
+      }
+    }
+  }
+  if (pages.length === 0) pages.push(pageOfPosition(from));
+  if (pages.length === 1) return `Page ${pages[0]}`;
+
+  const runs: [number, number][] = [];
+  for (const p of pages) {
+    const run = runs[runs.length - 1];
+    if (run && p === run[1] + 1) run[1] = p;
+    else runs.push([p, p]);
+  }
+  return `Pages ${runs.map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`)).join(", ")}`;
 }
 
 /* ── Daily rate ────────────────────────────────────────────────────────
