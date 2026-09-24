@@ -22,7 +22,7 @@ export default function PrivacyPage() {
       <p>
         MyDiiwaan is a portal for Qur&apos;an schools: the office, teachers, parents and students each use it to
         follow lessons, attendance and progress. This policy explains what information MyDiiwaan holds, why, who
-        can see it, and how to have it removed. It covers the website at mydiiwaan.com and the MyDiiwaan apps for
+        can see it, and how to have it removed. It covers the website at www.mydiiwaan.com and the MyDiiwaan apps for
         iPhone, iPad and Android, which show the same portal.
       </p>
 

@@ -4,4 +4,6 @@
     <string name="title_activity_main">MyDiiwaan</string>
     <string name="package_name">com.mydiiwaan.app</string>
     <string name="custom_url_scheme">com.mydiiwaan.app</string>
+    <!-- Shown in the staff sign-in card before the system location prompt. Kept here so the store rationale and the app say the same thing. -->
+    <string name="location_permission_rationale">MyDiiwaan uses your location only when you sign in or out as staff, to confirm you are at your school. It is not used in the background, and students and parents are never asked.</string>
 </resources>

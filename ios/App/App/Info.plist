@@ -25,7 +25,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>MyDiiwaan checks that you are at your school when you sign in or out as staff. Your location is only read at that moment.</string>
+	<string>MyDiiwaan uses your location only when you sign in or out as staff, to confirm you are at your school. It is not used in the background, and students and parents are never asked.</string>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

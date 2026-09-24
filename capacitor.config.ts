@@ -3,11 +3,13 @@ import type { CapacitorConfig } from "@capacitor/cli";
 /**
  * The MyDiiwaan app for iOS and Android.
  *
- * The app is the live portal in a native shell: it loads mydiiwaan.com, so a
- * change deployed to the site reaches the app at the same moment, with no
- * store resubmission. What the shell adds is native: the location check
- * behind staff sign-in, the splash screen and icon, system bars that follow
- * the app's theme, and an offline screen instead of a browser error.
+ * The app is the live portal in a native shell: it loads www.mydiiwaan.com
+ * (the canonical host; the bare domain 308-redirects there), so a change
+ * deployed to the site reaches the app at the same moment, with no store
+ * resubmission. What the shell adds, beyond a browser tab, is native: the
+ * location check behind staff sign-in, the splash screen and icon, system
+ * bars, pull-to-refresh, Android back navigation, and an offline screen
+ * instead of a browser error. See docs/app-store-release.md.
  *
  * Links to anywhere other than mydiiwaan.com (WhatsApp, email, a school's
  * own website) open in the phone's browser, not inside the app.
@@ -17,13 +19,16 @@ const config: CapacitorConfig = {
   appName: "MyDiiwaan",
   // Only the offline screen and a hand-off page live in the app itself.
   webDir: "mobile/www",
-  backgroundColor: "#0e2347",
+  backgroundColor: "#24272b",
   // Lets the site recognise the app (e.g. in request logs) without sniffing.
   appendUserAgent: "MyDiiwaanApp",
   server: {
-    url: "https://mydiiwaan.com",
-    // Both spellings of the domain stay inside the app, so a redirect from
-    // one to the other doesn't bounce the user out to the browser.
+    // Load the canonical host directly. A 308 from the bare domain to www
+    // used to flash a redirect (and could leave the WebView on the wrong
+    // host) before the portal appeared.
+    url: "https://www.mydiiwaan.com",
+    // Both spellings stay inside the app, so any leftover link to the bare
+    // domain does not bounce the user out to the browser.
     allowNavigation: ["mydiiwaan.com", "www.mydiiwaan.com"],
     errorPath: "offline.html",
   },
