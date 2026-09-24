@@ -48,6 +48,7 @@ import {
   DIRECTION_LABEL,
   formatPosition,
   nextPosition,
+  pageOfPosition,
   walk,
   type Direction,
 } from "@/lib/mushafPlan";
@@ -1070,7 +1071,15 @@ export default function QuranAssignmentsPage() {
               </h2>
               <div className="gold-rule my-4" />
               <Mushaf
-                initialPage={selectedSurahData?.startPage ?? 1}
+                // Open on the page the lesson starts on, and move there
+                // again when the starting ayah changes. Mushaf only reads
+                // initialPage when it mounts, so the key remounts it; the
+                // end ayah only redraws the highlight, which needs no jump.
+                key={`${selectedSurah}:${ayahStart}`}
+                initialPage={pageOfPosition({
+                  surah: parseInt(selectedSurah),
+                  ayah: parseInt(ayahStart) || 1,
+                })}
                 highlightedRange={{
                   surah: parseInt(selectedSurah),
                   start: parseInt(ayahStart),

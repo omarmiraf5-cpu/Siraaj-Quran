@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSurahById } from "@/data/mushaf-index";
 import { Mushaf } from "@/components/Mushaf";
+import { pageOfPosition } from "@/lib/mushafPlan";
 import {
   formatDay,
   dueLabel,
@@ -289,7 +290,10 @@ export default function ParentQuranProgressPage() {
                         </button>
                       </div>
                       <Mushaf
-                        initialPage={surah?.startPage ?? 1}
+                        // Open on the page the portion starts on, not the
+                        // surah's first page — Al-Baqarah 275 is page 47,
+                        // and opening on page 2 hid the highlight entirely.
+                        initialPage={pageOfPosition({ surah: a.surah, ayah: a.ayah_start })}
                         highlightedRange={{
                           surah: a.surah,
                           start: a.ayah_start,
