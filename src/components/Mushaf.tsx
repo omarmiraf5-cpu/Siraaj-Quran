@@ -542,8 +542,19 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
 
       // A dead candidate (missing bitrate or wrong edition id) 404s here —
       // fall through to the next one rather than giving up on the reciter.
-      audio.addEventListener("error", () => attempt(n + 1), { once: true });
-      audio.play().catch(() => attempt(n + 1));
+      // A 404 reports twice, as the element's error event and as play()'s
+      // rejection, and following both started the next source twice: two
+      // copies of the ayah over each other, one of them beyond the reach of
+      // pause. Only the first report moves on, and only while this is still
+      // the audio in play — not after the reader has tapped another ayah.
+      let movedOn = false;
+      const next = () => {
+        if (movedOn || audioRef.current !== audio) return;
+        movedOn = true;
+        attempt(n + 1);
+      };
+      audio.addEventListener("error", next, { once: true });
+      audio.play().catch(next);
     };
 
     attempt(0);
