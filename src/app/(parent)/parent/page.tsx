@@ -30,10 +30,12 @@ import { IconBook, IconChart, IconCalendar, IconArrow } from "@/components/icons
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { useLanguage } from "@/components/LanguageProvider";
+import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
   const { t, language } = useLanguage();
+  const { mode: noticeMode, api: noticeApi } = useAttendanceApi("parent");
 
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
@@ -108,6 +110,10 @@ export default function ParentDashboard() {
           </>
         }
       />
+
+      {/* The school's notices for this family — a child absent five school
+          days in a row — until the parent dismisses them. */}
+      {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
 
       {/* Which child. A parent with one child never sees this. */}
       {children.length > 1 && (

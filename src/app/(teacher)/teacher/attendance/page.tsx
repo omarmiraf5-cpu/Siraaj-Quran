@@ -21,6 +21,17 @@ import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { LoadingNote } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
+import { demoAttendanceFetch } from "@/lib/demoAttendance";
+import { PlanAlertBanner } from "@/components/yearly-plan-ui";
+
+/** A child whose absences just reached a run long enough to tell home about. */
+interface LongAbsence {
+  student_id: string;
+  name: string;
+  count: number;
+  parents_notified: number;
+  newly_notified: boolean;
+}
 
 const MARKS: {
   status: AttendanceStatus;
@@ -36,8 +47,10 @@ const MARKS: {
   { status: "excused", letterKey: "common.excusedLetter", on: "bg-slate-600 border-slate-600 text-white", off: "hover:border-slate-600 hover:text-slate-700", dot: "bg-slate-500", num: "text-slate-700 dark:text-slate-300" },
 ];
 
+/** Today on the teacher's own device — not toISOString(), which is the UTC
+ *  date and turns an evening register in Edmonton into tomorrow's. */
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString("en-CA");
 }
 
 export default function TeacherAttendancePage() {
@@ -58,6 +71,7 @@ export default function TeacherAttendancePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [longAbsences, setLongAbsences] = useState<LongAbsence[]>([]);
 
   // Merged with whatever the admin portal has added, so a newly enrolled
   // student shows up on today's register without a page reload elsewhere.
@@ -134,49 +148,23 @@ export default function TeacherAttendancePage() {
   const remaining = students.length - marked;
 
   const saveAttendance = async () => {
-    if (isDemo) {
-      setSaved(true);
-      return;
-    }
-
     setSaving(true);
     setError(null);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error(t("teacher.attendance.signedOut"));
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("school_id")
-        .eq("id", user.id)
-        .single();
-
-      // Replace today's rows rather than upsert against the unique
-      // constraint: class_id is null for every row here (no halaqa
-      // filtering yet), and Postgres never treats two nulls as equal for
-      // uniqueness — an upsert wouldn't find today's existing rows to
-      // update, it would just pile up duplicates on every re-save.
-      const { error: deleteError } = await supabase
-        .from("attendance")
-        .delete()
-        .eq("teacher_id", user.id)
-        .eq("class_date", today);
-      if (deleteError) throw deleteError;
-
-      const rows = Object.entries(records).map(([student_id, status]) => ({
-        student_id,
-        class_date: today,
-        status,
-        teacher_id: user.id,
-        school_id: profile?.school_id,
-      }));
-
-      if (rows.length > 0) {
-        const { error: insertError } = await supabase.from("attendance").insert(rows);
-        if (insertError) throw insertError;
-      }
+      // Saved through the server — which also works out whether any child
+      // has now been absent five school days in a row and, if so, tells
+      // their parents and the office. The sample portal answers the same
+      // request in the browser.
+      const send = isDemo ? demoAttendanceFetch("teacher") : fetch;
+      const res = await send("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: today, records }),
+      });
+      const body = await res.json();
+      if (res.status === 401) throw new Error(t("teacher.attendance.signedOut"));
+      if (!res.ok) throw new Error(body.error ?? t("teacher.attendance.saveFailed"));
+      setLongAbsences(Array.isArray(body.alerts) ? body.alerts : []);
 
       setHistory((h) => {
         const next = { ...h };
@@ -278,6 +266,21 @@ export default function TeacherAttendancePage() {
           );
         })}
       </div>
+
+      {longAbsences.map((a) => (
+        <PlanAlertBanner
+          key={a.student_id}
+          level="critical"
+          title={`${a.name} has now been absent ${a.count} school days in a row`}
+          detail={
+            a.newly_notified
+              ? a.parents_notified > 0
+                ? "Their parents and the office have been sent a notice in the portal."
+                : "The office has been sent a notice. No parent account is linked to this student, so please call the family."
+              : "Their parents and the office were already notified about this run of absences."
+          }
+        />
+      ))}
 
       {error && (
         <div className="bg-red-50 dark:bg-red-950/25 border border-red-200 dark:border-red-800/40 rounded-2xl p-4">

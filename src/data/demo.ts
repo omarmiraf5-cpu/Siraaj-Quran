@@ -160,7 +160,9 @@ const DAYS = [
 // rather than everyone looking identical.
 const PATTERNS: Record<string, AttendanceStatus[]> = {
   s1: ["present","present","present","present","late","present","present","present","present","present","present","present","absent","present","present","present","late","present","present","present"],
-  s2: ["present","late","present","absent","present","present","late","present","present","excused","present","present","present","late","present","present","present","present","absent","present"],
+  // Omar's last five school days are all absences — the run that sends his
+  // parent and the office a notice, so the sample portal shows it.
+  s2: ["absent","absent","absent","absent","absent","present","late","present","present","excused","present","present","present","late","present","present","present","present","absent","present"],
   s3: ["present","present","present","present","present","present","present","present","present","present","present","present","present","present","present","late","present","present","present","present"],
   s4: ["absent","absent","late","present","present","late","present","absent","present","present","late","present","present","present","absent","present","present","late","present","present"],
   s5: ["present","present","late","present","present","present","excused","excused","present","present","present","late","present","present","present","present","present","absent","present","late"],

@@ -33,6 +33,7 @@ import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 
 type ReviewItem = { id: string; halaqaName: string };
 type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: string | null };
@@ -40,6 +41,7 @@ type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: 
 export default function AdminDashboard() {
   const supabase = createClient();
   const { t, language } = useLanguage();
+  const { mode: noticeMode, api: noticeApi } = useAttendanceApi("admin");
   const [ready, setReady] = useState(false);
 
   const [school, setSchool] = useState({
@@ -213,6 +215,10 @@ export default function AdminDashboard() {
           `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
         ]}
       />
+
+      {/* Notices the portal raised on its own — a child absent five school
+          days running, a teacher reporting an absence. */}
+      {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile value={activeStudentCount} label={t("nav.students")} sub={`${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`} />

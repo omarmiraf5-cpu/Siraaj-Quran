@@ -31,6 +31,7 @@ import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
+import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
@@ -61,6 +62,7 @@ export default function TeacherDashboard() {
   const supabase = createClient();
   const { t, language } = useLanguage();
   const demoUser = useDemoUser();
+  const { mode: staffMode, api: staffApi } = useAttendanceApi("teacher");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [drilldown, setDrilldown] = useState<DrilldownView | null>(null);
 
@@ -199,6 +201,10 @@ export default function TeacherDashboard() {
           </>
         }
       />
+
+      {/* Signing in on arrival — the first thing a teacher does, so it sits
+          straight under the greeting rather than on a page of its own. */}
+      {staffMode !== "loading" && <SignInCard api={staffApi} />}
 
       {/* At a glance — each number carries the context that makes it mean
           something, and opens the list it is counting. Opening a list is a

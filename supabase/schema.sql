@@ -483,19 +483,12 @@ end $$;
 create unique index if not exists quranic_assignments_auto_one_per_day
   on quranic_assignments(student_id, due_date)
   where portion = 'new' and source = 'auto';
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'quranic_assignments_surah_end_check'
-  ) then
-    alter table quranic_assignments
-      add constraint quranic_assignments_surah_end_check
-      check (surah_end between surah and 114);
-  end if;
-end $$;
--- The two constraints above (plus the table's own unnamed "surah_end
--- between surah and 114" and "ayah_end >= ayah_start" checks, from before
--- either had an explicit name) all assume an *ascending* walk — true for
+-- Earlier builds constrained surah_end to "between surah and 114" (added
+-- here by name, and as the table's own unnamed checks alongside "ayah_end
+-- >= ayah_start"). It is no longer added at all: re-adding it on every run
+-- only to drop it again below failed outright the moment the table held a
+-- single hifz lesson crossing into an earlier surah. Those checks all
+-- assume an *ascending* walk — true for
 -- a "forward" lesson, false for a "hifz" one, where the walk moves toward
 -- *lower* surah numbers and, inside the surah it lands in, potentially a
 -- lower ayah too. A lesson that starts at Al-Falaq 4 and reaches into
@@ -1368,3 +1361,144 @@ create policy "Admins can manage their school's calendar" on school_calendar_day
 
 create index if not exists idx_school_calendar_days_school_date
   on school_calendar_days(school_id, date);
+
+-- ══════════════════════════════════════
+-- Staff attendance: signing in on the premises
+-- ══════════════════════════════════════
+-- Where the school is, so a teacher's sign-in can be checked against it.
+-- Set by an admin standing on the premises ("use my current location") or
+-- typed in from a map. Null until then, and signing in is refused until it
+-- is set — there is nothing to check a location against.
+alter table schools add column if not exists latitude double precision;
+alter table schools add column if not exists longitude double precision;
+-- How far from that point still counts as "on the premises", in metres.
+alter table schools add column if not exists geofence_radius_m int not null default 150;
+-- When staff are due in, in the school's own time zone, and how many
+-- minutes after that a sign-in still counts as on time.
+alter table schools add column if not exists staff_start_time time not null default '09:00';
+alter table schools add column if not exists staff_late_grace_minutes int not null default 5;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'schools_location_valid') then
+    alter table schools add constraint schools_location_valid check (
+      (latitude is null and longitude is null)
+      or (latitude between -90 and 90 and longitude between -180 and 180)
+    );
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'schools_geofence_radius_valid') then
+    alter table schools add constraint schools_geofence_radius_valid
+      check (geofence_radius_m between 25 and 2000);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'schools_late_grace_valid') then
+    alter table schools add constraint schools_late_grace_valid
+      check (staff_late_grace_minutes between 0 and 120);
+  end if;
+end $$;
+
+-- One row per teacher per day they signed in. A day with no row is an
+-- absence — worked out when the register is read, against the school
+-- calendar and any absence the teacher reported, not stored.
+--
+-- Nobody can write these rows from the browser, teachers included: there
+-- is deliberately no insert or update policy below. Every sign-in goes
+-- through /api/staff-attendance, which checks the teacher is on the
+-- premises before the server writes the row. If teachers could insert
+-- their own rows directly, the location check would be a suggestion.
+--
+-- The teacher's own coordinates are not kept — only how far from the
+-- school they were and how precise their phone said the fix was, which is
+-- all a disputed sign-in ever needs.
+create table if not exists staff_attendance (
+  id                  uuid primary key default gen_random_uuid(),
+  school_id           uuid not null references schools(id) on delete cascade,
+  teacher_id          uuid not null references profiles(id) on delete cascade,
+  work_date           date not null,
+  signed_in_at        timestamptz,
+  signed_out_at       timestamptz,
+  sign_in_distance_m  int,
+  sign_in_accuracy_m  int,
+  sign_out_distance_m int,
+  sign_out_accuracy_m int,
+  -- The office's correction for a day the sign-in could not happen as it
+  -- should (a phone with no location, a forgotten sign-out). Wins over
+  -- whatever the sign-in times alone would say.
+  override_status     text check (override_status in ('present', 'late', 'absent', 'excused')),
+  override_note       text check (char_length(override_note) <= 500),
+  override_by         uuid references profiles(id) on delete set null,
+  created_at          timestamptz default now(),
+  constraint staff_attendance_one_per_day unique (teacher_id, work_date)
+);
+alter table staff_attendance enable row level security;
+
+drop policy if exists "Teachers can read own staff attendance" on staff_attendance;
+create policy "Teachers can read own staff attendance" on staff_attendance
+  for select using (teacher_id = auth.uid());
+drop policy if exists "Admins can read staff attendance in their school" on staff_attendance;
+create policy "Admins can read staff attendance in their school" on staff_attendance
+  for select using (school_id = my_school_id() and my_role() = 'admin');
+
+create index if not exists idx_staff_attendance_school_date
+  on staff_attendance(school_id, work_date);
+
+-- A teacher telling the office ahead of time (or on the morning) that they
+-- will not be in. A day covered by one reads as a reported absence rather
+-- than a no-show. Written through /api/staff-absence, which also lets the
+-- office know.
+create table if not exists staff_absence_reports (
+  id            uuid primary key default gen_random_uuid(),
+  school_id     uuid not null references schools(id) on delete cascade,
+  teacher_id    uuid not null references profiles(id) on delete cascade,
+  from_date     date not null,
+  to_date       date not null,
+  reason        text not null check (reason in ('sick', 'family', 'travel', 'other')),
+  note          text check (char_length(note) <= 500),
+  cancelled_at  timestamptz,
+  created_at    timestamptz default now(),
+  constraint staff_absence_reports_range check (to_date >= from_date and to_date - from_date <= 60)
+);
+alter table staff_absence_reports enable row level security;
+
+drop policy if exists "Teachers can read own absence reports" on staff_absence_reports;
+create policy "Teachers can read own absence reports" on staff_absence_reports
+  for select using (teacher_id = auth.uid());
+drop policy if exists "Admins can read absence reports in their school" on staff_absence_reports;
+create policy "Admins can read absence reports in their school" on staff_absence_reports
+  for select using (school_id = my_school_id() and my_role() = 'admin');
+
+create index if not exists idx_staff_absence_reports_school
+  on staff_absence_reports(school_id, from_date);
+
+-- ══════════════════════════════════════
+-- Notifications
+-- ══════════════════════════════════════
+-- Notices the portal raises on its own — a child absent five school days
+-- in a row, a teacher reporting an absence — shown to whoever they are for
+-- until they dismiss them. Written only by the server; a recipient can
+-- read their own and mark them read.
+--
+-- dedupe_key stops the same event notifying the same person twice: one
+-- run of absences is one notice, however many more days it goes on.
+create table if not exists notifications (
+  id            uuid primary key default gen_random_uuid(),
+  school_id     uuid not null references schools(id) on delete cascade,
+  recipient_id  uuid not null references profiles(id) on delete cascade,
+  student_id    uuid references students(id) on delete cascade,
+  kind          text not null check (kind in ('absence_streak', 'staff_absence_report')),
+  title         text not null,
+  body          text not null,
+  dedupe_key    text,
+  read_at       timestamptz,
+  created_at    timestamptz default now(),
+  constraint notifications_once unique (recipient_id, dedupe_key)
+);
+alter table notifications enable row level security;
+
+drop policy if exists "Recipients can read own notifications" on notifications;
+create policy "Recipients can read own notifications" on notifications
+  for select using (recipient_id = auth.uid());
+drop policy if exists "Recipients can mark own notifications read" on notifications;
+create policy "Recipients can mark own notifications read" on notifications
+  for update using (recipient_id = auth.uid()) with check (recipient_id = auth.uid());
+
+create index if not exists idx_notifications_recipient
+  on notifications(recipient_id, created_at desc);
