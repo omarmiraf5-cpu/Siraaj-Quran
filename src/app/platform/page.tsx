@@ -44,6 +44,8 @@ export default function PlatformPage() {
   const [confirmText, setConfirmText] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Per school: a welcome email being re-sent, and how that went.
+  const [welcome, setWelcome] = useState<Record<string, { sending: boolean; ok?: boolean; message?: string }>>({});
 
   useEffect(() => {
     fetch("/api/platform/schools")
@@ -95,6 +97,19 @@ export default function PlatformPage() {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete school");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const sendWelcome = async (school: School) => {
+    setWelcome((prev) => ({ ...prev, [school.id]: { sending: true } }));
+    try {
+      const res = await fetch(`/api/platform/schools/${school.id}/welcome`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "The welcome email didn't send");
+      setWelcome((prev) => ({ ...prev, [school.id]: { sending: false, ok: true, message: `Welcome email sent to ${data.sentTo}.` } }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "The welcome email didn't send";
+      setWelcome((prev) => ({ ...prev, [school.id]: { sending: false, ok: false, message } }));
     }
   };
 
@@ -232,7 +247,17 @@ export default function PlatformPage() {
                           {s.active ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-end">
+                      <td className="px-5 py-4 text-end whitespace-nowrap">
+                        {s.adminContact && (
+                          <button
+                            type="button"
+                            onClick={() => sendWelcome(s)}
+                            disabled={welcome[s.id]?.sending}
+                            className="text-[11px] font-semibold text-ink hover:underline disabled:opacity-50 me-4"
+                          >
+                            {welcome[s.id]?.sending ? "Sending…" : "Send welcome email"}
+                          </button>
+                        )}
                         {confirmingId !== s.id && (
                           <button
                             type="button"
@@ -244,6 +269,20 @@ export default function PlatformPage() {
                         )}
                       </td>
                     </tr>
+                    {welcome[s.id]?.message && (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className={`px-5 py-3 text-[12px] ${
+                            welcome[s.id].ok
+                              ? "bg-status-success-bg text-status-success-text"
+                              : "bg-status-error-bg/40 text-status-error-text"
+                          }`}
+                        >
+                          {welcome[s.id].message}
+                        </td>
+                      </tr>
+                    )}
                     {confirmingId === s.id && (
                       <tr>
                         <td colSpan={8} className="px-5 py-4 bg-status-error-bg/40">

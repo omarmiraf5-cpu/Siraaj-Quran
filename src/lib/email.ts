@@ -42,20 +42,23 @@ export interface OutgoingEmail {
   text: string;
 }
 
+export type EmailResult = { ok: true } | { ok: false; reason: string };
+
 /**
  * Sends one email through Resend's API.
  *
  * Never throws. Every email MyDiiwaan sends is about something that has
  * already happened, so a missing RESEND_API_KEY, Resend being down or
- * refusing the message, even a bug in `build`, is only logged — under
- * `what`, to say which email it was.
+ * refusing the message, even a bug in `build`, is logged under `what` (to
+ * say which email it was) and handed back as a reason, for a caller that
+ * has someone to show it to.
  */
-export async function sendEmail(what: string, build: () => OutgoingEmail): Promise<void> {
+export async function sendEmail(what: string, build: () => OutgoingEmail): Promise<EmailResult> {
   try {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       console.warn(`${what}: not sent, because RESEND_API_KEY isn't set.`);
-      return;
+      return { ok: false, reason: "RESEND_API_KEY isn't set on the server." };
     }
     const email = build();
     const response = await fetch("https://api.resend.com/emails", {
@@ -72,9 +75,15 @@ export async function sendEmail(what: string, build: () => OutgoingEmail): Promi
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
-      console.error(`${what}: refused by Resend: ${response.status} ${await response.text()}`);
+      const body = await response.text();
+      console.error(`${what}: refused by Resend: ${response.status} ${body}`);
+      let message = body;
+      try { message = JSON.parse(body).message ?? body; } catch { /* not JSON: the raw text will do */ }
+      return { ok: false, reason: `Resend refused it: ${message}` };
     }
+    return { ok: true };
   } catch (error) {
     console.error(`${what}: failed:`, error);
+    return { ok: false, reason: `Couldn't send it: ${error instanceof Error ? error.message : String(error)}` };
   }
 }

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { emailButton, emailLayout, escapeHtml, sendEmail } from "@/lib/email";
+import { emailButton, emailLayout, escapeHtml, sendEmail, type EmailResult } from "@/lib/email";
 import { NEW_SCHOOL_ALERT_EMAIL, SITE_URL } from "@/lib/site";
 
 /** What the owner is told about a school that has just finished signing up. */
@@ -78,7 +78,7 @@ export function newSchoolAlertEmail(school: NewSchool) {
 }
 
 /** Emails the owner that a school has signed up. Never throws (see sendEmail). */
-export function sendNewSchoolAlert(school: NewSchool): Promise<void> {
+export function sendNewSchoolAlert(school: NewSchool): Promise<EmailResult> {
   return sendEmail(`New-school email for "${school.name}"`, () => ({
     // Resend's shared sender works before any domain is verified with
     // them — but only to the account's own address, which is why the

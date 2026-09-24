@@ -1,6 +1,6 @@
 import "server-only";
 
-import { emailButton, emailLayout, escapeHtml, sendEmail } from "@/lib/email";
+import { emailButton, emailLayout, escapeHtml, sendEmail, type EmailResult } from "@/lib/email";
 import { EMAIL_FROM, SITE_URL, SUPPORT_EMAIL } from "@/lib/site";
 
 /** The school a new admin has just finished setting up. */
@@ -108,7 +108,7 @@ export function schoolWelcomeEmail(school: WelcomedSchool) {
 }
 
 /** Emails a school's new admin their welcome. Never throws (see sendEmail). */
-export function sendSchoolWelcome(school: WelcomedSchool): Promise<void> {
+export function sendSchoolWelcome(school: WelcomedSchool): Promise<EmailResult> {
   return sendEmail(`Welcome email for "${school.name}"`, () => ({
     from: EMAIL_FROM,
     to: school.adminEmail,
