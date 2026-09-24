@@ -12,6 +12,7 @@ import { DEMO_ACCOUNTS } from "@/lib/demo";
 import { SHOW_DEMO_LOGINS } from "@/lib/demoMode";
 import type { Role } from "@/lib/types";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
+import { safeNextPath } from "@/lib/safeNextPath";
 
 const ROLES: { key: Role; labelKey: string; portalKey: string }[] = [
   { key: "parent",  labelKey: "role.parent",  portalKey: "login.portal.parent"  },
@@ -122,15 +123,21 @@ export default function LoginPage() {
     });
   }, [loadRoster]);
 
+  // Where to go once signed in: the page a link asked to come back to (the
+  // platform page sends its owner here with ?next=/platform), or else the
+  // person's own portal.
+  const destination = (ownRole: string) =>
+    safeNextPath(new URLSearchParams(window.location.search).get("next")) ?? `/${ownRole}`;
+
   // Already signed in — the app reopening, or a return visit — goes straight
-  // to that person's own portal instead of asking for the password again.
+  // on instead of asking for the password again.
   useEffect(() => {
     let cancelled = false;
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user || cancelled) return;
       if (user.user_metadata?.must_change_password) { router.replace("/change-password"); return; }
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      if (!cancelled && profile?.role) router.replace(`/${profile.role}`);
+      if (!cancelled && profile?.role) router.replace(destination(profile.role));
     }).catch(() => {});
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,14 +208,15 @@ export default function LoginPage() {
       router.push("/change-password");
       return;
     }
-    // Their own portal, whichever tab happened to be selected.
+    // Their own portal (or the page the link asked for), whichever tab
+    // happened to be selected.
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, school_id")
       .eq("id", data.user?.id ?? "")
       .single();
     rememberSchool(profile?.school_id).catch(() => {});
-    router.push(`/${profile?.role ?? role}`);
+    router.push(destination(profile?.role ?? role));
   };
 
   // Appending through the updater rather than off the rendered value: a

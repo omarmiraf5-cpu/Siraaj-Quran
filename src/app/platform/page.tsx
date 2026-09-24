@@ -2,6 +2,8 @@
 
 import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 interface School {
   id: string;
@@ -28,8 +30,14 @@ function formatDate(iso: string) {
 }
 
 export default function PlatformPage() {
+  const router = useRouter();
+  const supabase = createClient();
   const [schools, setSchools] = useState<School[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set when the list was refused: nobody signed in (401), or someone who
+  // isn't the platform owner (403, with their email), so the page can offer
+  // to sign in as the owner instead of dead-ending.
+  const [refused, setRefused] = useState<{ status: 401 | 403; email: string | null } | null>(null);
   // The school whose row has its confirm-delete UI open, what's been typed
   // to confirm it, and whether the delete request for it is in flight.
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -40,12 +48,26 @@ export default function PlatformPage() {
   useEffect(() => {
     fetch("/api/platform/schools")
       .then(async (res) => {
+        if (res.status === 401 || res.status === 403) {
+          const { data } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+          setRefused({ status: res.status, email: data.user?.email ?? null });
+          return;
+        }
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load schools");
         setSchools(data.schools);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load schools"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Out of whichever account this is, then back here once signed in.
+  const signInAsOwner = async () => {
+    try { localStorage.removeItem("demo_user"); } catch { /* private mode */ }
+    document.cookie = "demo_mode=; path=/; max-age=0";
+    await supabase.auth.signOut().catch(() => {});
+    router.push("/login?next=/platform");
+  };
 
   const startConfirm = (id: string) => {
     setConfirmingId(id);
@@ -103,17 +125,46 @@ export default function PlatformPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {error && (
-          <div className="card-quiet p-6 text-center space-y-2">
-            <p className="text-status-error-text font-semibold">{error}</p>
-            <p className="text-ink-muted text-sm">
-              This page is restricted to the platform operator. If you believe this is a mistake, make sure your
-              account has <code className="text-ink">is_platform_admin</code> set in Supabase.
+        {refused && (
+          <div className="card-quiet p-8 text-center space-y-3 max-w-xl mx-auto">
+            <p className="text-ink font-semibold">
+              {refused.status === 401 ? "Sign in to see all schools" : "This page is for the platform owner"}
             </p>
+            <p className="text-ink-muted text-sm">
+              {refused.status === 401 ? (
+                "Use the account that's set up as the platform owner."
+              ) : refused.email ? (
+                <>
+                  You&apos;re signed in as <strong className="text-ink">{refused.email}</strong>, which isn&apos;t
+                  the platform owner&apos;s account.
+                </>
+              ) : (
+                "The account you're signed in with isn't the platform owner's."
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={signInAsOwner}
+              className="inline-block mt-1 bg-brand-navy text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all"
+            >
+              {refused.status === 401 ? "Sign in" : "Sign in with another account"}
+            </button>
+            {refused.status === 403 && (
+              <p className="text-ink-muted text-xs pt-1">
+                If this is your own account, make sure it has <code className="text-ink">is_platform_admin</code> set
+                in Supabase.
+              </p>
+            )}
           </div>
         )}
 
-        {!error && !schools && <p className="text-ink-muted text-sm">Loading…</p>}
+        {error && (
+          <div className="card-quiet p-6 text-center space-y-2">
+            <p className="text-status-error-text font-semibold">{error}</p>
+          </div>
+        )}
+
+        {!error && !refused && !schools && <p className="text-ink-muted text-sm">Loading…</p>}
 
         {!error && schools && schools.length === 0 && (
           <div className="card-quiet p-8 text-center space-y-3">
