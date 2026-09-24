@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
+import { createClient } from "@/lib/supabase/client";
+import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 
 // Which weekdays carry Qur'an instruction, and which specific dates are
 // closed. Every yearly plan's pace figures and behind-schedule alerts read
@@ -31,6 +33,48 @@ const ghostBtn =
 const inputClass =
   "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
 
+// The sample portal has no school behind it, so its calendar lives in the
+// browser, answering the same requests /api/school-calendar does. Without
+// this the page opened on "Unauthorized" in front of every prospect.
+const DEMO_CALENDAR_KEY = "demo_school_calendar_v1";
+const DEMO_CALENDAR = {
+  weekdays: [1, 2, 3, 4, 5],
+  closedDates: [
+    { id: "demo-closed-1", date: "2026-08-31", label: "Staff training day" },
+    { id: "demo-closed-2", date: "2026-10-12", label: "Thanksgiving" },
+  ] as ClosedDate[],
+};
+
+async function demoCalendarFetch(input: string, init?: RequestInit): Promise<Response> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const store = readDemoStore(DEMO_CALENDAR_KEY, DEMO_CALENDAR);
+  const reply = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  if (method === "GET") return reply(store);
+  if (method === "PATCH") {
+    store.weekdays = JSON.parse(String(init?.body)).weekdays;
+    writeDemoStore(DEMO_CALENDAR_KEY, store);
+    return reply({ weekdays: store.weekdays });
+  }
+  if (method === "POST") {
+    if (!(typeof init?.body === "string")) {
+      return reply({ error: "Uploading a file isn't available in the sample portal — add a date below instead." }, 400);
+    }
+    const { date, label } = JSON.parse(init.body);
+    const added = { id: `demo-closed-${Date.now().toString(36)}`, date, label };
+    store.closedDates = mergeById(store.closedDates, [added]);
+    writeDemoStore(DEMO_CALENDAR_KEY, store);
+    return reply({ added: [added] });
+  }
+  if (method === "DELETE") {
+    const id = new URL(input, "http://demo.local").searchParams.get("id");
+    store.closedDates = store.closedDates.filter((d) => d.id !== id);
+    writeDemoStore(DEMO_CALENDAR_KEY, store);
+    return reply({ ok: true });
+  }
+  return reply({ error: "Not available in the sample portal" }, 404);
+}
+
 function mergeById(prev: ClosedDate[], added: ClosedDate[]): ClosedDate[] {
   const byId = new Map(prev.map((d) => [d.id, d]));
   for (const d of added) byId.set(d.id, d);
@@ -53,12 +97,21 @@ export default function AdminCalendarPage() {
   const [addingDate, setAddingDate] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
+  // Which fetch this page talks through — decided once, before anything loads.
+  const demo = useRef(false);
+  const api = (input: string, init?: RequestInit) =>
+    demo.current ? demoCalendarFetch(input, init) : fetch(input, init);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/school-calendar");
+        const {
+          data: { user },
+        } = await createClient().auth.getUser();
+        demo.current = !user;
+        const res = await api("/api/school-calendar");
         const payload = await res.json();
         if (!res.ok) throw new Error(payload.error || "Couldn't load the school calendar.");
         setWeekdays(payload.weekdays);
@@ -85,7 +138,7 @@ export default function AdminCalendarPage() {
     setSavingWeekdays(true);
     setError(null);
     try {
-      const res = await fetch("/api/school-calendar", {
+      const res = await api("/api/school-calendar", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ weekdays: next }),
@@ -108,7 +161,7 @@ export default function AdminCalendarPage() {
     try {
       const body = new FormData();
       body.append("file", file);
-      const res = await fetch("/api/school-calendar", { method: "POST", body });
+      const res = await api("/api/school-calendar", { method: "POST", body });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || "Couldn't read that file.");
       const added: ClosedDate[] = payload.added;
@@ -126,7 +179,7 @@ export default function AdminCalendarPage() {
     setAddingDate(true);
     setAddError(null);
     try {
-      const res = await fetch("/api/school-calendar", {
+      const res = await api("/api/school-calendar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: newDate, label: newLabel.trim() || null }),
@@ -148,7 +201,7 @@ export default function AdminCalendarPage() {
     const prev = closedDates;
     setClosedDates(closedDates.filter((d) => d.id !== id));
     try {
-      const res = await fetch(`/api/school-calendar?id=${id}`, { method: "DELETE" });
+      const res = await api(`/api/school-calendar?id=${id}`, { method: "DELETE" });
       if (!res.ok) {
         const payload = await res.json();
         throw new Error(payload.error || "Couldn't remove that date.");
