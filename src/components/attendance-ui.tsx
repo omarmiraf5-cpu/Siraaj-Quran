@@ -257,6 +257,12 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
         </div>
       </div>
 
+      {(canSignIn || canSignOut) && (
+        <p className="text-[12px] text-ink-muted mt-3 leading-relaxed">
+          This checks your location once, only to confirm you are at the school. The map pin is not kept.
+          Students and parents are never asked.
+        </p>
+      )}
       {!settings.configured && (
         <p className="text-[12.5px] text-amber-800 dark:text-amber-300 mt-3">
           Signing in isn&apos;t switched on yet — the office needs to set the school&apos;s location first.

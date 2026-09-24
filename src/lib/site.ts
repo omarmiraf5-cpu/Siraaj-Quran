@@ -4,7 +4,14 @@
  * everywhere.
  */
 export const SUPPORT_EMAIL = "omar.miraf5@gmail.com";
-export const SITE_URL = "https://mydiiwaan.com";
+/**
+ * Canonical origin. The bare host (https://mydiiwaan.com) 308-redirects here
+ * at the edge (Cloudflare CNAME to Vercel). Email links, metadata and store
+ * listings should use this origin. Supabase Auth → URL Configuration must
+ * use the same Site URL; that setting lives in the Supabase dashboard, not
+ * in this repo. See docs/app-store-release.md.
+ */
+export const SITE_URL = "https://www.mydiiwaan.com";
 export const PRIVACY_UPDATED = "24 September 2026";
 
 /**

@@ -7,7 +7,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Push notifications are not part of 1.0. Do not request notification
+        // permission until a provider is chosen; add @capacitor/push-notifications
+        // and the Push Notifications capability then. The shell does not need
+        // to change for that.
         return true
     }
 
