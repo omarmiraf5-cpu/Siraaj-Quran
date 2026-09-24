@@ -18,6 +18,7 @@ import {
 } from "@/components/yearly-plan-ui";
 import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
 import { usePortalRoster } from "@/hooks/usePortalRoster";
+import { DEMO_PLAN_TODAY, demoPlanFetch } from "@/lib/demoPlans";
 import {
   formatApprox,
   formatQuantity,
@@ -63,6 +64,13 @@ interface PlanPayload {
 
 export default function ParentYearlyPlanPage() {
   const { mode, students: children } = usePortalRoster();
+  // The sample portal answers these requests in the browser from the
+  // sample school's plans — see demoPlans.ts.
+  const api = useCallback(
+    (input: string, init?: RequestInit) =>
+      mode === "demo" ? demoPlanFetch(input, init) : fetch(input, init),
+    [mode]
+  );
   const [childId, setChildId] = useState<string | null>(null);
   const [payload, setPayload] = useState<PlanPayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -75,7 +83,7 @@ export default function ParentYearlyPlanPage() {
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [mushafMilestone, setMushafMilestone] = useState<Milestone | null>(null);
   const [showFullYear, setShowFullYear] = useState(false);
-  const today = todayISO();
+  const today = mode === "demo" ? DEMO_PLAN_TODAY : todayISO();
 
   useEffect(() => {
     if (!childId && children.length > 0) setChildId(children[0].id);
@@ -88,7 +96,7 @@ export default function ParentYearlyPlanPage() {
     setError(null);
     setErrorCode(null);
     try {
-      const res = await fetch(`/api/yearly-plans?student_id=${encodeURIComponent(id)}`);
+      const res = await api(`/api/yearly-plans?student_id=${encodeURIComponent(id)}`);
       const body = await res.json();
       if (!res.ok) {
         // Server error text is for staff, not for a family. It names
@@ -115,10 +123,10 @@ export default function ParentYearlyPlanPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   useEffect(() => {
-    if (mode !== "real" || !childId) return;
+    if (mode === "loading" || !childId) return;
     load(childId);
   }, [mode, childId, load]);
 
@@ -128,8 +136,8 @@ export default function ParentYearlyPlanPage() {
   // both.
   const [schoolCal, setSchoolCal] = useState<SchoolCalendar>(DEFAULT_CALENDAR);
   useEffect(() => {
-    if (mode !== "real") return;
-    fetch("/api/school-calendar")
+    if (mode === "loading") return;
+    api("/api/school-calendar")
       .then((r) => r.json())
       .then((b) => {
         if (!Array.isArray(b?.weekdays)) return;
@@ -138,7 +146,7 @@ export default function ParentYearlyPlanPage() {
         );
       })
       .catch(() => {});
-  }, [mode]);
+  }, [mode, api]);
 
   const plan = payload?.plan ?? null;
   const milestones = useMemo(() => payload?.milestones ?? [], [payload]);
@@ -167,7 +175,7 @@ export default function ParentYearlyPlanPage() {
   const acknowledge = async (id: string) => {
     setAcknowledging(id);
     try {
-      const res = await fetch("/api/yearly-plans/alerts", {
+      const res = await api("/api/yearly-plans/alerts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
@@ -195,20 +203,6 @@ export default function ParentYearlyPlanPage() {
     return (
       <div className="space-y-6 max-w-6xl">
         <LoadingNote>Loading…</LoadingNote>
-      </div>
-    );
-  }
-
-  if (mode === "demo") {
-    return (
-      <div className="space-y-6 max-w-6xl">
-        <PortalHero eyebrow="Parent" title="Yearly plan" />
-        <SectionCard title="Sign in to see your child's plan">
-          <PlanEmptyState
-            title="This is the sample portal"
-            body="Yearly plans are held encrypted against a real school's records, so there is nothing to show here. Sign in with the details your school gave you."
-          />
-        </SectionCard>
       </div>
     );
   }
@@ -335,8 +329,12 @@ export default function ParentYearlyPlanPage() {
                     {progress.varianceUnits >= 0
                       ? `${child?.name ?? "Your child"} is ${`${formatApprox(progress.varianceUnits)} ${unitLabel(progress.varianceUnits, plan.unit)}`} ahead of where the plan expects them today.`
                       : `${child?.name ?? "Your child"} is ${`${formatApprox(Math.abs(progress.varianceUnits))} ${unitLabel(progress.varianceUnits, plan.unit)}`} short of where the plan expects them today.`}{" "}
-                    At the current pace the year finishes at about{" "}
-                    {formatApprox(progress.projectedUnits)} of {formatQuantity(progress.totalUnits)}.
+                    {/* A projection past the whole plan just means "on course to
+                        finish" — early in a year, a few good days would
+                        otherwise read as finishing at 479 of 230. */}
+                    {progress.projectedUnits >= progress.totalUnits
+                      ? "At the current pace the whole year's plan will be finished on time."
+                      : `At the current pace the year finishes at about ${formatApprox(progress.projectedUnits)} of ${formatQuantity(progress.totalUnits)}.`}
                   </p>
                 </div>
               </div>
@@ -357,6 +355,7 @@ export default function ParentYearlyPlanPage() {
             plan={plan}
             cal={schoolCal}
             totalUnits={progress.totalUnits}
+            today={today}
             onViewFullYear={() => setShowFullYear(true)}
           />
 

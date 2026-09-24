@@ -172,7 +172,9 @@ export default function ParentQuranProgressPage() {
               const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
               const rangeLabel = surahEnd
                 ? `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
-                : `ayahs ${a.ayah_start}–${a.ayah_end}`;
+                : a.ayah_start === a.ayah_end
+                  ? `ayah ${a.ayah_start}`
+                  : `ayahs ${a.ayah_start}–${a.ayah_end}`;
               const due = a.status === "completed" ? null : dueLabel(a.due_date);
               const isOpen = expanded === a.id;
 

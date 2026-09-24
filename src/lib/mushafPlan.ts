@@ -483,7 +483,9 @@ export function formatRange(from: Position, to: Position): string {
 
   if (from.surah === to.surah) {
     const whole = from.ayah === 1 && to.ayah === a.ayahs;
-    return whole ? a.englishName : `${a.englishName} ${from.ayah}–${to.ayah}`;
+    if (whole) return a.englishName;
+    // One ayah on its own — Al-Baqarah 282 fills a whole page by itself.
+    return from.ayah === to.ayah ? `${a.englishName} ${from.ayah}` : `${a.englishName} ${from.ayah}–${to.ayah}`;
   }
   const left = from.ayah === 1 ? a.englishName : `${a.englishName} ${from.ayah}`;
   const right = to.ayah === b.ayahs ? b.englishName : `${b.englishName} ${to.ayah}`;

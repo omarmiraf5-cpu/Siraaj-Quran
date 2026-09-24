@@ -19,7 +19,8 @@ import {
   type PlanAlert,
   type ProgressEntry,
 } from "@/lib/yearlyPlan";
-import { weeklyMilestonesFromDailyRate, type DailyRateSegment } from "@/lib/mushafPlan";
+import { weeklyMilestonesFromDailyRate } from "@/lib/mushafPlan";
+import { canRebuildMilestones, sameSchedule } from "@/lib/planLessons";
 import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
 
 /**
@@ -414,26 +415,6 @@ export async function loadCalendarForSchool(supabase: Db, schoolId: string): Pro
 }
 
 /**
- * True when the stored milestones are exactly the schedule the plan's own
- * fields produce today: same weeks, same dates, same ayahs, same targets.
- */
-function sameSchedule(stored: Milestone[], expected: DailyRateSegment[]): boolean {
-  if (stored.length !== expected.length) return false;
-  return stored.every((m, i) => {
-    const e = expected[i];
-    return (
-      m.starts_on === e.starts_on &&
-      m.due_on === e.due_on &&
-      m.from_surah === e.from_surah &&
-      m.from_ayah === e.from_ayah &&
-      m.to_surah === e.to_surah &&
-      m.to_ayah === e.to_ayah &&
-      Math.abs(m.target_units - e.target_units) < 0.005
-    );
-  });
-}
-
-/**
  * Rebuilds a daily-rate plan's stored milestones from its own current
  * fields when they no longer match. The weekly checklist a teacher sees is
  * a mechanical readout of the plan's anchor, dates, daily amount and the
@@ -476,12 +457,7 @@ export async function resyncDailyRateMilestones(
   if (plan.start_surah == null || plan.start_ayah == null || plan.direction == null) return milestones;
   if (plan.daily_new_amount == null || plan.daily_new_amount <= 0) return milestones;
 
-  const hasProgress = milestones.some((m) => m.completed_units > 0) || entries.length > 0;
-  if (hasProgress) return milestones;
-  const teacherWritten = milestones.some(
-    (m) => m.title != null || m.description != null || m.from_surah == null
-  );
-  if (teacherWritten) return milestones;
+  if (!canRebuildMilestones(milestones, entries)) return milestones;
 
   try {
     const calendar = cal ?? (await loadCalendarForSchool(supabase, schoolId));

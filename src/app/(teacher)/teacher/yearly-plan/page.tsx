@@ -18,6 +18,7 @@ import {
   paceColor,
 } from "@/components/yearly-plan-ui";
 import { useSchoolRoster } from "@/hooks/usePortalRoster";
+import { DEMO_PLAN_TODAY, demoPlanFetch } from "@/lib/demoPlans";
 import { SURAHS, getSurahById } from "@/data/mushaf-index";
 import {
   DIRECTION_LABEL,
@@ -254,13 +255,23 @@ function ReviewAmountButtons({
 
 export default function TeacherYearlyPlanPage() {
   const { mode, students } = useSchoolRoster();
+  // The sample portal has no server to hold plans, so its requests are
+  // answered in the browser from the sample school's own plans instead —
+  // same routes, same shapes, so nothing else on this page changes.
+  const api = useCallback(
+    (input: string, init?: RequestInit) =>
+      mode === "demo" ? demoPlanFetch(input, init) : fetch(input, init),
+    [mode]
+  );
   const [studentId, setStudentId] = useState<string | null>(null);
   const [payload, setPayload] = useState<PlanPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const today = todayISO();
+  // The sample portal lives on its own fixed date, like every other sample
+  // screen, so its plans agree with the rest of it about what day it is.
+  const today = mode === "demo" ? DEMO_PLAN_TODAY : todayISO();
 
   // Which of the student's plans is on screen, when it isn't whichever one
   // GET would prefer on its own — set only by clicking an "other year" pill.
@@ -296,7 +307,7 @@ export default function TeacherYearlyPlanPage() {
     try {
       const qs = new URLSearchParams({ student_id: id });
       if (planId) qs.set("plan_id", planId);
-      const res = await fetch(`/api/yearly-plans?${qs.toString()}`);
+      const res = await api(`/api/yearly-plans?${qs.toString()}`);
       const body = await res.json();
       if (!res.ok) {
         setErrorCode(body?.code ?? null);
@@ -320,10 +331,10 @@ export default function TeacherYearlyPlanPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   useEffect(() => {
-    if (mode !== "real" || !studentId) return;
+    if (mode === "loading" || !studentId) return;
     setSelectedPlanId(null);
     setCreatingNew(false);
     setEditingPlan(false);
@@ -371,8 +382,8 @@ export default function TeacherYearlyPlanPage() {
      or if a school never set one up. */
   const [schoolCal, setSchoolCal] = useState<SchoolCalendar>(DEFAULT_CALENDAR);
   useEffect(() => {
-    if (mode !== "real") return;
-    fetch("/api/school-calendar")
+    if (mode === "loading") return;
+    api("/api/school-calendar")
       .then((r) => r.json())
       .then((b) => {
         if (!Array.isArray(b?.weekdays)) return;
@@ -381,7 +392,7 @@ export default function TeacherYearlyPlanPage() {
         );
       })
       .catch(() => {});
-  }, [mode]);
+  }, [mode, api]);
 
   /* ── Where the student already is ──────────────────────────────────
      Read from the daily lessons the teacher already records, so a plan
@@ -418,6 +429,15 @@ export default function TeacherYearlyPlanPage() {
       .finally(() => { if (!cancelled) setDetecting(false); });
     return () => { cancelled = true; };
   }, [mode, studentId]);
+
+  // A new plan in the sample portal starts on its own "today", not the real
+  // calendar's September — otherwise it would open with nothing due yet
+  // and nothing to show on the Assignments page.
+  useEffect(() => {
+    if (mode !== "demo") return;
+    const y = Number(DEMO_PLAN_TODAY.slice(0, 4));
+    setDraft((d) => ({ ...d, academic_year: `${y}-${y + 1}`, starts_on: DEMO_PLAN_TODAY, ends_on: `${y + 1}-06-25` }));
+  }, [mode]);
 
   const startFrom = useMemo(() => {
     const p = { surah: draft.startSurah, ayah: draft.startAyah };
@@ -521,7 +541,7 @@ export default function TeacherYearlyPlanPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/yearly-plans", {
+      const res = await api("/api/yearly-plans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -549,7 +569,7 @@ export default function TeacherYearlyPlanPage() {
       // and failing to save a preference should not report as a failure
       // to create it.
       if (canAnchor) {
-        fetch("/api/quran-position", {
+        api("/api/quran-position", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ student_id: studentId, direction: draft.direction }),
@@ -579,7 +599,7 @@ export default function TeacherYearlyPlanPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/yearly-plans/milestones", {
+      const res = await api("/api/yearly-plans/milestones", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -642,7 +662,7 @@ export default function TeacherYearlyPlanPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/yearly-plans/progress", {
+      const res = await api("/api/yearly-plans/progress", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -667,7 +687,7 @@ export default function TeacherYearlyPlanPage() {
     if (!plan) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/yearly-plans", {
+      const res = await api("/api/yearly-plans", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: plan.id, status }),
@@ -741,7 +761,7 @@ export default function TeacherYearlyPlanPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/yearly-plans", {
+      const res = await api("/api/yearly-plans", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -788,7 +808,7 @@ export default function TeacherYearlyPlanPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/yearly-plans?id=${encodeURIComponent(plan.id)}`, {
+      const res = await api(`/api/yearly-plans?id=${encodeURIComponent(plan.id)}`, {
         method: "DELETE",
       });
       const body = await res.json();
@@ -809,20 +829,6 @@ export default function TeacherYearlyPlanPage() {
     return (
       <div className="space-y-6 max-w-6xl">
         <LoadingNote>Loading your roster…</LoadingNote>
-      </div>
-    );
-  }
-
-  if (mode === "demo") {
-    return (
-      <div className="space-y-6 max-w-6xl">
-        <PortalHero eyebrow="Teacher" title="Yearly plan" />
-        <SectionCard title="Sign in to build a plan">
-          <PlanEmptyState
-            title="Yearly plans need a real school"
-            body="This is the sample portal, so there is no roster to attach a plan to and no encryption key to store one under. Sign in with your school's teacher account to set out a student's year."
-          />
-        </SectionCard>
       </div>
     );
   }
@@ -1536,6 +1542,7 @@ export default function TeacherYearlyPlanPage() {
             plan={plan}
             cal={schoolCal}
             totalUnits={progress.totalUnits}
+            today={today}
             onViewFullYear={() => setShowFullYear(true)}
           />
 

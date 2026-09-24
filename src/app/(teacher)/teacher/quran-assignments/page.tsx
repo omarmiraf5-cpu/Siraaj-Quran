@@ -34,6 +34,14 @@ import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote } fr
 import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
 import { IconBook, IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
+import {
+  demoConfirmSurah,
+  demoGradePlanLesson,
+  demoPlanStudents,
+  demoSyncPlans,
+  isDemoPlanLesson,
+} from "@/lib/demoPlans";
+import { statusForRating } from "@/lib/planLessons";
 import { useLanguage } from "@/components/LanguageProvider";
 import {
   DIRECTION_HINT,
@@ -142,6 +150,11 @@ export default function QuranAssignmentsPage() {
   const [success, setSuccess] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [demoCreated, setDemoCreated] = useState<QuranicAssignment[]>([]);
+  // The sample school's plan lessons, and which students have a plan — a
+  // student whose new lesson comes from their plan doesn't also show the
+  // hand-typed sample one.
+  const [demoPlanLessons, setDemoPlanLessons] = useState<QuranicAssignment[]>([]);
+  const [demoPlanStudentIds, setDemoPlanStudentIds] = useState<Set<string>>(new Set());
   const [realAssignments, setRealAssignments] = useState<QuranicAssignment[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
@@ -175,6 +188,9 @@ export default function QuranAssignmentsPage() {
           setDemoCreated(loadDemoCreated());
           setOverrides(readDemoStore(OVERRIDES_KEY, {}));
           setLog(readDemoStore(LOG_KEY, []));
+          // The same catch-up the live site runs on opening this page, from
+          // the sample school's own yearly plans — see demoPlans.ts.
+          refreshDemoPlans();
           return;
         }
 
@@ -423,6 +439,15 @@ export default function QuranAssignmentsPage() {
     }
   };
 
+  const refreshDemoPlans = () => {
+    const { lessons, summaries } = demoSyncPlans();
+    setDemoPlanLessons(
+      [...lessons].sort((x, y) => (y.due_date ?? "").localeCompare(x.due_date ?? ""))
+    );
+    setPlanSummaries(summaries);
+    setDemoPlanStudentIds(demoPlanStudents());
+  };
+
   const refreshAssignments = async () => {
     const { data: refreshed } = await supabase
       .from("quranic_assignments")
@@ -435,6 +460,11 @@ export default function QuranAssignmentsPage() {
 
   const confirmSurah = async (studentId: string, surah: number) => {
     const key = `${studentId}:${surah}`;
+    if (isDemo) {
+      demoConfirmSurah(studentId, surah);
+      refreshDemoPlans();
+      return;
+    }
     setConfirmingSurah(key);
     try {
       await fetch("/api/surah-confirmations", {
@@ -520,7 +550,15 @@ export default function QuranAssignmentsPage() {
   // belong to demo mode only — a real school sees its own work or an empty
   // list, never invented rows attributed to its teachers.
   const allAssignments = (
-    isDemo ? [...demoCreated, ...DEMO_ASSIGNMENTS] : realAssignments
+    isDemo
+      ? [
+          ...demoCreated,
+          ...demoPlanLessons,
+          ...DEMO_ASSIGNMENTS.filter(
+            (a) => !(a.portion === "new" && demoPlanStudentIds.has(a.student_id))
+          ),
+        ]
+      : realAssignments
   ).map((a) => withOverride(a, overrides));
 
   const startEditing = (a: QuranicAssignment) => {
@@ -536,11 +574,21 @@ export default function QuranAssignmentsPage() {
       teacher_notes: draftNotes.trim() || null,
     };
     try {
-      if (isDemo) {
-        const next = { ...overrides, [a.id]: { ...overrides[a.id], ...patch } };
+      if (isDemo && isDemoPlanLesson(a.id)) {
+        // A plan lesson: rated the way the live site rates one, which also
+        // carries it through to the student's yearly plan.
+        demoGradePlanLesson(a.id, draftRating, draftNotes.trim() || null);
+        refreshDemoPlans();
+      } else if (isDemo) {
+        // The rating settles the status too, the same as on the live site.
+        const next = {
+          ...overrides,
+          [a.id]: { ...overrides[a.id], ...patch, status: statusForRating(draftRating) },
+        };
         setOverrides(next);
         writeDemoStore(OVERRIDES_KEY, next);
-
+      }
+      if (isDemo) {
         // A rating turns into today's entry in the history log — replacing
         // today's entry for this same portion if one already exists, rather
         // than piling up duplicates from re-grading the same session.
@@ -1068,7 +1116,9 @@ export default function QuranAssignmentsPage() {
 
             const rangeLabel = surahEnd
               ? `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
-              : `${surah?.englishName ?? `Surah ${a.surah}`} · ayahs ${a.ayah_start}–${a.ayah_end}`;
+              : a.ayah_start === a.ayah_end
+                ? `${surah?.englishName ?? `Surah ${a.surah}`} · ayah ${a.ayah_start}`
+                : `${surah?.englishName ?? `Surah ${a.surah}`} · ayahs ${a.ayah_start}–${a.ayah_end}`;
 
             return (
               <li key={a.id}>
