@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendNewSchoolAlert } from "@/lib/newSchoolAlert";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 // Bootstraps a brand-new school: no admin session exists yet to gate this
 // behind (unlike /api/admin/accounts, which requires one), so this is the
@@ -295,6 +296,24 @@ export async function POST(request: NextRequest) {
         children: childIndexes.map((i) => studentList[i].name.trim()),
       });
     }
+
+    // The school is complete. The owner's email about it goes out after this
+    // response does, so the new admin never waits on it — and since
+    // sendNewSchoolAlert only logs a failed send, it can't reach the unwind
+    // below either.
+    after(() =>
+      sendNewSchoolAlert({
+        name: school.name,
+        city: school.city,
+        province: school.province,
+        adminName: data.admin.fullName,
+        adminEmail: data.admin.email.trim().toLowerCase(),
+        halaqas: halaqaNames.length,
+        teachers: teacherLogins.length,
+        students: studentPins.length,
+        parents: parentLogins.length,
+      })
+    );
 
     return NextResponse.json(
       {
