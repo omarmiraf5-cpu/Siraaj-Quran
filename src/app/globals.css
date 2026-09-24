@@ -327,6 +327,33 @@ body {
     linear-gradient(-45deg, rgba(198, 162, 83, 0.03) 1px, transparent 1px);
 }
 
+/* ── Notches, status bars and home indicators ─────────────────────────
+   The viewport is viewport-fit=cover, so on a phone with a notch — and in
+   the MyDiiwaan app, which draws edge to edge — the page reaches under the
+   status bar and the home indicator. These insets move content clear of
+   them. In an ordinary browser tab every inset is 0 and nothing changes. */
+body {
+  padding-top: env(safe-area-inset-top);
+}
+.status-bar-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: #0e2347;
+  z-index: 60;
+  pointer-events: none;
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+/* Full-height screens (sign-in, set-up) start below the status bar, so they
+   are that much shorter — otherwise they scroll by the height of the bar. */
+.min-h-screen {
+  min-height: calc(100vh - env(safe-area-inset-top));
+}
+
 @layer components {
   /* Page title: serif, because everything being one bold sans is most of
      why the portals read as a template. */

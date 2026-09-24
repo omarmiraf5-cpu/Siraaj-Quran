@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -65,6 +65,10 @@ const STUDENT_AVATARS = [
   { id: "E", color: "bg-subject-pink"   },
 ];
 
+// The school a device last signed in to, so the student tab can show its
+// roster without the ?school= link — which the MyDiiwaan app never receives.
+const SCHOOL_KEY = "mydiiwaan_school";
+
 interface RosterStudent {
   id: string;
   first_name: string;
@@ -92,20 +96,73 @@ export default function LoginPage() {
   const [schoolName,      setSchoolName]      = useState<string | null>(null);
   const [studentId,       setStudentId]       = useState<string | null>(null);
 
-  useEffect(() => {
-    const slug = new URLSearchParams(window.location.search).get("school");
-    if (!slug) return;
-    fetch(`/api/student-roster?school=${encodeURIComponent(slug)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
-        setRoster(data.students ?? []);
-        setSchoolName(data.school?.name ?? null);
-      })
-      .catch(() => {
-        /* No roster: the demo avatars stay as they were. */
-      });
+  const [schoolCode,      setSchoolCode]      = useState("");
+  const [schoolLookup,    setSchoolLookup]    = useState<"idle" | "loading" | "notFound">("idle");
+
+  const loadRoster = useCallback(async (slug: string) => {
+    const r = await fetch(`/api/student-roster?school=${encodeURIComponent(slug)}`);
+    if (!r.ok) return false;
+    const data = await r.json();
+    setRoster(data.students ?? []);
+    setSchoolName(data.school?.name ?? null);
+    try { localStorage.setItem(SCHOOL_KEY, slug); } catch { /* private mode */ }
+    return true;
   }, []);
+
+  // The school from the link, or else the one this device last used.
+  useEffect(() => {
+    let slug = new URLSearchParams(window.location.search).get("school");
+    if (!slug) {
+      try { slug = localStorage.getItem(SCHOOL_KEY); } catch { /* private mode */ }
+    }
+    if (!slug) return;
+    loadRoster(slug).catch(() => {
+      /* No roster: the student tab explains how to find the school. */
+    });
+  }, [loadRoster]);
+
+  // Already signed in — the app reopening, or a return visit — goes straight
+  // to that person's own portal instead of asking for the password again.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user || cancelled) return;
+      if (user.user_metadata?.must_change_password) { router.replace("/change-password"); return; }
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      if (!cancelled && profile?.role) router.replace(`/${profile.role}`);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const findSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = schoolCode.trim().toLowerCase().replace(/\s+/g, "-");
+    if (!code) return;
+    setSchoolLookup("loading");
+    const found = await loadRoster(code).catch(() => false);
+    setSchoolLookup(found ? "idle" : "notFound");
+  };
+
+  const forgetSchool = () => {
+    try { localStorage.removeItem(SCHOOL_KEY); } catch { /* private mode */ }
+    setRoster(null);
+    setSchoolName(null);
+    setStudentId(null);
+    setSelectedAvatar(null);
+    setPin("");
+    setSchoolCode("");
+  };
+
+  /** Keep this device's school, so a child using the same phone or tablet
+   *  later sees their classmates' names without a link. */
+  const rememberSchool = async (schoolId: string | null | undefined) => {
+    if (!schoolId) return;
+    const { data } = await supabase.from("schools").select("slug").eq("id", schoolId).single();
+    if (data?.slug) {
+      try { localStorage.setItem(SCHOOL_KEY, data.slug); } catch { /* private mode */ }
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,7 +200,14 @@ export default function LoginPage() {
       router.push("/change-password");
       return;
     }
-    router.push(`/${role}`);
+    // Their own portal, whichever tab happened to be selected.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, school_id")
+      .eq("id", data.user?.id ?? "")
+      .single();
+    rememberSchool(profile?.school_id).catch(() => {});
+    router.push(`/${profile?.role ?? role}`);
   };
 
   // Appending through the updater rather than off the rendered value: a
@@ -372,8 +436,39 @@ export default function LoginPage() {
                 // school hands out. Showing the sample avatars here instead
                 // gave a real child five strangers to choose from and a PIN
                 // that could never work, with nothing explaining why.
-                <p className="text-center text-white/70 text-sm leading-relaxed px-4">
-                  {t("login.needSchoolLink")}
+                <form onSubmit={findSchool} className="space-y-3">
+                  <p className="text-center text-white/70 text-sm leading-relaxed px-4">
+                    {t("login.enterSchoolCode")}
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      value={schoolCode}
+                      onChange={(e) => { setSchoolCode(e.target.value); setSchoolLookup("idle"); }}
+                      placeholder={t("login.schoolCodePlaceholder")}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className="flex-1 min-w-0 rounded-card bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-brand-gold/70"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!schoolCode.trim() || schoolLookup === "loading"}
+                      className="rounded-card bg-brand-gold text-brand-navy font-semibold px-4 disabled:opacity-50 active:scale-95 transition-all"
+                    >
+                      {schoolLookup === "loading" ? "…" : t("login.findSchool")}
+                    </button>
+                  </div>
+                  {schoolLookup === "notFound" && (
+                    <p className="text-center text-red-200 text-xs">{t("login.schoolNotFound")}</p>
+                  )}
+                </form>
+              )}
+
+              {roster && schoolName && (
+                <p className="text-center">
+                  <button type="button" onClick={forgetSchool} className="text-[11px] text-white/50 underline underline-offset-2 hover:text-white/80">
+                    {t("login.notYourSchool")}
+                  </button>
                 </p>
               )}
 

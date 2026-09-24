@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Newsreader, Amiri, Aref_Ruqaa, Noto_Sans_Arabic } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { NativeBridge } from "@/components/NativeBridge";
 import "./globals.css";
 
 /* Loaded here rather than through an @import in globals.css. CSS ignores an
@@ -61,6 +62,17 @@ export const metadata: Metadata = {
   icons: { icon: "/crest.jpg" },
 };
 
+// viewport-fit=cover lets the page draw under a phone's notch and home
+// indicator, which is what makes env(safe-area-inset-*) report real values;
+// the layout pads itself by those (globals.css, the status strip below, the
+// mobile header and bottom bars). In a browser tab they are all 0.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0e2347",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -73,6 +85,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen">
+        {/* Behind the phone's status bar: in the app the page starts below
+            it, and this keeps the strip the portal's navy in either theme. */}
+        <div aria-hidden className="status-bar-strip" />
+        <NativeBridge />
         <ThemeProvider>
           <LanguageProvider>{children}</LanguageProvider>
         </ThemeProvider>

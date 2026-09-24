@@ -24,6 +24,10 @@ import { createClient } from "@/lib/supabase/client";
 export default function AdminStudentsPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
+  // The code students type in the app (the school's slug), and whether the
+  // sign-in link was just copied.
+  const [schoolSlug, setSchoolSlug] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
 
@@ -115,6 +119,14 @@ export default function AdminStudentsPage() {
         .eq("id", user.id)
         .single();
       setSchoolId(profile?.school_id ?? null);
+      if (profile?.school_id) {
+        supabase
+          .from("schools")
+          .select("slug")
+          .eq("id", profile.school_id)
+          .single()
+          .then(({ data }) => setSchoolSlug(data?.slug ?? null));
+      }
       await Promise.all([loadRealStudents(), loadRealHalaqas().then(setHalaqas)]);
     };
     load().finally(() => setReady(true));
@@ -253,6 +265,34 @@ export default function AdminStudentsPage() {
         title="Students"
         meta={[`${students.length} total`, `${activeCount} active`, `${halaqas.length} halaqas`]}
       />
+
+      {schoolSlug && (
+        <div className="card-quiet p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="eyebrow">Student sign-in</p>
+            <p className="text-[13px] text-ink mt-1">
+              School code: <span className="font-mono font-semibold">{schoolSlug}</span>
+            </p>
+            <p className="text-[11.5px] text-ink-muted mt-0.5 leading-relaxed">
+              Students type this code once in the MyDiiwaan app, or open the sign-in link. Then they tap
+              their name and enter their PIN.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const link = `${window.location.origin}/login?school=${schoolSlug}`;
+              navigator.clipboard?.writeText(link).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }).catch(() => {});
+            }}
+            className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-[12.5px] font-semibold px-3.5 py-2 rounded-xl hover:border-brand-navy/40 transition"
+          >
+            {copied ? "Copied" : "Copy sign-in link"}
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <input

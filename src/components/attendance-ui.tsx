@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 import { createClient } from "@/lib/supabase/client";
 import { demoAttendanceFetch, type DemoRole } from "@/lib/demoAttendance";
 import { formatClock, type StaffDay } from "@/lib/attendanceRules";
@@ -40,8 +42,11 @@ export interface Fix {
 
 /** The phone's current position, asked for fresh and as precisely as it
  *  can manage — a cached or network-only fix is what gets someone refused
- *  while standing in the staff room. */
-export function currentPosition(): Promise<Fix> {
+ *  while standing in the staff room. In the MyDiiwaan app this goes through
+ *  the phone's own location service, so the permission prompt names the app
+ *  rather than the web address inside it. */
+export async function currentPosition(): Promise<Fix> {
+  if (Capacitor.isNativePlatform()) return nativePosition();
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
       reject(new Error("This device can't share its location, so it can't be used to sign in. Try your phone."));
@@ -62,6 +67,30 @@ export function currentPosition(): Promise<Fix> {
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
   });
+}
+
+async function nativePosition(): Promise<Fix> {
+  const denied = new Error(
+    "Location is turned off for MyDiiwaan. Allow it in your phone's Settings (Settings → MyDiiwaan → Location), then try again."
+  );
+  try {
+    let perm = await Geolocation.checkPermissions();
+    if (perm.location !== "granted") perm = await Geolocation.requestPermissions({ permissions: ["location"] });
+    if (perm.location === "denied") throw denied;
+    const p = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    return { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
+  } catch (e) {
+    if (e === denied) throw e;
+    const message = e instanceof Error ? e.message.toLowerCase() : "";
+    if (message.includes("denied") || message.includes("permission")) throw denied;
+    if (message.includes("disabled") || message.includes("services")) {
+      throw new Error("Location services are off on this phone. Turn them on in Settings, then try again.");
+    }
+    if (message.includes("timeout") || message.includes("timed out")) {
+      throw new Error("Finding your location took too long. Try again — near a window helps.");
+    }
+    throw new Error("Your location couldn't be found. Check that location services are turned on, then try again.");
+  }
 }
 
 /* ── A day's status ────────────────────────────────────────────────── */

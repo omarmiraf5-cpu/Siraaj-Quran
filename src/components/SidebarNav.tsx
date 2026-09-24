@@ -100,7 +100,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   return (
     <>
       {/* ── MOBILE TOP BAR ── */}
-      <header className="md:hidden fixed top-0 start-0 end-0 z-50 gradient-navy flex items-center justify-between px-4 h-14 shadow-dark">
+      <header className="md:hidden fixed top-[env(safe-area-inset-top)] start-0 end-0 z-50 gradient-navy flex items-center justify-between px-4 h-14 shadow-dark">
         <div className="flex items-center gap-2.5 min-w-0">
           <Crest
             branding={branding}
