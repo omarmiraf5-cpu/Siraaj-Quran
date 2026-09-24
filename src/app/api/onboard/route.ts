@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNewSchoolAlert } from "@/lib/newSchoolAlert";
+import { sendSchoolWelcome } from "@/lib/schoolWelcome";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 import { after, NextRequest, NextResponse } from "next/server";
 
@@ -297,21 +298,28 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // The school is complete. The owner's email about it goes out after this
-    // response does, so the new admin never waits on it — and since
-    // sendNewSchoolAlert only logs a failed send, it can't reach the unwind
-    // below either.
+    // The school is complete. Two emails about it go out after this response
+    // does, so the new admin never waits on them: their welcome, and the
+    // owner's heads-up. Both senders only log a failed send, so neither can
+    // reach the unwind below.
+    const counts = {
+      halaqas: halaqaNames.length,
+      teachers: teacherLogins.length,
+      students: studentPins.length,
+      parents: parentLogins.length,
+    };
+    const adminEmail = data.admin.email.trim().toLowerCase();
+    after(() =>
+      sendSchoolWelcome({ name: school.name, slug, adminName: data.admin.fullName, adminEmail, ...counts })
+    );
     after(() =>
       sendNewSchoolAlert({
         name: school.name,
         city: school.city,
         province: school.province,
         adminName: data.admin.fullName,
-        adminEmail: data.admin.email.trim().toLowerCase(),
-        halaqas: halaqaNames.length,
-        teachers: teacherLogins.length,
-        students: studentPins.length,
-        parents: parentLogins.length,
+        adminEmail,
+        ...counts,
       })
     );
 

@@ -14,3 +14,11 @@ export const PRIVACY_UPDATED = "24 September 2026";
  * test sender delivers to.
  */
 export const NEW_SCHOOL_ALERT_EMAIL = "omar.miraf5@gmail.com";
+
+/**
+ * Who emails to schools (the welcome a new admin gets) come from. Resend
+ * only sends from a domain verified with them (Resend → Domains), so until
+ * mydiiwaan.com is, those emails are refused and the refusal is logged.
+ * Replies go to SUPPORT_EMAIL, not to this address.
+ */
+export const EMAIL_FROM = "MyDiiwaan <hello@mydiiwaan.com>";
