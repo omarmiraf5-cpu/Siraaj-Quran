@@ -20,6 +20,7 @@ import {
   decodeMilestone,
   decodePlan,
   isFailure,
+  loadCalendarForSchool,
   loadMilestonesAndEntries,
   loadPlan,
   milestoneTextColumns,
@@ -157,20 +158,25 @@ export async function GET(req: NextRequest) {
     // decodePlan straight off `preferred` rather than loadPlan(id), which
     // would re-select the exact row already in hand above — one fewer
     // sequential round trip on the single most common path through here.
-    const loaded: LoadedPlan = {
-      plan: decodePlan(preferred),
-      ...(await loadMilestonesAndEntries(supabase, preferred.id as string)),
-    };
-    // Self-heals a plan whose dates were edited before its milestones were
-    // rebuilt to match — see resyncDailyRateMilestones. A no-op on every
-    // plan that is already in sync, which is almost all of them almost all
-    // of the time.
+    // A daily-rate plan's milestones are checked against the school
+    // calendar below, so that is fetched alongside them rather than after.
+    const plan = decodePlan(preferred);
+    const needsCalendar = plan.daily_new_amount != null && plan.start_surah != null;
+    const [rest, cal] = await Promise.all([
+      loadMilestonesAndEntries(supabase, preferred.id as string),
+      needsCalendar ? loadCalendarForSchool(supabase, preferred.school_id as string) : undefined,
+    ]);
+    const loaded: LoadedPlan = { plan, ...rest };
+    // Self-heals a plan whose milestones no longer match its own schedule
+    // — see resyncDailyRateMilestones. A no-op on every plan that is
+    // already in sync, which is almost all of them almost all of the time.
     loaded.milestones = await resyncDailyRateMilestones(
       supabase,
       loaded.plan,
       preferred.school_id as string,
       loaded.milestones,
-      loaded.entries
+      loaded.entries,
+      cal
     );
 
     const alerts = await refreshAlerts(

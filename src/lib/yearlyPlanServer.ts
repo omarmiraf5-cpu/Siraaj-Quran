@@ -19,7 +19,7 @@ import {
   type PlanAlert,
   type ProgressEntry,
 } from "@/lib/yearlyPlan";
-import { nextPosition, weeklyMilestonesFromDailyRate } from "@/lib/mushafPlan";
+import { weeklyMilestonesFromDailyRate, type DailyRateSegment } from "@/lib/mushafPlan";
 import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
 
 /**
@@ -414,37 +414,36 @@ export async function loadCalendarForSchool(supabase: Db, schoolId: string): Pro
 }
 
 /**
- * True when one milestone doesn't pick up exactly where the one before it
- * left off — a daily-rate plan's own weekly buckets are built by grouping
- * a single continuous walk through the mushaf, so consecutive milestones
- * are never supposed to skip or repeat an ayah, whatever gap in *dates*
- * a weekend or holiday between them creates. A teacher deleting one
- * milestone by hand (there being nothing else that could do it) leaves
- * exactly this kind of hole without moving either of its neighbours'
- * own dates out of the plan's overall range, which is why this needs its
- * own check rather than folding into the start/end one below.
+ * True when the stored milestones are exactly the schedule the plan's own
+ * fields produce today: same weeks, same dates, same ayahs, same targets.
  */
-function hasMilestoneGap(direction: Plan["direction"], milestones: Milestone[]): boolean {
-  for (let i = 0; i < milestones.length - 1; i++) {
-    const a = milestones[i];
-    const b = milestones[i + 1];
-    if (a.to_surah == null || a.to_ayah == null || b.from_surah == null || b.from_ayah == null) continue;
-    const expected = nextPosition({ surah: a.to_surah, ayah: a.to_ayah }, direction!);
-    if (!expected || expected.surah !== b.from_surah || expected.ayah !== b.from_ayah) return true;
-  }
-  return false;
+function sameSchedule(stored: Milestone[], expected: DailyRateSegment[]): boolean {
+  if (stored.length !== expected.length) return false;
+  return stored.every((m, i) => {
+    const e = expected[i];
+    return (
+      m.starts_on === e.starts_on &&
+      m.due_on === e.due_on &&
+      m.from_surah === e.from_surah &&
+      m.from_ayah === e.from_ayah &&
+      m.to_surah === e.to_surah &&
+      m.to_ayah === e.to_ayah &&
+      Math.abs(m.target_units - e.target_units) < 0.005
+    );
+  });
 }
 
 /**
  * Rebuilds a daily-rate plan's stored milestones from its own current
  * fields when they no longer match. The weekly checklist a teacher sees is
- * a mechanical readout of starts_on/ends_on/daily_new_amount — nothing
- * else — so a plan whose dates were edited after its milestones were first
- * generated is left holding rows from a schedule that no longer exists: a
- * milestone dated before the plan's own start, permanently "past due" no
- * matter what today is. The same rebuild also catches a milestone deleted
- * by hand, which leaves a hole in the mushaf coverage without necessarily
- * moving either boundary — see hasMilestoneGap.
+ * a mechanical readout of the plan's anchor, dates, daily amount and the
+ * school calendar — nothing else — so whenever any of those move, or the
+ * page arithmetic behind them is corrected, the stored rows describe a
+ * schedule that no longer exists: a milestone dated before the plan's own
+ * start, a hole left by one deleted by hand, or a week reaching an ayah
+ * past the pages it was meant to cover. Comparing the whole schedule
+ * rather than probing for each of those symptoms catches all of them,
+ * including ones nobody has thought of yet.
  *
  * Only for a plan anchored to the mushaf with a daily rate set — the one
  * kind whose milestones are fully derivable from the plan row alone. Never
@@ -452,39 +451,40 @@ function hasMilestoneGap(direction: Plan["direction"], milestones: Milestone[]):
  * above zero, or a progress entry): that means the schedule has already
  * been acted on, and silently rebuilding it would erase that history —
  * the teacher deletes and recreates the plan instead, the same as for any
- * other change too large to apply automatically.
+ * other change too large to apply automatically. Nor one holding a
+ * milestone a teacher wrote or edited themselves (a title, a description,
+ * or no mushaf range at all): the generator never writes any of those, and
+ * a rebuild would throw the teacher's own words away.
  *
- * Called from both a read (self-healing a plan whose dates were edited
- * before this existed) and a write (keeping one edited from here on from
- * ever going stale) — the same "reconcile on read" shape as refreshAlerts,
- * and safe for the same reason: staleness is judged from rows the caller's
- * own RLS-scoped session already fetched, not from unchecked input.
+ * Called from both a read (self-healing a plan saved under older rules)
+ * and a write (keeping one edited from here on from ever going stale) —
+ * the same "reconcile on read" shape as refreshAlerts, and safe for the
+ * same reason: staleness is judged from rows the caller's own RLS-scoped
+ * session already fetched, not from unchecked input.
+ *
+ * `cal` saves a round trip for a caller that already loaded the school
+ * calendar; without it, it is loaded here when needed.
  */
 export async function resyncDailyRateMilestones(
   supabase: Db,
   plan: Plan,
   schoolId: string,
   milestones: Milestone[],
-  entries: ProgressEntry[]
+  entries: ProgressEntry[],
+  cal?: SchoolCalendar
 ): Promise<Milestone[]> {
   if (plan.start_surah == null || plan.start_ayah == null || plan.direction == null) return milestones;
   if (plan.daily_new_amount == null || plan.daily_new_amount <= 0) return milestones;
 
-  const first = milestones[0];
-  const last = milestones[milestones.length - 1];
-  const stale =
-    !first ||
-    !last ||
-    first.starts_on < plan.starts_on ||
-    last.due_on > plan.ends_on ||
-    hasMilestoneGap(plan.direction, milestones);
-  if (!stale) return milestones;
-
   const hasProgress = milestones.some((m) => m.completed_units > 0) || entries.length > 0;
   if (hasProgress) return milestones;
+  const teacherWritten = milestones.some(
+    (m) => m.title != null || m.description != null || m.from_surah == null
+  );
+  if (teacherWritten) return milestones;
 
   try {
-    const cal = await loadCalendarForSchool(supabase, schoolId);
+    const calendar = cal ?? (await loadCalendarForSchool(supabase, schoolId));
     const segs = weeklyMilestonesFromDailyRate(
       { surah: plan.start_surah, ayah: plan.start_ayah },
       plan.direction,
@@ -492,8 +492,9 @@ export async function resyncDailyRateMilestones(
       plan.daily_new_amount,
       plan.starts_on,
       plan.ends_on,
-      cal
+      calendar
     );
+    if (sameSchedule(milestones, segs)) return milestones;
 
     const { error: delError } = await supabase.from(MILESTONES).delete().eq("plan_id", plan.id);
     if (delError) throw delError;

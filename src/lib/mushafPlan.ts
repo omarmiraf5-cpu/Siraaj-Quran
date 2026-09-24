@@ -138,79 +138,94 @@ export function endOf(blocks: MushafBlock[]): Position | null {
    How many ayahs a target amounts to, which depends on the unit and, for
    the page-based units, on where in the mushaf you are standing. */
 
-/** Cumulative ayahs from the very start of the mushaf up to (not
- *  including) a position — what ayahsBeforePage is built from, and the
- *  exact-position sibling of pageOfPosition's reverse lookup. */
-function ayahsBeforePosition(pos: Position): number {
+/* Page geometry, built once from PAGE_STARTS — the real per-page layout
+   the mushaf reader itself renders from — so every page question below is
+   an array read. The Madinah mushaf never splits an ayah across a page
+   break, so "which page is this ayah on" has exactly one answer. */
+
+/** Global 0-based index of each surah's first ayah, by surah id. */
+const SURAH_OFFSET: number[] = (() => {
+  const out = new Array<number>(SURAHS.length + 1).fill(0);
   let total = 0;
   for (const s of SURAHS) {
-    if (s.id < pos.surah) total += s.ayahs;
-    else if (s.id === pos.surah) {
-      total += Math.max(0, pos.ayah - 1);
-      break;
-    } else break;
+    out[s.id] = total;
+    total += s.ayahs;
   }
-  return total;
-}
+  return out;
+})();
 
-/** The exact first surah:ayah a page opens on, from the real per-page
- *  layout data — not approximated. */
-function startOfPage(page: number): Position {
-  const [surah, ayah] = PAGE_STARTS[Math.max(1, Math.min(TOTAL_PAGES, page)) - 1];
-  return { surah, ayah };
+/** The page every ayah sits on, by global index. */
+const AYAH_PAGE: Uint16Array = (() => {
+  const out = new Uint16Array(TOTAL_AYAHS);
+  for (let p = 1; p <= TOTAL_PAGES; p++) {
+    const [s, a] = PAGE_STARTS[p - 1];
+    const from = SURAH_OFFSET[s] + a - 1;
+    const to =
+      p < TOTAL_PAGES ? SURAH_OFFSET[PAGE_STARTS[p][0]] + PAGE_STARTS[p][1] - 1 : TOTAL_AYAHS;
+    out.fill(p, from, to);
+  }
+  return out;
+})();
+
+/** How many ayahs each page holds, by page number. */
+const PAGE_AYAHS: Uint16Array = (() => {
+  const out = new Uint16Array(TOTAL_PAGES + 1);
+  for (const p of AYAH_PAGE) out[p]++;
+  return out;
+})();
+
+/** Exactly which page a position falls on. */
+export function pageOfPosition(pos: Position): number {
+  const s = getSurahById(pos.surah);
+  if (!s) return 1;
+  const ayah = Math.max(1, Math.min(s.ayahs, Math.round(pos.ayah)));
+  return AYAH_PAGE[SURAH_OFFSET[s.id] + ayah - 1];
 }
 
 /**
- * How many ayahs of the mushaf lie before a given page.
+ * Pages of text walked from `start`, ayah by ayah, in `direction`:
+ * entry n is how many pages the first n walked ayahs amount to, each ayah
+ * counting as its page's share (1 ÷ the ayahs on that page).
  *
- * Reads PAGE_STARTS — the real per-page layout data, not a proportional
- * guess — for the whole-page part, and only interpolates for a fractional
- * page (a "5 lines a day" pace can ask for a fourth of a page), and then
- * only across the single page it falls on. That is a world apart from the
- * approximation this replaced, which spread a surah's ayahs evenly across
- * every page it touches: proportional-by-ayah-count is not proportional
- * by how much text an ayah actually holds, and on a long surah that drifts
- * by a page or more — confirmed on An-Nisa, whose ayah 12 the old formula
- * placed on page 78 when the real mushaf starts it on page 79. That was
- * never just a display glitch: the same formula sizes every "N pages a
- * day" plan's actual daily portion.
+ * Measured along the path the student actually takes, not along the page
+ * numbers. The two differ in hifz order: inside a surah the walk moves UP
+ * through the mushaf (Al-Mulk runs pages 562, 563, 564), but the old
+ * formula counted "N pages" as the N pages *below* the start, so a hifz
+ * student's second day was sized off At-Tahrim's page instead of the Al-Mulk
+ * page they were actually on — sometimes far more than a page, sometimes
+ * far less. A page the walk only visits part of (a shared page at a surah
+ * boundary, or a start partway down a page) counts only for the part walked.
  *
- * page > TOTAL_PAGES (the walk asked for one more page than the mushaf
- * has) reports the mushaf's own total ayah count, the same as always
- * asking "how many ayahs lie before the end" — the boundary a plan
- * running off the last page needs to detect that, not a further guess at
- * pages that do not exist.
+ * Cached per start and direction: a daily schedule asks this for the same
+ * anchor a few hundred times.
  */
-export function ayahsBeforePage(page: number): number {
-  const p = Math.max(1, Math.min(TOTAL_PAGES + 1, page));
-  const whole = Math.floor(p);
-  const before = whole > TOTAL_PAGES ? TOTAL_AYAHS : ayahsBeforePosition(startOfPage(whole));
-  const frac = p - whole;
-  if (frac <= 0) return before;
-  const nextWhole = whole + 1;
-  const beforeNext = nextWhole > TOTAL_PAGES ? TOTAL_AYAHS : ayahsBeforePosition(startOfPage(nextWhole));
-  return before + (beforeNext - before) * frac;
-}
+const walkCache = new Map<string, Float64Array>();
 
-/** Exactly which page a position falls on, read off the real per-page
- *  layout data — the page whose own start is the latest one at or before
- *  this position. */
-export function pageOfPosition(pos: Position): number {
-  const key = pos.surah * 1000 + pos.ayah;
-  let lo = 0;
-  let hi = PAGE_STARTS.length - 1;
-  let page = 1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    const [s, a] = PAGE_STARTS[mid];
-    if (s * 1000 + a <= key) {
-      page = mid + 1; // 1-indexed
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
+function walkedPages(start: Position, direction: Direction): Float64Array {
+  const key = `${start.surah}:${start.ayah}:${direction}`;
+  const hit = walkCache.get(key);
+  if (hit) return hit;
+
+  const order = surahOrder(direction);
+  const startIdx = order.indexOf(start.surah);
+  const cumulative: number[] = [0];
+  if (startIdx !== -1) {
+    let pages = 0;
+    for (let i = startIdx; i < order.length; i++) {
+      const s = getSurahById(order[i])!;
+      const from = i === startIdx ? Math.max(1, Math.min(start.ayah, s.ayahs)) : 1;
+      const base = SURAH_OFFSET[s.id];
+      for (let a = from; a <= s.ayahs; a++) {
+        pages += 1 / PAGE_AYAHS[AYAH_PAGE[base + a - 1]];
+        cumulative.push(pages);
+      }
     }
   }
-  return page;
+
+  const out = Float64Array.from(cumulative);
+  if (walkCache.size >= 64) walkCache.clear();
+  walkCache.set(key, out);
+  return out;
 }
 
 /** First and last page of a juz, from the real boundaries. */
@@ -231,26 +246,31 @@ function juzOfPage(page: number): number {
 }
 
 /**
- * A page target, in ayahs — measured between two points on the page line
- * rather than accumulated surah by surah.
+ * A page target, in ayahs: how many ayahs, walked from `start` in
+ * `direction`, make up `pages` pages of text.
  *
- * `pages` counts the page `start` is already on as the first of them: one
- * page means just that page, in full. The span is [from, from+pages-1]
- * forward or [from-pages+1, from] in hifz — pages-1 pages *beyond* the
- * starting one, not pages-worth on top of it. Getting the +1 on the wrong
- * side here once made "1 page" measure two real pages: correct from the
- * second page a cursor stood on, because both ends of that difference
- * carried the same extra page and it cancelled — but wrong on the very
- * first page anywhere a walk starts, where there is no earlier call for
- * it to cancel against, and "1 page" quietly became 2.
+ * From the top of a page this lands exactly on page boundaries — "2 pages"
+ * from An-Nisa 1 is An-Nisa 1–11, pages 77 and 78, and not one ayah of 79.
+ * A fraction of a page is split in proportion to the ayahs on the page the
+ * walk has reached.
  */
 export function ayahsForPages(start: Position, direction: Direction, pages: number): number {
   if (pages <= 0) return 0;
-  const from = pageOfPosition(start);
-  const to = direction === "hifz" ? from - pages : from + pages;
-  const a = ayahsBeforePage(direction === "hifz" ? to + 1 : from);
-  const b = ayahsBeforePage(direction === "hifz" ? from + 1 : to);
-  return Math.max(0, Math.round(Math.abs(b - a)));
+  const walked = walkedPages(start, direction);
+  const n = walked.length - 1;
+  if (n === 0) return 0;
+  if (pages >= walked[n] - 1e-9) return n;
+
+  // First ayah count whose running total reaches the target.
+  let lo = 1;
+  let hi = n;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (walked[mid] >= pages - 1e-9) hi = mid;
+    else lo = mid + 1;
+  }
+  const frac = (pages - walked[lo - 1]) / (walked[lo] - walked[lo - 1]);
+  return Math.max(0, Math.round(lo - 1 + Math.min(1, Math.max(0, frac))));
 }
 
 /**

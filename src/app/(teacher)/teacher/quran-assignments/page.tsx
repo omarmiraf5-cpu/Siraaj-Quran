@@ -634,12 +634,11 @@ export default function QuranAssignmentsPage() {
             <AlertGlyph colour="#b8860b" />
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold tracking-tight text-amber-700">
-                {studentLabel} finished {surah_name} — has he been tested on the whole surah?
+                {studentLabel} has reached the end of {surah_name} — test the whole surah
               </p>
               <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
-                The next lesson moves into a new surah. Confirm he&apos;s been heard reciting all of{" "}
-                {surah_name} before the plan schedules anything from the next one — until then, no
-                new lesson is generated for him.
+                Once {studentLabel} has recited all of {surah_name} to you, confirm it here. The next
+                lesson won&apos;t be scheduled until you do.
               </p>
             </div>
             <button

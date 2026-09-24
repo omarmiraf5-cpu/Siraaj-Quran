@@ -748,7 +748,7 @@ export const JUZ_START_PAGES: number[] = [1, 22, 42, 62, 82, 102, 121, 142, 162,
  * ayahs evenly across its page span, which can drift by a page or more
  * within a single long surah (confirmed: interpolation put An-Nisa 12 on
  * page 78; the real mushaf has it starting page 79). This is the exact
- * ground truth pageOfPosition/ayahsBeforePage walk against. */
+ * ground truth all of mushafPlan's page math is built from. */
 export const PAGE_STARTS: Array<[number, number]> = [
   [1,1], [2,1], [2,6], [2,17], [2,25], [2,30], [2,38], [2,49], [2,58], [2,62],
   [2,70], [2,77], [2,84], [2,89], [2,94], [2,102], [2,106], [2,113], [2,120], [2,127],

@@ -3,7 +3,15 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addDays } from "@/lib/planDates";
-import { dailyPaceOf, dailySchedule, surahName } from "@/lib/mushafPlan";
+import { getSurahById } from "@/data/mushaf-index";
+import {
+  dailyPaceOf,
+  dailySchedule,
+  surahName,
+  surahOrder,
+  type Direction,
+  type Position,
+} from "@/lib/mushafPlan";
 import {
   computePlanProgress,
   evaluateAlerts,
@@ -13,11 +21,13 @@ import {
 } from "@/lib/yearlyPlan";
 import {
   PLANS,
+  decodePlan,
   isFailure,
   loadCalendarForSchool,
-  loadPlan,
+  loadMilestonesAndEntries,
   requireCaller,
   resyncDailyRateMilestones,
+  type LoadedPlan,
 } from "@/lib/yearlyPlanServer";
 
 /**
@@ -96,24 +106,28 @@ export async function syncAutoAssignments(
   try {
     const { data: rows, error } = await supabase
       .from(PLANS)
-      .select("id, school_id, teacher_id")
+      .select("*")
       .eq("student_id", studentId)
       .eq("status", "active")
       .order("academic_year", { ascending: false })
       .limit(1);
     if (error) throw error;
-    const row = rows?.[0] as { id: string; school_id: string; teacher_id: string } | undefined;
+    const row = rows?.[0] as ({ id: string; school_id: string; teacher_id: string } & Record<string, unknown>) | undefined;
     if (!row) return null;
 
-    const loaded = await loadPlan(supabase, row.id);
-    if (!loaded) return null;
+    const [rest, cal] = await Promise.all([
+      loadMilestonesAndEntries(supabase, row.id),
+      loadCalendarForSchool(supabase, row.school_id),
+    ]);
+    const loaded: LoadedPlan = { plan: decodePlan(row), ...rest };
 
     loaded.milestones = await resyncDailyRateMilestones(
       supabase,
       loaded.plan,
       row.school_id,
       loaded.milestones,
-      loaded.entries
+      loaded.entries,
+      cal
     );
 
     const alerts = evaluateAlerts(loaded.plan, loaded.milestones, loaded.entries, today);
@@ -131,7 +145,6 @@ export async function syncAutoAssignments(
       return summary; // An unanchored plan has no position to generate from.
     }
 
-    const cal = await loadCalendarForSchool(supabase, row.school_id);
     const dailyAmount = dailyPaceOf(plan, cal, progress.totalUnits);
     if (dailyAmount == null) return summary;
 
@@ -139,67 +152,69 @@ export async function syncAutoAssignments(
 
     // Where the generator itself last left off — never the most recent row
     // of any kind, which a manual correction could move out of sequence.
-    const { data: lastAutoRows, error: lastAutoError } = await admin
-      .from(ASSIGNMENTS)
-      .select("surah_end, due_date")
-      .eq("student_id", studentId)
-      .eq("portion", "new")
-      .eq("source", "auto")
-      .order("due_date", { ascending: false })
-      .limit(1);
+    const [
+      { data: lastAutoRows, error: lastAutoError },
+      { data: confirmedRows, error: confirmedError },
+    ] = await Promise.all([
+      admin
+        .from(ASSIGNMENTS)
+        .select("surah, ayah_start, surah_end, ayah_end, due_date")
+        .eq("student_id", studentId)
+        .eq("portion", "new")
+        .eq("source", "auto")
+        .order("due_date", { ascending: false })
+        .limit(1),
+      admin.from(CONFIRMATIONS).select("surah").eq("student_id", studentId),
+    ]);
     if (lastAutoError) throw lastAutoError;
-    const lastAuto = lastAutoRows?.[0] as { surah_end: number; due_date: string } | undefined;
-
-    const generateFrom = lastAuto ? addDays(lastAuto.due_date, 1) : plan.starts_on;
-    if (generateFrom > today) return summary; // Already caught up.
-
-    const start = { surah: plan.start_surah, ayah: plan.start_ayah };
-    const dayRows = dailySchedule(
-      start,
-      plan.direction,
-      plan.unit,
-      dailyAmount,
-      plan.starts_on,
-      generateFrom,
-      today,
-      cal
-    );
-    if (dayRows.length === 0) return summary;
-
-    const { data: confirmedRows, error: confirmedError } = await admin
-      .from(CONFIRMATIONS)
-      .select("surah")
-      .eq("student_id", studentId);
     if (confirmedError) throw confirmedError;
+    const lastAuto = lastAutoRows?.[0] as
+      | { surah: number; ayah_start: number; surah_end: number; ayah_end: number; due_date: string }
+      | undefined;
     const confirmed = new Set((confirmedRows ?? []).map((r) => r.surah as number));
 
-    // A surah only needs confirming once the walk actually leaves it for a
-    // new one — the first row ever generated has nothing before it to
-    // confirm, so priorSurah starts null and the gate simply does not
-    // apply until there is a real transition to judge.
-    let priorSurah: number | null = lastAuto ? lastAuto.surah_end : null;
+    // Nothing new is due while the generator is already caught up, but a
+    // surah the last lesson finished is still reported, so the teacher
+    // is asked to confirm it straight away rather than on the morning the
+    // next lesson falls due.
+    // Never past the plan's own last day: a plan that has ended has nothing
+    // left to assign, however long after that someone opens the list.
+    const generateFrom = lastAuto ? addDays(lastAuto.due_date, 1) : plan.starts_on;
+    const until = today < plan.ends_on ? today : plan.ends_on;
+    const dayRows =
+      generateFrom > until
+        ? []
+        : dailySchedule(
+            { surah: plan.start_surah, ayah: plan.start_ayah },
+            plan.direction,
+            plan.unit,
+            dailyAmount,
+            plan.starts_on,
+            generateFrom,
+            until,
+            cal
+          );
+
+    // The gate sits between days: any surah a generated lesson finished
+    // has to be confirmed as tested before the *next* day's lesson is
+    // written. It cannot sit inside a day — in Juz 'Amma a single page is
+    // often three whole surahs (page 604 is An-Nas, Al-Falaq and
+    // Al-Ikhlas), so a gate that refused any lesson crossing a surah
+    // boundary would refuse the very first lesson of the plan, before the
+    // student had been given anything to be tested on. Seeded from the
+    // last lesson already written, so a gate raised on an earlier visit is
+    // still standing on this one.
+    const blocking: number[] = lastAuto
+      ? surahsCompletedIn(
+          { surah: lastAuto.surah, ayah: lastAuto.ayah_start },
+          { surah: lastAuto.surah_end, ayah: lastAuto.ayah_end },
+          plan.direction
+        ).filter((s) => !confirmed.has(s))
+      : [];
     const toInsert: Record<string, unknown>[] = [];
-    let pending: PendingSurahConfirmation | null = null;
 
     for (const day of dayRows) {
-      // Crossing between two days: the previous day's row ended exactly on
-      // a surah's last ayah, and this one starts fresh in the next.
-      if (priorSurah != null && day.from.surah !== priorSurah && !confirmed.has(priorSurah)) {
-        pending = { surah: priorSurah, surah_name: surahName(priorSurah) };
-        break;
-      }
-      // Crossing within a single day: a short surah near the end of a juz
-      // can be only a few ayahs — well under a full day's pace — so one
-      // day's own portion often finishes it and starts the next surah in
-      // the same row. That row would hand over new-surah material before
-      // the surah it opens with has been confirmed, which is exactly the
-      // case above is meant to prevent; it just cannot be read off
-      // `day.from.surah` alone, since here the row *does* start in
-      // already-confirmed territory.
-      if (day.to.surah !== day.from.surah && !confirmed.has(day.from.surah)) {
-        pending = { surah: day.from.surah, surah_name: surahName(day.from.surah) };
-        break;
-      }
+      if (blocking.length > 0) break;
       toInsert.push({
         student_id: studentId,
         teacher_id: row.teacher_id,
@@ -213,9 +228,13 @@ export async function syncAutoAssignments(
         status: "assigned",
         source: "auto",
       });
-      priorSurah = day.to.surah;
+      for (const s of surahsCompletedIn(day.from, day.to, plan.direction)) {
+        if (!confirmed.has(s)) blocking.push(s);
+      }
     }
-    summary.pending_confirmation = pending;
+    if (blocking.length > 0) {
+      summary.pending_confirmation = { surah: blocking[0], surah_name: surahName(blocking[0]) };
+    }
 
     if (toInsert.length > 0) {
       const { error: insError } = await admin.from(ASSIGNMENTS).insert(toInsert);
@@ -234,4 +253,21 @@ export async function syncAutoAssignments(
     console.error("Quranic assignments: could not auto-sync from the yearly plan", error);
     return null;
   }
+}
+
+/**
+ * The surahs a lesson from `from` to `to` finishes, in the order it
+ * finishes them: every surah it passes out of, plus the last one if the
+ * lesson ends on its final ayah. A lesson that stops partway through a
+ * surah has not finished it, so that surah is not asked about yet.
+ */
+function surahsCompletedIn(from: Position, to: Position, direction: Direction): number[] {
+  const order = surahOrder(direction);
+  const first = order.indexOf(from.surah);
+  const last = order.indexOf(to.surah);
+  if (first === -1 || last === -1 || last < first) return [];
+
+  const out = order.slice(first, last);
+  if (to.ayah >= (getSurahById(to.surah)?.ayahs ?? Infinity)) out.push(to.surah);
+  return out;
 }
