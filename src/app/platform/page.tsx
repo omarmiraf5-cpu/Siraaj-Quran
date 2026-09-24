@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { placeLabel } from "@/lib/places";
 
 interface School {
   id: string;
@@ -11,6 +12,7 @@ interface School {
   slug: string;
   city: string;
   province: string;
+  country: string | null;
   plan: string;
   active: boolean;
   created_at: string;
@@ -211,7 +213,7 @@ export default function PlatformPage() {
                       <td className="px-5 py-4">
                         <p className="font-semibold text-ink">{s.name}</p>
                         <p className="text-ink-muted text-xs">
-                          {s.city}, {s.province} · {s.slug}
+                          {placeLabel(s.city, s.province, s.country)} · {s.slug}
                         </p>
                       </td>
                       <td className="px-5 py-4">

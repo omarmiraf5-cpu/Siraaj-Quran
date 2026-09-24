@@ -1,6 +1,7 @@
 import "server-only";
 
 import { emailButton, emailLayout, escapeHtml, sendEmail, type EmailResult } from "@/lib/email";
+import { placeLabel } from "@/lib/places";
 import { NEW_SCHOOL_ALERT_EMAIL, SITE_URL } from "@/lib/site";
 
 /** What the owner is told about a school that has just finished signing up. */
@@ -8,6 +9,8 @@ export interface NewSchool {
   name: string;
   city: string;
   province: string;
+  /** ISO 3166 code. */
+  country: string;
   adminName: string;
   adminEmail: string;
   halaqas: number;
@@ -23,7 +26,7 @@ export interface NewSchool {
  */
 export function newSchoolAlertEmail(school: NewSchool) {
   const name = school.name.replace(/\s+/g, " ").trim();
-  const place = [school.city, school.province].map((s) => s.trim()).filter(Boolean).join(", ");
+  const place = placeLabel(school.city, school.province, school.country);
   const dashboard = `${SITE_URL}/platform`;
   const rows: Array<[string, string]> = [
     ["Admin", school.adminName.trim()],

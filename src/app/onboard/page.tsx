@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { countriesByName, countryOfTimeZone, countryTimeZones, placeLabel, timeZoneLabel } from "@/lib/places";
 
 type Step =
   | "welcome"
@@ -33,8 +34,48 @@ const STEP_LABELS: Record<Step, string> = {
 interface SchoolForm {
   name: string;
   city: string;
+  /** ISO 3166 code, e.g. "CA", "SO". */
+  country: string;
+  /** A Canadian province's code; anywhere else, whatever state or region was typed (may be blank). */
   province: string;
+  /** IANA zone; "" until one is chosen in a country with several. */
   timezone: string;
+}
+
+const CA_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"];
+
+// Canada's main zones, and the province most of each one's schools are in,
+// so a Canadian device starts on a sensible province. Anyone else picks.
+const CA_PROVINCE_BY_ZONE: Record<string, string> = {
+  "America/Vancouver": "BC",
+  "America/Edmonton": "AB",
+  "America/Regina": "SK",
+  "America/Winnipeg": "MB",
+  "America/Toronto": "ON",
+  "America/Halifax": "NS",
+  "America/Moncton": "NB",
+  "America/St_Johns": "NL",
+  "America/Whitehorse": "YT",
+};
+
+/** The time zone this device is set to, e.g. "Africa/Mogadishu". */
+function deviceZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The school step's fields for a country: its only time zone, or the
+ * device's own if it's one of several there (else left for the person to
+ * choose), and for Canada the province that zone points to.
+ */
+function placeFor(country: string, deviceZone: string): Pick<SchoolForm, "country" | "province" | "timezone"> {
+  const zones = countryTimeZones(country);
+  const timezone = zones.includes(deviceZone) ? deviceZone : zones.length === 1 ? zones[0] : "";
+  return { country, timezone, province: country === "CA" ? (CA_PROVINCE_BY_ZONE[timezone] ?? "") : "" };
 }
 interface AdminForm {
   fullName: string;
@@ -104,7 +145,25 @@ export default function OnboardPage() {
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
 
-  const [school, setSchool] = useState<SchoolForm>({ name: "", city: "", province: "AB", timezone: "America/Edmonton" });
+  const [school, setSchool] = useState<SchoolForm>({
+    name: "",
+    city: "",
+    country: "CA",
+    province: "AB",
+    timezone: "America/Edmonton",
+  });
+  const countries = useMemo(() => countriesByName("en"), []);
+  const zones = useMemo(() => countryTimeZones(school.country), [school.country]);
+  const pickCountry = (country: string) => setSchool((s) => ({ ...s, ...placeFor(country, deviceZone()) }));
+
+  // Start where the device is: a school signing up from Mogadishu opens on
+  // Somalia, one in Toronto on Canada and Ontario. A device whose zone isn't
+  // any country's keeps the defaults above.
+  useEffect(() => {
+    const zone = deviceZone();
+    const country = countryOfTimeZone(zone);
+    if (country) setSchool((s) => ({ ...s, ...placeFor(country, zone) }));
+  }, []);
   const [admin, setAdmin] = useState<AdminForm>({ fullName: "", email: "", password: "" });
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -298,7 +357,12 @@ export default function OnboardPage() {
   const canProceed = () => {
     switch (step) {
       case "school":
-        return school.name.trim() && school.city.trim();
+        return (
+          school.name.trim() &&
+          school.city.trim() &&
+          school.timezone &&
+          (school.country !== "CA" || school.province)
+        );
       case "admin":
         return admin.fullName.trim() && admin.email.trim() && admin.password.length >= 8;
       case "teachers":
@@ -422,40 +486,67 @@ export default function OnboardPage() {
                 className={inputClass}
               />
             </div>
+            <div>
+              <label className={labelClass}>Country</label>
+              <select value={school.country} onChange={(e) => pickCountry(e.target.value)} className={inputClass}>
+                {countries.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>City</label>
                 <input
                   value={school.city}
                   onChange={(e) => setSchool({ ...school, city: e.target.value })}
-                  placeholder="e.g., Edmonton"
+                  placeholder={school.country === "CA" ? "e.g., Edmonton" : "City or town"}
                   className={inputClass}
                 />
               </div>
-              <div>
-                <label className={labelClass}>Province</label>
-                <select
-                  value={school.province}
-                  onChange={(e) => setSchool({ ...school, province: e.target.value })}
-                  className={inputClass}
-                >
-                  {["AB", "ON", "BC", "MB", "SK", "QC", "NB", "NS", "PE", "NL"].map((p) => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
+              {school.country === "CA" ? (
+                <div>
+                  <label className={labelClass}>Province</label>
+                  <select
+                    value={school.province}
+                    onChange={(e) => setSchool({ ...school, province: e.target.value })}
+                    className={inputClass}
+                  >
+                    {!school.province && <option value="">Choose…</option>}
+                    {CA_PROVINCES.map((p) => (
+                      <option key={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className={labelClass}>
+                    State or region <span className="font-normal text-ink-muted">(optional)</span>
+                  </label>
+                  <input
+                    value={school.province}
+                    onChange={(e) => setSchool({ ...school, province: e.target.value })}
+                    placeholder="State, province or region"
+                    className={inputClass}
+                  />
+                </div>
+              )}
             </div>
             <div>
-              <label className={labelClass}>Timezone</label>
+              <label className={labelClass}>Time zone</label>
               <select
                 value={school.timezone}
                 onChange={(e) => setSchool({ ...school, timezone: e.target.value })}
                 className={inputClass}
               >
-                <option value="America/Edmonton">America/Edmonton</option>
-                <option value="America/Toronto">America/Toronto</option>
-                <option value="America/Vancouver">America/Vancouver</option>
-                <option value="America/Winnipeg">America/Winnipeg</option>
+                {!school.timezone && <option value="">Choose a time zone…</option>}
+                {zones.map((z) => (
+                  <option key={z} value={z}>
+                    {timeZoneLabel(z)}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex justify-between pt-2">
@@ -832,7 +923,8 @@ export default function OnboardPage() {
           <div className="card-quiet p-8 space-y-5">
             <h2 className="text-xl font-bold text-ink">Review &amp; confirm</h2>
             <div className="space-y-3 text-sm">
-              <p><span className="text-ink-muted">School:</span> <span className="font-semibold text-ink">{school.name}, {school.city}, {school.province}</span></p>
+              <p><span className="text-ink-muted">School:</span> <span className="font-semibold text-ink">{school.name}, {placeLabel(school.city, school.province, school.country)}</span></p>
+              <p><span className="text-ink-muted">Time zone:</span> <span className="font-semibold text-ink">{school.timezone ? timeZoneLabel(school.timezone) : "—"}</span></p>
               <p><span className="text-ink-muted">Admin:</span> <span className="font-semibold text-ink">{admin.fullName} ({admin.email})</span></p>
               <p><span className="text-ink-muted">Teachers:</span> <span className="font-semibold text-ink">{teachers.length}</span></p>
               <p><span className="text-ink-muted">Students:</span> <span className="font-semibold text-ink">{students.length}</span></p>

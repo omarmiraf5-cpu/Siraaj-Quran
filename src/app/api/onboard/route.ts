@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNewSchoolAlert } from "@/lib/newSchoolAlert";
 import { sendSchoolWelcome } from "@/lib/schoolWelcome";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
+import { isTimeZone } from "@/lib/places";
 import { after, NextRequest, NextResponse } from "next/server";
 
 // Bootstraps a brand-new school: no admin session exists yet to gate this
@@ -10,7 +11,9 @@ import { after, NextRequest, NextResponse } from "next/server";
 // entirely through the service-role client.
 
 interface OnboardingData {
-  school: { name: string; city: string; province: string; timezone: string };
+  // country: ISO 3166 code. province: a Canadian province's code, or
+  // elsewhere whatever state or region was typed, possibly blank.
+  school: { name: string; city: string; country?: string; province?: string; timezone: string };
   admin: { fullName: string; email: string; password: string };
   teachers: Array<{ name: string; email: string; halaqa: string }>;
   students: Array<{ name: string; age: number; halaqa: string }>;
@@ -37,12 +40,20 @@ function approximateDateOfBirth(age: number): string {
   return `${birthYear}-01-01`;
 }
 
+// The school code students type or open a link with. Accents are folded
+// away first ("École" becomes "ecole", not "cole"), and a name with no
+// Latin letters at all, say one written in Arabic, falls back to "school"
+// (made unique below) rather than an empty code.
 function slugify(name: string) {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+  return (
+    name
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "school"
+  );
 }
 
 function initials(fullName: string) {
@@ -69,6 +80,14 @@ export async function POST(request: NextRequest) {
     if (!data.school?.name || !data.admin?.email || !data.admin?.password) {
       return NextResponse.json({ error: "School name, admin email, and password are required" }, { status: 400 });
     }
+    // Any country's zone, but a real one: every date a school sees (today's
+    // attendance, due dates, the calendar) is worked out in it.
+    if (!isTimeZone(data.school.timezone)) {
+      return NextResponse.json({ error: "Choose your school's time zone." }, { status: 400 });
+    }
+    // Missing only from a sign-up form loaded before countries were offered,
+    // which listed Canadian provinces and zones alone.
+    const country = /^[A-Z]{2}$/.test(data.school.country ?? "") ? (data.school.country as string) : "CA";
 
     // Checked up front, before anything is created: a collision discovered
     // partway through (e.g. on the third teacher) would already have left a
@@ -124,17 +143,24 @@ export async function POST(request: NextRequest) {
       slug = `${baseSlug}-${i}`;
     }
 
-    const { data: school, error: schoolError } = await admin
+    const schoolRow = {
+      name: data.school.name.trim(),
+      slug,
+      city: (data.school.city ?? "").trim(),
+      province: (data.school.province ?? "").trim(),
+      timezone: data.school.timezone,
+    };
+    let { data: school, error: schoolError } = await admin
       .from("schools")
-      .insert({
-        name: data.school.name.trim(),
-        slug,
-        city: data.school.city.trim() || "Edmonton",
-        province: data.school.province || "AB",
-        timezone: data.school.timezone || "America/Edmonton",
-      })
+      .insert({ ...schoolRow, country })
       .select()
       .single();
+    // A database that hasn't had schema.sql re-run since schools.country was
+    // added has nowhere to keep it: the school is created without it rather
+    // than not at all.
+    if (schoolError && /country/.test(schoolError.message) && ["PGRST204", "42703"].includes(schoolError.code)) {
+      ({ data: school, error: schoolError } = await admin.from("schools").insert(schoolRow).select().single());
+    }
     if (schoolError) throw new Error(`School creation failed: ${schoolError.message}`);
 
     schoolId = school.id as string;
@@ -317,6 +343,7 @@ export async function POST(request: NextRequest) {
         name: school.name,
         city: school.city,
         province: school.province,
+        country,
         adminName: data.admin.fullName,
         adminEmail,
         ...counts,

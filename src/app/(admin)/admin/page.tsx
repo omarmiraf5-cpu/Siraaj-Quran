@@ -210,7 +210,7 @@ export default function AdminDashboard() {
         eyebrow={t("common.schoolOverview")}
         title={school.name}
         meta={[
-          `${school.city}, ${school.province}`,
+          [school.city, school.province].filter(Boolean).join(", "),
           formatDay(DEMO_TODAY, language),
           `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
         ]}

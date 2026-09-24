@@ -28,17 +28,31 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  const { data: schools, error } = await admin
+  // "*" rather than a column list: schools.country is only there once
+  // schema.sql has been re-run, and naming it before then would fail the
+  // whole list instead of just leaving the country off.
+  const { data: rows, error } = await admin
     .from("schools")
-    .select("id, name, slug, city, province, plan, active, created_at")
+    .select("*")
     .order("created_at", { ascending: false });
+  const schools = (rows ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    slug: s.slug,
+    city: s.city,
+    province: s.province,
+    country: s.country ?? null,
+    plan: s.plan,
+    active: s.active,
+    created_at: s.created_at,
+  }));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   const enriched = await Promise.all(
-    (schools ?? []).map(async (school) => {
+    schools.map(async (school) => {
       const [{ count: studentCount }, { count: teacherCount }, { data: admins }] = await Promise.all([
         admin.from("students").select("id", { count: "exact", head: true }).eq("school_id", school.id),
         admin

@@ -40,6 +40,13 @@ alter table schools enable row level security;
 -- Migration for schools created before the portal could be white-labelled.
 alter table schools add column if not exists name_arabic text;
 
+-- Which country the school is in, as an ISO 3166 code ('CA', 'SO', 'GB'…):
+-- schools can sign up from anywhere. Every school from before it existed
+-- was Canadian, which the default fills in for them. For a Canadian school
+-- `province` holds the province's code; anywhere else, the state or region
+-- as typed, or nothing.
+alter table schools add column if not exists country text not null default 'CA';
+
 -- ══════════════════════════════════════
 -- Profiles (extends auth.users)
 -- ══════════════════════════════════════
