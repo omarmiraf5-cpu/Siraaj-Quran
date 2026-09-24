@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addDays } from "@/lib/planDates";
+import { isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
 import { getSurahById } from "@/data/mushaf-index";
 import {
   dailyPaceOf,
@@ -150,10 +151,20 @@ export async function syncAutoAssignments(
 
     const admin = createAdminClient() as unknown as Db;
 
-    // Where the generator itself last left off — never the most recent row
-    // of any kind, which a manual correction could move out of sequence.
+    // The next school day's lesson is written ahead of time, so a teacher
+    // can see on Thursday what a weekend class starts with on Saturday, and
+    // on Saturday what Sunday brings. Never past the plan's own last day: a
+    // plan that has ended has nothing left to assign.
+    const lookahead = nextInstructionalDay(today, cal);
+    const until = lookahead < plan.ends_on ? lookahead : plan.ends_on;
+
+    // Where the generator itself last left off up to today — never the most
+    // recent row of any kind, which a manual correction could move out of
+    // sequence. Lessons already written for later days are read separately:
+    // they are still only a preview, and are checked against the plan below.
     const [
       { data: lastAutoRows, error: lastAutoError },
+      { data: aheadRows, error: aheadError },
       { data: confirmedRows, error: confirmedError },
     ] = await Promise.all([
       admin
@@ -162,25 +173,27 @@ export async function syncAutoAssignments(
         .eq("student_id", studentId)
         .eq("portion", "new")
         .eq("source", "auto")
+        .lte("due_date", today)
         .order("due_date", { ascending: false })
         .limit(1),
+      admin
+        .from(ASSIGNMENTS)
+        .select("id, surah, ayah_start, surah_end, ayah_end, due_date, status, memorization_level, daily_rating, teacher_notes")
+        .eq("student_id", studentId)
+        .eq("portion", "new")
+        .eq("source", "auto")
+        .gt("due_date", today),
       admin.from(CONFIRMATIONS).select("surah").eq("student_id", studentId),
     ]);
     if (lastAutoError) throw lastAutoError;
+    if (aheadError) throw aheadError;
     if (confirmedError) throw confirmedError;
     const lastAuto = lastAutoRows?.[0] as
       | { surah: number; ayah_start: number; surah_end: number; ayah_end: number; due_date: string }
       | undefined;
     const confirmed = new Set((confirmedRows ?? []).map((r) => r.surah as number));
 
-    // Nothing new is due while the generator is already caught up, but a
-    // surah the last lesson finished is still reported, so the teacher
-    // is asked to confirm it straight away rather than on the morning the
-    // next lesson falls due.
-    // Never past the plan's own last day: a plan that has ended has nothing
-    // left to assign, however long after that someone opens the list.
     const generateFrom = lastAuto ? addDays(lastAuto.due_date, 1) : plan.starts_on;
-    const until = today < plan.ends_on ? today : plan.ends_on;
     const dayRows =
       generateFrom > until
         ? []
@@ -195,6 +208,37 @@ export async function syncAutoAssignments(
             cal
           );
 
+    // A lesson written ahead of its day goes stale if the plan is edited
+    // before that day comes — a new start date, pace or starting ayah. Any
+    // that no longer match are rewritten, as long as nobody has touched
+    // them yet; one a teacher has already graded or noted is left alone.
+    type AheadRow = {
+      id: string; surah: number; ayah_start: number; surah_end: number; ayah_end: number;
+      due_date: string; status: string; memorization_level: number;
+      daily_rating: string | null; teacher_notes: string | null;
+    };
+    let ahead = (aheadRows ?? []) as AheadRow[];
+    const expectedByDate = new Map(dayRows.map((d) => [d.date, d]));
+    const matches = (r: AheadRow) => {
+      const d = expectedByDate.get(r.due_date);
+      return (
+        !!d &&
+        d.from.surah === r.surah && d.from.ayah === r.ayah_start &&
+        d.to.surah === r.surah_end && d.to.ayah === r.ayah_end
+      );
+    };
+    const untouched = (r: AheadRow) =>
+      r.status === "assigned" && !r.memorization_level && r.daily_rating == null && r.teacher_notes == null;
+    if (!ahead.every(matches) && ahead.every(untouched)) {
+      const { error: delError } = await admin
+        .from(ASSIGNMENTS)
+        .delete()
+        .in("id", ahead.map((r) => r.id));
+      if (delError) throw delError;
+      ahead = [];
+    }
+    const alreadyWritten = new Set(ahead.map((r) => r.due_date));
+
     // The gate sits between days: any surah a generated lesson finished
     // has to be confirmed as tested before the *next* day's lesson is
     // written. It cannot sit inside a day — in Juz 'Amma a single page is
@@ -203,7 +247,9 @@ export async function syncAutoAssignments(
     // boundary would refuse the very first lesson of the plan, before the
     // student had been given anything to be tested on. Seeded from the
     // last lesson already written, so a gate raised on an earlier visit is
-    // still standing on this one.
+    // still standing on this one — and reported even when nothing new is
+    // due, so the teacher is asked straight away rather than on the
+    // morning the next lesson falls due.
     const blocking: number[] = lastAuto
       ? surahsCompletedIn(
           { surah: lastAuto.surah, ayah: lastAuto.ayah_start },
@@ -215,19 +261,21 @@ export async function syncAutoAssignments(
 
     for (const day of dayRows) {
       if (blocking.length > 0) break;
-      toInsert.push({
-        student_id: studentId,
-        teacher_id: row.teacher_id,
-        school_id: row.school_id,
-        surah: day.from.surah,
-        ayah_start: day.from.ayah,
-        surah_end: day.to.surah,
-        ayah_end: day.to.ayah,
-        portion: "new",
-        due_date: day.date,
-        status: "assigned",
-        source: "auto",
-      });
+      if (!alreadyWritten.has(day.date)) {
+        toInsert.push({
+          student_id: studentId,
+          teacher_id: row.teacher_id,
+          school_id: row.school_id,
+          surah: day.from.surah,
+          ayah_start: day.from.ayah,
+          surah_end: day.to.surah,
+          ayah_end: day.to.ayah,
+          portion: "new",
+          due_date: day.date,
+          status: "assigned",
+          source: "auto",
+        });
+      }
       for (const s of surahsCompletedIn(day.from, day.to, plan.direction)) {
         if (!confirmed.has(s)) blocking.push(s);
       }
@@ -270,4 +318,15 @@ function surahsCompletedIn(from: Position, to: Position, direction: Direction): 
   const out = order.slice(first, last);
   if (to.ayah >= (getSurahById(to.surah)?.ayahs ?? Infinity)) out.push(to.surah);
   return out;
+}
+
+/** The first school day after `today`, by the school's own calendar.
+ *  Bounded, so a calendar with no school days at all cannot loop forever;
+ *  past the bound it simply looks no further ahead than today. */
+function nextInstructionalDay(today: string, cal: SchoolCalendar): string {
+  let day = addDays(today, 1);
+  for (let i = 0; i < 120; i++, day = addDays(day, 1)) {
+    if (isInstructionalDay(day, cal)) return day;
+  }
+  return today;
 }
