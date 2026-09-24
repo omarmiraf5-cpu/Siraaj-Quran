@@ -592,6 +592,16 @@ export function MilestoneMushafModal({
       onClose={onClose}
     >
       <Mushaf
+        // Forces a fresh mount whenever the milestone actually opened
+        // changes. Mushaf seeds its page with useState(() => initialPage),
+        // which — correctly — only runs once per component instance; if
+        // this modal ever moves from one milestone straight to another
+        // without a render in between where it returned null (a `key` that
+        // doesn't change gives React no reason to treat that as a new
+        // instance), it would carry on showing the previous milestone's
+        // page and ignore the new one, looking exactly like the surah's
+        // own opening page never actually got fixed.
+        key={`${milestone.from_surah}:${milestone.from_ayah}`}
         // The range's own starting page — not the surah's opening page,
         // which only happens to be the same thing for a milestone that
         // starts right at the beginning of its surah. Every other
