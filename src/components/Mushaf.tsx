@@ -56,7 +56,8 @@ const RECITERS: Reciter[] = [
     name: "Al-Minshawi",
     sources: [
       { host: "islamic", edition: "ar.minshawi", bitrate: 128 },
-      { host: "everyayah", folder: "Minshawi_Murattal_128kbps" },
+      // EveryAyah spells him "Minshawy"; the "Minshawi_..." folder 404s.
+      { host: "everyayah", folder: "Minshawy_Murattal_128kbps" },
     ],
   },
   {
