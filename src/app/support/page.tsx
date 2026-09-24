@@ -20,8 +20,9 @@ export default function SupportPage() {
 
       <h2>I forgot my password</h2>
       <p>
-        Ask your school&apos;s office. They can give you a new temporary password, and you&apos;ll choose your own the
-        next time you sign in.
+        On the sign-in screen, tap <Link href="/forgot-password">Forgot your password?</Link> and enter the email you
+        sign in with. We&apos;ll email you a link to choose a new one. It can take a minute, so check your spam folder
+        too. Your school&apos;s office can also give you a new temporary password.
       </p>
 
       <h2>A student can&apos;t sign in</h2>

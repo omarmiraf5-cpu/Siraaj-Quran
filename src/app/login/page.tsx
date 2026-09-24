@@ -71,6 +71,9 @@ const STUDENT_AVATARS = [
 // roster without the ?school= link — which the MyDiiwaan app never receives.
 const SCHOOL_KEY = "mydiiwaan_school";
 
+// The email typed here, handed to /forgot-password (which reads the same key).
+const RESET_EMAIL_KEY = "mydiiwaan_reset_email";
+
 interface RosterStudent {
   id: string;
   first_name: string;
@@ -557,13 +560,18 @@ export default function LoginPage() {
                 {loading ? t("login.signingIn") : `${t("login.signInTo")} ${t(ROLES.find((r) => r.key === role)?.portalKey ?? "")}`}
               </button>
 
-              {/* Plain text, not a link: there's no self-service reset, and
-                  a link that goes nowhere reads as a broken page. A school's
-                  own admin issues a new temporary password from the Teachers
-                  or Parents page. */}
-              <p className="text-center text-white/55 text-xs leading-relaxed px-4">
+              {/* Hands over whatever email is already typed, so it's there
+                  waiting on the reset page — through sessionStorage rather
+                  than the URL, which would carry it into server logs. */}
+              <Link
+                href="/forgot-password"
+                onClick={() => {
+                  try { sessionStorage.setItem(RESET_EMAIL_KEY, email.trim()); } catch { /* private mode */ }
+                }}
+                className="block text-center text-white/65 hover:text-white text-xs font-semibold underline-offset-2 hover:underline transition-colors"
+              >
                 {t("login.forgotPassword")}
-              </p>
+              </Link>
 
               {SHOW_DEMO_LOGINS && (
                 <div className="mt-4 bg-white/5 border border-white/10 rounded-card px-4 py-3">
