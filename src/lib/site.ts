@@ -3,6 +3,6 @@
  * the app store listings. One place, so changing the address changes it
  * everywhere.
  */
-export const SUPPORT_EMAIL = "support@mydiiwaan.com";
+export const SUPPORT_EMAIL = "omar.miraf5@gmail.com";
 export const SITE_URL = "https://mydiiwaan.com";
 export const PRIVACY_UPDATED = "24 September 2026";

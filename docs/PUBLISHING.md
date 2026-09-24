@@ -14,9 +14,10 @@ Builds run on GitHub — no Mac needed. You do everything below from a browser.
 1. **Run the database update.** Supabase → SQL Editor → paste all of
    `supabase/schema.sql` → Run. It should say *Success*. Account deletion
    (which both stores require) needs it.
-2. **Support email.** The privacy policy, support page and store listings give
-   `support@mydiiwaan.com`. Create that mailbox, or tell Claude which address
-   to use instead (it is set in `src/lib/site.ts`).
+2. **Support email.** The privacy policy, support page and Account page give
+   `omar.miraf5@gmail.com` (set in `src/lib/site.ts` — change it there, or
+   ask Claude, and the site and apps follow at once; the store listings'
+   contact email is typed into each store's form and changed there).
 3. **Check the web address.** Open `mydiiwaan.com` in Safari. If the address
    bar changes to `www.mydiiwaan.com`, tell Claude — the app should then load
    the www address directly.
@@ -210,7 +211,7 @@ Add testers by email list, and share the opt-in link with them.
 - Feature graphic: `Google-Play/googleplay-feature-graphic-1024x500.png`
 - Phone screenshots: the `Google-Play/googleplay-phone-*.png` files.
 - Tablet screenshots (optional): the iPad images work for 10" tablets.
-- Category: **Education**. Contact email: `support@mydiiwaan.com`.
+- Category: **Education**. Contact email: `omar.miraf5@gmail.com`.
   Website: `https://mydiiwaan.com`.
 
 ### B8. Production
