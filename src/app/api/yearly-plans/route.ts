@@ -20,6 +20,7 @@ import {
   decodeMilestone,
   decodePlan,
   isFailure,
+  loadMilestonesAndEntries,
   loadPlan,
   milestoneTextColumns,
   newId,
@@ -30,6 +31,7 @@ import {
   requireTeacher,
   resyncDailyRateMilestones,
   routeError,
+  type LoadedPlan,
 } from "@/lib/yearlyPlanServer";
 
 /**
@@ -152,10 +154,13 @@ export async function GET(req: NextRequest) {
       rows.find((r) => r.status === "draft") ??
       rows[0];
 
-    const loaded = await loadPlan(supabase, preferred.id as string);
-    if (!loaded) {
-      return NextResponse.json({ plan: null, milestones: [], entries: [], alerts: [] });
-    }
+    // decodePlan straight off `preferred` rather than loadPlan(id), which
+    // would re-select the exact row already in hand above — one fewer
+    // sequential round trip on the single most common path through here.
+    const loaded: LoadedPlan = {
+      plan: decodePlan(preferred),
+      ...(await loadMilestonesAndEntries(supabase, preferred.id as string)),
+    };
     // Self-heals a plan whose dates were edited before its milestones were
     // rebuilt to match — see resyncDailyRateMilestones. A no-op on every
     // plan that is already in sync, which is almost all of them almost all

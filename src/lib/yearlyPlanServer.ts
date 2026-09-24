@@ -355,6 +355,28 @@ export interface LoadedPlan {
  * but is not yours" confirms another family's child has a plan; the route
  * turns both into the same 404.
  */
+/** The milestones and progress log alone, run together rather than one
+ *  after the other. Split out of loadPlan so a caller that already has the
+ *  plan row itself — GET already selected the whole list it picks
+ *  `preferred` out of — isn't paying for loadPlan's own redundant re-select
+ *  of a row it is holding in its hand. */
+export async function loadMilestonesAndEntries(
+  supabase: Db,
+  planId: string
+): Promise<Pick<LoadedPlan, "milestones" | "entries">> {
+  const [{ data: msRows, error: msError }, { data: prRows, error: prError }] = await Promise.all([
+    supabase.from(MILESTONES).select("*").eq("plan_id", planId).order("sequence"),
+    supabase.from(PROGRESS).select("*").eq("plan_id", planId).order("recorded_on"),
+  ]);
+  if (msError) throw msError;
+  if (prError) throw prError;
+
+  return {
+    milestones: (msRows ?? []).map(decodeMilestone),
+    entries: (prRows ?? []).map(decodeProgress),
+  };
+}
+
 export async function loadPlan(supabase: Db, planId: string): Promise<LoadedPlan | null> {
   const { data: planRow, error: planError } = await supabase
     .from(PLANS)
@@ -364,18 +386,8 @@ export async function loadPlan(supabase: Db, planId: string): Promise<LoadedPlan
   if (planError) throw planError;
   if (!planRow) return null;
 
-  const [{ data: msRows, error: msError }, { data: prRows, error: prError }] = await Promise.all([
-    supabase.from(MILESTONES).select("*").eq("plan_id", planId).order("sequence"),
-    supabase.from(PROGRESS).select("*").eq("plan_id", planId).order("recorded_on"),
-  ]);
-  if (msError) throw msError;
-  if (prError) throw prError;
-
-  return {
-    plan: decodePlan(planRow),
-    milestones: (msRows ?? []).map(decodeMilestone),
-    entries: (prRows ?? []).map(decodeProgress),
-  };
+  const { milestones, entries } = await loadMilestonesAndEntries(supabase, planId);
+  return { plan: decodePlan(planRow), milestones, entries };
 }
 
 /* ── Calendar loading ─────────────────────────────────────────────────── */
@@ -578,50 +590,55 @@ export async function syncPlanAlerts(
     const open = (openRows ?? []) as Record<string, unknown>[];
     const openByCode = new Map(open.map((r) => [r.code as string, r]));
     const currentByCode = new Map(current.map((a) => [a.code, a]));
-    const result: StoredAlert[] = [];
 
-    for (const alert of current) {
-      const existing = openByCode.get(alert.code);
-      if (existing) {
-        // Same alert, re-worded: the shortfall figure in the detail moves
-        // every time a teacher records a session, and a parent reading a
-        // stale number would be worse than no number.
-        const id = existing.id as string;
-        const detail_enc = encryptField(alert.detail, fieldContext(ALERTS, id, "detail_enc"));
-        const { error: upError } = await supabase
-          .from(ALERTS)
-          .update({ detail_enc, level: alert.level })
-          .eq("id", id);
-        if (upError) throw upError;
-        result.push({
-          ...alert,
+    // Each alert's own read-modify-write is independent of every other
+    // alert's — nothing here orders them — so they run concurrently rather
+    // than one round trip at a time. A plan open on three fronts at once
+    // (behind schedule, a missed milestone, gone quiet) used to cost three
+    // sequential database calls on every single page load for that alone.
+    const result: StoredAlert[] = await Promise.all(
+      current.map(async (alert): Promise<StoredAlert> => {
+        const existing = openByCode.get(alert.code);
+        if (existing) {
+          // Same alert, re-worded: the shortfall figure in the detail moves
+          // every time a teacher records a session, and a parent reading a
+          // stale number would be worse than no number.
+          const id = existing.id as string;
+          const detail_enc = encryptField(alert.detail, fieldContext(ALERTS, id, "detail_enc"));
+          const { error: upError } = await supabase
+            .from(ALERTS)
+            .update({ detail_enc, level: alert.level })
+            .eq("id", id);
+          if (upError) throw upError;
+          return {
+            ...alert,
+            id,
+            triggered_on: existing.triggered_on as string,
+            acknowledged_at: (existing.acknowledged_at as string | null) ?? null,
+          };
+        }
+
+        const id = newId();
+        const row = {
           id,
-          triggered_on: existing.triggered_on as string,
-          acknowledged_at: (existing.acknowledged_at as string | null) ?? null,
-        });
-        continue;
-      }
-
-      const id = newId();
-      const row = {
-        id,
-        plan_id: planId,
-        student_id: studentId,
-        school_id: schoolId,
-        code: alert.code,
-        level: alert.level,
-        triggered_on: today,
-        detail_enc: encryptField(alert.detail, fieldContext(ALERTS, id, "detail_enc")),
-      };
-      const { error: insError } = await supabase.from(ALERTS).insert(row);
-      if (insError) {
-        // The unique constraint firing means a row for this plan/code/day
-        // already exists — two tabs opened the page at once. Not an error
-        // worth surfacing; the alert is shown from the in-memory copy.
-        if (insError.code !== "23505") throw insError;
-      }
-      result.push({ ...alert, id, triggered_on: today, acknowledged_at: null });
-    }
+          plan_id: planId,
+          student_id: studentId,
+          school_id: schoolId,
+          code: alert.code,
+          level: alert.level,
+          triggered_on: today,
+          detail_enc: encryptField(alert.detail, fieldContext(ALERTS, id, "detail_enc")),
+        };
+        const { error: insError } = await supabase.from(ALERTS).insert(row);
+        if (insError) {
+          // The unique constraint firing means a row for this plan/code/day
+          // already exists — two tabs opened the page at once. Not an error
+          // worth surfacing; the alert is shown from the in-memory copy.
+          if (insError.code !== "23505") throw insError;
+        }
+        return { ...alert, id, triggered_on: today, acknowledged_at: null };
+      })
+    );
 
     // Anything open that is no longer true has cleared. Resolved rather
     // than deleted so "behind from November to February" stays on record.
