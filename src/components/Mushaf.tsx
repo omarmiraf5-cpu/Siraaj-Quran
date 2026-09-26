@@ -5,9 +5,11 @@ import {
   SURAHS,
   TOTAL_PAGES,
   getSurahById,
+  getHizbForPage,
   getJuzForPage,
   getSurahsOnPage,
 } from "@/data/mushaf-index";
+import { useLanguage } from "@/components/LanguageProvider";
 import { QcfMushafPage, usePageLayout } from "./QcfMushafPage";
 
 interface HighlightRange {
@@ -304,6 +306,10 @@ function MushafPage({
   const layout = usePageLayout(pageNum);
   const surahsHere = getSurahsOnPage(pageNum);
   const juz = getJuzForPage(pageNum);
+  const hizb = getHizbForPage(pageNum);
+  const { language } = useLanguage();
+  const arabic = language === "ar";
+  const num = (n: number) => (arabic ? toArabicNumerals(n) : String(n));
 
   // Every ayah that appears on this page, in reading order. Taken from the
   // layout the page already fetched, so playing a page costs no extra request.
@@ -337,35 +343,39 @@ function MushafPage({
   // and whether a second page shows at all, live in globals.css under
   // .mushaf-page, driven by a container query on .mushaf-root.
   return (
-    <div className="mushaf-page relative bg-[#fdfaf0] dark:bg-[#1c1a14] flex-none flex flex-col aspect-[1/1.545] overflow-hidden">
-      {/* Ornamental frame */}
-      <div className="absolute inset-0 border-[3px] border-[#a8894a]/60 dark:border-[#8b7d56]/30 rounded-[3px] pointer-events-none" />
-      <div className="absolute inset-[5px] border border-[#a8894a]/35 dark:border-[#8b7d56]/20 rounded-[2px] pointer-events-none" />
-      <div className="absolute inset-[9px] border-[2px] border-[#c4a95a]/25 dark:border-[#c4a95a]/12 rounded-[2px] pointer-events-none" />
-      <span className="absolute top-[9px] right-[9px] w-4 h-4 border-t-2 border-r-2 border-[#a8894a]/50 pointer-events-none" />
-      <span className="absolute top-[9px] left-[9px] w-4 h-4 border-t-2 border-l-2 border-[#a8894a]/50 pointer-events-none" />
-      <span className="absolute bottom-[9px] right-[9px] w-4 h-4 border-b-2 border-r-2 border-[#a8894a]/50 pointer-events-none" />
-      <span className="absolute bottom-[9px] left-[9px] w-4 h-4 border-b-2 border-l-2 border-[#a8894a]/50 pointer-events-none" />
-
-      <div className="relative px-4 md:px-7 pt-4 md:pt-5 pb-2 flex flex-col flex-1 min-h-0" dir="rtl" lang="ar">
-        {/* Running header: surah name(s) right, juz left */}
-        <div className="flex justify-between items-baseline mb-1.5 pb-1 border-b border-[#a8894a]/25 flex-shrink-0">
-          <span className="font-arabic text-[13px] md:text-[15px] text-[#8b6f35] dark:text-[#c4a95a]/60 truncate">
+    <div className="mushaf-page relative bg-[var(--mushaf-page)] text-[var(--mushaf-ink)] flex-none flex flex-col aspect-[1/1.545] overflow-hidden shadow-[0_1px_4px_rgba(60,45,20,0.12)]">
+      <div className="relative px-[5%] pt-[2.5%] pb-[4%] flex flex-col flex-1 min-h-0" dir="rtl" lang="ar">
+        {/* Running header, as the printed Mushaf's: juz and hizb on the left,
+            the page number in the middle (tap it to hear the page), and the
+            surah or surahs on the right (tap one to hear it all). */}
+        <div
+          dir="ltr"
+          className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-2 pb-[2.5%] flex-shrink-0 text-[10px] md:text-[12px] tracking-wide text-[var(--mushaf-muted)]"
+        >
+          <span className={`truncate ${arabic ? "font-arabic text-[12px] md:text-[14px]" : ""}`}>
+            {arabic ? `الجزء ${num(juz)}، الحزب ${num(hizb)}` : `Juz ${juz}, Hizb ${hizb}`}
+          </span>
+          <button
+            onClick={() => onPlayAyahs(pageAyahs)}
+            disabled={pageAyahs.length === 0}
+            title={`Play page ${pageNum}`}
+            className={`tabular-nums hover:text-[var(--mushaf-ink)] disabled:opacity-50 transition ${arabic ? "font-arabic text-[12px] md:text-[14px]" : ""}`}
+          >
+            {num(pageNum)}
+          </button>
+          <span className={`truncate text-end ${arabic ? "font-arabic text-[12px] md:text-[14px]" : ""}`}>
             {surahsHere.map((s, i) => (
               <span key={s.id}>
                 {i > 0 && <span className="opacity-50"> · </span>}
                 <button
                   onClick={() => onPlaySurah(s.id)}
                   title={`Play all of ${s.englishName}`}
-                  className="hover:text-[#c4a95a] hover:underline decoration-dotted underline-offset-2 transition"
+                  className="hover:text-[var(--mushaf-ink)] hover:underline decoration-dotted underline-offset-2 transition"
                 >
-                  {s.name}
+                  {arabic ? s.name : s.englishName}
                 </button>
               </span>
             ))}
-          </span>
-          <span className="font-arabic text-[13px] md:text-[15px] text-[#8b6f35] dark:text-[#c4a95a]/60 flex-shrink-0 pr-2">
-            الجزء {toArabicNumerals(juz)}
           </span>
         </div>
 
@@ -380,17 +390,6 @@ function MushafPage({
           }}
         />
 
-        {/* Page number — bottom centre */}
-        <div className="flex-shrink-0 flex justify-center pt-1.5 mt-1 border-t border-[#a8894a]/25">
-          <button
-            onClick={() => onPlayAyahs(pageAyahs)}
-            disabled={pageAyahs.length === 0}
-            title={`Play page ${pageNum}`}
-            className="inline-flex items-center justify-center min-w-[30px] h-[22px] px-2 rounded-full border border-[#a8894a]/45 font-arabic text-[12px] md:text-[14px] text-[#8b6f35] dark:text-[#c4a95a]/60 hover:border-[#c4a95a] hover:text-[#c4a95a] disabled:opacity-50 transition"
-          >
-            {toArabicNumerals(pageNum)}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -664,13 +663,13 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     return () => ro.disconnect();
   }, []);
 
-  // A bound Mushaf opens on an even/odd pair, so the spread shows the pair
-  // containing the current page — landing on 177 displays 176-177, with 177
-  // still on screen. On a single page there is no pair: show it exactly.
-  const rightPage =
-    isSpread && currentPage > 1 && currentPage % 2 !== 0
-      ? currentPage - 1
-      : currentPage;
+  // The Madinah Mushaf opens with Al-Fatihah (page 1) on the right, facing
+  // the start of Al-Baqarah (page 2), and keeps that pairing to the end: an
+  // odd page on the right, the even page after it on the left, 593 facing
+  // 594 and 603 facing 604. The spread shows the pair holding the current
+  // page — landing on 594 displays 593-594, with 594 still on screen. On a
+  // single page there is no pair: show it exactly.
+  const rightPage = isSpread && currentPage % 2 === 0 ? currentPage - 1 : currentPage;
   const leftPageNum = rightPage + 1;
 
   const goTo = useCallback((p: number) => {
@@ -811,7 +810,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
       {/* Book spread — lower page number sits on the right (RTL). Whether the
           second page shows, and the row direction, are container-query driven
           (see .mushaf-* rules in globals.css). */}
-      <div className="relative bg-[#3a3228] dark:bg-[#1a1610] rounded-xl p-1.5 lg:p-2 shadow-2xl">
+      <div className="relative bg-[var(--mushaf-sheet)] rounded-xl p-1.5 lg:p-2 border border-black/[0.06] dark:border-white/[0.06]">
         {/* The book-spine shadow between two pages. Its own visibility was
             purely CSS/container-width driven, with no idea whether a second
             page actually exists to divide from the first — so on page 604,
@@ -824,10 +823,13 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
             that without touching the width-based logic for every other
             page. */}
         {leftPageNum <= TOTAL_PAGES && (
-          <div className="mushaf-gutter absolute left-1/2 top-2 bottom-2 w-[3px] -translate-x-1/2 bg-gradient-to-r from-black/20 via-black/5 to-black/20 z-10" />
+          <div className="mushaf-gutter absolute left-1/2 top-2 bottom-2 w-[18px] -translate-x-1/2 bg-gradient-to-r from-transparent via-black/[0.07] to-transparent z-10 pointer-events-none" />
         )}
 
-        <div className="mushaf-spread-row flex flex-col items-center justify-center gap-1.5 lg:gap-[3px]">
+        {/* Always laid out left to right, so row-reverse (globals.css) puts
+            the lower page on the right in every language: under an Arabic
+            UI's dir="rtl" it would reverse a second time and swap them. */}
+        <div dir="ltr" className="mushaf-spread-row flex flex-col items-center justify-center gap-1.5 lg:gap-[3px]">
           <MushafPage
             pageNum={rightPage}
             highlightedRange={highlightedRange}
@@ -911,8 +913,9 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         )}
       </div>
 
-      {/* Navigation — Next advances (leftward, RTL) */}
-      <div className="flex items-center justify-between">
+      {/* Navigation — Next advances leftward, as the pages do, whatever
+          the UI's own direction. */}
+      <div dir="ltr" className="flex items-center justify-between">
         <button
           onClick={goNext}
           disabled={atEnd}

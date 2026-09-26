@@ -281,6 +281,19 @@
 .mushaf-root {
   container-type: inline-size;
   container-name: mushaf;
+  /* The printed Madinah Mushaf's paper and ink. The page colour is also
+     what the surah band's cartouche is filled with, so the name sits on
+     the page itself. */
+  --mushaf-page: #f7f3ea;
+  --mushaf-sheet: #ece5d6;
+  --mushaf-ink: #1d1c1a;
+  --mushaf-muted: #7c7669;
+}
+.dark .mushaf-root {
+  --mushaf-page: #1d1b16;
+  --mushaf-sheet: #121009;
+  --mushaf-ink: #ece4d2;
+  --mushaf-muted: #a39a86;
 }
 
 .mushaf-second-page,

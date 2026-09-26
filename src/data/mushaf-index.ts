@@ -825,6 +825,40 @@ export function getJuzForPage(page: number): number {
   return juz;
 }
 
+/** Where each of the 60 hizbs begins, as [surah, ayah]: hizb n is
+ * HIZB_STARTS[n - 1], and every other one opens a juz. Checked against the
+ * quarter markers in the page data (public/mushaf): each start that falls
+ * mid-surah has one there, and the other sixteen open a surah. */
+export const HIZB_STARTS: Array<[number, number]> = [
+  [1, 1], [2, 75], [2, 142], [2, 203], [2, 253], [3, 15], [3, 93], [3, 171], [4, 24], [4, 88],
+  [4, 148], [5, 27], [5, 82], [6, 36], [6, 111], [7, 1], [7, 88], [7, 171], [8, 41], [9, 34],
+  [9, 93], [10, 26], [11, 6], [11, 84], [12, 53], [13, 19], [15, 1], [16, 51], [17, 1], [17, 99],
+  [18, 75], [20, 1], [21, 1], [22, 1], [23, 1], [24, 21], [25, 21], [26, 111], [27, 56], [28, 51],
+  [29, 46], [31, 22], [33, 31], [34, 24], [36, 28], [37, 145], [39, 32], [40, 41], [41, 47], [43, 24],
+  [46, 1], [48, 18], [51, 31], [55, 1], [58, 1], [62, 1], [67, 1], [72, 1], [78, 1], [87, 1],
+];
+
+/** The page each hizb starts on: the last page to begin at or before it. */
+const HIZB_START_PAGES = HIZB_STARTS.map(([s, a]) => {
+  let page = 1;
+  PAGE_STARTS.forEach(([ps, pa], i) => {
+    if (ps < s || (ps === s && pa <= a)) page = i + 1;
+  });
+  return page;
+});
+
+/** The hizb a page's running header names: the last to have begun by the end
+ * of the page, the same way getJuzForPage names a juz that begins partway
+ * down it — so page 62, where Juz 4 and Hizb 7 both begin, reads "Juz 4,
+ * Hizb 7" rather than pairing the new juz with the old hizb. */
+export function getHizbForPage(page: number): number {
+  let hizb = 1;
+  HIZB_START_PAGES.forEach((start, i) => {
+    if (page >= start) hizb = i + 1;
+  });
+  return hizb;
+}
+
 export function getSurahsOnPage(page: number): SurahMeta[] {
   return (PAGE_SURAHS[page] ?? [])
     .map((id) => getSurahById(id))
