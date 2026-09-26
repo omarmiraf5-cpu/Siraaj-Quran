@@ -83,6 +83,56 @@ create policy "Users can read own profile" on profiles
 drop policy if exists "Users can update own profile" on profiles;
 create policy "Users can update own profile" on profiles
   for update using (auth.uid() = id);
+
+-- What a signed-in person may change about a profile through their own
+-- session: their name and contact details, and (for the office, of someone
+-- else in their school) whether the account is active. Never who they are
+-- or where: role, school, email and the platform-owner flag only change
+-- through this app's server, which checks who is asking, or the SQL editor.
+-- Row-level security can't say this — it picks rows, not columns — and
+-- without it the update policies above let anyone make themselves an admin,
+-- move to another school, or turn on is_platform_admin for themselves.
+-- Who is signed in, for code that runs as the caller and so may not be
+-- allowed to look in the auth schema itself.
+create or replace function my_user_id()
+returns uuid
+language sql security definer stable set search_path = public
+as $$ select auth.uid() $$;
+
+create or replace function guard_profile_changes()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  -- Held only to signed-in users' own requests: the service role (this
+  -- app's server) and the SQL editor are not the 'authenticated' role.
+  if current_user <> 'authenticated' then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.is_platform_admin then
+      raise exception 'Only the platform can grant that' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+  if new.id is distinct from old.id
+     or new.role is distinct from old.role
+     or new.school_id is distinct from old.school_id
+     or new.email is distinct from old.email
+     or new.is_platform_admin is distinct from old.is_platform_admin then
+    raise exception 'That can only be changed by the school office through MyDiiwaan' using errcode = '42501';
+  end if;
+  if new.active is distinct from old.active and old.id = my_user_id() then
+    raise exception 'Only the school office can switch an account on or off' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists guard_profile_changes on profiles;
+create trigger guard_profile_changes
+  before insert or update on profiles
+  for each row execute function guard_profile_changes();
 -- security definer + a pinned search_path so these run as the function
 -- owner and bypass profiles' own RLS internally. Without that, a policy
 -- on profiles that subqueries profiles (e.g. "is the caller an admin of
@@ -138,16 +188,27 @@ create policy "Admins can update own school" on schools
 -- Supabase's own auth service role, whose default search_path doesn't
 -- include public, so an unqualified "profiles" fails to resolve even
 -- though the table exists — a well-known gotcha for this exact pattern.
+--
+-- Which school and role an account gets is only taken from its metadata
+-- when the account was made by this app's server — marked in app_metadata,
+-- which only the service role can write (see accountProvisioning.ts).
+-- user_metadata alone is not to be trusted here: anyone can sign themselves
+-- up through Supabase's public auth API and write whatever they like into
+-- it, and this used to hand them the role and school they asked for — a
+-- parent could make themselves a second account as their school's admin.
+-- Anyone else gets a parent profile with no school, which can see nothing.
 create or replace function handle_new_user()
 returns trigger as $$
+declare
+  trusted boolean := coalesce(new.raw_app_meta_data->>'provisioned', '') = 'true';
 begin
   insert into public.profiles (id, role, full_name, email, school_id)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'role', 'parent'),
+    case when trusted then coalesce(new.raw_user_meta_data->>'role', 'parent') else 'parent' end,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
     new.email,
-    (new.raw_user_meta_data->>'school_id')::uuid
+    case when trusted then (new.raw_user_meta_data->>'school_id')::uuid else null end
   );
   return new;
 end;

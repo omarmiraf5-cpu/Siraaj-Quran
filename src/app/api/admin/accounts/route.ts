@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { PROVISIONED } from "@/lib/accountProvisioning";
 
 // inviteUserByEmail's link lands on whatever Site URL the Supabase project
 // has configured, and this app has no page yet that reads an invite token
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
       email: email.trim(),
       password: tempPassword,
       email_confirm: true,
+      app_metadata: PROVISIONED,
       user_metadata: {
         role: role as AllowedRole,
         full_name: full_name.trim(),

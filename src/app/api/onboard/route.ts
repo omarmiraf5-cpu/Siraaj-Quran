@@ -4,6 +4,7 @@ import { sendSchoolWelcome } from "@/lib/schoolWelcome";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 import { isTimeZone } from "@/lib/places";
 import { after, NextRequest, NextResponse } from "next/server";
+import { PROVISIONED } from "@/lib/accountProvisioning";
 
 // Bootstraps a brand-new school: no admin session exists yet to gate this
 // behind (unlike /api/admin/accounts, which requires one), so this is the
@@ -172,6 +173,7 @@ export async function POST(request: NextRequest) {
       email: data.admin.email.trim().toLowerCase(),
       password: data.admin.password,
       email_confirm: true,
+      app_metadata: PROVISIONED,
       user_metadata: { role: "admin", full_name: data.admin.fullName.trim(), school_id: schoolId },
     });
     if (adminError) throw new Error(`Admin account failed: ${adminError.message}`);
@@ -190,6 +192,7 @@ export async function POST(request: NextRequest) {
         email,
         password,
         email_confirm: true,
+        app_metadata: PROVISIONED,
         user_metadata: {
           role: "teacher",
           full_name: teacher.name.trim(),
@@ -250,6 +253,7 @@ export async function POST(request: NextRequest) {
         email: studentLoginEmail(studentRow.id),
         password: studentLoginPassword(studentRow.id, pin),
         email_confirm: true,
+        app_metadata: PROVISIONED,
         user_metadata: { role: "student", full_name: student.name.trim(), school_id: schoolId },
       });
       if (studentAuthError) throw new Error(`Student login for "${student.name}" failed: ${studentAuthError.message}`);
@@ -291,6 +295,7 @@ export async function POST(request: NextRequest) {
         email,
         password,
         email_confirm: true,
+        app_metadata: PROVISIONED,
         user_metadata: {
           role: "parent",
           full_name: parent.name.trim(),
