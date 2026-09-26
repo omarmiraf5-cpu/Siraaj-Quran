@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SURAHS } from "@/data/mushaf-index";
 
 // Segment: [kind, key, glyphChars]
@@ -32,6 +32,16 @@ function endsSurah(line: Segment[]): boolean {
   const [surah, ayah] = last[1].split(":").map(Number);
   return ayah === SURAHS[surah - 1]?.ayahs;
 }
+
+// How long the Mushaf's lines run, in em of their page's own QCF4 face,
+// measured over all 604 pages. Each word glyph is traced from the print with
+// its stretching and spacing, so a line the print fills edge to edge measures
+// 15.5em to 17.4em (16.1em typically), and the lines it sets short and centred
+// measure 14.3em or less: the Bismillah, every line of the two opening pages,
+// a surah's last line when it stops early, and "يوسوس في صدور الناس" on the
+// last page. No line falls in between.
+const FULL_LINE_EM = 16.13;
+const SHORT_LINE_EM = 15;
 
 // ── The 1441 print's colour, laid under the black QCF4 glyphs ─────────────
 // The fonts draw the Mushaf's marks in outline only. In the printed Madinah
@@ -153,7 +163,7 @@ function SurahFrame() {
       // Laid out left to right whatever the page's direction: in the RTL page
       // the two cartouche ends would otherwise swap and face the wrong way.
       dir="ltr"
-      className="absolute inset-x-0 top-[9%] bottom-[9%] p-[2px] pointer-events-none dark:brightness-[0.82]"
+      className="absolute inset-x-0 top-[2%] bottom-[2%] p-[2px] pointer-events-none dark:brightness-[0.82]"
       style={{ border: `1.5px solid ${PRINT_LINE}`, background: "var(--mushaf-page)" }}
     >
       <div
@@ -273,26 +283,30 @@ export function QcfMushafPage({
     };
   }, [facesNeeded]);
 
-  // The line area's size, to tell which lines are short of the full width.
-  const boxRef = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
-  useLayoutEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [facesReady, layout]);
+  // A face that arrives after the 4s fallback above is measured again when it
+  // lands, so the lines are set by the real glyphs rather than a stand-in's.
+  const [fontsLanded, setFontsLanded] = useState(0);
+  useEffect(() => {
+    if (typeof document === "undefined" || !document.fonts) return;
+    const landed = () => setFontsLanded((n) => n + 1);
+    document.fonts.addEventListener("loadingdone", landed);
+    return () => document.fonts.removeEventListener("loadingdone", landed);
+  }, []);
 
-  // Each line's glyphs at their natural width, in em, once the face can be measured.
+  // Each line's glyphs at their natural width, in em of the face drawing them.
   const naturalWidths = useMemo(
     () =>
       layout && facesReady && typeof document !== "undefined"
-        ? layout.l.map((line) => glyphsWidth(pageFont, line.map((seg) => seg[2]).join("")))
+        ? layout.l.map((line) =>
+            glyphsWidth(
+              line[0]?.[0] === KIND_BISMILLAH ? "QCF4_01" : pageFont,
+              line.map((seg) => seg[2]).join("")
+            )
+          )
         : null,
-    [layout, facesReady, pageFont]
+    // fontsLanded only asks for a fresh measurement; it isn't read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout, facesReady, pageFont, fontsLanded]
   );
 
   if (!layout || !facesReady) {
@@ -303,25 +317,23 @@ export function QcfMushafPage({
     );
   }
 
-  // Size the glyphs against the line area itself: the cqh term makes this
-  // page's line count exactly fill the height, and the cqw term stops a line
-  // from overrunning the width. With the page box locked to the Mushaf's
-  // proportion the two land together, so justification adds no visible gaps.
+  // Size the glyphs against the line area itself: the cqh term makes the
+  // page's lines exactly fill the height, and the cqw term makes a typical
+  // full line exactly fill the width. With the page box locked to the
+  // Mushaf's proportion the two land together, on every page alike. A surah's
+  // heading takes one line's slot, as in the print, so a page that opens
+  // three surahs (Quraysh to An-Nas) sets its text no smaller than any other.
   //
-  // The surah-name banner renders 1.5x a normal line's font-size (headerSize)
-  // while sharing the same line-height multiplier, so it occupies 1.5 "line
-  // slots", not 1. Budgeting it as 1 slot over-fills the page and the last
-  // line of ayah text gets clipped by the container's overflow: hidden.
+  // The two opening pages hold eight lines rather than fifteen. The print
+  // sets them in the middle of an ornamented page, spaced a little more
+  // openly than the rest, and so are they here.
   const LINE_H = 1.7;
-  const HEADER_SCALE = 1.5;
-  const rawLineCount = Math.max(layout.l.length, 1);
-  const headerLineCount = layout.l.filter(
-    (line) => line.length > 0 && line[0][0] === KIND_HEADER
-  ).length;
-  const effectiveLineCount =
-    rawLineCount - headerLineCount + headerLineCount * HEADER_SCALE;
-  const fitHeight = (100 / (effectiveLineCount * LINE_H)).toFixed(2);
-  const wordSize = `min(6.2cqw, ${fitHeight}cqh)`;
+  const opening = pageNum <= 2;
+  const OPENING_GAP = 0.6;
+  const slot = LINE_H + (opening ? OPENING_GAP : 0);
+  const fitHeight = (100 / (Math.max(layout.l.length, 1) * slot)).toFixed(2);
+  const wordSize = `min(${(100 / FULL_LINE_EM).toFixed(2)}cqw, ${fitHeight}cqh)`;
+  const lineGap = opening ? { marginBlock: `calc(${wordSize} * ${OPENING_GAP / 2})` } : undefined;
 
   // A surah:ayah pair orders correctly against another as long as ayah
   // counts never reach 1000 — the largest surah (Al-Baqarah) has 286.
@@ -338,26 +350,24 @@ export function QcfMushafPage({
 
   return (
     <div
-      ref={boxRef}
-      className="flex-1 min-h-0 overflow-hidden flex flex-col justify-evenly"
+      className={`flex-1 min-h-0 overflow-hidden flex flex-col ${opening ? "justify-center" : "justify-evenly"}`}
       style={{ containerType: "size" }}
       dir="rtl"
     >
       {layout.l.map((line, li) => {
-        // A surah's heading: the name, a little larger than the text, in
-        // the printed band. The line takes the HEADER_SCALE slots budgeted
-        // for it above, whatever size the name itself is drawn at.
+        // A surah's heading: the name in the printed band, which fills the
+        // line's slot.
         if (line.length > 0 && line[0][0] === KIND_HEADER) {
           return (
             <div
               key={li}
               className="relative w-full flex-none flex items-center justify-center"
-              style={{ height: `calc(${wordSize} * ${LINE_H * HEADER_SCALE})` }}
+              style={{ height: `calc(${wordSize} * ${LINE_H})`, ...lineGap }}
             >
               <SurahFrame />
               <span
                 className="relative"
-                style={{ fontFamily: "'QCF4_BSML', serif", fontSize: `calc(${wordSize} * 1.3)`, lineHeight: 1, whiteSpace: "nowrap" }}
+                style={{ fontFamily: "'QCF4_BSML', serif", fontSize: `calc(${wordSize} * 1.02)`, lineHeight: 1, whiteSpace: "nowrap" }}
               >
                 {line.map((seg) => seg[2]).join("")}
               </span>
@@ -367,44 +377,27 @@ export function QcfMushafPage({
 
         const isBismillahLine = line.length > 0 && line[0][0] === KIND_BISMILLAH;
 
-        // Total words + end-markers on the line — every character across
-        // every segment, since that is exactly what becomes a flex child
-        // below. Checked across a spread of real pages before picking 5:
-        // an ordinary page's sparsest line still lands at 6-7, while a
-        // genuinely short line — the tail of a short surah, both cases
-        // reported — sits at 2-4. A short line stretched edge to edge with
-        // only two or three words to hold it apart doesn't get a run of
-        // modest gaps, it gets one or two canyons, because there is
-        // nowhere else for the leftover width to go. No real justified
-        // typesetting — Arabic or Latin — stretches a line that sparse; a
-        // short line is set at its natural width instead, which for RTL
-        // means it starts flush at the right and simply ends wherever its
-        // last word ends, exactly like a paragraph's ragged last line.
-        const wordCount = line.reduce(
-          (sum, seg) => sum + Array.from(seg[2] || "").length,
-          0
-        );
-        // Where the print sets a line at its natural width, centred rather
-        // than stretched: the Bismillah, the two opening pages, and a
-        // surah's last line when it falls short of the full width, as the
-        // lines closing Surat al-Ghashiyah and Surat al-Fajr on pages
-        // 593-594 do. Short or not is measured: the glyphs' own widths
-        // against the line area, at the size they're actually drawn. No
-        // space is added between them — each QCF4 word glyph carries its own
-        // in its advance, which is why a full line's glyphs already span the
-        // page (99% of the width on page 593) and a short one's don't (81%).
-        const wordPx = box ? Math.min(0.062 * box.w, (Number(fitHeight) / 100) * box.h) : 0;
-        const naturalPx = naturalWidths && box ? wordPx * naturalWidths[li] : null;
-        const shortOfWidth = naturalPx !== null && box ? naturalPx < 0.9 * box.w : wordCount < 5;
-        const centered = isBismillahLine || pageNum <= 2 || (endsSurah(line) && shortOfWidth);
-        const justify = centered
-          ? "justify-center"
-          : wordCount < 5
-            ? "justify-start"
-            : "justify-between";
+        // A line the print sets short is centred at its natural width; any
+        // other is spread edge to edge. No space is added between the glyphs
+        // either way: each QCF4 word glyph carries its own in its advance.
+        // Should the face fail to measure, the two opening pages and each
+        // surah's last line are taken as the short ones.
+        const natural = naturalWidths?.[li] || 0;
+        const short =
+          isBismillahLine ||
+          (natural > 0 ? natural < SHORT_LINE_EM : opening || endsSurah(line));
+        // The few lines the print packs longer than the typical full line
+        // are drawn a touch smaller, just enough to fit, rather than cut off
+        // at the edge of the page.
+        const size =
+          natural > FULL_LINE_EM ? `min(${wordSize}, ${(100 / natural).toFixed(3)}cqw)` : wordSize;
 
         return (
-          <div key={li} className={`flex items-center w-full ${justify}`} style={{ lineHeight: 1.7 }}>
+          <div
+            key={li}
+            className={`flex items-center w-full ${short ? "justify-center" : "justify-between"}`}
+            style={{ lineHeight: LINE_H, ...lineGap }}
+          >
             {line.map((seg, si) => {
               const [kind, key, chars] = seg;
               const isBismillah = kind === KIND_BISMILLAH;
@@ -448,7 +441,7 @@ export function QcfMushafPage({
                     // page's own Hafs face. (Surah names, in QCF4_BSML, are
                     // drawn with their band above.)
                     fontFamily: isBismillah ? "'QCF4_01', serif" : `'${pageFont}', serif`,
-                    fontSize: wordSize,
+                    fontSize: size,
                     whiteSpace: "nowrap",
                   }}
                 >
