@@ -26,7 +26,7 @@ import {
   EmptyNote,
   LoadingNote,
 } from "@/components/portal-ui";
-import { IconBook, IconCalendar, IconPen, IconArrow } from "@/components/icons";
+import { IconBook, IconCalendar, IconClock, IconPen, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
@@ -180,8 +180,9 @@ export default function TeacherDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 pt-2">
-      {/* Greeting — carries the day's actual state and the two things a
-          teacher opens this page to do, rather than standing empty. */}
+      {/* Greeting — carries the day's actual state and the things a teacher
+          opens this page to do, rather than standing empty: the register,
+          setting work, and their own sign-in page. */}
       <PortalHero
         eyebrow={t("common.asalaamuAlaykum")}
         title={(isDemo ? demoUser?.name : teacherName) ?? t("role.teacher")}
@@ -197,6 +198,9 @@ export default function TeacherDashboard() {
             </HeroButtonPrimary>
             <HeroButtonGhost href="/teacher/quran-assignments" icon={<IconPen />}>
               {t("common.assign")}
+            </HeroButtonGhost>
+            <HeroButtonGhost href="/teacher/my-attendance" icon={<IconClock />}>
+              {t("nav.signIn")}
             </HeroButtonGhost>
           </>
         }

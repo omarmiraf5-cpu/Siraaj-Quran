@@ -9,9 +9,10 @@ import { formatDay } from "@/data/demo";
 import { useLanguage } from "@/components/LanguageProvider";
 
 /**
- * A teacher's own attendance: signing in and out, the last four weeks as
- * the office sees them, and telling the office about an absence ahead of
- * time — which then shows as reported rather than a no-show.
+ * A teacher's own attendance, under "Sign in" in the menu: signing in and
+ * out, the last four weeks as the office sees them, and telling the office
+ * about an absence ahead of time — which then shows as reported rather than
+ * a no-show.
  */
 
 interface Payload {
@@ -25,7 +26,7 @@ const input =
   "w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition";
 
 export default function MyAttendancePage() {
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
   const { mode, api } = useAttendanceApi("teacher");
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export default function MyAttendancePage() {
     <div className="max-w-4xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow="Staff"
-        title="My attendance"
+        title={t("nav.signIn")}
         meta={data ? [formatDay(data.today, language), "Last 4 weeks"] : []}
       />
 

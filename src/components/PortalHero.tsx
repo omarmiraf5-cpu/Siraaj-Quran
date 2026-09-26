@@ -20,7 +20,7 @@ export function PortalHero({
   return (
     <header className="gradient-navy rounded-[18px] px-7 py-6 relative overflow-hidden">
       <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-      <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="eyebrow text-white/45">{eyebrow}</p>
           <h1 className="page-title text-white text-3xl mt-1.5">{title}</h1>
@@ -35,7 +35,7 @@ export function PortalHero({
             </p>
           )}
         </div>
-        {actions && <div className="flex gap-2.5 flex-shrink-0">{actions}</div>}
+        {actions && <div className="flex flex-wrap gap-2.5 flex-shrink-0">{actions}</div>}
       </div>
       {children}
     </header>
