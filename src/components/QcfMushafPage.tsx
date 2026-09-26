@@ -294,25 +294,35 @@ export function QcfMushafPage({
   useLayoutEffect(() => {
     const area = areaRef.current;
     if (!area || !layout || !facesReady) return;
-    const areaWidth = area.getBoundingClientRect().width;
-    if (!areaWidth) return;
-    const widths = Array.from(area.children, (row) => {
-      const glyphs = Array.from(row.querySelectorAll<HTMLElement>(":scope > [data-glyph]"));
-      const fontPx = glyphs.length ? parseFloat(getComputedStyle(glyphs[0]).fontSize) : 0;
-      if (!fontPx) return 0;
-      const drawn = glyphs.reduce((sum, g) => sum + g.getBoundingClientRect().width, 0);
-      // Taken against the area's own drawn width, so a zoom on an ancestor
-      // (a modal opening) scales both alike, then into em of the font size.
-      return ((drawn / areaWidth) * area.clientWidth) / fontPx;
-    });
-    setMeasured((prev) =>
-      prev &&
-      prev.layout === layout &&
-      prev.widths.length === widths.length &&
-      prev.widths.every((w, i) => Math.abs(w - widths[i]) < 0.01)
-        ? prev
-        : { layout, widths }
-    );
+    const measure = () => {
+      const areaWidth = area.getBoundingClientRect().width;
+      if (!areaWidth) return;
+      const widths = Array.from(area.children, (row) => {
+        const glyphs = Array.from(row.querySelectorAll<HTMLElement>(":scope > [data-glyph]"));
+        const fontPx = glyphs.length ? parseFloat(getComputedStyle(glyphs[0]).fontSize) : 0;
+        if (!fontPx) return 0;
+        const drawn = glyphs.reduce((sum, g) => sum + g.getBoundingClientRect().width, 0);
+        // Taken against the area's own drawn width, so a zoom on an ancestor
+        // (a modal opening) scales both alike, then into em of the font size.
+        return ((drawn / areaWidth) * area.clientWidth) / fontPx;
+      });
+      setMeasured((prev) =>
+        prev &&
+        prev.layout === layout &&
+        prev.widths.length === widths.length &&
+        prev.widths.every((w, i) => Math.abs(w - widths[i]) < 0.01)
+          ? prev
+          : { layout, widths }
+      );
+    };
+    measure();
+    // And again whenever a glyph changes size afterwards: a face the browser
+    // only applies after this first layout, for one. Resizing the lines to
+    // fit changes their pixels but not their width in em, so this settles.
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    area.querySelectorAll("[data-glyph]").forEach((g) => observer.observe(g));
+    return () => observer.disconnect();
   }, [layout, facesReady, fontsLanded]);
   const naturalWidths = measured?.layout === layout ? measured.widths : null;
 
