@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SURAHS } from "@/data/mushaf-index";
 
 // Segment: [kind, key, glyphChars]
@@ -15,15 +15,6 @@ const KIND_HEADER = 2;
 const KIND_BISMILLAH = 3;
 
 const cache = new Map<number, PageLayout>();
-
-let measurer: CanvasRenderingContext2D | null = null;
-/** How wide these glyphs are, side by side, in em of `face`. */
-function glyphsWidth(face: string, glyphs: string): number {
-  measurer ??= document.createElement("canvas").getContext("2d");
-  if (!measurer) return 0;
-  measurer.font = `100px '${face}'`;
-  return measurer.measureText(glyphs).width / 100;
-}
 
 /** Whether a line ends with the last ayah of its surah. */
 function endsSurah(line: Segment[]): boolean {
@@ -293,21 +284,37 @@ export function QcfMushafPage({
     return () => document.fonts.removeEventListener("loadingdone", landed);
   }, []);
 
-  // Each line's glyphs at their natural width, in em of the face drawing them.
-  const naturalWidths = useMemo(
-    () =>
-      layout && facesReady && typeof document !== "undefined"
-        ? layout.l.map((line) =>
-            glyphsWidth(
-              line[0]?.[0] === KIND_BISMILLAH ? "QCF4_01" : pageFont,
-              line.map((seg) => seg[2]).join("")
-            )
-          )
-        : null,
-    // fontsLanded only asks for a fresh measurement; it isn't read.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layout, facesReady, pageFont, fontsLanded]
-  );
+  // Each line's glyphs at their natural width, in em, measured off the lines
+  // as this browser lays them out rather than predicted. Sized to a canvas's
+  // prediction, the lines fitted in Chrome but ran past the line area on an
+  // iPad (Safari's engine) and lost their last letters. Measured before the
+  // page is first painted, and again whenever a face lands late.
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState<{ layout: PageLayout; widths: number[] } | null>(null);
+  useLayoutEffect(() => {
+    const area = areaRef.current;
+    if (!area || !layout || !facesReady) return;
+    const areaWidth = area.getBoundingClientRect().width;
+    if (!areaWidth) return;
+    const widths = Array.from(area.children, (row) => {
+      const glyphs = Array.from(row.querySelectorAll<HTMLElement>(":scope > [data-glyph]"));
+      const fontPx = glyphs.length ? parseFloat(getComputedStyle(glyphs[0]).fontSize) : 0;
+      if (!fontPx) return 0;
+      const drawn = glyphs.reduce((sum, g) => sum + g.getBoundingClientRect().width, 0);
+      // Taken against the area's own drawn width, so a zoom on an ancestor
+      // (a modal opening) scales both alike, then into em of the font size.
+      return ((drawn / areaWidth) * area.clientWidth) / fontPx;
+    });
+    setMeasured((prev) =>
+      prev &&
+      prev.layout === layout &&
+      prev.widths.length === widths.length &&
+      prev.widths.every((w, i) => Math.abs(w - widths[i]) < 0.01)
+        ? prev
+        : { layout, widths }
+    );
+  }, [layout, facesReady, fontsLanded]);
+  const naturalWidths = measured?.layout === layout ? measured.widths : null;
 
   if (!layout || !facesReady) {
     return (
@@ -334,6 +341,10 @@ export function QcfMushafPage({
   const fitHeight = (100 / (Math.max(layout.l.length, 1) * slot)).toFixed(2);
   const wordSize = `min(${(100 / FULL_LINE_EM).toFixed(2)}cqw, ${fitHeight}cqh)`;
   const lineGap = opening ? { marginBlock: `calc(${wordSize} * ${OPENING_GAP / 2})` } : undefined;
+  // A line's glyphs never add up to more than 99% of the line area's width,
+  // so neither rounding nor a letter whose ink reaches past its advance can
+  // take the line off the page.
+  const FIT = 99;
 
   // A surah:ayah pair orders correctly against another as long as ayah
   // counts never reach 1000 — the largest surah (Al-Baqarah) has 286.
@@ -349,8 +360,12 @@ export function QcfMushafPage({
   };
 
   return (
+    // Nothing in here is clipped: ink that reaches past a line's end, or a
+    // descender below the last line, shows in the page's margin rather than
+    // being cut off at the edge of the line area.
     <div
-      className={`flex-1 min-h-0 overflow-hidden flex flex-col ${opening ? "justify-center" : "justify-evenly"}`}
+      ref={areaRef}
+      className={`flex-1 min-h-0 flex flex-col ${opening ? "justify-center" : "justify-evenly"}`}
       style={{ containerType: "size" }}
       dir="rtl"
     >
@@ -380,17 +395,15 @@ export function QcfMushafPage({
         // A line the print sets short is centred at its natural width; any
         // other is spread edge to edge. No space is added between the glyphs
         // either way: each QCF4 word glyph carries its own in its advance.
-        // Should the face fail to measure, the two opening pages and each
+        // Until the line has been measured, the two opening pages and each
         // surah's last line are taken as the short ones.
         const natural = naturalWidths?.[li] || 0;
         const short =
           isBismillahLine ||
           (natural > 0 ? natural < SHORT_LINE_EM : opening || endsSurah(line));
-        // The few lines the print packs longer than the typical full line
-        // are drawn a touch smaller, just enough to fit, rather than cut off
-        // at the edge of the page.
-        const size =
-          natural > FULL_LINE_EM ? `min(${wordSize}, ${(100 / natural).toFixed(3)}cqw)` : wordSize;
+        // A line the print packs longer than the rest is drawn a touch
+        // smaller, just enough to fit, rather than run off the page.
+        const size = natural > 0 ? `min(${wordSize}, ${(FIT / natural).toFixed(3)}cqw)` : wordSize;
 
         return (
           <div
@@ -414,16 +427,19 @@ export function QcfMushafPage({
 
               // Each glyph is one whole word — render individually so the
               // flex row can stretch the line edge to edge like the print.
+              // None may shrink below its own width: squeezed, a word would
+              // draw over its neighbour.
               return Array.from(chars).map((ch, ci) => (
                 <span
                   key={`${si}-${ci}`}
+                  data-glyph=""
                   role={clickable ? "button" : undefined}
                   tabIndex={clickable ? 0 : undefined}
                   onClick={handle}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handle();
                   }}
-                  className={`${isRosette ? "relative" : ""} ${clickable ? "cursor-pointer" : ""} ${
+                  className={`flex-none ${isRosette ? "relative" : ""} ${clickable ? "cursor-pointer" : ""} ${
                     playing
                       ? "bg-emerald-200/70 dark:bg-emerald-900/50 rounded"
                       : hl
