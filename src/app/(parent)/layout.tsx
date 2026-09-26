@@ -20,6 +20,12 @@ const NAV = [
     icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
   },
   {
+    href: "/parent/class-work",
+    labelKey: "nav.classWork",
+    // Islamic Studies and Arabic: a worksheet with lines of writing.
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 12h7M9 16h5"/></svg>,
+  },
+  {
     href: "/parent/yearly-plan",
     labelKey: "nav.yearlyPlan",
     // A milestone track: a rule with three stops. Geometric by

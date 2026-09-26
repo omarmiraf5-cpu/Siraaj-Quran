@@ -26,6 +26,7 @@ import {
   type IllumColour,
 } from "@/components/student-ui";
 import { IconCheck, IconBookOpen, IconClock, IconStar } from "@/components/icons";
+import { StudentWorkSwitch } from "@/components/class-work-ui";
 
 // A colour and a mark per portion, held steady across the app so a child
 // learns the three by sight before they learn them by name.
@@ -107,6 +108,8 @@ export default function StudentAssignmentsPage() {
           </div>
         </div>
       </header>
+
+      <StudentWorkSwitch current="quran" />
 
       {HIFZ_PORTIONS.map((portion, pi) => {
         const items = grouped[portion];

@@ -1573,3 +1573,139 @@ end $$;
 alter table notifications drop constraint if exists notifications_kind_check;
 alter table notifications add constraint notifications_kind_check
   check (kind in ('absence_streak', 'staff_absence_report', 'account_deleted', 'deletion_request'));
+
+-- ══════════════════════════════════════
+-- Islamic Studies & Arabic assignments
+-- ══════════════════════════════════════
+-- Work a teacher or the office sets outside the Qur'an: written answers and
+-- multiple-choice questions that a child answers in their own portal, the
+-- teacher marks, and the child's parents can follow.
+--
+-- Three tables, because a child must never be able to read the right
+-- answers: the questions live on the assignment, which children can read;
+-- the right option of each multiple-choice question lives in its key,
+-- which only staff can. A child's copy of the work — their answers, marks,
+-- score and the teacher's comment — is their submission row, created for
+-- each child the work is set for.
+--
+-- Children and parents only ever read here. A child hands work in through
+-- /api/class-work/[id]/submit, which checks it is theirs and still open and
+-- then writes it with the service role: an update policy of their own would
+-- let them write their score too.
+create table if not exists subject_assignments (
+  id            uuid primary key default gen_random_uuid(),
+  school_id     uuid not null references schools(id) on delete cascade,
+  subject       text not null check (subject in ('islamic_studies', 'arabic')),
+  title         text not null,
+  instructions  text not null default '',
+  -- [{ id, kind: 'written' | 'choice', prompt, options?, points }], in order.
+  questions     jsonb not null default '[]'::jsonb,
+  max_points    int not null check (max_points > 0),
+  due_date      date,
+  -- Null once the teacher who set it deletes their account: the work and
+  -- the children's answers belong to the school and stay.
+  created_by    uuid references profiles(id) on delete set null,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+alter table subject_assignments enable row level security;
+create index if not exists idx_subject_assignments_school
+  on subject_assignments(school_id, created_at desc);
+
+create table if not exists subject_assignment_keys (
+  assignment_id uuid primary key references subject_assignments(id) on delete cascade,
+  school_id     uuid not null references schools(id) on delete cascade,
+  -- { questionId: index of the right option }, one per multiple-choice question.
+  answers       jsonb not null default '{}'::jsonb
+);
+alter table subject_assignment_keys enable row level security;
+
+create table if not exists subject_submissions (
+  id             uuid primary key default gen_random_uuid(),
+  assignment_id  uuid not null references subject_assignments(id) on delete cascade,
+  student_id     uuid not null references students(id) on delete cascade,
+  school_id      uuid not null references schools(id) on delete cascade,
+  status         text not null default 'assigned' check (status in ('assigned', 'submitted', 'graded')),
+  -- { questionId: written text, or the index of the option picked }
+  answers        jsonb not null default '{}'::jsonb,
+  -- { questionId: points given }
+  marks          jsonb not null default '{}'::jsonb,
+  score          numeric(7,2),
+  feedback       text,
+  submitted_at   timestamptz,
+  graded_by      uuid references profiles(id) on delete set null,
+  graded_at      timestamptz,
+  updated_at     timestamptz not null default now(),
+  constraint subject_submissions_one_per_student unique (assignment_id, student_id)
+);
+alter table subject_submissions enable row level security;
+create index if not exists idx_subject_submissions_student on subject_submissions(student_id);
+
+-- Definer functions for the questions these tables' policies ask of each
+-- other — the same reason as my_children_student_ids() above: written as
+-- plain subqueries, assignments asking submissions "is this child's?" while
+-- submissions ask assignments "is this teacher's?" recurse forever (42P17).
+create or replace function manages_subject_assignment(aid uuid)
+returns boolean
+language sql security definer stable set search_path = public
+as $$
+  select exists (
+    select 1 from subject_assignments a
+    where a.id = aid
+      and a.school_id = my_school_id()
+      and (my_role() = 'admin' or (my_role() = 'teacher' and a.created_by = auth.uid()))
+  )
+$$;
+
+create or replace function my_subject_assignment_ids()
+returns setof uuid
+language sql security definer stable set search_path = public
+as $$
+  select ss.assignment_id
+  from subject_submissions ss
+  join students s on s.id = ss.student_id
+  where s.profile_id = auth.uid()
+$$;
+
+create or replace function my_childrens_subject_assignment_ids()
+returns setof uuid
+language sql security definer stable set search_path = public
+as $$
+  select ss.assignment_id
+  from subject_submissions ss
+  join parent_students ps on ps.student_id = ss.student_id
+  where ps.parent_id = auth.uid()
+$$;
+
+-- A teacher manages the work they set; the office manages all of the school's.
+drop policy if exists "Staff manage subject assignments" on subject_assignments;
+create policy "Staff manage subject assignments" on subject_assignments
+  for all using (
+    school_id = my_school_id()
+    and (my_role() = 'admin' or (my_role() = 'teacher' and created_by = auth.uid()))
+  ) with check (
+    school_id = my_school_id()
+    and (my_role() = 'admin' or (my_role() = 'teacher' and created_by = auth.uid()))
+  );
+drop policy if exists "Students read their subject assignments" on subject_assignments;
+create policy "Students read their subject assignments" on subject_assignments
+  for select using (id in (select my_subject_assignment_ids()));
+drop policy if exists "Parents read their children's subject assignments" on subject_assignments;
+create policy "Parents read their children's subject assignments" on subject_assignments
+  for select using (id in (select my_childrens_subject_assignment_ids()));
+
+drop policy if exists "Staff manage answer keys" on subject_assignment_keys;
+create policy "Staff manage answer keys" on subject_assignment_keys
+  for all using (manages_subject_assignment(assignment_id))
+  with check (manages_subject_assignment(assignment_id));
+
+drop policy if exists "Staff manage subject submissions" on subject_submissions;
+create policy "Staff manage subject submissions" on subject_submissions
+  for all using (manages_subject_assignment(assignment_id))
+  with check (manages_subject_assignment(assignment_id) and school_id = my_school_id());
+drop policy if exists "Students read own subject submissions" on subject_submissions;
+create policy "Students read own subject submissions" on subject_submissions
+  for select using (student_id in (select id from students where profile_id = auth.uid()));
+drop policy if exists "Parents read children's subject submissions" on subject_submissions;
+create policy "Parents read children's subject submissions" on subject_submissions
+  for select using (student_id in (select my_children_student_ids()));

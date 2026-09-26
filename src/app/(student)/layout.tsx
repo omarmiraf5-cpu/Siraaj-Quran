@@ -29,8 +29,11 @@ const TABS = [
   { href: "/student/attendance", labelKey: "nav.register", Icon: IconCalendar, colour: "turquoise" },
 ] as const;
 
-// The Learn tab stays lit while you are inside any of the books it holds.
+// The Learn tab stays lit while you are inside any of the books it holds,
+// and the Work tab across both kinds of work: the Qur'an, and Islamic
+// Studies and Arabic.
 const LEARN_PATHS = ["/student/learn", "/student/qaidah", "/student/tajweed", "/student/hadith"];
+const WORK_PATHS = ["/student/assignments", "/student/class-work"];
 
 function StudentTabBar() {
   const pathname = usePathname();
@@ -43,7 +46,9 @@ function StudentTabBar() {
           const active =
             href === "/student/learn"
               ? LEARN_PATHS.some((p) => pathname.startsWith(p))
-              : pathname === href;
+              : href === "/student/assignments"
+                ? WORK_PATHS.some((p) => pathname.startsWith(p))
+                : pathname === href;
           return (
             <Link
               key={href}
