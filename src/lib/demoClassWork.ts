@@ -15,10 +15,12 @@ import {
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { addDays } from "@/lib/planDates";
 import {
+  FILE_LIMITS,
   LIMITS,
   autoMarks,
   needsTeacher,
   parseAnswers,
+  parseFileRefs,
   parseMarks,
   parseNewAssignment,
   totalOf,
@@ -40,7 +42,10 @@ import {
 
 export type ClassWorkRole = "teacher" | "admin" | "student" | "parent";
 
-const KEY = "demo_class_work_v1";
+const KEY = "demo_class_work_v2";
+/** Where the sample portal's files live: in the browser, as data URLs, under
+ *  paths that only need to look like the real ones. */
+export const DEMO_FILES_PREFIX = "demo/";
 const TEACHER = DEMO_TEACHERS[0]; // Ms. Farah — the sample teacher account.
 const OFFICE = { id: "office", name: "School office" };
 const STUDENT = DEMO_CURRENT_STUDENT.id;
@@ -95,6 +100,7 @@ function seed(): Store {
     due_date: addDays(DEMO_TODAY, 3),
     created_by: TEACHER.id,
     created_at: at(-1),
+    attachments: [],
   };
   const days: StoredAssignment = {
     id: "cw-days",
@@ -111,18 +117,22 @@ function seed(): Store {
     due_date: addDays(DEMO_TODAY, -2),
     created_by: TEACHER.id,
     created_at: at(-6),
+    attachments: [],
   };
   const wudu: StoredAssignment = {
     id: "cw-wudu",
     subject: "islamic_studies",
     title: "Wudu, step by step",
-    instructions: "",
+    instructions: "Use the worksheet to help you.",
     questions: [{ id: "q1", kind: "written", prompt: "Write the steps of wudu in the right order.", points: 6 }],
     key: {},
     max_points: 6,
     due_date: addDays(DEMO_TODAY, -1),
     created_by: TEACHER.id,
     created_at: at(-4),
+    attachments: [
+      { path: "demo/wudu-worksheet.png", name: "Wudu worksheet.png", size: 12_555, type: "image/png", url: "/demo/wudu-worksheet.png" },
+    ],
   };
   const sevenDays = "السبت، الأحد، الاثنين، الثلاثاء، الأربعاء، الخميس، الجمعة";
   return {
@@ -246,10 +256,21 @@ export function demoClassWorkFetch(role: ClassWorkRole) {
       );
     }
 
+    // The sample portal keeps its files in the browser: the page reads each
+    // one as a data URL itself, so there is no upload link to hand out.
+    if (url.pathname === "/api/class-work/files" && method === "POST") {
+      return reply({ demo: true, prefix: DEMO_FILES_PREFIX });
+    }
+
     if (url.pathname === "/api/class-work" && method === "POST") {
       if (!staff) return reply({ error: "This page isn't available for your account" }, 403);
-      const parsed = parseNewAssignment(await readBody(init));
+      const body = await readBody(init);
+      const parsed = parseNewAssignment(body);
       if (!parsed.ok) return reply({ error: parsed.error }, 400);
+      const files = parseFileRefs(body.attachments, DEMO_FILES_PREFIX, FILE_LIMITS.perAssignment);
+      if (!files.ok) return reply({ error: files.error }, 400);
+      // parseFileRefs drops the link; here the data URL is the file itself.
+      const withData = files.value.map((f, i) => ({ ...f, url: (body.attachments as Array<{ url?: string }>)[i]?.url }));
       const known = new Set(roster().students.map((s) => s.id));
       if (parsed.value.student_ids.some((sid) => !known.has(sid))) {
         return reply({ error: "Some of those students aren't in your school." }, 400);
@@ -266,6 +287,7 @@ export function demoClassWorkFetch(role: ClassWorkRole) {
         due_date: v.due_date,
         created_by: role === "admin" ? OFFICE.id : TEACHER.id,
         created_at: new Date().toISOString(),
+        attachments: withData,
       };
       store.assignments.unshift(a);
       store.submissions.push(...v.student_ids.map((sid) => copy(a.id, sid, "assigned")));
@@ -320,13 +342,22 @@ export function demoClassWorkFetch(role: ClassWorkRole) {
       const s = store.submissions.find((x) => x.assignment_id === id && x.student_id === STUDENT);
       if (!a || !s) return reply({ error: "That assignment isn't one of yours." }, 404);
       if (s.status !== "assigned") return reply({ error: "You've already handed this in." }, 409);
-      const parsed = parseAnswers(a.questions, (await readBody(init)).answers);
+      const sent = (await readBody(init)).answers as Record<string, unknown> | undefined;
+      const parsed = parseAnswers(a.questions, sent, DEMO_FILES_PREFIX);
       if (!parsed.ok) return reply({ error: parsed.error }, 400);
       if (Object.keys(parsed.value).length === 0) {
         return reply({ error: "Answer at least one question before you hand it in." }, 400);
       }
       const now = new Date().toISOString();
       const markedNow = !needsTeacher(a.questions);
+      // Put each handed-in file's data URL back with it (see above).
+      for (const q of a.questions) {
+        const got = parsed.value[q.id];
+        const orig = sent?.[q.id];
+        if (Array.isArray(got) && Array.isArray(orig)) {
+          parsed.value[q.id] = got.map((f, i) => ({ ...f, url: (orig[i] as { url?: string })?.url }));
+        }
+      }
       s.answers = parsed.value;
       s.marks = autoMarks(a.questions, a.key, parsed.value);
       s.status = markedNow ? "graded" : "submitted";

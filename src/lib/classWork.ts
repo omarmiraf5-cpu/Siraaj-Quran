@@ -9,7 +9,9 @@
 export const SUBJECTS = ["islamic_studies", "arabic"] as const;
 export type Subject = (typeof SUBJECTS)[number];
 
-export type QuestionKind = "written" | "choice";
+/** A written answer, a multiple-choice pick, or photos and files of work
+ *  done on paper (a worksheet, Arabic handwriting). */
+export type QuestionKind = "written" | "choice" | "upload";
 
 export interface Question {
   /** Stable within its assignment: "q1", "q2"… */
@@ -29,8 +31,125 @@ export interface Question {
 export type AnswerKey = Record<string, number>;
 
 /** A child's answers, by question id: text for a written question, the
- *  index of the option they picked for a multiple-choice one. */
-export type Answers = Record<string, string | number>;
+ *  index of the option they picked for a multiple-choice one, the files
+ *  they handed in for an upload one. */
+export type Answers = Record<string, string | number | FileRef[]>;
+
+/* ── Files ─────────────────────────────────────────────────────────── */
+
+/** A file attached to an assignment by its teacher, or handed in by a child. */
+export interface FileRef {
+  /** Where it's kept in the school's private storage. */
+  path: string;
+  /** Its name as it was uploaded. */
+  name: string;
+  size: number;
+  type: string;
+  /** A short-lived link to open it — added when the file is sent to someone
+   *  allowed to see it, never stored. */
+  url?: string;
+}
+
+/** The private Supabase Storage bucket the files live in. */
+export const FILE_BUCKET = "class-work";
+
+export const FILE_LIMITS = {
+  maxBytes: 25 * 1024 * 1024,
+  perAssignment: 10,
+  perAnswer: 10,
+  name: 150,
+} as const;
+
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  heic: "image/heic",
+  heif: "image/heif",
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  txt: "text/plain",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  webm: "audio/webm",
+};
+export const FILE_TYPES: readonly string[] = [...new Set(Object.values(TYPE_BY_EXTENSION))];
+
+/** What the file picker offers. */
+export const FILE_ACCEPT = "image/*,application/pdf,.doc,.docx,.ppt,.pptx,.txt,audio/*";
+
+/**
+ * The file's type as the portal knows it — from what the browser said or,
+ * when it said nothing useful (it often doesn't for Word files), from the
+ * name. Null for anything the portal doesn't take.
+ */
+export function fileType(name: string, declared: string | null | undefined): string | null {
+  const t = (declared ?? "").toLowerCase();
+  if (t === "audio/x-m4a" || t === "audio/m4a") return "audio/mp4";
+  if (t === "audio/mp3") return "audio/mpeg";
+  if (FILE_TYPES.includes(t)) return t;
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  return TYPE_BY_EXTENSION[ext] ?? null;
+}
+
+/** A name storage accepts: plain letters and digits only (it refuses Arabic
+ *  and most punctuation in a key), keeping the extension. The name people
+ *  see stays as it was uploaded. */
+export function storageName(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const ext = dot > 0 ? name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) : "";
+  const base = (dot > 0 ? name.slice(0, dot) : name)
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, 60);
+  return `${base || "file"}${ext ? `.${ext}` : ""}`;
+}
+
+export function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")} MB`;
+}
+
+export const isImage = (f: Pick<FileRef, "type">) => f.type.startsWith("image/") && f.type !== "image/heic" && f.type !== "image/heif";
+
+/**
+ * Files someone says they uploaded, checked: each has to be somewhere under
+ * `prefix` — the caller's own school's (and, for a child, their own) part
+ * of storage — so nobody can attach a file from another school or hand in
+ * another child's. Any link that came with them is dropped.
+ */
+export function parseFileRefs(raw: unknown, prefix: string, max: number): Result<FileRef[]> {
+  if (raw === undefined || raw === null) return { ok: true, value: [] };
+  if (!Array.isArray(raw)) return { ok: false, error: "Those files weren't readable." };
+  if (raw.length > max) return { ok: false, error: `Up to ${max} files.` };
+  const files: FileRef[] = [];
+  for (const f of raw) {
+    const r = (f ?? {}) as Record<string, unknown>;
+    const path = typeof r.path === "string" ? r.path : "";
+    if (!path.startsWith(prefix) || path.includes("..") || path.length > 400) {
+      return { ok: false, error: "One of those files isn't yours to attach." };
+    }
+    const name = typeof r.name === "string" ? r.name.trim().slice(0, FILE_LIMITS.name) : "";
+    const size = Number(r.size);
+    const type = fileType(name, typeof r.type === "string" ? r.type : "");
+    if (!name || !type || !Number.isFinite(size) || size <= 0 || size > FILE_LIMITS.maxBytes) {
+      return { ok: false, error: "One of those files can't be attached." };
+    }
+    files.push({ path, name, size, type });
+  }
+  return { ok: true, value: files };
+}
 
 /** Points given for each question, by question id. */
 export type Marks = Record<string, number>;
@@ -47,6 +166,8 @@ export interface ClassAssignment {
   due_date: string | null;
   created_by: string;
   created_at: string;
+  /** The teacher's own files for the work: a worksheet, a page to read. */
+  attachments: FileRef[];
 }
 
 export interface ClassSubmission {
@@ -145,8 +266,8 @@ export function parseNewAssignment(body: unknown): Result<NewAssignment> {
   for (const [i, q] of raw.entries()) {
     const n = i + 1;
     const r = (q ?? {}) as Record<string, unknown>;
-    const kind = r.kind === "choice" ? "choice" : r.kind === "written" ? "written" : null;
-    if (!kind) return { ok: false, error: `Question ${n}: choose a written answer or multiple choice.` };
+    const kind = r.kind === "choice" || r.kind === "written" || r.kind === "upload" ? (r.kind as QuestionKind) : null;
+    if (!kind) return { ok: false, error: `Question ${n}: choose a written answer, multiple choice or an upload.` };
     const prompt = text(r.prompt);
     if (!prompt) return { ok: false, error: `Question ${n} is empty.` };
     if (prompt.length > LIMITS.prompt) return { ok: false, error: `Question ${n} is too long.` };
@@ -195,13 +316,23 @@ export function parseNewAssignment(body: unknown): Result<NewAssignment> {
 }
 
 /** A child's answers, keeping only real answers to this assignment's questions. */
-export function parseAnswers(questions: Question[], body: unknown): Result<Answers> {
+/**
+ * A child's answers, keeping only real answers to this assignment's
+ * questions. Files handed in for an upload question have to be in
+ * `uploadPrefix`, the child's own part of storage for this assignment.
+ */
+export function parseAnswers(questions: Question[], body: unknown, uploadPrefix = ""): Result<Answers> {
   const b = (body ?? {}) as Record<string, unknown>;
   const answers: Answers = {};
   for (const q of questions) {
     const v = b[q.id];
     if (v === undefined || v === null || v === "") continue;
-    if (q.kind === "choice") {
+    if (q.kind === "upload") {
+      if (!uploadPrefix) return { ok: false, error: "Files can't be handed in here." };
+      const files = parseFileRefs(v, uploadPrefix, FILE_LIMITS.perAnswer);
+      if (!files.ok) return files;
+      if (files.value.length) answers[q.id] = files.value;
+    } else if (q.kind === "choice") {
       const pick = Number(v);
       if (!Number.isInteger(pick) || pick < 0 || pick >= (q.options?.length ?? 0)) {
         return { ok: false, error: "One of the answers isn't one of the choices." };
@@ -229,7 +360,18 @@ export function autoMarks(questions: Question[], key: AnswerKey, answers: Answer
 
 /** Whether the work has anything a teacher has to read and mark by hand. */
 export function needsTeacher(questions: Question[]): boolean {
-  return questions.some((q) => q.kind === "written");
+  return questions.some((q) => q.kind !== "choice");
+}
+
+/** Whether a question has been answered at all. */
+export function isAnswered(q: Question, a: Answers[string] | undefined): boolean {
+  if (a === undefined || a === "") return false;
+  return q.kind === "upload" ? Array.isArray(a) && a.length > 0 : true;
+}
+
+/** Every file a submission's answers hold. */
+export function answerFiles(answers: Answers): FileRef[] {
+  return Object.values(answers).flatMap((a) => (Array.isArray(a) ? a : []));
 }
 
 /**

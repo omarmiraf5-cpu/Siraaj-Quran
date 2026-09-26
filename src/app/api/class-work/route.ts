@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isError, requireMember } from "@/lib/attendanceServer";
-import { parseNewAssignment, type ClassWorkItem, type StaffAssignment } from "@/lib/classWork";
-import { namesOf, staffRoster, toAssignment, toSubmission } from "@/lib/classWorkServer";
+import { FILE_LIMITS, answerFiles, parseFileRefs, parseNewAssignment, type ClassWorkItem, type StaffAssignment } from "@/lib/classWork";
+import { addLinks, namesOf, staffRoster, teacherFilesPrefix, toAssignment, toSubmission } from "@/lib/classWorkServer";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -58,13 +58,17 @@ export async function GET() {
       ? await supabase.from("subject_assignments").select("*").in("id", ids)
       : { data: [] as any[] };
     const byId = new Map((rows ?? []).map((r: any) => [r.id, r]));
-    const names = await namesOf(createAdminClient(), (rows ?? []).map((r: any) => r.created_by));
+    const admin = createAdminClient();
+    const names = await namesOf(admin, (rows ?? []).map((r: any) => r.created_by));
     const items: ClassWorkItem[] = (subRows ?? [])
       .filter((s: any) => byId.has(s.assignment_id))
       .map((s: any) => {
         const a = byId.get(s.assignment_id);
         return { assignment: toAssignment(a), submission: toSubmission(s), set_by: names.get(a.created_by) ?? null };
       });
+    // The teacher's files, and what each child handed in — all of it theirs
+    // (or their children's) to see, as row-level security just decided.
+    await addLinks(admin, items.flatMap((i) => [...i.assignment.attachments, ...answerFiles(i.submission.answers)]));
 
     if (me.role === "parent") {
       const { data: children } = await supabase.from("students").select("id, full_name").order("full_name");
@@ -96,6 +100,12 @@ export async function POST(req: NextRequest) {
   const parsed = parseNewAssignment(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const a = parsed.value;
+  const attachments = parseFileRefs(
+    (body as Record<string, unknown>).attachments,
+    teacherFilesPrefix(me.school_id),
+    FILE_LIMITS.perAssignment
+  );
+  if (!attachments.ok) return NextResponse.json({ error: attachments.error }, { status: 400 });
 
   // Only children of the caller's own school, and only ones still enrolled.
   const { data: students, error: studentsError } = await supabase
@@ -122,6 +132,9 @@ export async function POST(req: NextRequest) {
       max_points: a.max_points,
       due_date: a.due_date,
       created_by: me.id,
+      // Only when there are files, so work without any still saves on a
+      // database that hasn't had the attachments column added yet.
+      ...(attachments.value.length > 0 ? { attachments: attachments.value } : {}),
     })
     .select()
     .single();

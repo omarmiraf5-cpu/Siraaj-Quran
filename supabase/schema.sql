@@ -1598,7 +1598,9 @@ create table if not exists subject_assignments (
   subject       text not null check (subject in ('islamic_studies', 'arabic')),
   title         text not null,
   instructions  text not null default '',
-  -- [{ id, kind: 'written' | 'choice', prompt, options?, points }], in order.
+  -- [{ id, kind: 'written' | 'choice' | 'upload', prompt, options?, points }],
+  -- in order. An upload question is answered with photos or files of work
+  -- done on paper.
   questions     jsonb not null default '[]'::jsonb,
   max_points    int not null check (max_points > 0),
   due_date      date,
@@ -1611,6 +1613,9 @@ create table if not exists subject_assignments (
 alter table subject_assignments enable row level security;
 create index if not exists idx_subject_assignments_school
   on subject_assignments(school_id, created_at desc);
+-- The teacher's own files for the work — a worksheet, a page to read — as
+-- [{ path, name, size, type }] in the class-work storage bucket below.
+alter table subject_assignments add column if not exists attachments jsonb not null default '[]'::jsonb;
 
 create table if not exists subject_assignment_keys (
   assignment_id uuid primary key references subject_assignments(id) on delete cascade,
@@ -1709,3 +1714,36 @@ create policy "Students read own subject submissions" on subject_submissions
 drop policy if exists "Parents read children's subject submissions" on subject_submissions;
 create policy "Parents read children's subject submissions" on subject_submissions
   for select using (student_id in (select my_children_student_ids()));
+
+-- The files: worksheets teachers attach, and the photos and files children
+-- hand in, in one private bucket. Nobody reads or writes it directly — no
+-- storage policies grant that. The class-work routes check who is asking,
+-- then hand out a one-time upload link or a short-lived link to open a
+-- file. Paths are <school>/assignments/… and <school>/answers/<assignment>/
+-- <student>/…, and the routes only accept files under the caller's own.
+-- Skipped where there is no storage schema (a plain Postgres for tests).
+do $$
+begin
+  if to_regclass('storage.buckets') is null then
+    return;
+  end if;
+  insert into storage.buckets (id, name, public)
+  values ('class-work', 'class-work', false)
+  on conflict (id) do update set public = false;
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'storage' and table_name = 'buckets' and column_name = 'allowed_mime_types'
+  ) then
+    update storage.buckets
+    set file_size_limit = 26214400,
+        allowed_mime_types = array[
+          'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
+          'application/pdf', 'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'text/plain', 'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/ogg', 'audio/webm'
+        ]
+    where id = 'class-work';
+  end if;
+end $$;

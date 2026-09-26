@@ -1,14 +1,16 @@
 import "server-only";
 
 import type { Db } from "@/lib/attendanceServer";
-import type {
-  AnswerKey,
-  ClassAssignment,
-  ClassSubmission,
-  Question,
-  RosterStudent,
-  Subject,
-  SubmissionStatus,
+import {
+  FILE_BUCKET,
+  type AnswerKey,
+  type ClassAssignment,
+  type ClassSubmission,
+  type FileRef,
+  type Question,
+  type RosterStudent,
+  type Subject,
+  type SubmissionStatus,
 } from "@/lib/classWork";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -24,6 +26,7 @@ export function toAssignment(row: any): ClassAssignment {
     due_date: row.due_date ?? null,
     created_by: row.created_by ?? "",
     created_at: row.created_at,
+    attachments: (Array.isArray(row.attachments) ? row.attachments : []) as FileRef[],
   };
 }
 
@@ -84,4 +87,44 @@ export async function keyOf(admin: Db, assignmentId: string): Promise<AnswerKey>
     .eq("assignment_id", assignmentId)
     .maybeSingle();
   return ((data as any)?.answers ?? {}) as AnswerKey;
+}
+
+/* ── Files ─────────────────────────────────────────────────────────── */
+
+/** Where a school's teachers' files go, and where one child's files for one
+ *  assignment go. The routes only accept files from under these. */
+export const teacherFilesPrefix = (schoolId: string) => `${schoolId}/assignments/`;
+export const childFilesPrefix = (schoolId: string, assignmentId: string, studentId: string) =>
+  `${schoolId}/answers/${assignmentId}/${studentId}/`;
+
+/**
+ * Adds a link to open each of these files, good for an hour — for someone
+ * the route has already checked may see them. One call signs the lot; the
+ * links are written onto the same objects that go out in the response.
+ */
+export async function addLinks(admin: Db, files: FileRef[]): Promise<void> {
+  const paths = [...new Set(files.map((f) => f.path))];
+  if (paths.length === 0) return;
+  const { data, error } = await admin.storage.from(FILE_BUCKET).createSignedUrls(paths, 60 * 60);
+  if (error || !data) {
+    console.error("Class work: could not sign file links", error);
+    return;
+  }
+  const links = new Map<string, string>();
+  for (const d of data as Array<{ path: string | null; signedUrl: string | null }>) {
+    if (d.path && d.signedUrl) links.set(d.path, d.signedUrl);
+  }
+  for (const f of files) {
+    const url = links.get(f.path);
+    if (url) f.url = url;
+  }
+}
+
+/** Deletes files from storage. Best effort: a file left behind costs a
+ *  little space, while failing the delete it belongs to would cost more. */
+export async function removeFiles(admin: Db, paths: string[]): Promise<void> {
+  const unique = [...new Set(paths)];
+  if (unique.length === 0) return;
+  const { error } = await admin.storage.from(FILE_BUCKET).remove(unique);
+  if (error) console.error("Class work: could not remove files", error);
 }

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isError, requireMember } from "@/lib/attendanceServer";
-import { LIMITS } from "@/lib/classWork";
-import { toSubmission } from "@/lib/classWorkServer";
+import { LIMITS, answerFiles } from "@/lib/classWork";
+import { addLinks, toSubmission } from "@/lib/classWorkServer";
 
 /**
  * Sends a child's work back for another try: it opens again with their
@@ -50,5 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!updated || updated.length === 0) {
     return NextResponse.json({ error: "This assignment wasn't set for that student." }, { status: 404 });
   }
-  return NextResponse.json({ submission: toSubmission(updated[0]) });
+  const submission = toSubmission(updated[0]);
+  await addLinks(createAdminClient(), answerFiles(submission.answers));
+  return NextResponse.json({ submission });
 }

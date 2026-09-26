@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { demoClassWorkFetch, type ClassWorkRole } from "@/lib/demoClassWork";
@@ -11,8 +11,15 @@ import { PortalHero } from "@/components/PortalHero";
 import { ILLUM_CLASS, ProgressRing, FriendlyEmpty, type IllumColour } from "@/components/student-ui";
 import { IconCheck, IconX, IconPen } from "@/components/icons";
 import {
+  FILE_ACCEPT,
+  FILE_BUCKET,
+  FILE_LIMITS,
   LIMITS,
   SUBJECTS,
+  fileSize,
+  fileType,
+  isAnswered,
+  isImage,
   isOverdue,
   percentOf,
   scoreLine,
@@ -21,6 +28,7 @@ import {
   type ClassAssignment,
   type ClassSubmission,
   type ClassWorkItem,
+  type FileRef,
   type Question,
   type RosterStudent,
   type StaffAssignment,
@@ -66,6 +74,160 @@ function todayFor(mode: Mode): string {
   if (mode === "demo") return DEMO_TODAY;
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/* ── Files ─────────────────────────────────────────────────────────── */
+
+/** Files the sample portal can take: they're kept in this browser. */
+const DEMO_MAX_BYTES = 1024 * 1024;
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error(`“${file.name}” couldn't be read.`));
+    r.readAsDataURL(file);
+  });
+}
+
+/**
+ * Uploads one file for the work: straight to the school's private storage,
+ * with a one-time link the server hands out once it has checked who is
+ * asking — or, in the sample portal, into the page itself as a data URL.
+ */
+async function uploadFile(
+  api: Api,
+  mode: Mode,
+  file: File,
+  purpose: "assignment" | "answer",
+  assignmentId?: string
+): Promise<FileRef> {
+  const type = fileType(file.name, file.type);
+  if (!type) throw new Error(`“${file.name}” can't be uploaded. Use a photo, a PDF, a Word or PowerPoint file, or a recording.`);
+  if (file.size > FILE_LIMITS.maxBytes) throw new Error(`“${file.name}” is too big — the most is ${fileSize(FILE_LIMITS.maxBytes)}.`);
+  const link = await call<{ path?: string; token?: string; demo?: boolean; prefix?: string }>(api, "/api/class-work/files", "POST", {
+    purpose,
+    assignment_id: assignmentId,
+    name: file.name,
+    type,
+    size: file.size,
+  });
+  if (link.demo || mode === "demo") {
+    if (file.size > DEMO_MAX_BYTES) {
+      throw new Error(`The sample portal keeps files in this browser, so they can be up to ${fileSize(DEMO_MAX_BYTES)} here.`);
+    }
+    return {
+      path: `${link.prefix ?? "demo/"}${Date.now().toString(36)}-${file.name}`,
+      name: file.name,
+      size: file.size,
+      type,
+      url: await readAsDataUrl(file),
+    };
+  }
+  const { error } = await createClient()
+    .storage.from(FILE_BUCKET)
+    .uploadToSignedUrl(link.path!, link.token!, file, { contentType: type });
+  if (error) throw new Error(`“${file.name}” didn't finish uploading. Please try again.`);
+  // A local preview until the server sends back a link of its own.
+  return { path: link.path!, name: file.name, size: file.size, type, url: URL.createObjectURL(file) };
+}
+
+const PaperClip = ({ size = 15 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M21.4 11.05 12.2 20.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5" />
+  </svg>
+);
+
+function fileBadge(f: FileRef): string {
+  if (f.type === "application/pdf") return "PDF";
+  if (f.type.includes("word") || f.type === "application/msword") return "DOC";
+  if (f.type.includes("presentation") || f.type.includes("powerpoint")) return "PPT";
+  if (f.type.startsWith("audio/")) return "♪";
+  if (f.type.startsWith("image/")) return "IMG";
+  return "TXT";
+}
+
+/** Files as a row of tiles: a picture's own thumbnail, a badge otherwise.
+ *  Each opens in a new tab; with onRemove, each can be taken off. */
+function FileChips({ files, onRemove }: { files: FileRef[]; onRemove?: (i: number) => void }) {
+  const { t } = useLanguage();
+  if (files.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {files.map((f, i) => {
+        const body = (
+          <>
+            {isImage(f) && f.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={f.url} alt="" className="w-12 h-12 rounded-lg object-cover border border-surface-border flex-shrink-0" />
+            ) : (
+              <span className="w-12 h-12 rounded-lg bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
+                {fileBadge(f)}
+              </span>
+            )}
+            <span className="min-w-0 text-start">
+              <span className="block text-[12.5px] font-semibold text-ink truncate max-w-[170px]" dir="auto">
+                {f.name}
+              </span>
+              <span className="block text-[11px] text-ink-muted">{fileSize(f.size)}</span>
+            </span>
+          </>
+        );
+        return (
+          <li key={`${f.path}-${i}`} className="relative">
+            {f.url ? (
+              <a
+                href={f.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2.5 rounded-xl border border-surface-border bg-surface-card ps-1.5 pe-3 py-1.5 hover:bg-surface-bg-warm transition"
+              >
+                {body}
+              </a>
+            ) : (
+              <span className="flex items-center gap-2.5 rounded-xl border border-surface-border bg-surface-card ps-1.5 pe-3 py-1.5">{body}</span>
+            )}
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(i)}
+                aria-label={`${t("cw.remove")} ${f.name}`}
+                className="absolute -top-2 -end-2 w-6 h-6 rounded-full bg-surface-card border border-surface-border text-ink-muted hover:text-red-700 flex items-center justify-center shadow-sm"
+              >
+                <IconX size={12} />
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** A button that opens the file picker; the files chosen go to onFiles. */
+function FilePicker({ label, busy, onFiles }: { label: string; busy: boolean; onFiles: (files: File[]) => void }) {
+  const { t } = useLanguage();
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={ref}
+        type="file"
+        accept={FILE_ACCEPT}
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const list = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (list.length) onFiles(list);
+        }}
+      />
+      <button type="button" disabled={busy} onClick={() => ref.current?.click()} className={`${quietButton} inline-flex items-center gap-2`}>
+        <PaperClip />
+        {busy ? t("cw.uploading") : label}
+      </button>
+    </>
+  );
 }
 
 /* ── Small pieces ──────────────────────────────────────────────────── */
@@ -145,7 +307,7 @@ function AnsweredQuestion({
 }: {
   q: Question;
   n: number;
-  answer: string | number | undefined;
+  answer: Answers[string] | undefined;
   mark: number | undefined;
   rightOption?: number;
   showMark: boolean;
@@ -162,7 +324,15 @@ function AnsweredQuestion({
           {showMark && mark !== undefined ? `${mark} / ${q.points}` : pointsText(q.points, t)}
         </span>
       </div>
-      {q.kind === "choice" ? (
+      {q.kind === "upload" ? (
+        Array.isArray(answer) && answer.length > 0 ? (
+          <div className="mt-2">
+            <FileChips files={answer} />
+          </div>
+        ) : (
+          <p className="mt-2 text-[12px] text-ink-muted italic">{t("cw.notAnswered")}</p>
+        )
+      ) : q.kind === "choice" ? (
         <ul className="mt-2 space-y-1.5">
           {(q.options ?? []).map((o, i) => {
             const picked = answer === i;
@@ -329,6 +499,11 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
                       </h3>
                       <p className="text-[12px] text-ink-muted mt-1">
                         {questionsText(a.questions.length, t)} · {pointsText(a.max_points, t)}
+                        {a.attachments.length > 0 && (
+                          <span className="inline-flex items-center gap-1 ms-1.5 align-middle">
+                            · <PaperClip size={12} /> {a.attachments.length}
+                          </span>
+                        )}
                         {role === "admin" && a.set_by ? ` · ${t("cw.setBy")} ${a.set_by}` : ""}
                       </p>
                       <div className="mt-3.5 h-1.5 rounded-full bg-surface-bg-warm overflow-hidden flex">
@@ -355,6 +530,7 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
       {composing && data && (
         <Composer
           api={api}
+          mode={mode}
           roster={data.roster}
           onClose={() => setComposing(false)}
           onDone={() => {
@@ -381,7 +557,7 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
 /* ── Setting new work ──────────────────────────────────────────────── */
 
 interface DraftQuestion {
-  kind: "written" | "choice";
+  kind: "written" | "choice" | "upload";
   prompt: string;
   options: string[];
   correct: number | null;
@@ -390,14 +566,23 @@ interface DraftQuestion {
 
 const blankWritten = (): DraftQuestion => ({ kind: "written", prompt: "", options: [], correct: null, points: 5 });
 const blankChoice = (): DraftQuestion => ({ kind: "choice", prompt: "", options: ["", ""], correct: null, points: 1 });
+const blankUpload = (): DraftQuestion => ({
+  kind: "upload",
+  prompt: "Take a photo of your finished work and upload it.",
+  options: [],
+  correct: null,
+  points: 10,
+});
 
 function Composer({
   api,
+  mode,
   roster,
   onClose,
   onDone,
 }: {
   api: Api;
+  mode: Mode;
   roster: StaffList["roster"];
   onClose: () => void;
   onDone: () => void;
@@ -408,9 +593,31 @@ function Composer({
   const [instructions, setInstructions] = useState("");
   const [due, setDue] = useState("");
   const [questions, setQuestions] = useState<DraftQuestion[]>([blankWritten()]);
+  const [attachments, setAttachments] = useState<FileRef[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const attach = async (files: File[]) => {
+    setUploading(true);
+    setError(null);
+    const added: FileRef[] = [];
+    for (const f of files.slice(0, FILE_LIMITS.perAssignment - attachments.length)) {
+      try {
+        added.push(await uploadFile(api, mode, f, "assignment"));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "That file didn't upload.");
+      }
+    }
+    setAttachments((a) => [...a, ...added]);
+    // A worksheet usually comes back as a photo of the finished page, so an
+    // assignment still on its untouched first question gets an upload
+    // question in its place. It can be changed back like any other.
+    if (added.length)
+      setQuestions((qs) => (qs.length === 1 && qs[0].kind === "written" && !qs[0].prompt.trim() ? [blankUpload()] : qs));
+    setUploading(false);
+  };
 
   // The school's children by halaqa, in the order the halaqas are listed;
   // anyone in none of the caller's halaqas under "Other students".
@@ -448,6 +655,7 @@ function Composer({
         title,
         instructions,
         due_date: due || null,
+        attachments: attachments.map(({ url, ...f }) => (mode === "demo" ? { ...f, url } : f)),
         questions: questions.map((q) => ({
           kind: q.kind,
           prompt: q.prompt,
@@ -502,12 +710,20 @@ function Composer({
           />
         </label>
 
+        <div className="space-y-2.5">
+          <p className="eyebrow">{t("cw.files")}</p>
+          <FileChips files={attachments} onRemove={(i) => setAttachments((a) => a.filter((_, j) => j !== i))} />
+          {attachments.length < FILE_LIMITS.perAssignment && (
+            <FilePicker label={t("cw.attach")} busy={uploading} onFiles={attach} />
+          )}
+        </div>
+
         <div className="space-y-3">
           {questions.map((q, i) => (
             <div key={i} className="rounded-2xl border border-surface-border bg-surface-bg-warm/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="eyebrow">
-                  {t("cw.question")} {i + 1} · {q.kind === "choice" ? t("cw.choice") : t("cw.written")}
+                  {t("cw.question")} {i + 1} · {q.kind === "choice" ? t("cw.choice") : q.kind === "upload" ? t("cw.upload") : t("cw.written")}
                 </p>
                 <div className="flex items-center gap-2">
                   <label className="flex items-center gap-1.5 text-[12px] text-ink-muted">
@@ -542,6 +758,7 @@ function Composer({
                 className={`${input} mt-2.5 resize-y`}
                 dir="auto"
               />
+              {q.kind === "upload" && <p className="mt-2 text-[11.5px] text-ink-muted">{t("cw.uploadHint")}</p>}
               {q.kind === "choice" && (
                 <div className="mt-2.5 space-y-2">
                   <p className="text-[11.5px] text-ink-muted">Tick the right answer.</p>
@@ -611,6 +828,14 @@ function Composer({
             >
               + {t("cw.addChoice")}
             </button>
+            <button
+              type="button"
+              disabled={questions.length >= LIMITS.questions}
+              onClick={() => setQuestions((qs) => [...qs, blankUpload()])}
+              className={quietButton}
+            >
+              + {t("cw.upload")}
+            </button>
             <span className="ms-auto self-center text-[12px] text-ink-muted tabular-nums">
               {questionsText(questions.length, t)} · {pointsText(total, t)}
             </span>
@@ -675,7 +900,7 @@ function Composer({
           <button type="button" onClick={onClose} className={quietButton}>
             {t("common.cancel")}
           </button>
-          <button type="button" onClick={save} disabled={saving} className={primaryButton}>
+          <button type="button" onClick={save} disabled={saving || uploading} className={primaryButton}>
             {saving ? t("common.saving") : t("cw.set")}
           </button>
         </div>
@@ -749,6 +974,7 @@ function AssignmentDetail({ id, api, today, onClose }: { id: string; api: Api; t
               {a.instructions}
             </p>
           )}
+          <FileChips files={a.attachments} />
           <ul className="divide-y divide-surface-border border-y border-surface-border">
             {detail.submissions.map((s) => (
               <li key={s.id}>
@@ -944,9 +1170,32 @@ function readDraft(id: string): Answers | null {
     return null;
   }
 }
+/**
+ * Answers as the server wants them: a file is its place in storage, and a
+ * preview made on this device (a blob: link) means nothing anywhere else.
+ * In the sample portal the data URL is the file, so it goes along.
+ */
+function forServer(answers: Answers, mode: Mode): Answers {
+  return Object.fromEntries(
+    Object.entries(answers).map(([k, v]) => [
+      k,
+      Array.isArray(v) ? v.map(({ url, ...f }) => (mode === "demo" && url?.startsWith("data:") ? { ...f, url } : f)) : v,
+    ])
+  );
+}
+
 function writeDraft(id: string, answers: Answers | null) {
   try {
-    if (answers) localStorage.setItem(draftKey(id), JSON.stringify(answers));
+    if (answers) {
+      // A blob: preview doesn't outlive the page; the file's place does.
+      const keep = Object.fromEntries(
+        Object.entries(answers).map(([k, v]) => [
+          k,
+          Array.isArray(v) ? v.map((f) => (f.url?.startsWith("blob:") ? { ...f, url: undefined } : f)) : v,
+        ])
+      );
+      localStorage.setItem(draftKey(id), JSON.stringify(keep));
+    }
     else localStorage.removeItem(draftKey(id));
   } catch {
     // The answers are still on screen; they just won't survive a reload.
@@ -1048,6 +1297,7 @@ export function StudentClassWork() {
         <WorkSheet
           item={open}
           api={api}
+          mode={mode}
           onClose={() => setOpenId(null)}
           onHandedIn={(s) => {
             setItems((list) => (list ?? []).map((i) => (i.assignment.id === open.assignment.id ? { ...i, submission: s } : i)));
@@ -1061,11 +1311,13 @@ export function StudentClassWork() {
 function WorkSheet({
   item,
   api,
+  mode,
   onClose,
   onHandedIn,
 }: {
   item: ClassWorkItem;
   api: Api;
+  mode: Mode;
   onClose: () => void;
   onHandedIn: (s: ClassSubmission) => void;
 }) {
@@ -1076,23 +1328,48 @@ function WorkSheet({
   // teacher sent it back — the answers they handed in last time.
   const [answers, setAnswers] = useState<Answers>(() => readDraft(a.id) ?? s.answers ?? {});
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const set = (qid: string, v: string | number) =>
+  const set = (qid: string, v: Answers[string]) =>
     setAnswers((prev) => {
       const next = { ...prev, [qid]: v };
       writeDraft(a.id, next);
       return next;
     });
 
-  const unanswered = a.questions.filter((q) => answers[q.id] === undefined || answers[q.id] === "").length;
+  const filesFor = (qid: string): FileRef[] => {
+    const v = answers[qid];
+    return Array.isArray(v) ? v : [];
+  };
+  const addFiles = async (qid: string, files: File[]) => {
+    setUploading(qid);
+    setError(null);
+    const added: FileRef[] = [];
+    for (const f of files.slice(0, FILE_LIMITS.perAnswer - filesFor(qid).length)) {
+      try {
+        added.push(await uploadFile(api, mode, f, "answer", a.id));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "That file didn't upload.");
+      }
+    }
+    setAnswers((prev) => {
+      const had = Array.isArray(prev[qid]) ? (prev[qid] as FileRef[]) : [];
+      const next = { ...prev, [qid]: [...had, ...added] };
+      writeDraft(a.id, next);
+      return next;
+    });
+    setUploading(null);
+  };
+
+  const unanswered = a.questions.filter((q) => !isAnswered(q, answers[q.id])).length;
 
   const handIn = async () => {
     if (unanswered > 0 && !window.confirm(`${unanswered} question${unanswered === 1 ? " is" : "s are"} not answered yet. Hand it in anyway?`)) return;
     setBusy(true);
     setError(null);
     try {
-      const { submission } = await call<{ submission: ClassSubmission }>(api, `/api/class-work/${a.id}/submit`, "POST", { answers });
+      const { submission } = await call<{ submission: ClassSubmission }>(api, `/api/class-work/${a.id}/submit`, "POST", { answers: forServer(answers, mode) });
       writeDraft(a.id, null);
       onHandedIn(submission);
     } catch (e) {
@@ -1132,6 +1409,12 @@ function WorkSheet({
             {a.instructions}
           </p>
         )}
+        {a.attachments.length > 0 && (
+          <div className="space-y-2">
+            <p className="eyebrow">{t("cw.fromTeacher")}</p>
+            <FileChips files={a.attachments} />
+          </div>
+        )}
 
         {open ? (
           <div className="space-y-4">
@@ -1144,7 +1427,17 @@ function WorkSheet({
                   </p>
                   <span className="text-[11.5px] text-ink-muted whitespace-nowrap">{pointsText(q.points, t)}</span>
                 </div>
-                {q.kind === "choice" ? (
+                {q.kind === "upload" ? (
+                  <div className="mt-3 space-y-3">
+                    <FileChips
+                      files={filesFor(q.id)}
+                      onRemove={(fi) => set(q.id, filesFor(q.id).filter((_, j) => j !== fi))}
+                    />
+                    {filesFor(q.id).length < FILE_LIMITS.perAnswer && (
+                      <FilePicker label={t("cw.addPhoto")} busy={uploading === q.id} onFiles={(files) => addFiles(q.id, files)} />
+                    )}
+                  </div>
+                ) : q.kind === "choice" ? (
                   <div className="mt-3 grid gap-2" role="radiogroup" aria-label={q.prompt}>
                     {(q.options ?? []).map((o, oi) => {
                       const on = answers[q.id] === oi;
@@ -1183,7 +1476,7 @@ function WorkSheet({
               </div>
             ))}
             {error && <ErrorLine>{error}</ErrorLine>}
-            <button type="button" onClick={handIn} disabled={busy} className="w-full gradient-emerald text-white text-[15px] font-bold py-3.5 rounded-2xl disabled:opacity-50 active:scale-[.99] transition">
+            <button type="button" onClick={handIn} disabled={busy || uploading !== null} className="w-full gradient-emerald text-white text-[15px] font-bold py-3.5 rounded-2xl disabled:opacity-50 active:scale-[.99] transition">
               {busy ? t("cw.handingIn") : t("cw.handIn")}
             </button>
           </div>
@@ -1327,6 +1620,7 @@ export function ParentClassWork() {
                 {open.assignment.instructions}
               </p>
             )}
+            <FileChips files={open.assignment.attachments} />
             <div className="divide-y divide-surface-border">
               {open.assignment.questions.map((q, i) => (
                 <AnsweredQuestion

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isError, requireMember } from "@/lib/attendanceServer";
-import { LIMITS } from "@/lib/classWork";
-import { toAssignment, toSubmission } from "@/lib/classWorkServer";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { LIMITS, answerFiles } from "@/lib/classWork";
+import { addLinks, removeFiles, toAssignment, toSubmission } from "@/lib/classWorkServer";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -29,13 +30,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
     : { data: [] as any[] };
   const nameOf = new Map((students ?? []).map((s: any) => [s.id, s.full_name]));
 
-  return NextResponse.json({
-    assignment: toAssignment(row),
-    key: (key as any)?.answers ?? {},
-    submissions: (subs ?? [])
-      .map((s: any) => ({ ...toSubmission(s), student_name: nameOf.get(s.student_id) ?? "Student" }))
-      .sort((a: any, b: any) => a.student_name.localeCompare(b.student_name)),
-  });
+  const assignment = toAssignment(row);
+  const submissions = (subs ?? [])
+    .map((s: any) => ({ ...toSubmission(s), student_name: nameOf.get(s.student_id) ?? "Student" }))
+    .sort((a: any, b: any) => a.student_name.localeCompare(b.student_name));
+  await addLinks(createAdminClient(), [
+    ...assignment.attachments,
+    ...submissions.flatMap((s: any) => answerFiles(s.answers)),
+  ]);
+  return NextResponse.json({ assignment, key: (key as any)?.answers ?? {}, submissions });
 }
 
 /** A change to the title, the instructions or the due date. The questions
@@ -93,7 +96,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const me = await requireMember(supabase, ["teacher", "admin"]);
   if (isError(me)) return me.error;
 
-  const { data, error } = await supabase.from("subject_assignments").delete().eq("id", id).select("id");
+  // The files go with it: the teacher's, and every child's.
+  const { data: subs } = await supabase.from("subject_submissions").select("answers").eq("assignment_id", id);
+  const { data, error } = await supabase.from("subject_assignments").delete().eq("id", id).select("id, attachments");
   if (error) {
     console.error("Class work: could not delete", error);
     return NextResponse.json({ error: "Couldn't delete it. Please try again." }, { status: 500 });
@@ -101,5 +106,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "That assignment isn't there any more." }, { status: 404 });
   }
+  await removeFiles(createAdminClient(), [
+    ...toAssignment(data[0]).attachments.map((f) => f.path),
+    ...(subs ?? []).flatMap((s: any) => answerFiles(s.answers ?? {}).map((f) => f.path)),
+  ]);
   return NextResponse.json({ deleted: id });
 }

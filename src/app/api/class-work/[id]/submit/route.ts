@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isError, requireMember } from "@/lib/attendanceServer";
-import { autoMarks, needsTeacher, parseAnswers, totalOf } from "@/lib/classWork";
-import { keyOf, toAssignment, toSubmission } from "@/lib/classWorkServer";
+import { answerFiles, autoMarks, needsTeacher, parseAnswers, totalOf } from "@/lib/classWork";
+import { addLinks, childFilesPrefix, keyOf, toAssignment, toSubmission } from "@/lib/classWorkServer";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -52,7 +52,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!row) return NextResponse.json({ error: "That assignment isn't one of yours." }, { status: 404 });
   const assignment = toAssignment(row);
 
-  const parsed = parseAnswers(assignment.questions, body.answers);
+  // Photos and files have to be ones this child uploaded for this work.
+  const parsed = parseAnswers(assignment.questions, body.answers, childFilesPrefix(me.school_id, id, sub.student_id));
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
   if (Object.keys(parsed.value).length === 0) {
     return NextResponse.json({ error: "Answer at least one question before you hand it in." }, { status: 400 });
@@ -86,5 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!updated || updated.length === 0) {
     return NextResponse.json({ error: "You've already handed this in." }, { status: 409 });
   }
-  return NextResponse.json({ submission: toSubmission(updated[0]) });
+  const submission = toSubmission(updated[0]);
+  await addLinks(admin, answerFiles(submission.answers));
+  return NextResponse.json({ submission });
 }

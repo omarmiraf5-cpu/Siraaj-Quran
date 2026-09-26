@@ -433,6 +433,14 @@ export const translations: Record<Language, Record<string, string>> = {
     "cw.questionMany": "questions",
     "cw.point": "point",
     "cw.average": "average",
+    "cw.upload": "Upload answer",
+    "cw.uploadHint": "The child hands in photos or files of their work.",
+    "cw.files": "Files",
+    "cw.attach": "Attach a worksheet or file",
+    "cw.addPhoto": "Add a photo or file",
+    "cw.uploading": "Uploading…",
+    "cw.fromTeacher": "From your teacher",
+    "cw.remove": "Remove",
   },
 
   so: {
@@ -835,6 +843,14 @@ export const translations: Record<Language, Record<string, string>> = {
     "cw.questionMany": "su'aalood",
     "cw.point": "dhibic",
     "cw.average": "celcelis",
+    "cw.upload": "Soo rar jawaabta",
+    "cw.uploadHint": "Ilmuhu wuxuu soo rarayaa sawirro ama faylal shaqadiisa ah.",
+    "cw.files": "Faylal",
+    "cw.attach": "Ku lifaaq warqad shaqo ama fayl",
+    "cw.addPhoto": "Ku dar sawir ama fayl",
+    "cw.uploading": "Waa la soo rarayaa…",
+    "cw.fromTeacher": "Waxaa soo diray macallinkaaga",
+    "cw.remove": "Ka saar",
   },
 
   ar: {
@@ -1237,5 +1253,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "cw.questionMany": "أسئلة",
     "cw.point": "درجة",
     "cw.average": "المعدل",
+    "cw.upload": "رفع الإجابة",
+    "cw.uploadHint": "يسلّم الطالب صورًا أو ملفات لعمله.",
+    "cw.files": "الملفات",
+    "cw.attach": "أرفق ورقة عمل أو ملفًا",
+    "cw.addPhoto": "أضف صورة أو ملفًا",
+    "cw.uploading": "جارٍ الرفع…",
+    "cw.fromTeacher": "من معلمك",
+    "cw.remove": "إزالة",
   },
 };

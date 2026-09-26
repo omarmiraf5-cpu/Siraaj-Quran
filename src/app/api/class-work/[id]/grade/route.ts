@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isError, requireMember } from "@/lib/attendanceServer";
-import { LIMITS, parseMarks, totalOf } from "@/lib/classWork";
-import { toAssignment, toSubmission } from "@/lib/classWorkServer";
+import { LIMITS, answerFiles, parseMarks, totalOf } from "@/lib/classWork";
+import { addLinks, toAssignment, toSubmission } from "@/lib/classWorkServer";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -61,5 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     console.error("Class work: could not mark", error);
     return NextResponse.json({ error: "Couldn't save the marks. Please try again." }, { status: 500 });
   }
-  return NextResponse.json({ submission: toSubmission(updated[0]) });
+  const submission = toSubmission(updated[0]);
+  await addLinks(createAdminClient(), answerFiles(submission.answers));
+  return NextResponse.json({ submission });
 }
