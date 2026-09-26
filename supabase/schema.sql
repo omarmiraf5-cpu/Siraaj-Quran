@@ -133,6 +133,24 @@ drop trigger if exists guard_profile_changes on profiles;
 create trigger guard_profile_changes
   before insert or update on profiles
   for each row execute function guard_profile_changes();
+
+-- When someone last used the portal (any page, any day), as the portal
+-- itself records it — their last sign-in alone says little, since a
+-- session stays signed in for weeks. Shown to the platform owner.
+alter table profiles add column if not exists last_seen_at timestamptz;
+
+-- Marks the caller as having just used the portal — at most once every five
+-- minutes, and by the database's clock rather than the device's. The
+-- portal calls it as its pages open (useRecordVisit).
+create or replace function touch_last_seen()
+returns void
+language sql security definer set search_path = public
+as $$
+  update profiles
+  set last_seen_at = now()
+  where id = auth.uid()
+    and (last_seen_at is null or last_seen_at < now() - interval '5 minutes')
+$$;
 -- security definer + a pinned search_path so these run as the function
 -- owner and bypass profiles' own RLS internally. Without that, a policy
 -- on profiles that subqueries profiles (e.g. "is the caller an admin of

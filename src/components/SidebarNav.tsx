@@ -9,6 +9,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
+import { useRecordVisit } from "@/hooks/useRecordVisit";
 
 interface NavItem {
   href: string;
@@ -84,6 +85,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const demoUser = useDemoUser();
   const branding = useSchoolBranding();
   const { t } = useLanguage();
+  useRecordVisit();
   const role = t(roleKey);
   const displayName = demoUser?.name ?? userName ?? role;
   const [moreOpen, setMoreOpen] = useState(false);
