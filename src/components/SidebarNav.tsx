@@ -65,10 +65,13 @@ function Crest({ branding, size, className }: { branding: SchoolBranding; size: 
         alt={branding.name}
         width={size}
         height={size}
-        // The platform crest is a square image meant to fill its slot; a
-        // school's own logo is artwork with its own margins, so it gets
-        // fitted rather than cropped.
-        className={`w-full h-full ${branding.isCustom ? "object-contain bg-white" : "object-cover"}`}
+        // The MyDiiwaan crest is drawn to fill its slot, its dark ground
+        // running to the edges; a school's own logo is artwork with its own
+        // margins, so it gets fitted rather than cropped. Which one this is
+        // goes by whether the school has a logo of its own, not by whether
+        // a school is signed in: one that hasn't uploaded a logo still shows
+        // the crest, and fitted it came out small, between white bars.
+        className={`w-full h-full ${branding.hasOwnLogo ? "object-contain bg-white" : "object-cover"}`}
       />
     </div>
   );

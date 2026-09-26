@@ -11,6 +11,11 @@ export type SchoolBranding = {
    *  the platform default (demo mode, signed out, or a school that hasn't
    *  set anything up yet). */
   isCustom: boolean;
+  /** Whether logoUrl is the school's own logo rather than the MyDiiwaan
+   *  crest standing in for one. A school can have its name in the chrome
+   *  without having uploaded a logo, and the crest is drawn differently
+   *  from a school's own artwork (see SidebarNav's Crest). */
+  hasOwnLogo: boolean;
 };
 
 const PLATFORM_DEFAULT: SchoolBranding = {
@@ -18,6 +23,7 @@ const PLATFORM_DEFAULT: SchoolBranding = {
   nameArabic: "ديواني",
   logoUrl: "/crest.jpg",
   isCustom: false,
+  hasOwnLogo: false,
 };
 
 // Every school on the platform shares one deployment, so the crest and
@@ -47,6 +53,7 @@ export function useSchoolBranding(): SchoolBranding {
         nameArabic: data.name_arabic || null,
         logoUrl: data.logo_url || PLATFORM_DEFAULT.logoUrl,
         isCustom: true,
+        hasOwnLogo: Boolean(data.logo_url),
       });
     };
 
