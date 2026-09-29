@@ -14,6 +14,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { welcomeNote } from "@/lib/welcomeNote";
 
 interface ParentRow {
   id: string;
@@ -171,8 +172,12 @@ export default function AdminParentsPage() {
       await loadReal();
       resetForm();
       setNote(
-        data.warning ??
-          `Account created for ${data.email}. Temporary password: ${data.temp_password} — share this with them so they can sign in. They'll be asked to set their own password the first time.`
+        [
+          data.warning,
+          `${data.warning ? "" : `Account created for ${data.email}. `}${welcomeNote(data.welcome_email)}Temporary password: ${data.temp_password} — share it with them if the email doesn't reach them. They'll be asked to set their own password the first time they use it.`,
+        ]
+          .filter(Boolean)
+          .join(" ")
       );
     } catch (err) {
       setNote(err instanceof Error ? err.message : "Failed to create parent account");
@@ -263,7 +268,7 @@ export default function AdminParentsPage() {
           <p className="text-xs text-ink-muted">
             {isDemo
               ? "In the demo this is stored locally — no real account is created."
-              : "You'll get a temporary password to share with them. They see only the children linked here."}
+              : "We'll email them a link to choose their own password, and you'll get a temporary password to share in case the email doesn't reach them. They see only the children linked here."}
           </p>
           <button
             type="submit"

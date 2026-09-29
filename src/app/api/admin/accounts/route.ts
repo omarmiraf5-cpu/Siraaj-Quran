@@ -3,13 +3,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { PROVISIONED } from "@/lib/accountProvisioning";
+import { sendAccountWelcomes } from "@/lib/accountWelcome";
 
-// inviteUserByEmail's link lands on whatever Site URL the Supabase project
-// has configured, and this app has no page yet that reads an invite token
-// from the URL and lets someone set a password — so a real invite email
-// would currently dead-end. Creating the account with a temporary password
-// instead means the admin can hand it over and the person can sign in right
-// away with the existing login form.
+// Accounts are made with a temporary password the admin can hand over, so
+// the person can sign in straight away. They're also emailed a welcome with
+// a link to choose their own password (lib/accountWelcome); the temporary
+// one is the way in if that email doesn't arrive.
 function generateTempPassword() {
   return randomBytes(9).toString("base64url");
 }
@@ -61,7 +60,7 @@ async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) 
     };
   }
 
-  return { caller };
+  return { caller, user };
 }
 
 // Creating any account needs Supabase's admin API (to write the auth.users
@@ -92,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     const auth = await requireAdmin(supabase);
     if (auth.error) return auth.error;
-    const { caller } = auth;
+    const { caller, user } = auth;
 
     // The on_auth_user_created trigger reads this metadata to fill in the
     // new profiles row, so the account lands in the right school with the
@@ -122,6 +121,7 @@ export async function POST(req: NextRequest) {
     // already covers it, and elevated privileges are worth keeping to the
     // one step that genuinely can't be done without them.
     let linked = 0;
+    let warning: string | undefined;
     if (role === "parent" && Array.isArray(student_ids) && student_ids.length > 0) {
       const { error: linkError } = await supabase.from("parent_students").insert(
         student_ids.map((student_id: string) => ({
@@ -131,22 +131,41 @@ export async function POST(req: NextRequest) {
       );
       // The account itself is already real at this point, so a failed link
       // is reported alongside it rather than pretending nothing happened.
-      if (linkError) {
-        return NextResponse.json(
-          {
-            id: data.user.id,
-            email: data.user.email,
-            temp_password: tempPassword,
-            warning: `Account created, but linking children failed: ${linkError.message}`,
-          },
-          { status: 201 }
-        );
-      }
-      linked = student_ids.length;
+      if (linkError) warning = `Account created, but linking children failed: ${linkError.message}`;
+      else linked = student_ids.length;
     }
 
+    // Their welcome, with a link to choose their own password. Waited for,
+    // so the admin sees whether it went; replies go to the admin.
+    const [{ data: school }, { data: children }] = await Promise.all([
+      admin.from("schools").select("name").eq("id", caller.school_id).maybeSingle(),
+      linked > 0
+        ? admin.from("students").select("full_name").in("id", student_ids).eq("school_id", caller.school_id)
+        : Promise.resolve({ data: [] as Array<{ full_name: string }> }),
+    ]);
+    const welcome = await sendAccountWelcomes(
+      [
+        {
+          userId: data.user.id,
+          name: full_name.trim(),
+          email: data.user.email ?? email.trim(),
+          role: role as AllowedRole,
+          children: (children ?? []).map((c: { full_name: string }) => c.full_name),
+        },
+      ],
+      { name: school?.name ?? "Your school", replyTo: user.email }
+    );
+
     return NextResponse.json(
-      { id: data.user.id, email: data.user.email, temp_password: tempPassword, linked },
+      {
+        id: data.user.id,
+        email: data.user.email,
+        temp_password: tempPassword,
+        linked,
+        ...(warning ? { warning } : {}),
+        // "sent", or why it wasn't.
+        welcome_email: welcome.ok ? "sent" : welcome.reason,
+      },
       { status: 201 }
     );
   } catch (error) {

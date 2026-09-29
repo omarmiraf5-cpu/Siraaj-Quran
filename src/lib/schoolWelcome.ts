@@ -13,14 +13,16 @@ export interface WelcomedSchool {
   teachers: number;
   students: number;
   parents: number;
+  /** Set at sign-up, when each teacher and parent is emailed a link of their own. */
+  adultsEmailed?: boolean;
 }
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-const SALAM = "Assalamu alaikum wa rahmatullahi wa barakatuh";
+export const SALAM = "Assalamu alaikum wa rahmatullahi wa barakatuh";
 
-/** A saying quoted in the welcome: the Arabic, its meaning, and where it's from. */
-interface Quote {
+/** A saying quoted in a welcome email: the Arabic, its meaning, and where it's from. */
+export interface Quote {
   arabic: string;
   english: string;
   source: string;
@@ -29,7 +31,7 @@ interface Quote {
 // Both from Sahih al-Bukhari 5027, where al-Sulami's words follow the
 // hadith he narrated. The Arabic is as al-Bukhari has it; if you change
 // either, check the wording and reference against the book.
-const HADITH: Quote = {
+export const HADITH: Quote = {
   arabic: "خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ",
   english: "The best of you are those who learn the Qur'an and teach it.",
   source: "Narrated by ‘Uthman ibn ‘Affan, may Allah be pleased with him · Sahih al-Bukhari 5027",
@@ -54,13 +56,13 @@ const ARABIC_FONT = "'Amiri','Noto Naskh Arabic','Traditional Arabic','Geeza Pro
 /** Keeps the last two words together, so a wrapped line never ends on one word alone. */
 const noOrphan = (s: string) => s.replace(/ (\S+)$/, "&nbsp;$1");
 
-const quoteHtml = (q: Quote) => `<div style="margin-top:12px;border-left:3px solid #d9bd74;background:#faf6ec;border-radius:0 12px 12px 0;padding:14px 18px 14px 16px;">
+export const quoteHtml = (q: Quote) => `<div style="margin-top:12px;border-left:3px solid #d9bd74;background:#faf6ec;border-radius:0 12px 12px 0;padding:14px 18px 14px 16px;">
       <p dir="rtl" lang="ar" style="margin:0;font-family:${ARABIC_FONT};font-size:24px;line-height:1.8;color:#0e2347;text-align:right;">${noOrphan(q.arabic)}</p>
       <p style="margin:4px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.45;font-style:italic;color:#1f2430;">“${noOrphan(q.english)}”</p>
       <p style="margin:8px 0 0;font-size:12.5px;line-height:1.5;color:#6b6f7a;">${q.source.replace(/Sahih al-Bukhari \d+/, '<span style="white-space:nowrap;">$&</span>')}</p>
     </div>`;
 
-const quoteText = (q: Quote) => [`  ${q.arabic}`, `  “${q.english}”`, `  (${q.source})`];
+export const quoteText = (q: Quote) => [`  ${q.arabic}`, `  “${q.english}”`, `  (${q.source})`];
 
 /**
  * The new admin's welcome. It opens with the salam and a word on the work
@@ -91,8 +93,9 @@ export function schoolWelcomeEmail(school: WelcomedSchool) {
     .filter(Boolean)
     .join(" · ");
 
-  const adultsLine =
-    "They sign in at the same address with their email and the temporary password shown when you finished signing up, then choose their own password.";
+  const adultsLine = school.adultsEmailed
+    ? "We've emailed each of them a link to choose their own password. If it doesn't reach them, they can sign in at the same address with their email and the temporary password shown when you finished signing up."
+    : "They sign in at the same address with their email and the temporary password shown when you finished signing up, then choose their own password.";
   const resetLine =
     "Lost a password or PIN? You can reset teacher and parent passwords, and set student PINs, any time from your admin portal.";
 

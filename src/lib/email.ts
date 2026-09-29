@@ -44,6 +44,25 @@ export interface OutgoingEmail {
 
 export type EmailResult = { ok: true } | { ok: false; reason: string };
 
+/** An email as Resend's API takes it. */
+const forResend = (email: OutgoingEmail) => ({
+  from: email.from,
+  to: [email.to],
+  ...(email.replyTo ? { reply_to: email.replyTo } : {}),
+  subject: email.subject,
+  html: email.html,
+  text: email.text,
+});
+
+/** What Resend said, from the body of a refusal. */
+function refusalMessage(body: string): string {
+  try {
+    return JSON.parse(body).message ?? body;
+  } catch {
+    return body; // not JSON: the raw text will do
+  }
+}
+
 /**
  * Sends one email through Resend's API.
  *
@@ -64,24 +83,50 @@ export async function sendEmail(what: string, build: () => OutgoingEmail): Promi
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: email.from,
-        to: [email.to],
-        ...(email.replyTo ? { reply_to: email.replyTo } : {}),
-        subject: email.subject,
-        html: email.html,
-        text: email.text,
-      }),
+      body: JSON.stringify(forResend(email)),
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       const body = await response.text();
       console.error(`${what}: refused by Resend: ${response.status} ${body}`);
-      let message = body;
-      try { message = JSON.parse(body).message ?? body; } catch { /* not JSON: the raw text will do */ }
-      return { ok: false, reason: `Resend refused it: ${message}` };
+      return { ok: false, reason: `Resend refused it: ${refusalMessage(body)}` };
     }
     return { ok: true };
+  } catch (error) {
+    console.error(`${what}: failed:`, error);
+    return { ok: false, reason: `Couldn't send it: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+/**
+ * Sends several emails through Resend's batch endpoint, a hundred to a
+ * request: a whole school's teachers and families at once, without running
+ * into Resend's limit of a couple of requests a second. Never throws, like
+ * sendEmail; if any batch is refused, the first reason comes back.
+ */
+export async function sendEmailBatch(what: string, build: () => OutgoingEmail[]): Promise<EmailResult> {
+  try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.warn(`${what}: not sent, because RESEND_API_KEY isn't set.`);
+      return { ok: false, reason: "RESEND_API_KEY isn't set on the server." };
+    }
+    const emails = build();
+    let refused: string | null = null;
+    for (let i = 0; i < emails.length; i += 100) {
+      const response = await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(emails.slice(i, i + 100).map(forResend)),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`${what}: refused by Resend: ${response.status} ${body}`);
+        refused ??= refusalMessage(body);
+      }
+    }
+    return refused ? { ok: false, reason: `Resend refused it: ${refused}` } : { ok: true };
   } catch (error) {
     console.error(`${what}: failed:`, error);
     return { ok: false, reason: `Couldn't send it: ${error instanceof Error ? error.message : String(error)}` };

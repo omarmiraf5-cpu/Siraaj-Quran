@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNewSchoolAlert } from "@/lib/newSchoolAlert";
 import { sendSchoolWelcome } from "@/lib/schoolWelcome";
+import { sendAccountWelcomes, type NewAccount } from "@/lib/accountWelcome";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 import { isTimeZone } from "@/lib/places";
 import { after, NextRequest, NextResponse } from "next/server";
@@ -185,6 +186,10 @@ export async function POST(request: NextRequest) {
     // admin who just created it — knew the password to.
     const teacherIdByHalaqa: Record<string, string> = {};
     const teacherLogins: Array<{ name: string; email: string; password: string }> = [];
+    // Each teacher and parent is also emailed a link to choose their own
+    // password, once the school is complete; the temporary one above stays
+    // the way in if the email doesn't arrive.
+    const welcomes: NewAccount[] = [];
     for (const teacher of teacherList) {
       const email = teacher.email.trim().toLowerCase();
       const password = `Temp${randomPin()}${randomPin()}!`;
@@ -207,6 +212,7 @@ export async function POST(request: NextRequest) {
       createdUserIds.push(teacherAuth.user.id);
       teacherIdByHalaqa[teacher.halaqa] = teacherAuth.user.id;
       teacherLogins.push({ name: teacher.name.trim(), email, password });
+      welcomes.push({ userId: teacherAuth.user.id, name: teacher.name.trim(), email, role: "teacher" });
     }
 
     const halaqaNames = Array.from(
@@ -327,12 +333,20 @@ export async function POST(request: NextRequest) {
         password,
         children: childIndexes.map((i) => studentList[i].name.trim()),
       });
+      welcomes.push({
+        userId: parentAuth.user.id,
+        name: parent.name.trim(),
+        email,
+        role: "parent",
+        children: childIndexes.map((i) => studentList[i].name.trim()),
+      });
     }
 
-    // The school is complete. Two emails about it go out after this response
-    // does, so the new admin never waits on them: their welcome, and the
-    // owner's heads-up. Both senders only log a failed send, so neither can
-    // reach the unwind below.
+    // The school is complete. Its emails go out after this response does, so
+    // the new admin never waits on them: their welcome, the owner's heads-up,
+    // and each teacher's and parent's welcome with a link to choose their
+    // password. Every sender only logs a failed send, so none can reach the
+    // unwind below.
     const counts = {
       halaqas: halaqaNames.length,
       teachers: teacherLogins.length,
@@ -341,7 +355,14 @@ export async function POST(request: NextRequest) {
     };
     const adminEmail = data.admin.email.trim().toLowerCase();
     after(() =>
-      sendSchoolWelcome({ name: school.name, slug, adminName: data.admin.fullName, adminEmail, ...counts })
+      sendSchoolWelcome({
+        name: school.name,
+        slug,
+        adminName: data.admin.fullName,
+        adminEmail,
+        ...counts,
+        adultsEmailed: welcomes.length > 0,
+      })
     );
     after(() =>
       sendNewSchoolAlert({
@@ -354,6 +375,9 @@ export async function POST(request: NextRequest) {
         ...counts,
       })
     );
+    if (welcomes.length > 0) {
+      after(() => sendAccountWelcomes(welcomes, { name: school.name, replyTo: adminEmail }));
+    }
 
     return NextResponse.json(
       {

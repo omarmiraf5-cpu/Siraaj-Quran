@@ -20,6 +20,7 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { welcomeNote } from "@/lib/welcomeNote";
 
 export default function AdminTeachersPage() {
   const supabase = createClient();
@@ -141,7 +142,7 @@ export default function AdminTeachersPage() {
       setNewEmail("");
       setShowForm(false);
       setInviteNote(
-        `Account created for ${data.email}. Temporary password: ${data.temp_password} — share this with them so they can sign in. They'll be asked to set their own password the first time.`
+        `Account created for ${data.email}. ${welcomeNote(data.welcome_email)}Temporary password: ${data.temp_password} — share it with them if the email doesn't reach them. They'll be asked to set their own password the first time they use it.`
       );
     } catch (err) {
       setInviteNote(err instanceof Error ? err.message : "Failed to create teacher");
@@ -254,7 +255,7 @@ export default function AdminTeachersPage() {
           <p className="text-xs text-ink-muted">
             {isDemo
               ? "New teachers start without a halaqa — assign one from the Halaqas page."
-              : "You'll get a temporary password to share with them — they start without a halaqa assigned."}
+              : "We'll email them a link to choose their own password, and you'll get a temporary password to share in case the email doesn't reach them. They start without a halaqa assigned."}
           </p>
           <button
             type="submit"

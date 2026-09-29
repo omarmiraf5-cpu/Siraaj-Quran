@@ -973,9 +973,10 @@ export default function OnboardPage() {
               <div className="card-quiet p-6">
                 <h3 className="font-bold text-ink mb-1">Teacher logins</h3>
                 <p className="text-ink-muted text-xs mb-4">
-                  Give each teacher their email and temporary password — they sign in at{" "}
-                  <span className="font-mono">{origin}/login</span> under &ldquo;Teacher&rdquo;, and
-                  will be asked to set their own password the first time.
+                  We&apos;ve emailed each teacher a link to choose their own password. If it doesn&apos;t
+                  reach them (it may be in Junk), give them their email and temporary password below: they
+                  sign in at <span className="font-mono">{origin}/login</span> under &ldquo;Teacher&rdquo;,
+                  and will be asked to set their own password the first time.
                 </p>
                 <ul className="divide-y divide-surface-border">
                   {result.teachers.map((t) => (
@@ -997,9 +998,10 @@ export default function OnboardPage() {
               <div className="card-quiet p-6">
                 <h3 className="font-bold text-ink mb-1">Parent logins</h3>
                 <p className="text-ink-muted text-xs mb-4">
-                  Send each family their email and temporary password — they sign in at{" "}
-                  <span className="font-mono">{origin}/login</span> under &ldquo;Parent&rdquo;, and
-                  will be asked to set their own password the first time.
+                  We&apos;ve emailed each family a link to choose their own password. If it doesn&apos;t
+                  reach them (it may be in Junk), send them their email and temporary password below: they
+                  sign in at <span className="font-mono">{origin}/login</span> under &ldquo;Parent&rdquo;,
+                  and will be asked to set their own password the first time.
                 </p>
                 <ul className="divide-y divide-surface-border">
                   {result.parents.map((p) => (
