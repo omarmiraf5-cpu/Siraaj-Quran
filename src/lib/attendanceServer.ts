@@ -27,16 +27,26 @@ export async function requireMember(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, school_id, full_name")
+    .select("id, role, school_id, full_name, active")
     .eq("id", user.id)
     .maybeSingle();
+  // Switched off by the school office: nothing here, whatever session it has.
+  if (profile && profile.active === false) {
+    return {
+      error: NextResponse.json(
+        { error: "This account has been switched off. Please contact your school.", switched_off: true },
+        { status: 403 }
+      ),
+    };
+  }
   if (!profile?.school_id) {
     return { error: NextResponse.json({ error: "This account is not attached to a school" }, { status: 403 }) };
   }
   if (roles && !roles.includes(profile.role)) {
     return { error: NextResponse.json({ error: "This page isn't available for your account" }, { status: 403 }) };
   }
-  return profile as Member;
+  const { active: _active, ...member } = profile;
+  return member as Member;
 }
 
 export function isError(x: unknown): x is { error: NextResponse } {

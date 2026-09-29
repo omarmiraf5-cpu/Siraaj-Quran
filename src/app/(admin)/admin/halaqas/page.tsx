@@ -15,7 +15,8 @@ import {
   allTeachers,
   allStudents,
   studentsInHalaqa,
-  teacherName,
+  halaqaTeacherIds,
+  halaqaTeacherNames,
   type HalaqaOverride,
   type TeacherOverride,
   type StudentOverride,
@@ -26,6 +27,55 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+
+/**
+ * The school's teachers as chips: tap to add one to the halaqa, tap again to
+ * take them off. Everyone ticked teaches its children. Switched-off teachers
+ * are left out unless they're already on it.
+ */
+function TeacherPicker({
+  teachers,
+  selected,
+  onChange,
+}: {
+  teachers: DemoTeacher[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const shown = teachers.filter((t) => t.active !== false || selected.includes(t.id));
+  if (shown.length === 0) {
+    return <p className="text-xs text-ink-muted">No teachers yet. Add them on the Teachers page.</p>;
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {shown.map((t) => {
+        const on = selected.includes(t.id);
+        return (
+          <button
+            key={t.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(on ? selected.filter((id) => id !== t.id) : [...selected, t.id])}
+            className={`px-3 py-1.5 rounded-full text-[12.5px] font-semibold transition-all ${
+              on
+                ? "gradient-emerald text-white"
+                : "bg-surface-card border border-surface-border text-ink-muted hover:text-ink"
+            }`}
+          >
+            {on ? "✓ " : ""}
+            {t.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Its first teacher (kept if still ticked) and the others, from the teachers ticked. */
+function splitTeachers(ids: string[], current: string | null): { lead: string | null; others: string[] } {
+  const lead = current && ids.includes(current) ? current : ids[0] ?? null;
+  return { lead, others: ids.filter((id) => id !== lead) };
+}
 
 export default function AdminHalaqasPage() {
   const supabase = createClient();
@@ -42,7 +92,7 @@ export default function AdminHalaqasPage() {
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newSchedule, setNewSchedule] = useState("");
-  const [newTeacherId, setNewTeacherId] = useState("");
+  const [newTeacherIds, setNewTeacherIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -51,23 +101,41 @@ export default function AdminHalaqasPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftSchedule, setDraftSchedule] = useState("");
-  const [draftTeacherId, setDraftTeacherId] = useState("");
+  const [draftTeacherIds, setDraftTeacherIds] = useState<string[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
-    const { data, error } = await supabase
-      .from("classes")
-      .select("id, name, teacher_id, schedule")
-      .order("name");
+    const [{ data, error }, { data: others }] = await Promise.all([
+      supabase.from("classes").select("id, name, teacher_id, schedule").order("name"),
+      // A database without class_teachers yet answers with an error here;
+      // the halaqas still load, each with its one teacher.
+      supabase.from("class_teachers").select("class_id, teacher_id"),
+    ]);
     // Surfaced rather than swallowed: a failure here is indistinguishable
     // from a school with no halaqas yet, which sent us hunting through
     // permissions and account links for something the error said outright.
     if (error) throw new Error(`Couldn't load halaqas: ${error.message}`);
+    const othersOf = new Map<string, string[]>();
+    for (const o of others ?? []) othersOf.set(o.class_id, [...(othersOf.get(o.class_id) ?? []), o.teacher_id]);
     return (data ?? []).map((c) => ({
       id: c.id,
       name: c.name,
       teacherId: c.teacher_id,
+      coTeacherIds: othersOf.get(c.id) ?? [],
       schedule: c.schedule ?? "",
     }));
+  };
+
+  /** Puts a halaqa's other teachers in place: exactly these, no one else. */
+  const setOtherTeachers = async (classId: string, others: string[]) => {
+    const { error: clearError } = await supabase.from("class_teachers").delete().eq("class_id", classId);
+    if (clearError) throw clearError;
+    if (others.length === 0) return;
+    const { error } = await supabase
+      .from("class_teachers")
+      .insert(others.map((teacher_id) => ({ class_id: classId, teacher_id })));
+    if (error) throw error;
   };
 
   const loadRealTeachers = async (): Promise<DemoTeacher[]> => {
@@ -154,12 +222,14 @@ export default function AdminHalaqasPage() {
     e.preventDefault();
     if (!newName.trim() || !newSchedule.trim()) return;
 
+    const { lead, others } = splitTeachers(newTeacherIds, null);
     if (isDemo) {
       const halaqa: DemoHalaqa = {
         id: `local-halaqa-${Date.now()}`,
         name: newName.trim(),
         schedule: newSchedule.trim(),
-        teacherId: newTeacherId || null,
+        teacherId: lead,
+        coTeacherIds: others,
       };
       const next = [...created, halaqa];
       setCreated(next);
@@ -167,7 +237,7 @@ export default function AdminHalaqasPage() {
       setHalaqas(allHalaqas(next, overrides));
       setNewName("");
       setNewSchedule("");
-      setNewTeacherId("");
+      setNewTeacherIds([]);
       setShowForm(false);
       return;
     }
@@ -179,20 +249,25 @@ export default function AdminHalaqasPage() {
     setSaving(true);
     setFormError(null);
     try {
-      const { error } = await supabase.from("classes").insert({
-        name: newName.trim(),
-        subject: "Qur'an & Hifz",
-        grade: 0,
-        schedule: newSchedule.trim(),
-        teacher_id: newTeacherId || null,
-        school_id: schoolId,
-      });
+      const { data: cls, error } = await supabase
+        .from("classes")
+        .insert({
+          name: newName.trim(),
+          subject: "Qur'an & Hifz",
+          grade: 0,
+          schedule: newSchedule.trim(),
+          teacher_id: lead,
+          school_id: schoolId,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      if (others.length > 0) await setOtherTeachers(cls.id, others);
 
       setHalaqas(await loadRealHalaqas());
       setNewName("");
       setNewSchedule("");
-      setNewTeacherId("");
+      setNewTeacherIds([]);
       setShowForm(false);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to add halaqa");
@@ -205,15 +280,18 @@ export default function AdminHalaqasPage() {
     setEditingId(h.id === editingId ? null : h.id);
     setDraftName(h.name);
     setDraftSchedule(h.schedule);
-    setDraftTeacherId(h.teacherId ?? "");
+    setDraftTeacherIds(halaqaTeacherIds(h));
+    setEditError(null);
   };
 
   const saveEdit = async (h: DemoHalaqa) => {
+    const { lead, others } = splitTeachers(draftTeacherIds, h.teacherId);
     if (isDemo) {
       const patch: HalaqaOverride = {
         name: draftName.trim() || h.name,
         schedule: draftSchedule.trim() || h.schedule,
-        teacherId: draftTeacherId || null,
+        teacherId: lead,
+        coTeacherIds: others,
       };
       const next = { ...overrides, [h.id]: { ...overrides[h.id], ...patch } };
       setOverrides(next);
@@ -223,16 +301,27 @@ export default function AdminHalaqasPage() {
       return;
     }
 
-    await supabase
-      .from("classes")
-      .update({
-        name: draftName.trim() || h.name,
-        schedule: draftSchedule.trim() || h.schedule,
-        teacher_id: draftTeacherId || null,
-      })
-      .eq("id", h.id);
-    setHalaqas(await loadRealHalaqas());
-    setEditingId(null);
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const { error } = await supabase
+        .from("classes")
+        .update({
+          name: draftName.trim() || h.name,
+          schedule: draftSchedule.trim() || h.schedule,
+          teacher_id: lead,
+        })
+        .eq("id", h.id);
+      if (error) throw error;
+      const before = (h.coTeacherIds ?? []).slice().sort().join();
+      if (others.slice().sort().join() !== before) await setOtherTeachers(h.id, others);
+      setHalaqas(await loadRealHalaqas());
+      setEditingId(null);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   return (
@@ -279,19 +368,9 @@ export default function AdminHalaqasPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Teacher (optional)</label>
-            <select
-              value={newTeacherId}
-              onChange={(e) => setNewTeacherId(e.target.value)}
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-            >
-              <option value="">Unassigned</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm font-semibold text-ink mb-1">Teachers (optional)</label>
+            <p className="text-xs text-ink-muted mb-2">Tap everyone who teaches it. More than one can.</p>
+            <TeacherPicker teachers={teachers} selected={newTeacherIds} onChange={setNewTeacherIds} />
           </div>
           {formError && <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>}
           <button
@@ -328,10 +407,10 @@ export default function AdminHalaqasPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-ink truncate">{h.name}</p>
                       <p className="text-[11px] text-ink-muted truncate">
-                        {teacherName(h.teacherId, teachers)} · {h.schedule}
+                        {halaqaTeacherNames(h, teachers)} · {h.schedule}
                       </p>
                     </div>
-                    {!h.teacherId && (
+                    {halaqaTeacherIds(h).length === 0 && (
                       <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 flex-shrink-0">
                         Unassigned
                       </span>
@@ -360,30 +439,24 @@ export default function AdminHalaqasPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-ink mb-1.5">Teacher</label>
-                        <select
-                          value={draftTeacherId}
-                          onChange={(e) => setDraftTeacherId(e.target.value)}
-                          className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-                        >
-                          <option value="">Unassigned</option>
-                          {teachers.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
+                        <label className="block text-xs font-semibold text-ink mb-1">Teachers</label>
+                        <p className="text-[11px] text-ink-muted mb-2">
+                          Tap to add or take off. Everyone ticked sees and teaches this halaqa&apos;s children.
+                        </p>
+                        <TeacherPicker teachers={teachers} selected={draftTeacherIds} onChange={setDraftTeacherIds} />
                       </div>
                       <p className="text-xs text-ink-muted">
                         {count} student{count === 1 ? "" : "s"} currently in this halaqa.
                       </p>
+                      {editError && <p className="text-xs text-red-600 dark:text-red-400">{editError}</p>}
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => saveEdit(h)}
-                          className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all"
+                          disabled={savingEdit}
+                          className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
                         >
-                          Save
+                          {savingEdit ? "Saving…" : "Save"}
                         </button>
                         <button
                           type="button"

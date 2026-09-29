@@ -10,6 +10,7 @@ import {
   DEMO_HALAQA_OVERRIDES_KEY,
   allTeachers,
   allHalaqas,
+  halaqaTeacherIds,
   initials,
   type TeacherOverride,
   type HalaqaOverride,
@@ -21,6 +22,7 @@ import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { welcomeNote } from "@/lib/welcomeNote";
+import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
 
 export default function AdminTeachersPage() {
   const supabase = createClient();
@@ -44,18 +46,23 @@ export default function AdminTeachersPage() {
   const [draftActive, setDraftActive] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [resetNote, setResetNote] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Real halaqas, for showing each teacher's assignment(s) — kept as a
   // separate loader so the demo path can reuse it unchanged.
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
-    const { data } = await supabase
-      .from("classes")
-      .select("id, name, teacher_id, schedule")
-      .order("name");
+    const [{ data }, { data: others }] = await Promise.all([
+      supabase.from("classes").select("id, name, teacher_id, schedule").order("name"),
+      supabase.from("class_teachers").select("class_id, teacher_id"),
+    ]);
+    const othersOf = new Map<string, string[]>();
+    for (const o of others ?? []) othersOf.set(o.class_id, [...(othersOf.get(o.class_id) ?? []), o.teacher_id]);
     return (data ?? []).map((c) => ({
       id: c.id,
       name: c.name,
       teacherId: c.teacher_id,
+      coTeacherIds: othersOf.get(c.id) ?? [],
       schedule: c.schedule ?? "",
     }));
   };
@@ -157,6 +164,7 @@ export default function AdminTeachersPage() {
     setDraftEmail(t.email);
     setDraftActive(t.active !== false);
     setResetNote(null);
+    setSaveError(null);
   };
 
   // A teacher's temporary password is shown once, when the account is made.
@@ -202,14 +210,20 @@ export default function AdminTeachersPage() {
       return;
     }
 
-    // Email is the account's real sign-in identity, so it isn't editable
-    // from this simple form — only name and active status are.
-    await supabase
-      .from("profiles")
-      .update({ full_name: draftName.trim() || t.name, active: draftActive })
-      .eq("id", t.id);
-    await loadRealTeachers();
-    setEditingId(null);
+    // Through the server, which also has Supabase refuse a switched-off
+    // teacher's sign-ins. Email is the account's real sign-in identity, so
+    // it isn't editable from this simple form — only name and active are.
+    setSavingEdit(true);
+    setSaveError(null);
+    try {
+      await saveAccount(t.id, { full_name: draftName.trim() || t.name, active: draftActive });
+      await loadRealTeachers();
+      setEditingId(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const activeCount = teachers.filter((t) => t.active !== false).length;
@@ -283,7 +297,7 @@ export default function AdminTeachersPage() {
             {teachers.map((t) => {
               const isOpen = editingId === t.id;
               const inactive = t.active === false;
-              const theirHalaqas = halaqas.filter((h) => h.teacherId === t.id);
+              const theirHalaqas = halaqas.filter((h) => halaqaTeacherIds(h).includes(t.id));
               return (
                 <li key={t.id}>
                   <button
@@ -354,13 +368,19 @@ export default function AdminTeachersPage() {
                         />
                         Active
                       </label>
+                      <p className="text-[11px] text-ink-muted -mt-1 leading-relaxed">
+                        Untick to switch {t.name} off: they can&apos;t sign in or see anything
+                        until you switch them back on.
+                      </p>
+                      {saveError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{saveError}</p>}
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => saveEdit(t)}
-                          className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all"
+                          disabled={savingEdit}
+                          className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
                         >
-                          Save
+                          {savingEdit ? "Saving…" : "Save"}
                         </button>
                         <button
                           type="button"
@@ -384,6 +404,20 @@ export default function AdminTeachersPage() {
                           <p className="text-[11px] text-ink mt-2 leading-relaxed break-words">{resetNote}</p>
                         )}
                       </div>
+
+                      {!isDemo && (
+                        <div className="pt-3 border-t border-surface-border">
+                          <DeleteAccount
+                            name={t.name}
+                            consequences={`This deletes ${t.name}'s sign-in for good. The register, lessons and messages they recorded stay with the school without their name, and a halaqa they teach alone will need another teacher. To keep them but stop them signing in, untick Active instead.`}
+                            onDelete={async () => {
+                              await deleteAccount(t.id);
+                              setEditingId(null);
+                              await loadRealTeachers();
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </li>

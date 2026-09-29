@@ -27,11 +27,12 @@ async function sendResetIfAllowed(email: string) {
     // made-up address, and their teacher sets a new one.
     const { data: profile } = await admin
       .from("profiles")
-      .select("id, role, full_name")
+      .select("id, role, full_name, active")
       .eq("email", email)
       .limit(1)
       .maybeSingle();
-    if (!profile || profile.role === "student") return;
+    // Nor an account the school office has switched off.
+    if (!profile || profile.role === "student" || profile.active === false) return;
 
     // Stamped in app_metadata, which only the service role can write, so the
     // limit can't be reset from a browser.

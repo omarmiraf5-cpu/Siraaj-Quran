@@ -160,15 +160,27 @@ $$;
 -- for relation "profiles"`, and it fires even for a plain self-read: the
 -- subquery is planned as an uncorrelated InitPlan evaluated up front,
 -- before the simple `auth.uid() = id` branch could ever short-circuit it.
+--
+-- A switched-off account (profiles.active = false, set by the school office)
+-- has no role and no school as far as the rules below are concerned, so it
+-- can read and change nothing, even in the hour before a session it already
+-- had runs out. (Supabase is also told to refuse its sign-ins; see
+-- /api/admin/accounts/[id].)
 create or replace function my_role()
 returns text
 language sql security definer stable set search_path = public
-as $$ select role from profiles where id = auth.uid() $$;
+as $$ select role from profiles where id = auth.uid() and active $$;
 
 create or replace function my_school_id()
 returns uuid
 language sql security definer stable set search_path = public
-as $$ select school_id from profiles where id = auth.uid() $$;
+as $$ select school_id from profiles where id = auth.uid() and active $$;
+
+-- Whether the caller's account is switched on.
+create or replace function am_active()
+returns boolean
+language sql security definer stable set search_path = public
+as $$ select coalesce((select active from profiles where id = auth.uid()), false) $$;
 
 drop policy if exists "Admins can read all school profiles" on profiles;
 create policy "Admins can read all school profiles" on profiles
@@ -272,7 +284,7 @@ alter table students add column if not exists hifz_direction text;
 drop policy if exists "Admins and teachers can read students in their school" on students;
 create policy "Admins and teachers can read students in their school" on students
   for select using (
-    school_id in (select school_id from profiles where id = auth.uid() and role in ('admin', 'teacher'))
+    school_id in (select school_id from profiles where id = auth.uid() and role in ('admin', 'teacher') and active)
   );
 drop policy if exists "Student can read own record" on students;
 create policy "Student can read own record" on students
@@ -312,16 +324,18 @@ alter table parent_students enable row level security;
 create or replace function my_children_student_ids()
 returns setof uuid
 language sql security definer stable set search_path = public
-as $$ select student_id from parent_students where parent_id = auth.uid() $$;
+as $$ select student_id from parent_students where parent_id = auth.uid() and am_active() $$;
 
 create or replace function student_school_id(sid uuid)
 returns uuid
 language sql security definer stable set search_path = public
 as $$ select school_id from students where id = sid $$;
 
+-- Every parent policy below goes through these links, so a parent the
+-- office has switched off sees none of them, and so nothing of any child.
 drop policy if exists "Parents can read own links" on parent_students;
 create policy "Parents can read own links" on parent_students
-  for select using (parent_id = auth.uid());
+  for select using (parent_id = auth.uid() and am_active());
 drop policy if exists "Admins can manage parent links" on parent_students;
 create policy "Admins can manage parent links" on parent_students
   for all using (
@@ -361,7 +375,7 @@ alter table classes add column if not exists schedule text;
 alter table classes alter column teacher_id drop not null;
 drop policy if exists "Teachers can read own classes" on classes;
 create policy "Teachers can read own classes" on classes
-  for select using (teacher_id = auth.uid());
+  for select using (teacher_id = auth.uid() and am_active());
 drop policy if exists "Admins can manage all classes" on classes;
 create policy "Admins can manage all classes" on classes
   for all using (
@@ -379,6 +393,18 @@ create table if not exists class_enrollments (
 );
 alter table class_enrollments enable row level security;
 
+-- A halaqa's other teachers, when more than one teaches it. Its first
+-- teacher stays in classes.teacher_id; everyone here sees and teaches the
+-- same children as they do (my_taught_class_ids below).
+create table if not exists class_teachers (
+  class_id    uuid not null references classes(id) on delete cascade,
+  teacher_id  uuid not null references profiles(id) on delete cascade,
+  created_at  timestamptz default now(),
+  primary key (class_id, teacher_id)
+);
+alter table class_teachers enable row level security;
+create index if not exists idx_class_teachers_teacher on class_teachers(teacher_id);
+
 -- Same definer treatment as the students/parent_students pair above, and
 -- for the same cycle: classes' policies ask class_enrollments who is
 -- enrolled, class_enrollments' policies ask classes who owns the class.
@@ -395,15 +421,48 @@ as $$
   where s.profile_id = auth.uid()
 $$;
 
+-- The halaqas the caller teaches, as its first teacher or one of the
+-- others (class_teachers). None for a switched-off account.
 create or replace function my_taught_class_ids()
 returns setof uuid
 language sql security definer stable set search_path = public
-as $$ select id from classes where teacher_id = auth.uid() $$;
+as $$
+  select id from classes where teacher_id = auth.uid() and am_active()
+  union
+  select class_id from class_teachers where teacher_id = auth.uid() and am_active()
+$$;
+
+-- The children in those halaqas. Their teachers share what's recorded
+-- about them (lessons, register, recitations, stars, surah tests, class
+-- work), whichever of them recorded it: see each table's teacher policy.
+create or replace function my_taught_student_ids()
+returns setof uuid
+language sql security definer stable set search_path = public
+as $$
+  select student_id from class_enrollments where class_id in (select my_taught_class_ids())
+$$;
 
 create or replace function class_school_id(cid uuid)
 returns uuid
 language sql security definer stable set search_path = public
 as $$ select school_id from classes where id = cid $$;
+
+-- The office chooses a halaqa's teachers, from its own school's teachers;
+-- a teacher sees who else teaches their halaqas.
+drop policy if exists "Admins manage halaqa teachers" on class_teachers;
+create policy "Admins manage halaqa teachers" on class_teachers
+  for all using (
+    class_school_id(class_id) = my_school_id() and my_role() = 'admin'
+  ) with check (
+    class_school_id(class_id) = my_school_id() and my_role() = 'admin'
+    and exists (select 1 from profiles p where p.id = teacher_id and p.role = 'teacher' and p.school_id = my_school_id())
+  );
+drop policy if exists "Teachers see their halaqas' teachers" on class_teachers;
+create policy "Teachers see their halaqas' teachers" on class_teachers
+  for select using (class_id in (select my_taught_class_ids()));
+drop policy if exists "Teachers can read halaqas they teach" on classes;
+create policy "Teachers can read halaqas they teach" on classes
+  for select using (id in (select my_taught_class_ids()));
 
 drop policy if exists "Teachers can read enrollments for own classes" on class_enrollments;
 create policy "Teachers can read enrollments for own classes" on class_enrollments
@@ -611,7 +670,8 @@ end $$;
 alter table quranic_assignments enable row level security;
 drop policy if exists "Teachers can manage own quranic assignments" on quranic_assignments;
 create policy "Teachers can manage own quranic assignments" on quranic_assignments
-  for all using (teacher_id = auth.uid());
+  for all using ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()))
+  with check ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()));
 drop policy if exists "Students can read own quranic assignments" on quranic_assignments;
 create policy "Students can read own quranic assignments" on quranic_assignments
   for select using (
@@ -652,7 +712,8 @@ create table if not exists surah_test_confirmations (
 alter table surah_test_confirmations enable row level security;
 drop policy if exists "Teachers can manage own students' surah confirmations" on surah_test_confirmations;
 create policy "Teachers can manage own students' surah confirmations" on surah_test_confirmations
-  for all using (teacher_id = auth.uid());
+  for all using ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()))
+  with check ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()));
 drop policy if exists "Students can read own surah confirmations" on surah_test_confirmations;
 create policy "Students can read own surah confirmations" on surah_test_confirmations
   for select using (
@@ -740,7 +801,8 @@ begin
 end $$;
 drop policy if exists "Teachers can manage attendance for own classes" on attendance;
 create policy "Teachers can manage attendance for own classes" on attendance
-  for all using (teacher_id = auth.uid());
+  for all using ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()))
+  with check ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()));
 drop policy if exists "Admins can read all attendance" on attendance;
 create policy "Admins can read all attendance" on attendance
   for select using (
@@ -942,7 +1004,8 @@ end $$;
 alter table recitation_log enable row level security;
 drop policy if exists "Teachers can manage recitation log for own students" on recitation_log;
 create policy "Teachers can manage recitation log for own students" on recitation_log
-  for all using (teacher_id = auth.uid());
+  for all using ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()))
+  with check ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()));
 drop policy if exists "Students can read own recitation log" on recitation_log;
 create policy "Students can read own recitation log" on recitation_log
   for select using (
@@ -978,7 +1041,8 @@ create table if not exists student_stars (
 alter table student_stars enable row level security;
 drop policy if exists "Teachers can manage stars for own students" on student_stars;
 create policy "Teachers can manage stars for own students" on student_stars
-  for all using (teacher_id = auth.uid());
+  for all using ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()))
+  with check ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()));
 drop policy if exists "Students can read own stars" on student_stars;
 create policy "Students can read own stars" on student_stars
   for select using (
@@ -1009,7 +1073,8 @@ create table if not exists student_badges (
 alter table student_badges enable row level security;
 drop policy if exists "Teachers can manage badges for own students" on student_badges;
 create policy "Teachers can manage badges for own students" on student_badges
-  for all using (teacher_id = auth.uid());
+  for all using ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()))
+  with check ((teacher_id = auth.uid() or student_id in (select my_taught_student_ids())) and (select am_active()));
 drop policy if exists "Students can read own badges" on student_badges;
 create policy "Students can read own badges" on student_badges
   for select using (
@@ -1741,6 +1806,18 @@ as $$
   )
 $$;
 
+-- A teacher who shares a halaqa with whoever set the work: it was set for
+-- a child in a halaqa they teach.
+create or replace function teaches_subject_assignment(aid uuid)
+returns boolean
+language sql security definer stable set search_path = public
+as $$
+  select my_role() = 'teacher' and exists (
+    select 1 from subject_submissions ss
+    where ss.assignment_id = aid and ss.student_id in (select my_taught_student_ids())
+  )
+$$;
+
 create or replace function my_subject_assignment_ids()
 returns setof uuid
 language sql security definer stable set search_path = public
@@ -1771,6 +1848,11 @@ create policy "Staff manage subject assignments" on subject_assignments
     school_id = my_school_id()
     and (my_role() = 'admin' or (my_role() = 'teacher' and created_by = auth.uid()))
   );
+-- ...and a teacher sharing a halaqa with whoever set the work reads it, and
+-- marks the answers of that halaqa's children (below), without deleting it.
+drop policy if exists "Teachers read class work set for their halaqas" on subject_assignments;
+create policy "Teachers read class work set for their halaqas" on subject_assignments
+  for select using (teaches_subject_assignment(id));
 drop policy if exists "Students read their subject assignments" on subject_assignments;
 create policy "Students read their subject assignments" on subject_assignments
   for select using (id in (select my_subject_assignment_ids()));
@@ -1787,6 +1869,13 @@ drop policy if exists "Staff manage subject submissions" on subject_submissions;
 create policy "Staff manage subject submissions" on subject_submissions
   for all using (manages_subject_assignment(assignment_id))
   with check (manages_subject_assignment(assignment_id) and school_id = my_school_id());
+drop policy if exists "Teachers see their halaqas' class work answers" on subject_submissions;
+create policy "Teachers see their halaqas' class work answers" on subject_submissions
+  for select using (student_id in (select my_taught_student_ids()) and teaches_subject_assignment(assignment_id));
+drop policy if exists "Teachers mark their halaqas' class work answers" on subject_submissions;
+create policy "Teachers mark their halaqas' class work answers" on subject_submissions
+  for update using (student_id in (select my_taught_student_ids()) and teaches_subject_assignment(assignment_id))
+  with check (student_id in (select my_taught_student_ids()) and teaches_subject_assignment(assignment_id));
 drop policy if exists "Students read own subject submissions" on subject_submissions;
 create policy "Students read own subject submissions" on subject_submissions
   for select using (student_id in (select id from students where profile_id = auth.uid()));
@@ -1824,5 +1913,29 @@ begin
           'text/plain', 'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/ogg', 'audio/webm'
         ]
     where id = 'class-work';
+  end if;
+end $$;
+
+-- ══════════════════════════════════════
+-- Switched-off accounts
+-- ══════════════════════════════════════
+-- Switching a teacher or parent off (the office's Teachers and Parents
+-- pages, through /api/admin/accounts/[id]) also tells Supabase to refuse
+-- their sign-ins, and switching them back on lifts that. Accounts switched
+-- off before it did are given the same here. Skipped where there is no
+-- Supabase auth schema (a plain Postgres for tests).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'auth' and table_name = 'users' and column_name = 'banned_until'
+  ) then
+    update auth.users u
+    set banned_until = now() + interval '100 years'
+    from public.profiles p
+    where p.id = u.id
+      and p.active = false
+      and p.role in ('teacher', 'parent')
+      and (u.banned_until is null or u.banned_until < now());
   end if;
 end $$;

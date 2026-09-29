@@ -102,8 +102,10 @@ export default function TeacherDashboard() {
         await Promise.all([
           supabase.from("profiles").select("full_name").eq("id", user.id).single(),
           supabase.from("students").select("id, full_name, grade").eq("active", true).order("full_name"),
-          supabase.from("quranic_assignments").select("*").eq("teacher_id", user.id),
-          supabase.from("attendance").select("student_id, class_date, status").eq("teacher_id", user.id),
+          // Theirs, and those for the children of any halaqa they teach
+          // (with others, too): the policies on both tables decide.
+          supabase.from("quranic_assignments").select("*"),
+          supabase.from("attendance").select("student_id, class_date, status"),
         ]);
 
       setTeacherName(profile?.full_name ?? null);

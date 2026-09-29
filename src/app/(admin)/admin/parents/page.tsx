@@ -15,6 +15,8 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { welcomeNote } from "@/lib/welcomeNote";
+import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
+import { IconArrow } from "@/components/icons";
 
 interface ParentRow {
   id: string;
@@ -46,6 +48,37 @@ export default function AdminParentsPage() {
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
+  // The parent whose row is open, with its on/off switch as it's being edited.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [draftActive, setDraftActive] = useState(true);
+  const [savingSwitch, setSavingSwitch] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+
+  const toggleOpen = (p: ParentRow) => {
+    setOpenId(p.id === openId ? null : p.id);
+    setDraftActive(p.active !== false);
+    setSwitchError(null);
+  };
+
+  // Through the server, which also has Supabase refuse a switched-off
+  // parent's sign-ins.
+  const saveSwitch = async (p: ParentRow) => {
+    if (isDemo) {
+      setNote("Sample data — there's no real account to switch off.");
+      return;
+    }
+    setSavingSwitch(true);
+    setSwitchError(null);
+    try {
+      await saveAccount(p.id, { active: draftActive });
+      await loadReal();
+      setOpenId(null);
+    } catch (err) {
+      setSwitchError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+    } finally {
+      setSavingSwitch(false);
+    }
+  };
 
   // The school's own way back when a parent loses the temporary password
   // they were given — the same thing the Teachers page offers, so neither
@@ -291,30 +324,108 @@ export default function AdminParentsPage() {
           <EmptyNote>No parent accounts yet.</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
-            {parents.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 py-3">
-                <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
-                  {initials(p.name)}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{p.name}</p>
-                  <p className="text-[11px] text-ink-muted truncate">
-                    {p.email}
-                    {p.childIds.length > 0
-                      ? ` · ${p.childIds.map(childName).join(", ")}`
-                      : " · no child linked"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => resetPassword(p)}
-                  disabled={resettingId === p.id}
-                  className="text-[11px] font-semibold text-ink-muted hover:text-ink px-2 py-1 flex-shrink-0 transition-colors disabled:opacity-50"
-                >
-                  {resettingId === p.id ? "Resetting…" : "Reset password"}
-                </button>
-              </li>
-            ))}
+            {parents.map((p) => {
+              const isOpen = openId === p.id;
+              const inactive = p.active === false;
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggleOpen(p)}
+                    aria-expanded={isOpen}
+                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                  >
+                    <span
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
+                        inactive
+                          ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500"
+                          : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"
+                      }`}
+                    >
+                      {initials(p.name)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[13px] font-semibold truncate ${inactive ? "text-ink-muted" : "text-ink"}`}>{p.name}</p>
+                      <p className="text-[11px] text-ink-muted truncate">
+                        {p.email}
+                        {p.childIds.length > 0
+                          ? ` · ${p.childIds.map(childName).join(", ")}`
+                          : " · no child linked"}
+                      </p>
+                    </div>
+                    {inactive && (
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
+                        Inactive
+                      </span>
+                    )}
+                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
+                      <IconArrow size={14} />
+                    </span>
+                  </button>
+
+                  {isOpen && (
+                    <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                      <label className="flex items-center gap-2 text-sm text-ink">
+                        <input
+                          type="checkbox"
+                          checked={draftActive}
+                          onChange={(e) => setDraftActive(e.target.checked)}
+                          className="w-4 h-4 rounded"
+                        />
+                        Active
+                      </label>
+                      <p className="text-[11px] text-ink-muted -mt-1 leading-relaxed">
+                        Untick to switch {p.name} off: they can&apos;t sign in or see anything until you switch
+                        them back on.
+                      </p>
+                      {switchError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{switchError}</p>}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => saveSwitch(p)}
+                          disabled={savingSwitch}
+                          className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
+                        >
+                          {savingSwitch ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(null)}
+                          className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+
+                      <div className="pt-3 border-t border-surface-border">
+                        <button
+                          type="button"
+                          onClick={() => resetPassword(p)}
+                          disabled={resettingId === p.id}
+                          className="text-[13px] font-semibold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
+                        >
+                          {resettingId === p.id ? "Resetting…" : "Reset password"}
+                        </button>
+                      </div>
+
+                      {!isDemo && (
+                        <div className="pt-3 border-t border-surface-border">
+                          <DeleteAccount
+                            name={p.name}
+                            consequences={`This deletes ${p.name}'s sign-in for good. Their children stay at the school, and messages they sent stay without their name. To keep them but stop them signing in, untick Active instead.`}
+                            onDelete={async () => {
+                              await deleteAccount(p.id);
+                              setOpenId(null);
+                              await loadReal();
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </SectionCard>

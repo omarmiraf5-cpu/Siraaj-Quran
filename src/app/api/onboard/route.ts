@@ -184,7 +184,9 @@ export async function POST(request: NextRequest) {
     // It used to be generated here and discarded, which left every teacher a
     // school added during signup holding an account nobody — not even the
     // admin who just created it — knew the password to.
-    const teacherIdByHalaqa: Record<string, string> = {};
+    // Every teacher given for each halaqa: the first becomes its teacher
+    // (classes.teacher_id), any others teach it alongside them.
+    const teacherIdsByHalaqa: Record<string, string[]> = {};
     const teacherLogins: Array<{ name: string; email: string; password: string }> = [];
     // Each teacher and parent is also emailed a link to choose their own
     // password, once the school is complete; the temporary one above stays
@@ -210,7 +212,7 @@ export async function POST(request: NextRequest) {
       });
       if (teacherError) throw new Error(`Teacher "${teacher.name}" failed: ${teacherError.message}`);
       createdUserIds.push(teacherAuth.user.id);
-      teacherIdByHalaqa[teacher.halaqa] = teacherAuth.user.id;
+      if (teacher.halaqa) (teacherIdsByHalaqa[teacher.halaqa] ??= []).push(teacherAuth.user.id);
       teacherLogins.push({ name: teacher.name.trim(), email, password });
       welcomes.push({ userId: teacherAuth.user.id, name: teacher.name.trim(), email, role: "teacher" });
     }
@@ -226,13 +228,26 @@ export async function POST(request: NextRequest) {
           name: halaqa,
           subject: "Qur'an & Hifz",
           grade: 0,
-          teacher_id: teacherIdByHalaqa[halaqa] ?? null,
+          teacher_id: teacherIdsByHalaqa[halaqa]?.[0] ?? null,
           school_id: schoolId,
         })
         .select()
         .single();
       if (classError) throw new Error(`Halaqa "${halaqa}" failed: ${classError.message}`);
       classIdByHalaqa[halaqa] = cls.id;
+      const others = (teacherIdsByHalaqa[halaqa] ?? []).slice(1);
+      if (others.length > 0) {
+        const { error: coError } = await admin
+          .from("class_teachers")
+          .insert(others.map((teacher_id) => ({ class_id: cls.id, teacher_id })));
+        // A database that hasn't had class_teachers added yet (schema.sql):
+        // the halaqa keeps its first teacher rather than the signup failing.
+        if (coError && ["42P01", "PGRST205"].includes(coError.code)) {
+          console.warn(`Onboarding: "${halaqa}" keeps one teacher; class_teachers isn't set up yet.`);
+        } else if (coError) {
+          throw new Error(`Teachers for "${halaqa}" failed: ${coError.message}`);
+        }
+      }
     }
 
     const studentPins: Array<{ name: string; halaqa: string; pin: string }> = [];

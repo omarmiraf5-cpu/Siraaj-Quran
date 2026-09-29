@@ -106,6 +106,8 @@ export interface DemoHalaqa {
       shown and re-keying it to an id would touch every one of those. */
   name: string;
   teacherId: string | null;
+  /** Its other teachers, when more than one teaches it (class_teachers). */
+  coTeacherIds?: string[];
   schedule: string;
 }
 
@@ -117,7 +119,18 @@ export const DEMO_HALAQAS: DemoHalaqa[] = [
 export const DEMO_CREATED_HALAQAS_KEY = "demo_created_halaqas";
 export const DEMO_HALAQA_OVERRIDES_KEY = "demo_halaqa_overrides";
 
-export type HalaqaOverride = Partial<Pick<DemoHalaqa, "name" | "teacherId" | "schedule">>;
+export type HalaqaOverride = Partial<Pick<DemoHalaqa, "name" | "teacherId" | "coTeacherIds" | "schedule">>;
+
+/** Everyone who teaches a halaqa, its first teacher first. */
+export function halaqaTeacherIds(h: Pick<DemoHalaqa, "teacherId" | "coTeacherIds">): string[] {
+  return [...new Set([h.teacherId, ...(h.coTeacherIds ?? [])].filter((id): id is string => Boolean(id)))];
+}
+
+/** "Ms. Farah", "Ms. Farah & Ustadh Bilal", or "Unassigned". */
+export function halaqaTeacherNames(h: Pick<DemoHalaqa, "teacherId" | "coTeacherIds">, teachers: DemoTeacher[] = DEMO_TEACHERS): string {
+  const ids = halaqaTeacherIds(h);
+  return ids.length === 0 ? "Unassigned" : ids.map((id) => teacherName(id, teachers)).join(" & ");
+}
 
 export function withHalaqaOverride(
   h: DemoHalaqa,

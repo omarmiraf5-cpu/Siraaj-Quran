@@ -136,10 +136,17 @@ export default function LoginPage() {
   // on instead of asking for the password again.
   useEffect(() => {
     let cancelled = false;
+    // Sent back here by a portal that found the account switched off.
+    if (new URLSearchParams(window.location.search).get("off") === "1") setError(t("welcome.accountOff"));
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user || cancelled) return;
+      const { data: profile } = await supabase.from("profiles").select("role, active").eq("id", user.id).single();
+      if (profile?.active === false) {
+        await supabase.auth.signOut().catch(() => {});
+        if (!cancelled) setError(t("welcome.accountOff"));
+        return;
+      }
       if (user.user_metadata?.must_change_password) { router.replace("/change-password"); return; }
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       if (!cancelled && profile?.role) router.replace(destination(profile.role));
     }).catch(() => {});
     return () => { cancelled = true; };
@@ -206,18 +213,30 @@ export default function LoginPage() {
       email: trimmedEmail,
       password: trimmedPass,
     });
-    if (error) { setError(t("login.invalidCredentials")); setLoading(false); return; }
-    if (data.user?.user_metadata?.must_change_password) {
-      router.push("/change-password");
+    if (error) {
+      // Supabase refuses an account the school office has switched off.
+      const switchedOff = error.code === "user_banned" || /banned/i.test(error.message);
+      setError(t(switchedOff ? "welcome.accountOff" : "login.invalidCredentials"));
+      setLoading(false);
       return;
     }
     // Their own portal (or the page the link asked for), whichever tab
     // happened to be selected.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, school_id")
+      .select("role, school_id, active")
       .eq("id", data.user?.id ?? "")
       .single();
+    if (profile?.active === false) {
+      await supabase.auth.signOut().catch(() => {});
+      setError(t("welcome.accountOff"));
+      setLoading(false);
+      return;
+    }
+    if (data.user?.user_metadata?.must_change_password) {
+      router.push("/change-password");
+      return;
+    }
     rememberSchool(profile?.school_id).catch(() => {});
     router.push(destination(profile?.role ?? role));
   };

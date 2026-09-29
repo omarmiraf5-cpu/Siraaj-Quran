@@ -54,8 +54,16 @@ export async function POST(req: NextRequest) {
     if (entries.some(([, s]) => !STATUSES.includes(s as RegisterStatus))) {
       return NextResponse.json({ error: "Each mark must be present, late, absent or excused" }, { status: 400 });
     }
+    // The register page sends just what it changed since it opened or last
+    // saved: the marks it set (records) and the ones it took off (cleared).
+    // So two teachers sharing a halaqa each change only what they touched,
+    // and each child keeps one mark a day. A page from before this sends no
+    // `cleared`, and its marks replace its own for the day, as they did.
+    const cleared: string[] | null = Array.isArray(body.cleared)
+      ? [...new Set((body.cleared as unknown[]).filter((x): x is string => typeof x === "string"))]
+      : null;
 
-    const ids = entries.map(([id]) => id);
+    const ids = [...new Set([...entries.map(([id]) => id), ...(cleared ?? [])])];
     const { data: visible, error: visError } = ids.length
       ? await supabase.from("students").select("id, full_name").in("id", ids)
       : { data: [], error: null };
@@ -65,15 +73,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Some of those students aren't in your school" }, { status: 400 });
     }
 
-    // Replace this teacher's marks for the day rather than upsert: class_id
-    // is null on every row here, and Postgres never treats two nulls as
-    // equal, so an upsert would pile up duplicates on every re-save.
-    const { error: deleteError } = await supabase
-      .from("attendance")
-      .delete()
-      .eq("teacher_id", me.id)
-      .eq("class_date", date);
-    if (deleteError) throw deleteError;
+    // Marks are replaced rather than upserted: class_id is null on every row
+    // here, and Postgres never treats two nulls as equal, so an upsert would
+    // pile up duplicates on every re-save.
+    if (cleared) {
+      // Each child this save touched loses the day's mark it had: this
+      // teacher's own, or one a teacher sharing their halaqa set.
+      const shared = me.role === "teacher" ? await taughtStudentIds(supabase) : new Set<string>();
+      const theirs = ids.filter((id) => shared.has(id));
+      if (ids.length > 0) {
+        const { error } = await supabase
+          .from("attendance")
+          .delete()
+          .eq("teacher_id", me.id)
+          .eq("class_date", date)
+          .in("student_id", ids);
+        if (error) throw error;
+      }
+      if (theirs.length > 0) {
+        const { error } = await supabase.from("attendance").delete().eq("class_date", date).in("student_id", theirs);
+        if (error) throw error;
+      }
+    } else {
+      const { error: deleteError } = await supabase
+        .from("attendance")
+        .delete()
+        .eq("teacher_id", me.id)
+        .eq("class_date", date);
+      if (deleteError) throw deleteError;
+    }
     if (entries.length > 0) {
       const { error: insertError } = await supabase.from("attendance").insert(
         entries.map(([student_id, status]) => ({
@@ -199,4 +227,12 @@ async function alertLongAbsences(
   }
   await notify(admin, notices);
   return out;
+}
+
+/** The children in the halaqas this teacher teaches, alone or with others. */
+async function taughtStudentIds(supabase: Db): Promise<Set<string>> {
+  // A teacher's session sees the enrolments of exactly those halaqas.
+  const { data, error } = await supabase.from("class_enrollments").select("student_id");
+  if (error) throw error;
+  return new Set(((data ?? []) as Array<{ student_id: string }>).map((e) => e.student_id));
 }

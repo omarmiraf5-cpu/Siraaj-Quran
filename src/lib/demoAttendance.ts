@@ -354,7 +354,14 @@ export function demoAttendanceFetch(role: DemoRole) {
         const date = String(body.date ?? today);
         const marks = (body.records ?? {}) as Record<string, RegisterStatus>;
         const before = new Set(longAbsences(store).map((r) => `${r.studentId}:${r.from}`));
-        store.registers[date] = marks;
+        if (Array.isArray(body.cleared)) {
+          // Just what the page changed, as /api/attendance takes it.
+          const day = { ...(store.registers[date] ?? {}) };
+          for (const id of body.cleared as string[]) delete day[id];
+          store.registers[date] = { ...day, ...marks };
+        } else {
+          store.registers[date] = marks;
+        }
         save(store);
         const alerts = Object.entries(marks)
           .filter(([, s]) => s === "absent")

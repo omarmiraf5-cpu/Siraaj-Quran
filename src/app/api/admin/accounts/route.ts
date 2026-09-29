@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { PROVISIONED } from "@/lib/accountProvisioning";
 import { sendAccountWelcomes } from "@/lib/accountWelcome";
+import { ACCOUNT_ROLES, requireAdmin, schoolAccount, type AccountRole } from "@/lib/adminAccounts";
 
 // Accounts are made with a temporary password the admin can hand over, so
 // the person can sign in straight away. They're also emailed a welcome with
@@ -13,55 +14,8 @@ function generateTempPassword() {
   return randomBytes(9).toString("base64url");
 }
 
-const ALLOWED_ROLES = ["teacher", "parent"] as const;
-type AllowedRole = (typeof ALLOWED_ROLES)[number];
-
-// Both handlers below start the same way: prove there's a session, and that
-// it belongs to an admin. Shared so the reset path can't drift into being
-// the more permissive of the two.
-async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  }
-
-  const { data: caller, error: callerError } = await supabase
-    .from("profiles")
-    .select("role, school_id")
-    .eq("id", user.id)
-    .single();
-
-  if (callerError || !caller || caller.role !== "admin") {
-    // This 403 has fired for accounts that really were role='admin' in the
-    // table, so the generic message alone wasn't enough to tell a missing
-    // row apart from a wrong role apart from an RLS/session problem. Log
-    // the real cause server-side and echo a short hint in the response so
-    // it's visible without needing Vercel log access.
-    console.error("Admin check failed:", {
-      userId: user.id,
-      callerError: callerError?.message,
-      callerErrorCode: callerError?.code,
-      caller,
-    });
-    return {
-      error: NextResponse.json(
-        {
-          error: "Only an admin can manage accounts",
-          debug: callerError
-            ? `${callerError.code ?? ""} ${callerError.message}`.trim()
-            : caller
-            ? `signed-in account has role "${caller.role}", not admin`
-            : "no profile row is visible for this session",
-        },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { caller, user };
-}
+const ALLOWED_ROLES = ACCOUNT_ROLES;
+type AllowedRole = AccountRole;
 
 // Creating any account needs Supabase's admin API (to write the auth.users
 // row), which requires the service-role key — an RLS-scoped session can
@@ -194,33 +148,9 @@ export async function PATCH(req: NextRequest) {
     const { caller } = auth;
 
     const admin = createAdminClient();
-
-    // Read the target with the service role, then check it against the
-    // caller's own school here. Going through the admin's RLS-scoped session
-    // instead would make "not in your school" and "no such account" look
-    // identical, and this has to refuse the first case loudly.
-    const { data: target, error: targetError } = await admin
-      .from("profiles")
-      .select("id, role, school_id, full_name, email")
-      .eq("id", user_id)
-      .maybeSingle();
-
-    if (targetError) throw targetError;
-    if (!target) {
-      return NextResponse.json({ error: "No such account" }, { status: 404 });
-    }
-    if (target.school_id !== caller.school_id) {
-      return NextResponse.json(
-        { error: "That account belongs to a different school" },
-        { status: 403 }
-      );
-    }
-    if (!ALLOWED_ROLES.includes(target.role as AllowedRole)) {
-      return NextResponse.json(
-        { error: `Cannot reset a ${target.role} account here` },
-        { status: 400 }
-      );
-    }
+    const found = await schoolAccount(admin, caller, user_id);
+    if (found.error) return found.error;
+    const { target } = found;
 
     // Merged rather than replaced: updateUserById overwrites user_metadata
     // wholesale, and dropping role/school_id from it would orphan the

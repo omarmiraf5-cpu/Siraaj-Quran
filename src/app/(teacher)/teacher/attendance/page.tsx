@@ -68,6 +68,9 @@ export default function TeacherAttendancePage() {
   const [students, setStudents] = useState<DemoStudent[]>([]);
   const [history, setHistory] = useState<Record<string, AttendanceDay[]>>({});
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
+  // Today's marks as they stand in the database: what a save changes is
+  // worked out against these.
+  const [savedMarks, setSavedMarks] = useState<Record<string, AttendanceStatus>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,10 +100,10 @@ export default function TeacherAttendancePage() {
 
       const [{ data: studentRows }, { data: attendanceRows }] = await Promise.all([
         supabase.from("students").select("id, full_name, grade, active").eq("active", true).order("full_name"),
-        // Scoped to this teacher's own recorded attendance — the same rows
-        // the "Teachers can manage attendance for own classes" policy
-        // already limits them to, kept explicit here for clarity.
-        supabase.from("attendance").select("student_id, class_date, status").eq("teacher_id", user.id),
+        // What this teacher recorded, and any marks for the children of a
+        // halaqa they teach, whoever took them: the attendance policy
+        // decides, so teachers sharing a halaqa see one register.
+        supabase.from("attendance").select("student_id, class_date, status"),
       ]);
 
       setStudents(
@@ -121,6 +124,7 @@ export default function TeacherAttendancePage() {
       }
       setHistory(byStudent);
       setRecords(todayRecords);
+      setSavedMarks(todayRecords);
     };
 
     load().finally(() => setReady(true));
@@ -159,7 +163,13 @@ export default function TeacherAttendancePage() {
       const res = await send("/api/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: today, records }),
+        // Only what changed since the page opened or last saved: a teacher
+        // sharing the halaqa may have marked other children meanwhile.
+        body: JSON.stringify({
+          date: today,
+          records: Object.fromEntries(Object.entries(records).filter(([id, status]) => savedMarks[id] !== status)),
+          cleared: Object.keys(savedMarks).filter((id) => !(id in records)),
+        }),
       });
       const body = await res.json();
       if (res.status === 401) throw new Error(t("teacher.attendance.signedOut"));
@@ -168,12 +178,16 @@ export default function TeacherAttendancePage() {
 
       setHistory((h) => {
         const next = { ...h };
+        for (const student_id of Object.keys(savedMarks)) {
+          if (!(student_id in records)) next[student_id] = (next[student_id] ?? []).filter((d) => d.date !== today);
+        }
         for (const [student_id, status] of Object.entries(records)) {
           const withoutToday = (next[student_id] ?? []).filter((d) => d.date !== today);
           next[student_id] = [{ date: today, status }, ...withoutToday];
         }
         return next;
       });
+      setSavedMarks(records);
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("teacher.attendance.saveFailed"));
