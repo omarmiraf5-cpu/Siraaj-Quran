@@ -4,8 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>MyDiiwaan</title>
-  <!-- Shown by the app when mydiiwaan.com can't be reached (capacitor.config
-       server.errorPath). Everything here is inline: there is no network. -->
+  <!-- Shown by the app when www.mydiiwaan.com can't be reached
+       (capacitor.config server.errorPath). Everything here is inline: there
+       is no network. -->
   <style>
     :root { color-scheme: light dark; }
     * { box-sizing: border-box; }
@@ -43,7 +44,7 @@
   </main>
   <script>
     function retry() {
-      window.location.href = "https://mydiiwaan.com/login";
+      window.location.href = "https://www.mydiiwaan.com/login";
     }
     // Come back on our own as soon as the connection does.
     window.addEventListener("online", retry);

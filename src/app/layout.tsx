@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Newsreader, Amiri, Aref_Ruqaa, Noto_Sans_Arabic } fr
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { NativeBridge } from "@/components/NativeBridge";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 /* Loaded here rather than through an @import in globals.css. CSS ignores an
@@ -56,10 +57,12 @@ const notoSansArabic = Noto_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "MyDiiwaan — Quran School Portal",
   description:
     "MyDiiwaan is a Quranic school management portal featuring Tajweed color coding, assignments, and progress tracking.",
   icons: { icon: "/crest.jpg" },
+  alternates: { canonical: "/" },
 };
 
 // viewport-fit=cover lets the page draw under a phone's notch and home

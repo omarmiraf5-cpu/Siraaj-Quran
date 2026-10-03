@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "assets:generate": "capacitor-assets generate --ios --android --iconBackgroundColor '#24272b' --iconBackgroundColorDark '#24272b' --splashBackgroundColor '#24272b' --splashBackgroundColorDark '#24272b'",
+    "cap:sync": "cap sync"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
