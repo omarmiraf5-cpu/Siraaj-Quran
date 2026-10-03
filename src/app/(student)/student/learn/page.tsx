@@ -15,8 +15,8 @@ const SHELF = [
     colour: "verdigris" as const,
     icon: <IconBookOpen size={22} />,
     title: "Qa'idah",
-    arabic: "الْقَاعِدَةُ النُّورَانِيَّةُ",
-    sub: "Learn to read Arabic, from the letters up.",
+    arabic: "أَحْسَنُ الْقَوَاعِدِ",
+    sub: "Learn to read Arabic with Ahsanul Qawaid, from the letters up.",
     count: `${QAIDAH_LESSONS.length} lessons`,
   },
   {

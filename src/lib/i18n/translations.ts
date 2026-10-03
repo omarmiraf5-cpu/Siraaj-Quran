@@ -894,7 +894,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.assignments": "الواجبات",
     "nav.messages": "الرسائل",
     "nav.mushaf": "المصحف",
-    "nav.qaidah": "القاعدة النورانية",
+    "nav.qaidah": "أحسن القواعد",
     "nav.hadith": "الأربعون النووية",
     "nav.awards": "النجوم والأوسمة",
     "nav.changePassword": "تغيير كلمة المرور",

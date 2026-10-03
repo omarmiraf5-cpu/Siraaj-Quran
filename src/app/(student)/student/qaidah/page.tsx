@@ -16,12 +16,12 @@ export default function StudentQaidahPage() {
             dir="rtl"
             lang="ar"
           >
-            الْقَاعِدَةُ النُّورَانِيَّةُ
+            أَحْسَنُ الْقَوَاعِدِ
           </p>
           <p className="text-[13px] text-white/55 mt-2.5">
             {QAIDAH_LESSONS.length} lessons
             <span className="text-white/25 mx-2">·</span>
-            letters to fluency
+            Ahsanul Qawaid
           </p>
         </div>
       </header>
