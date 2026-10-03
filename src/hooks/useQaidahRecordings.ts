@@ -12,9 +12,9 @@ import {
 import { recordingKey, type QaidahRecording } from "@/lib/qaidahRecordings";
 
 /**
- * The school's recordings of Qa'idah lessons, keyed by book and lesson, with
- * a link to play each — or, in the sample portal, the ones made in this
- * browser.
+ * The school's recordings of Qa'idah lessons and their tiles, keyed by
+ * recordingKey, with a link to play each — or, in the sample portal, the
+ * ones made in this browser.
  */
 export function useQaidahRecordings(mode: PortalMode) {
   const [recordings, setRecordings] = useState<Map<string, QaidahRecording>>(new Map());
@@ -34,9 +34,10 @@ export function useQaidahRecordings(mode: PortalMode) {
         for (const r of list) {
           const url = URL.createObjectURL(r.blob);
           objectUrls.current.push(url);
-          map.set(recordingKey(r.book, r.lesson), {
+          map.set(recordingKey(r.book, r.lesson, r.item), {
             book: r.book,
             lesson: r.lesson,
+            item: r.item ?? "",
             url,
             mime_type: r.mime_type,
             duration_s: r.duration_s,
@@ -53,7 +54,7 @@ export function useQaidahRecordings(mode: PortalMode) {
       setMissingTable(data.missing_table === true);
       setRecordings(
         new Map(
-          ((data.recordings ?? []) as QaidahRecording[]).map((r) => [recordingKey(r.book, r.lesson), r])
+          ((data.recordings ?? []) as QaidahRecording[]).map((r) => [recordingKey(r.book, r.lesson, r.item), r])
         )
       );
     };
@@ -70,12 +71,14 @@ export function useQaidahRecordings(mode: PortalMode) {
   useEffect(() => () => objectUrls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
   const put = useCallback((recording: QaidahRecording) => {
-    setRecordings((prev) => new Map(prev).set(recordingKey(recording.book, recording.lesson), recording));
+    setRecordings((prev) =>
+      new Map(prev).set(recordingKey(recording.book, recording.lesson, recording.item), recording)
+    );
   }, []);
-  const drop = useCallback((book: QaidahBookId, lesson: number) => {
+  const drop = useCallback((book: QaidahBookId, lesson: number, item = "") => {
     setRecordings((prev) => {
       const next = new Map(prev);
-      next.delete(recordingKey(book, lesson));
+      next.delete(recordingKey(book, lesson, item));
       return next;
     });
   }, []);
@@ -95,23 +98,26 @@ async function call<T>(method: string, body: unknown): Promise<T> {
 }
 
 /**
- * Saves a recording as the lesson's: straight to the school's private
- * storage through a one-time link, then recorded against the lesson. In the
- * sample portal, in this browser. Throws with a message to show.
+ * Saves a recording as the lesson's, or as one of its tiles' when there's an
+ * item: straight to the school's private storage through a one-time link,
+ * then recorded against the lesson. In the sample portal, in this browser.
+ * Throws with a message to show.
  */
 export async function saveLessonRecording(
   demo: boolean,
   book: QaidahBookId,
   lesson: number,
-  audio: { blob: Blob; type: string; duration: number | null }
+  audio: { blob: Blob; type: string; duration: number | null },
+  item = ""
 ): Promise<QaidahRecording> {
   const duration_s = audio.duration === null ? null : Math.round(audio.duration);
   if (demo) {
     const created_at = new Date().toISOString();
-    await demoSaveRecording({ book, lesson, blob: audio.blob, mime_type: audio.type, duration_s, created_at });
+    await demoSaveRecording({ book, lesson, item, blob: audio.blob, mime_type: audio.type, duration_s, created_at });
     return {
       book,
       lesson,
+      item,
       url: URL.createObjectURL(audio.blob),
       mime_type: audio.type,
       duration_s,
@@ -122,6 +128,7 @@ export async function saveLessonRecording(
   const link = await call<{ path: string; token: string; type: string; bucket: string }>("POST", {
     book,
     lesson,
+    item,
     type: audio.type,
     size: audio.blob.size,
   });
@@ -137,6 +144,7 @@ export async function saveLessonRecording(
   const saved = await call<{ recording: QaidahRecording | null }>("PUT", {
     book,
     lesson,
+    item,
     path: link.path,
     type: link.type,
     duration_s,
@@ -145,10 +153,10 @@ export async function saveLessonRecording(
   return saved.recording;
 }
 
-export async function deleteLessonRecording(demo: boolean, book: QaidahBookId, lesson: number) {
+export async function deleteLessonRecording(demo: boolean, book: QaidahBookId, lesson: number, item = "") {
   if (demo) {
-    await demoDeleteRecording(book, lesson);
+    await demoDeleteRecording(book, lesson, item);
     return;
   }
-  await call("DELETE", { book, lesson });
+  await call("DELETE", { book, lesson, item });
 }

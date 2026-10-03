@@ -1977,6 +1977,31 @@ create table if not exists qaidah_recordings (
 );
 alter table qaidah_recordings enable row level security;
 
+-- A lesson's tiles (each letter, syllable or word on it) can also be
+-- recorded one by one, for a child to tap and hear: item is the tile as the
+-- book prints it, and '' the recording of the whole lesson.
+alter table qaidah_recordings
+  add column if not exists item text not null default '';
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'qaidah_recordings_item_check'
+  ) then
+    alter table qaidah_recordings
+      add constraint qaidah_recordings_item_check
+      check (char_length(item) <= 200);
+  end if;
+  -- One recording per tile, as well as per lesson.
+  if not exists (
+    select 1 from pg_index i
+    join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any(i.indkey)
+    where i.indrelid = 'qaidah_recordings'::regclass and i.indisprimary and a.attname = 'item'
+  ) then
+    alter table qaidah_recordings drop constraint qaidah_recordings_pkey;
+    alter table qaidah_recordings add primary key (school_id, book, lesson, item);
+  end if;
+end $$;
+
 -- Everyone at the school can listen; its teachers and office record.
 drop policy if exists "School members read Qaidah recordings" on qaidah_recordings;
 create policy "School members read Qaidah recordings" on qaidah_recordings

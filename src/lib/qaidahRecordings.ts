@@ -1,13 +1,17 @@
 // A teacher's recording of a Qa'idah lesson, read aloud for the school's
-// children to play at home (qaidah_recordings in schema.sql). One per lesson
-// per school; the audio file sits in the class-work bucket, under the
-// school's own qaidah/ folder.
+// children to play at home (qaidah_recordings in schema.sql): the whole
+// lesson, or one of its tiles (a letter, a syllable, a word) on its own for a
+// child to tap and hear. One of each per school; the audio file sits in the
+// class-work bucket, under the school's own qaidah/ folder.
 
 import type { QaidahBookId } from "@/data/qaidah";
+import { isMissingTable } from "@/lib/qaidahLessons";
 
 export interface QaidahRecording {
   book: QaidahBookId;
   lesson: number;
+  /** The tile it reads, as the book prints it; "" for the whole lesson. */
+  item: string;
   /** Where to play it from: recordingPlayLink below, or in the sample portal the file itself. */
   url: string;
   mime_type: string;
@@ -18,6 +22,10 @@ export interface QaidahRecording {
 
 /** The longest recording the recorder makes: a lesson read through, with room to spare. */
 export const RECORDING_MAX_SECONDS = 15 * 60;
+/** ...and of one tile: a letter takes a second, an ayah a few. */
+export const TILE_MAX_SECONDS = 2 * 60;
+/** The longest tile there is room to key a recording by. */
+export const TILE_MAX_CHARS = 200;
 /** The bucket's own limit on a file. */
 export const RECORDING_MAX_BYTES = 25 * 1024 * 1024;
 
@@ -60,7 +68,9 @@ export function recordingExtension(type: string): string {
 export const recordingsFolder = (schoolId: string, book: QaidahBookId, lesson: number) =>
   `${schoolId}/qaidah/${book}/${lesson}/`;
 
-export const recordingKey = (book: QaidahBookId, lesson: number) => `${book}:${lesson}`;
+/** A recording's place among the school's: the lesson, and the tile if it's one. */
+export const recordingKey = (book: QaidahBookId, lesson: number, item = "") =>
+  item ? `${book}:${lesson}:${item}` : `${book}:${lesson}`;
 
 /**
  * Where the portals play a recording from: this site's own link, which sends
@@ -70,8 +80,18 @@ export const recordingKey = (book: QaidahBookId, lesson: number) => `${book}:${l
  * the recording was made, so recording a lesson again changes the link and
  * players fetch the new one.
  */
-export const recordingPlayLink = (book: QaidahBookId, lesson: number, recordedAt: string) =>
-  `/api/qaidah-recordings/play?book=${book}&lesson=${lesson}&v=${encodeURIComponent(recordedAt)}`;
+export const recordingPlayLink = (book: QaidahBookId, lesson: number, item: string, recordedAt: string) =>
+  `/api/qaidah-recordings/play?book=${book}&lesson=${lesson}${
+    item ? `&item=${encodeURIComponent(item)}` : ""
+  }&v=${encodeURIComponent(recordedAt)}`;
+
+/**
+ * The school's database hasn't had the update recordings need: no table yet,
+ * or no column for recording a lesson's tiles one by one.
+ */
+export function needsRecordingsUpdate(error: { code?: string } | null | undefined): boolean {
+  return isMissingTable(error) || error?.code === "42703" || error?.code === "PGRST204";
+}
 
 /** "2:05" */
 export function clock(seconds: number): string {

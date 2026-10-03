@@ -3,22 +3,26 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isError, requireMember } from "@/lib/attendanceServer";
 import { FILE_BUCKET } from "@/lib/classWork";
-import { isQaidahBookId, qaidahLesson } from "@/data/qaidah";
-import { isMissingTable } from "@/lib/qaidahLessons";
+import { isQaidahBookId, lessonTiles, qaidahLesson } from "@/data/qaidah";
+import { needsRecordingsUpdate } from "@/lib/qaidahRecordings";
 
-// A lesson's recording, to play: GET ?book=&lesson= sends the player on to
-// the file, through a link good for an hour. The portals' players point here
-// rather than at the file (recordingPlayLink), so each time one loads the
-// recording it gets a fresh link, and a page left open for hours still plays.
-// Anyone at the school may listen, as with the list in ../route.ts.
+// A lesson's recording, or one of its tiles', to play: GET ?book=&lesson=
+// (&item=) sends the player on to the file, through a link good for an hour.
+// The portals' players point here rather than at the file
+// (recordingPlayLink), so each time one loads the recording it gets a fresh
+// link, and a page left open for hours still plays. Anyone at the school may
+// listen, as with the list in ../route.ts.
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const me = await requireMember(supabase);
   if (isError(me)) return me.error;
-  const book = req.nextUrl.searchParams.get("book");
-  const lesson = Number(req.nextUrl.searchParams.get("lesson"));
-  if (!isQaidahBookId(book) || !Number.isInteger(lesson) || !qaidahLesson(book, lesson)) {
+  const params = req.nextUrl.searchParams;
+  const book = params.get("book");
+  const lesson = Number(params.get("lesson"));
+  const item = params.get("item") ?? "";
+  const found = isQaidahBookId(book) && Number.isInteger(lesson) ? qaidahLesson(book, lesson) : undefined;
+  if (!found || (item !== "" && !lessonTiles(found).includes(item))) {
     return NextResponse.json({ error: "That book has no such lesson." }, { status: 400 });
   }
 
@@ -28,15 +32,16 @@ export async function GET(req: NextRequest) {
     .eq("school_id", me.school_id)
     .eq("book", book)
     .eq("lesson", lesson)
+    .eq("item", item)
     .maybeSingle();
   if (error) {
-    if (isMissingTable(error)) {
+    if (needsRecordingsUpdate(error)) {
       return NextResponse.json({ error: "Lesson recordings need the latest database update." }, { status: 503 });
     }
     console.error("Qa'idah recordings: could not look one up", error);
     return NextResponse.json({ error: "Couldn't open that recording." }, { status: 500 });
   }
-  if (!data) return NextResponse.json({ error: "That lesson has no recording." }, { status: 404 });
+  if (!data) return NextResponse.json({ error: "There's no recording of that." }, { status: 404 });
 
   const { data: signed, error: signError } = await createAdminClient()
     .storage.from(FILE_BUCKET)

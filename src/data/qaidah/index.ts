@@ -26,6 +26,15 @@ export function qaidahLesson(bookId: QaidahBookId, lesson: number): QaidahLesson
   return qaidahBook(bookId).lessons.find((l) => l.id === lesson);
 }
 
+/**
+ * The tiles of a lesson's rows in the order they're read, each once: what a
+ * teacher records one by one. A tile printed twice is read the same way
+ * both times, so it has one recording.
+ */
+export function lessonTiles(lesson: QaidahLesson): string[] {
+  return [...new Set(lesson.rows.flat())];
+}
+
 /** The lesson after this one, or null at the end of the book. */
 export function nextQaidahLesson(bookId: QaidahBookId, lesson: number): number | null {
   return qaidahLesson(bookId, lesson + 1) ? lesson + 1 : null;

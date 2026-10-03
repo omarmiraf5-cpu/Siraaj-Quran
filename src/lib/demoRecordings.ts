@@ -9,6 +9,8 @@ import { recordingKey } from "@/lib/qaidahRecordings";
 export interface DemoRecording {
   book: QaidahBookId;
   lesson: number;
+  /** The tile, or "" (or, from before tiles, nothing) for the whole lesson. */
+  item?: string;
   blob: Blob;
   mime_type: string;
   duration_s: number | null;
@@ -56,13 +58,13 @@ export async function demoListRecordings(): Promise<DemoRecording[]> {
 }
 
 export async function demoSaveRecording(recording: DemoRecording): Promise<void> {
-  const key = recordingKey(recording.book, recording.lesson);
+  const key = recordingKey(recording.book, recording.lesson, recording.item);
   memory.set(key, recording);
   await withStore("readwrite", (s) => s.put(recording, key));
 }
 
-export async function demoDeleteRecording(book: QaidahBookId, lesson: number): Promise<void> {
-  const key = recordingKey(book, lesson);
+export async function demoDeleteRecording(book: QaidahBookId, lesson: number, item = ""): Promise<void> {
+  const key = recordingKey(book, lesson, item);
   memory.delete(key);
   await withStore("readwrite", (s) => s.delete(key));
 }

@@ -5,11 +5,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isError, requireMember, type Db, type Member } from "@/lib/attendanceServer";
 import { FILE_BUCKET } from "@/lib/classWork";
 import { namesOf } from "@/lib/classWorkServer";
-import { isQaidahBookId, qaidahLesson, type QaidahBookId } from "@/data/qaidah";
-import { isMissingTable } from "@/lib/qaidahLessons";
+import { isQaidahBookId, lessonTiles, qaidahLesson, type QaidahBookId } from "@/data/qaidah";
 import {
   RECORDING_MAX_BYTES,
   RECORDING_MAX_SECONDS,
+  needsRecordingsUpdate,
   recordingExtension,
   recordingPlayLink,
   recordingType,
@@ -20,31 +20,48 @@ import {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // A teacher's recordings of Qa'idah lessons, for the school's children to
-// play at home.
+// play at home: a lesson read through, or its tiles (letters, syllables,
+// words) one by one. `item` is the tile, as the book prints it; without one,
+// the request is about the whole lesson.
 //
 //   GET    ?book=                             everyone at the school: the
 //                                             recordings, with links to play
 //                                             (play/route.ts)
-//   POST   { book, lesson, type, size }       a teacher or the office: a
-//                                             one-time link to upload one
-//   PUT    { book, lesson, path, type,        ...then save it as the lesson's
-//            duration_s }                     recording, replacing any before
-//   DELETE { book, lesson }                   ...or take the lesson's away
+//   POST   { book, lesson, item?, type,       a teacher or the office: a
+//            size }                           one-time link to upload one
+//   PUT    { book, lesson, item?, path,       ...then save it as the lesson's
+//            type, duration_s }               (or tile's) recording,
+//                                             replacing any before
+//   DELETE { book, lesson, item? }            ...or take it away
 
-const COLUMNS = "book, lesson, path, mime_type, duration_s, teacher_id, created_at";
+const COLUMNS = "book, lesson, item, path, mime_type, duration_s, teacher_id, created_at";
 const MISSING =
   "Lesson recordings need the latest database update. The school's administrator can run it in Supabase.";
+/** How many rows Supabase hands back at a time. */
+const PAGE = 1000;
 
-/** Which lesson, from a request; or an error to answer with. */
-function readLesson(book: unknown, lesson: unknown): { book: QaidahBookId; lesson: number } | { error: NextResponse } {
+interface Which {
+  book: QaidahBookId;
+  lesson: number;
+  /** The tile; "" for the whole lesson. */
+  item: string;
+}
+
+/** Which lesson, and which of its tiles if any, from a request; or an error to answer with. */
+function readWhich(book: unknown, lesson: unknown, item: unknown): Which | { error: NextResponse } {
   if (!isQaidahBookId(book)) {
     return { error: NextResponse.json({ error: "Choose a Qa'idah book." }, { status: 400 }) };
   }
   const n = Number(lesson);
-  if (!Number.isInteger(n) || !qaidahLesson(book, n)) {
+  const found = Number.isInteger(n) ? qaidahLesson(book, n) : undefined;
+  if (!found) {
     return { error: NextResponse.json({ error: "That book has no such lesson." }, { status: 400 }) };
   }
-  return { book, lesson: n };
+  const tile = item ?? "";
+  if (typeof tile !== "string" || (tile !== "" && !lessonTiles(found).includes(tile))) {
+    return { error: NextResponse.json({ error: "That lesson has nothing like that to record." }, { status: 400 }) };
+  }
+  return { book, lesson: n, item: tile };
 }
 
 async function readBody(req: NextRequest): Promise<Record<string, unknown> | null> {
@@ -68,7 +85,8 @@ async function forPortals(admin: Db, rows: any[]): Promise<QaidahRecording[]> {
   return rows.map((r) => ({
     book: r.book,
     lesson: r.lesson,
-    url: recordingPlayLink(r.book, r.lesson, recordedAt(r.created_at)),
+    item: r.item ?? "",
+    url: recordingPlayLink(r.book, r.lesson, r.item ?? "", recordedAt(r.created_at)),
     mime_type: r.mime_type,
     duration_s: r.duration_s ?? null,
     teacher_name: names.get(r.teacher_id) ?? null,
@@ -86,14 +104,28 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    let query = supabase.from("qaidah_recordings").select(COLUMNS).eq("school_id", me.school_id);
-    if (book) query = query.eq("book", book);
-    const { data, error } = await query;
-    if (error) {
-      if (isMissingTable(error)) return NextResponse.json({ recordings: [], missing_table: true });
-      throw error;
+    // A school that records its lessons letter by letter soon has more than
+    // one page of them.
+    const rows: any[] = [];
+    for (let from = 0; ; from += PAGE) {
+      let query = supabase
+        .from("qaidah_recordings")
+        .select(COLUMNS)
+        .eq("school_id", me.school_id)
+        .order("book")
+        .order("lesson")
+        .order("item")
+        .range(from, from + PAGE - 1);
+      if (book) query = query.eq("book", book);
+      const { data, error } = await query;
+      if (error) {
+        if (needsRecordingsUpdate(error)) return NextResponse.json({ recordings: [], missing_table: true });
+        throw error;
+      }
+      rows.push(...(data ?? []));
+      if (!data || data.length < PAGE) break;
     }
-    return NextResponse.json({ recordings: await forPortals(createAdminClient(), data ?? []) });
+    return NextResponse.json({ recordings: await forPortals(createAdminClient(), rows) });
   } catch (error) {
     console.error("Qa'idah recordings: could not list", error);
     return NextResponse.json({ error: "Couldn't load the recordings." }, { status: 500 });
@@ -111,7 +143,7 @@ export async function POST(req: NextRequest) {
   if (isError(me)) return me.error;
   const body = await readBody(req);
   if (!body) return NextResponse.json({ error: "That request wasn't readable." }, { status: 400 });
-  const which = readLesson(body.book, body.lesson);
+  const which = readWhich(body.book, body.lesson, body.item);
   if ("error" in which) return which.error;
   const type = recordingType(typeof body.type === "string" ? body.type : "");
   if (!type) {
@@ -141,7 +173,7 @@ export async function PUT(req: NextRequest) {
   if (isError(me)) return me.error;
   const body = await readBody(req);
   if (!body) return NextResponse.json({ error: "That request wasn't readable." }, { status: 400 });
-  const which = readLesson(body.book, body.lesson);
+  const which = readWhich(body.book, body.lesson, body.item);
   if ("error" in which) return which.error;
   const path = typeof body.path === "string" ? body.path : "";
   // Only a file uploaded for this very lesson, through POST above.
@@ -153,17 +185,26 @@ export async function PUT(req: NextRequest) {
   const duration = Number(body.duration_s);
   const durationS = Number.isFinite(duration) && duration >= 0 ? Math.min(Math.round(duration), RECORDING_MAX_SECONDS) : null;
 
+  const admin = createAdminClient();
+  // The file just uploaded, when it isn't going to be the recording after all.
+  const discard = async () => {
+    const { error } = await admin.storage.from(FILE_BUCKET).remove([path]);
+    if (error) console.error("Qa'idah recordings: could not remove an unused upload", error);
+  };
   try {
-    const admin = createAdminClient();
     const { data: before, error: readError } = await supabase
       .from("qaidah_recordings")
       .select("path")
       .eq("school_id", me.school_id)
       .eq("book", which.book)
       .eq("lesson", which.lesson)
+      .eq("item", which.item)
       .maybeSingle();
     if (readError) {
-      if (isMissingTable(readError)) return NextResponse.json({ error: MISSING, missing_table: true }, { status: 503 });
+      if (needsRecordingsUpdate(readError)) {
+        await discard();
+        return NextResponse.json({ error: MISSING, missing_table: true }, { status: 503 });
+      }
       throw readError;
     }
     const { data: saved, error } = await supabase
@@ -173,17 +214,22 @@ export async function PUT(req: NextRequest) {
           school_id: me.school_id,
           book: which.book,
           lesson: which.lesson,
+          item: which.item,
           path,
           mime_type: type,
           duration_s: durationS,
           teacher_id: me.id,
           created_at: new Date().toISOString(),
         },
-        { onConflict: "school_id,book,lesson" }
+        { onConflict: "school_id,book,lesson,item" }
       )
       .select(COLUMNS)
       .single();
-    if (error) throw error;
+    if (error) {
+      await discard();
+      if (needsRecordingsUpdate(error)) return NextResponse.json({ error: MISSING, missing_table: true }, { status: 503 });
+      throw error;
+    }
     // The recording it replaces. Best effort: a file left behind costs a
     // little space, not a wrong recording.
     if (before?.path && before.path !== path) {
@@ -204,7 +250,7 @@ export async function DELETE(req: NextRequest) {
   if (isError(me)) return me.error;
   const body = await readBody(req);
   if (!body) return NextResponse.json({ error: "That request wasn't readable." }, { status: 400 });
-  const which = readLesson(body.book, body.lesson);
+  const which = readWhich(body.book, body.lesson, body.item);
   if ("error" in which) return which.error;
 
   try {
@@ -214,13 +260,14 @@ export async function DELETE(req: NextRequest) {
       .eq("school_id", me.school_id)
       .eq("book", which.book)
       .eq("lesson", which.lesson)
+      .eq("item", which.item)
       .select("path");
     if (error) {
-      if (isMissingTable(error)) return NextResponse.json({ error: MISSING, missing_table: true }, { status: 503 });
+      if (needsRecordingsUpdate(error)) return NextResponse.json({ error: MISSING, missing_table: true }, { status: 503 });
       throw error;
     }
     if (!data || data.length === 0) {
-      return NextResponse.json({ error: "That lesson has no recording." }, { status: 404 });
+      return NextResponse.json({ error: "There's no recording of that." }, { status: 404 });
     }
     const { error: removeError } = await createAdminClient()
       .storage.from(FILE_BUCKET)
