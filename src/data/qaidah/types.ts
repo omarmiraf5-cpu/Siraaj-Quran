@@ -29,8 +29,23 @@ export interface QaidahLesson {
   rows: string[][];
   /** A heading over the row at that index, where a lesson's rows fall into parts. */
   rowLabels?: Record<number, string>;
+  /**
+   * The rows that are ayahs of the Qur'an, by index, so a reciter can be
+   * played for each: the surahs the books end on.
+   */
+  ayahs?: Record<number, Ayah>;
   /** A point for the teacher or parent sitting with them. */
   note?: string;
+}
+
+/** An ayah of the Qur'an, as [surah, ayah]. */
+export type Ayah = [surah: number, ayah: number];
+
+/** A surah's ayahs, from its first, as the rows from `firstRow` on: for a lesson's `ayahs`. */
+export function surahRows(firstRow: number, surah: number, ayahCount: number): Record<number, Ayah> {
+  const rows: Record<number, Ayah> = {};
+  for (let ayah = 1; ayah <= ayahCount; ayah++) rows[firstRow + ayah - 1] = [surah, ayah];
+  return rows;
 }
 
 export interface QaidahBook {

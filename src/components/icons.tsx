@@ -154,3 +154,24 @@ export const IconNote = icon(
     <path d="M14 2v6h6M8 13h8M8 17h5" />
   </>
 );
+
+export const IconMic = icon(
+  <>
+    <rect x="9" y="2.5" width="6" height="12" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0M12 18v3.5" />
+  </>
+);
+
+export const IconStop = icon(
+  <>
+    <rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" />
+  </>
+);
+
+// A speaker, for a lesson that has a recording to listen to.
+export const IconSpeaker = icon(
+  <>
+    <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4Z" />
+    <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+  </>
+);

@@ -7,7 +7,7 @@ import { BAGHDADIYAH } from "./baghdadiyah";
 import { NURANIYAH } from "./nuraniyah";
 import type { QaidahBook, QaidahBookId, QaidahLesson } from "./types";
 
-export type { QaidahBook, QaidahBookId, QaidahLesson, Readings } from "./types";
+export type { Ayah, QaidahBook, QaidahBookId, QaidahLesson, Readings } from "./types";
 
 /** The books, in the order they are offered. */
 export const QAIDAH_BOOKS: QaidahBook[] = [AHSANUL_QAWAID, NURANIYAH, BAGHDADIYAH];

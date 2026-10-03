@@ -1,17 +1,25 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_QAIDAH_BOOK,
   QAIDAH_BOOKS,
   isQaidahBookId,
+  type Ayah,
   type QaidahBook,
   type QaidahBookId,
 } from "@/data/qaidah";
 import type { QaidahStatus } from "@/lib/qaidahLessons";
+import type { Reciter } from "@/lib/recitation";
 import { ILLUM_CLASS, GRAD_CLASS, surahColour } from "@/components/student-ui";
-import { IconArrow, IconCheck } from "@/components/icons";
+import { IconArrow, IconCheck, IconSpeaker } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
+import {
+  AyahButton,
+  RecitationBar,
+  useQaidahReciter,
+  useRecitation,
+} from "@/components/QaidahRecitation";
 
 // The Qa'idah is read, not skimmed: the Arabic is the content, so it is set
 // large enough to read across a table and each lesson opens on its own rather
@@ -59,6 +67,64 @@ function Prose({ text }: { text: string }) {
   );
 }
 
+/**
+ * A row of the lesson to read aloud, right to left. An ayah's row has a
+ * button to hear it recited, and lights up while it's being recited.
+ */
+function LessonRow({
+  items,
+  lessonKey,
+  ayah,
+  reciter,
+}: {
+  items: string[];
+  lessonKey: string;
+  ayah?: Ayah;
+  reciter: Reciter;
+}) {
+  const now = useRecitation();
+  const reciting = !!ayah && now.lesson === lessonKey && now.surah === ayah[0] && now.ayah === ayah[1];
+  const row = useRef<HTMLDivElement | null>(null);
+  // Following a surah through, the ayah being recited stays in view, clear
+  // of the header and of the menu bar along the bottom of a phone.
+  useEffect(() => {
+    const el = row.current;
+    if (!reciting || !now.through || !el) return;
+    const { top, bottom } = el.getBoundingClientRect();
+    if (top < 96 || bottom > window.innerHeight - 112) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [reciting, now.through]);
+
+  return (
+    <div
+      ref={row}
+      dir="rtl"
+      lang="ar"
+      className={`flex items-center gap-2 rounded-2xl border p-2.5 transition-colors ${
+        reciting ? "bg-brand-gold/10 border-brand-gold ring-2 ring-brand-gold/30" : "bg-surface-bg-warm border-surface-border"
+      }`}
+    >
+      {ayah && <AyahButton lesson={lessonKey} ayah={ayah} reciter={reciter} />}
+      <div className="flex-1 min-w-0 flex flex-wrap gap-1.5 justify-center">
+        {items.map((item, c) => {
+          const short = isShort(item);
+          return (
+            <span
+              key={c}
+              className={`font-arabic text-ink rounded-xl bg-surface-card border border-surface-border flex items-center justify-center ${
+                short
+                  ? "w-[46px] h-[52px] text-[27px]"
+                  : `min-h-[52px] px-3 py-1.5 ${letterCount(item) > 24 ? "text-[19px]" : "text-[23px]"}`
+              } leading-[1.9]`}
+            >
+              {item}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** One book's lessons, each opening on its own. */
 export function QaidahLessons({
   book,
@@ -67,6 +133,8 @@ export function QaidahLessons({
   current,
   passed = [],
   counts,
+  recordedLessons = [],
+  audioFor,
 }: {
   book: QaidahBook;
   /** The open lesson, where the page decides it; otherwise the child's own, or the first. */
@@ -78,11 +146,16 @@ export function QaidahLessons({
   passed?: number[];
   /** How many of the teacher's students are on each lesson. */
   counts?: Record<number, number>;
+  /** Lessons the teacher has recorded, marked on their headings. */
+  recordedLessons?: number[];
+  /** The recording of a lesson (or the teacher's recorder), shown when it opens. */
+  audioFor?: (lesson: number) => React.ReactNode;
 }) {
   const { t } = useLanguage();
   const [ownOpen, setOwnOpen] = useState<number | null>(current?.lesson ?? 1);
   const openLesson = open !== undefined ? open : ownOpen;
   const setOpenLesson = onOpenChange ?? setOwnOpen;
+  const [reciter, setReciter] = useQaidahReciter();
 
   return (
     <div className="space-y-3">
@@ -91,6 +164,8 @@ export function QaidahLessons({
         const isCurrent = current?.lesson === lesson.id;
         const isPassed = !isCurrent && passed.includes(lesson.id);
         const count = counts?.[lesson.id] ?? 0;
+        const recorded = recordedLessons.includes(lesson.id);
+        const lessonKey = `${book.id}:${lesson.id}`;
         // Reuses the surah hash so the lesson numbers spread across the
         // palette instead of cycling in a visible pattern.
         const colour = surahColour(lesson.id * 3 + 1);
@@ -130,7 +205,7 @@ export function QaidahLessons({
                 >
                   {lesson.arabicTitle}
                 </span>
-                {(isCurrent || isPassed || count > 0) && (
+                {(isCurrent || isPassed || count > 0 || recorded) && (
                   <span className="flex flex-wrap gap-1.5 mt-1.5">
                     {isCurrent && (
                       <span
@@ -151,6 +226,12 @@ export function QaidahLessons({
                       >
                         <IconCheck size={11} />
                         {t("qaidah.statusPassed")}
+                      </span>
+                    )}
+                    {recorded && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-surface-bg-warm border border-brand-gold/50 px-2 py-0.5 text-[11px] font-semibold text-ink">
+                        <IconSpeaker size={12} />
+                        {t("qaidah.recorded")}
                       </span>
                     )}
                     {count > 0 && (
@@ -180,6 +261,8 @@ export function QaidahLessons({
                 <p dir="ltr" className="text-[13px] text-ink-body leading-relaxed">
                   <Prose text={lesson.teaches} />
                 </p>
+
+                {audioFor?.(lesson.id)}
 
                 {/* Where the reading isn't what's printed — a letter that is
                     skipped, a word stopped on — each word as printed, with
@@ -222,6 +305,19 @@ export function QaidahLessons({
                   </div>
                 )}
 
+                {/* The surahs the book ends on, recited. */}
+                {lesson.ayahs && (
+                  <RecitationBar
+                    lesson={lessonKey}
+                    ayahs={Object.keys(lesson.ayahs)
+                      .map(Number)
+                      .sort((a, b) => a - b)
+                      .map((r) => lesson.ayahs![r])}
+                    reciter={reciter}
+                    onReciterChange={setReciter}
+                  />
+                )}
+
                 {/* The rows themselves, right to left. */}
                 <div className="mt-4 space-y-2.5">
                   {lesson.rows.map((row, r) => (
@@ -231,29 +327,7 @@ export function QaidahLessons({
                           <Prose text={lesson.rowLabels[r]} />
                         </p>
                       )}
-                      <div
-                        dir="rtl"
-                        lang="ar"
-                        className="flex flex-wrap gap-1.5 justify-center rounded-2xl bg-surface-bg-warm border border-surface-border p-2.5"
-                      >
-                        {row.map((item, c) => {
-                          const short = isShort(item);
-                          return (
-                            <span
-                              key={`${r}-${c}`}
-                              className={`font-arabic text-ink rounded-xl bg-surface-card border border-surface-border flex items-center justify-center ${
-                                short
-                                  ? "w-[46px] h-[52px] text-[27px]"
-                                  : `min-h-[52px] px-3 py-1.5 ${
-                                      letterCount(item) > 24 ? "text-[19px]" : "text-[23px]"
-                                    }`
-                              } leading-[1.9]`}
-                            >
-                              {item}
-                            </span>
-                          );
-                        })}
-                      </div>
+                      <LessonRow items={row} lessonKey={lessonKey} ayah={lesson.ayahs?.[r]} reciter={reciter} />
                     </Fragment>
                   ))}
                 </div>

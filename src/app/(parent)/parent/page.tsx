@@ -15,6 +15,7 @@ import { getSurahById } from "@/data/mushaf-index";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { useQaidahLessons } from "@/hooks/useQaidahLessons";
+import { useQaidahRecordings } from "@/hooks/useQaidahRecordings";
 import { ChildQaidahCard } from "@/components/QaidahLessonCard";
 import { PortalHero, HeroButtonPrimary, HeroButtonGhost } from "@/components/PortalHero";
 import {
@@ -54,6 +55,7 @@ export default function ParentDashboard() {
   const { attendance, assignments, ready } = useStudentRecord(child?.id ?? null, mode);
   // Each child's Qa'idah lesson, where their teacher has set one.
   const { rows: qaidahRows } = useQaidahLessons(mode, children.map((c) => c.id));
+  const { recordings: qaidahRecordings } = useQaidahRecordings(mode);
   const summary = summariseAttendance(attendance);
 
   const active = assignments.filter((a) => a.status !== "completed");
@@ -163,6 +165,7 @@ export default function ParentDashboard() {
       <ChildQaidahCard
         rows={qaidahRows.filter((r) => r.student_id === child.id)}
         childName={child.name.split(" ")[0]}
+        recordings={qaidahRecordings}
       />
 
       <div className="grid md:grid-cols-2 gap-3 items-start">

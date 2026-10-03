@@ -1960,6 +1960,35 @@ drop policy if exists "Parents read their children's Qaidah lessons" on qaidah_a
 create policy "Parents read their children's Qaidah lessons" on qaidah_assignments
   for select using (student_id in (select my_children_student_ids()));
 
+-- A teacher's recording of a Qa'idah lesson, read aloud for the school's
+-- children to play at home: one per lesson per school, replaced when it's
+-- recorded again. The file is in the private class-work bucket, under the
+-- school's own qaidah/ folder; the app hands out short-lived links to it.
+create table if not exists qaidah_recordings (
+  school_id   uuid not null references schools(id) on delete cascade,
+  book        text not null check (book in ('ahsanul_qawaid', 'nuraniyah', 'baghdadiyah')),
+  lesson      int not null check (lesson between 1 and 60),
+  path        text not null,
+  mime_type   text not null,
+  duration_s  int check (duration_s between 0 and 3600),
+  teacher_id  uuid references profiles(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  primary key (school_id, book, lesson)
+);
+alter table qaidah_recordings enable row level security;
+
+-- Everyone at the school can listen; its teachers and office record.
+drop policy if exists "School members read Qaidah recordings" on qaidah_recordings;
+create policy "School members read Qaidah recordings" on qaidah_recordings
+  for select using (school_id = my_school_id());
+drop policy if exists "School staff manage Qaidah recordings" on qaidah_recordings;
+create policy "School staff manage Qaidah recordings" on qaidah_recordings
+  for all using (
+    school_id = my_school_id() and my_role() in ('admin', 'teacher')
+  ) with check (
+    school_id = my_school_id() and my_role() in ('admin', 'teacher')
+  );
+
 -- ══════════════════════════════════════
 -- Switched-off accounts
 -- ══════════════════════════════════════

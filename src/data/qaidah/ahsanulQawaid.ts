@@ -9,7 +9,7 @@
 // lesson carries an English name and an explanation of what is being learnt
 // rather than a rendering of the rows.
 
-import { together as shapes, type QaidahBook, type QaidahLesson } from "./types";
+import { surahRows, together as shapes, type QaidahBook, type QaidahLesson } from "./types";
 
 const LESSONS: QaidahLesson[] = [
   {
@@ -450,6 +450,8 @@ const LESSONS: QaidahLesson[] = [
       ["لَمْ يَلِدْ وَلَمْ يُوْلَدْ"],
       ["وَلَمْ يَكُنْ لَّهٗ كُفُوًا اَحَدٌ"],
     ],
+    rowLabels: { 2: "Surah al-Ikhlas" },
+    ayahs: surahRows(2, 112, 4),
     note: "Read slowly and name each rule as you meet it. This is the bridge from the Qa'idah into the Qur'an.",
   },
   {

@@ -18,6 +18,7 @@ import {
   SHADDA,
   SUKUN,
   rowsOf,
+  surahRows,
   together,
   type QaidahBook,
   type QaidahLesson,
@@ -233,6 +234,7 @@ const LESSONS: QaidahLesson[] = [
       ["ٱهْدِنَا ٱلصِّرَٰطَ ٱلْمُسْتَقِيمَ"],
       ["صِرَٰطَ ٱلَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ ٱلْمَغْضُوبِ عَلَيْهِمْ وَلَا ٱلضَّآلِّينَ"],
     ],
+    ayahs: surahRows(0, 1, 7),
     note: "Read one ayah at a time, then the whole surah, stopping at the end of each ayah.",
   },
   {
@@ -263,6 +265,7 @@ const LESSONS: QaidahLesson[] = [
       4: "Al-Falaq",
       9: "An-Nas",
     },
+    ayahs: { ...surahRows(0, 112, 4), ...surahRows(4, 113, 5), ...surahRows(9, 114, 6) },
     note: "Children often know these by heart already: have them follow each word with a finger, so they read rather than recite.",
   },
 ];

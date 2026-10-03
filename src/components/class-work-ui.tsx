@@ -124,9 +124,15 @@ async function uploadFile(
       url: await readAsDataUrl(file),
     };
   }
+  // Storage files it under the type the file is labelled with (the
+  // contentType option counts only for raw bytes, not a file), and the
+  // bucket takes only the types it lists: a Word file the browser labelled
+  // with nothing, or an iPhone's audio/x-m4a, would be refused. So it goes up
+  // labelled with the type worked out above.
+  const labelled = new File([file], file.name, { type });
   const { error } = await createClient()
     .storage.from(FILE_BUCKET)
-    .uploadToSignedUrl(link.path!, link.token!, file, { contentType: type });
+    .uploadToSignedUrl(link.path!, link.token!, labelled, { contentType: type });
   if (error) throw new Error(`“${file.name}” didn't finish uploading. Please try again.`);
   // A local preview until the server sends back a link of its own.
   return { path: link.path!, name: file.name, size: file.size, type, url: URL.createObjectURL(file) };

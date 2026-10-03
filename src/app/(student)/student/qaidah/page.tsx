@@ -6,6 +6,10 @@ import { qaidahBook } from "@/data/qaidah";
 import { usePortalRoster } from "@/hooks/usePortalRoster";
 import { useQaidahLessons } from "@/hooks/useQaidahLessons";
 import { currentLessons, passedLessons } from "@/lib/qaidahLessons";
+import { recordingKey } from "@/lib/qaidahRecordings";
+import { useQaidahRecordings } from "@/hooks/useQaidahRecordings";
+import { LessonListen } from "@/components/QaidahRecorder";
+import { useLanguage } from "@/components/LanguageProvider";
 import {
   QaidahBookTabs,
   QaidahLessons,
@@ -15,6 +19,7 @@ import {
 import { MyQaidahLesson } from "@/components/QaidahLessonCard";
 
 export default function StudentQaidahPage() {
+  const { t } = useLanguage();
   // A signed-in child's roster is just themselves; the sample portal's is
   // the sample child.
   const { mode, students } = usePortalRoster([DEMO_CURRENT_STUDENT]);
@@ -25,6 +30,7 @@ export default function StudentQaidahPage() {
   const [bookId, setBookId] = useQaidahBookChoice();
   const [open, setOpen] = useState<number | null>(1);
   const book = qaidahBook(bookId);
+  const audio = useQaidahRecordings(mode);
 
   // Once the child's lesson is known, open the Qa'idah on it.
   const [settled, setSettled] = useState(false);
@@ -81,6 +87,13 @@ export default function StudentQaidahPage() {
         onOpenChange={setOpen}
         current={mine && mine.book === bookId ? { lesson: mine.lesson, status: mine.status } : undefined}
         passed={me ? passedLessons(rows, me.id, bookId) : []}
+        recordedLessons={book.lessons
+          .filter((l) => audio.recordings.has(recordingKey(bookId, l.id)))
+          .map((l) => l.id)}
+        audioFor={(lesson) => {
+          const recording = audio.recordings.get(recordingKey(bookId, lesson));
+          return recording ? <LessonListen recording={recording} label={t("qaidah.listen")} /> : null;
+        }}
       />
     </div>
   );

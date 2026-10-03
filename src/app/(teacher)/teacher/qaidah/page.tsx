@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { QAIDAH_BOOKS, qaidahBook } from "@/data/qaidah";
 import { currentLessons } from "@/lib/qaidahLessons";
+import { recordingKey } from "@/lib/qaidahRecordings";
+import { useQaidahRecordings } from "@/hooks/useQaidahRecordings";
 import {
   QaidahBookTabs,
   QaidahLessons,
@@ -11,11 +13,16 @@ import {
 } from "@/components/QaidahBook";
 import { QaidahAssignPanel, useQaidahClassroom } from "@/components/QaidahAssignPanel";
 import { PortalHero } from "@/components/PortalHero";
+import { LessonRecorder } from "@/components/QaidahRecorder";
 
 export default function TeacherQaidahPage() {
   const room = useQaidahClassroom();
   const [bookId, setBookId] = useQaidahBookChoice();
   const book = qaidahBook(bookId);
+  const audio = useQaidahRecordings(room.mode);
+  const recordedLessons = book.lessons
+    .filter((l) => audio.recordings.has(recordingKey(bookId, l.id)))
+    .map((l) => l.id);
 
   // How many children are on each lesson of the book on screen.
   const counts = useMemo(() => {
@@ -46,7 +53,25 @@ export default function TeacherQaidahPage() {
         </div>
         <div className="space-y-4 lg:order-1 min-w-0">
           <QaidahSummary book={book} />
-          <QaidahLessons key={bookId} book={book} counts={counts} />
+          <QaidahLessons
+            key={bookId}
+            book={book}
+            counts={counts}
+            recordedLessons={recordedLessons}
+            audioFor={(lesson) =>
+              room.mode === "loading" ? null : (
+                <LessonRecorder
+                  book={bookId}
+                  lesson={lesson}
+                  recording={audio.recordings.get(recordingKey(bookId, lesson))}
+                  demo={room.mode === "demo"}
+                  unavailable={audio.missingTable}
+                  onSaved={audio.put}
+                  onDeleted={() => audio.drop(bookId, lesson)}
+                />
+              )
+            }
+          />
         </div>
       </div>
     </div>

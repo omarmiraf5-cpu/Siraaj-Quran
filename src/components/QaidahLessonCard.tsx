@@ -3,6 +3,8 @@
 import { qaidahBook, qaidahLesson } from "@/data/qaidah";
 import { formatDay } from "@/data/demo";
 import { newestFirst, type QaidahAssignment } from "@/lib/qaidahLessons";
+import { recordingKey, type QaidahRecording } from "@/lib/qaidahRecordings";
+import { LessonListen } from "@/components/QaidahRecorder";
 import { GRAD_CLASS, ILLUM_CLASS } from "@/components/student-ui";
 import { SectionCard, TeacherNote } from "@/components/portal-ui";
 import { IconArrow, IconBookOpen, IconCheck } from "@/components/icons";
@@ -71,7 +73,16 @@ export function MyQaidahLesson({
 }
 
 /** A child's Qa'idah for their parent: the lesson they're on, and the last one passed. */
-export function ChildQaidahCard({ rows, childName }: { rows: QaidahAssignment[]; childName: string }) {
+export function ChildQaidahCard({
+  rows,
+  childName,
+  recordings,
+}: {
+  rows: QaidahAssignment[];
+  childName: string;
+  /** The school's lesson recordings: the current lesson's is offered to play. */
+  recordings?: Map<string, QaidahRecording>;
+}) {
   const { t, language } = useLanguage();
   const ordered = newestFirst(rows);
   const current = ordered[0];
@@ -88,6 +99,7 @@ export function ChildQaidahCard({ rows, childName }: { rows: QaidahAssignment[];
       ? t("qaidah.statusRepeat")
       : t("qaidah.statusAssigned");
   const colour = finished ? "verdigris" : current.status === "repeat" ? "vermilion" : "saffron";
+  const recording = finished ? undefined : recordings?.get(recordingKey(current.book, current.lesson));
 
   return (
     <SectionCard title={t("nav.qaidah")} note={childName}>
@@ -112,6 +124,7 @@ export function ChildQaidahCard({ rows, childName }: { rows: QaidahAssignment[];
               : `${t("qaidah.since")} ${formatDay(current.assigned_at.slice(0, 10), language)}`}
           </p>
           {current.note && !finished && <TeacherNote>{current.note}</TeacherNote>}
+          {recording && <LessonListen recording={recording} label={t("qaidah.listenParent")} />}
           {lastPassed && (
             <p className="text-[12px] text-ink-muted mt-3 pt-3 border-t border-surface-border">
               {t("qaidah.lastPassed")}: {qaidahBook(lastPassed.book).shortName} · {t("qaidah.lesson")}{" "}
