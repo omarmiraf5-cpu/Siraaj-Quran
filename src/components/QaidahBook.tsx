@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { QAIDAH_LESSONS } from "@/data/qaidah";
+import { Fragment, useCallback, useEffect, useState } from "react";
+import {
+  DEFAULT_QAIDAH_BOOK,
+  QAIDAH_BOOKS,
+  isQaidahBookId,
+  type QaidahBook,
+  type QaidahBookId,
+} from "@/data/qaidah";
+import type { QaidahStatus } from "@/lib/qaidahLessons";
 import { ILLUM_CLASS, GRAD_CLASS, surahColour } from "@/components/student-ui";
 import { IconArrow, IconCheck } from "@/components/icons";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // The Qa'idah is read, not skimmed: the Arabic is the content, so it is set
 // large enough to read across a table and each lesson opens on its own rather
@@ -51,13 +59,38 @@ function Prose({ text }: { text: string }) {
   );
 }
 
-export function QaidahBook() {
-  const [openLesson, setOpenLesson] = useState<number | null>(1);
+/** One book's lessons, each opening on its own. */
+export function QaidahLessons({
+  book,
+  open,
+  onOpenChange,
+  current,
+  passed = [],
+  counts,
+}: {
+  book: QaidahBook;
+  /** The open lesson, where the page decides it; otherwise the child's own, or the first. */
+  open?: number | null;
+  onOpenChange?: (lesson: number | null) => void;
+  /** The child's own lesson in this book, marked out. */
+  current?: { lesson: number; status: QaidahStatus };
+  /** Lessons the child has passed in this book, ticked. */
+  passed?: number[];
+  /** How many of the teacher's students are on each lesson. */
+  counts?: Record<number, number>;
+}) {
+  const { t } = useLanguage();
+  const [ownOpen, setOwnOpen] = useState<number | null>(current?.lesson ?? 1);
+  const openLesson = open !== undefined ? open : ownOpen;
+  const setOpenLesson = onOpenChange ?? setOwnOpen;
 
   return (
     <div className="space-y-3">
-      {QAIDAH_LESSONS.map((lesson, i) => {
+      {book.lessons.map((lesson, i) => {
         const isOpen = openLesson === lesson.id;
+        const isCurrent = current?.lesson === lesson.id;
+        const isPassed = !isCurrent && passed.includes(lesson.id);
+        const count = counts?.[lesson.id] ?? 0;
         // Reuses the surah hash so the lesson numbers spread across the
         // palette instead of cycling in a visible pattern.
         const colour = surahColour(lesson.id * 3 + 1);
@@ -65,7 +98,10 @@ export function QaidahBook() {
         return (
           <article
             key={lesson.id}
-            className="card-quiet overflow-hidden animate-rise"
+            id={`qaidah-${book.id}-${lesson.id}`}
+            className={`card-quiet overflow-hidden animate-rise scroll-mt-4 ${
+              isCurrent ? "ring-2 ring-brand-gold/70" : ""
+            }`}
             style={{ animationDelay: `${40 + i * 35}ms` }}
           >
             <button
@@ -94,6 +130,36 @@ export function QaidahBook() {
                 >
                   {lesson.arabicTitle}
                 </span>
+                {(isCurrent || isPassed || count > 0) && (
+                  <span className="flex flex-wrap gap-1.5 mt-1.5">
+                    {isCurrent && (
+                      <span
+                        className={`${
+                          ILLUM_CLASS[current.status === "repeat" ? "vermilion" : "saffron"]
+                        } !inline-flex !rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide`}
+                      >
+                        {current.status === "repeat"
+                          ? t("qaidah.statusRepeat")
+                          : current.status === "passed"
+                            ? t("qaidah.statusPassed")
+                            : t("qaidah.yourLesson")}
+                      </span>
+                    )}
+                    {isPassed && (
+                      <span
+                        className={`${ILLUM_CLASS.verdigris} !inline-flex !rounded-full gap-1 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide`}
+                      >
+                        <IconCheck size={11} />
+                        {t("qaidah.statusPassed")}
+                      </span>
+                    )}
+                    {count > 0 && (
+                      <span className="inline-flex rounded-full bg-surface-bg-warm border border-surface-border px-2 py-0.5 text-[11px] font-semibold text-ink-muted">
+                        {count} {t("qaidah.onThisLesson")}
+                      </span>
+                    )}
+                  </span>
+                )}
               </span>
 
               <span
@@ -159,30 +225,36 @@ export function QaidahBook() {
                 {/* The rows themselves, right to left. */}
                 <div className="mt-4 space-y-2.5">
                   {lesson.rows.map((row, r) => (
-                    <div
-                      key={r}
-                      dir="rtl"
-                      lang="ar"
-                      className="flex flex-wrap gap-1.5 justify-center rounded-2xl bg-surface-bg-warm border border-surface-border p-2.5"
-                    >
-                      {row.map((item, c) => {
-                        const short = isShort(item);
-                        return (
-                          <span
-                            key={`${r}-${c}`}
-                            className={`font-arabic text-ink rounded-xl bg-surface-card border border-surface-border flex items-center justify-center ${
-                              short
-                                ? "w-[46px] h-[52px] text-[27px]"
-                                : `min-h-[52px] px-3 py-1.5 ${
-                                    letterCount(item) > 24 ? "text-[19px]" : "text-[23px]"
-                                  }`
-                            } leading-[1.9]`}
-                          >
-                            {item}
-                          </span>
-                        );
-                      })}
-                    </div>
+                    <Fragment key={r}>
+                      {lesson.rowLabels?.[r] && (
+                        <p dir="ltr" className="text-[11.5px] font-semibold text-ink-muted text-center pt-1.5">
+                          <Prose text={lesson.rowLabels[r]} />
+                        </p>
+                      )}
+                      <div
+                        dir="rtl"
+                        lang="ar"
+                        className="flex flex-wrap gap-1.5 justify-center rounded-2xl bg-surface-bg-warm border border-surface-border p-2.5"
+                      >
+                        {row.map((item, c) => {
+                          const short = isShort(item);
+                          return (
+                            <span
+                              key={`${r}-${c}`}
+                              className={`font-arabic text-ink rounded-xl bg-surface-card border border-surface-border flex items-center justify-center ${
+                                short
+                                  ? "w-[46px] h-[52px] text-[27px]"
+                                  : `min-h-[52px] px-3 py-1.5 ${
+                                      letterCount(item) > 24 ? "text-[19px]" : "text-[23px]"
+                                    }`
+                              } leading-[1.9]`}
+                            >
+                              {item}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </Fragment>
                   ))}
                 </div>
 
@@ -205,9 +277,8 @@ export function QaidahBook() {
   );
 }
 
-/** The short summary shown at the top of the Qa'idah page. */
-export function QaidahSummary() {
-  const letters = QAIDAH_LESSONS[0].rows.flat().length;
+/** What working through the book involves, shown above its lessons. */
+export function QaidahSummary({ book }: { book: QaidahBook }) {
   return (
     <section className="card-quiet card-feature p-5">
       <div className="flex items-start gap-3.5">
@@ -217,13 +288,86 @@ export function QaidahSummary() {
         <div dir="ltr">
           <h2 className="page-title text-[16px]">How this works</h2>
           <p className="text-[13px] text-ink-body leading-relaxed mt-1">
-            The {QAIDAH_LESSONS.length} lessons of Ahsanul Qawaid, numbered as in the
-            book, from the {letters} letters to stopping at the end of an ayah.
-            Work through them in order — each one assumes the one before it.
-            Read every row aloud.
+            {book.summary} Work through the lessons in order — each one assumes the one
+            before it. Read every row aloud.
           </p>
         </div>
       </div>
     </section>
   );
+}
+
+/** Which book: the three side by side, each with its Arabic name. */
+export function QaidahBookTabs({
+  value,
+  onChange,
+}: {
+  value: QaidahBookId;
+  onChange: (book: QaidahBookId) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <div role="tablist" aria-label={t("qaidah.book")} className="grid grid-cols-3 gap-2">
+      {QAIDAH_BOOKS.map((b) => {
+        const active = b.id === value;
+        return (
+          <button
+            key={b.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(b.id)}
+            className={`rounded-2xl border px-2.5 py-2.5 text-center transition-all ${
+              active
+                ? "bg-brand-navy border-brand-navy text-white shadow-sm"
+                : "bg-surface-card border-surface-border text-ink hover:border-brand-gold/60"
+            }`}
+          >
+            <span className="block text-[13px] font-semibold leading-tight">{b.name}</span>
+            <span
+              className={`block font-arabic text-[13px] leading-snug mt-0.5 ${
+                active ? "text-brand-gold-light" : "text-ink-muted"
+              }`}
+              dir="rtl"
+              lang="ar"
+            >
+              {b.arabicName}
+            </span>
+            <span className={`block text-[11px] mt-0.5 ${active ? "text-white/60" : "text-ink-muted"}`}>
+              {b.lessons.length} {t("qaidah.lessonsCount")}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const BOOK_KEY = "mydiiwaan_qaidah_book";
+
+/**
+ * The book on screen, remembered in this browser so a school that teaches
+ * from one book opens on it. A child's own lesson can show its book without
+ * changing what's remembered.
+ */
+export function useQaidahBookChoice(): [QaidahBookId, (book: QaidahBookId, remember?: boolean) => void] {
+  const [book, setBook] = useState<QaidahBookId>(DEFAULT_QAIDAH_BOOK);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(BOOK_KEY);
+      if (isQaidahBookId(stored)) setBook(stored);
+    } catch {
+      // No storage (private browsing): the default book it is.
+    }
+  }, []);
+  const choose = useCallback((next: QaidahBookId, remember = true) => {
+    setBook(next);
+    if (!remember) return;
+    try {
+      localStorage.setItem(BOOK_KEY, next);
+    } catch {
+      // Still shown for this visit.
+    }
+  }, []);
+  return [book, choose];
 }

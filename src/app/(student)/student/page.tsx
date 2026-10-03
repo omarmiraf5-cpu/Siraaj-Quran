@@ -27,6 +27,9 @@ const PORTION_COLOUR: Record<HifzPortion, IllumColour> = {
 import { getSurahById } from "@/data/mushaf-index";
 import { computeXp, levelFor, levelMessage } from "@/lib/progress";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
+import { useQaidahLessons } from "@/hooks/useQaidahLessons";
+import { currentLessons } from "@/lib/qaidahLessons";
+import { MyQaidahLesson } from "@/components/QaidahLessonCard";
 import { SectionCard, AttendanceStrip, TeacherNote } from "@/components/portal-ui";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
@@ -71,6 +74,9 @@ export default function StudentDashboard() {
     mode
   );
   const summary = summariseAttendance(attendance);
+  // Their Qa'idah lesson, where the teacher has set one.
+  const { rows: qaidahRows } = useQaidahLessons(mode, students[0] ? [students[0].id] : []);
+  const myQaidah = students[0] ? (currentLessons(qaidahRows).get(students[0].id) ?? null) : null;
 
   const open = assignments.filter((a) => a.status !== "completed");
   const done = assignments.filter((a) => a.status === "completed");
@@ -191,6 +197,15 @@ export default function StudentDashboard() {
           </div>
         )}
       </div>
+
+      {myQaidah && (
+        <div className="space-y-2.5 animate-rise" style={{ animationDelay: "150ms" }}>
+          <SectionLabel colour="saffron" icon={<IconBookOpen size={13} />}>
+            {t("nav.qaidah")}
+          </SectionLabel>
+          <MyQaidahLesson row={myQaidah} href="/student/qaidah" />
+        </div>
+      )}
 
       {/* Today's three — the shape of a hifz day, one tile per portion,
           rather than an undifferentiated list of surahs. */}

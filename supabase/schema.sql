@@ -1917,6 +1917,50 @@ begin
 end $$;
 
 -- ══════════════════════════════════════
+-- Qa'idah lessons
+-- ══════════════════════════════════════
+-- Where each child is in their Qa'idah: the book (Ahsanul Qawaid, the
+-- Noorani Qaida or the Baghdadi Qaida; src/data/qaidah) and the lesson in
+-- it their teacher has set. One row for each lesson set, so a child's
+-- newest row is the lesson they're on, and the rest is their history:
+-- passed, sent back to practise again, or moved past.
+create table if not exists qaidah_assignments (
+  id           uuid primary key default gen_random_uuid(),
+  student_id   uuid not null references students(id) on delete cascade,
+  school_id    uuid not null references schools(id) on delete cascade,
+  teacher_id   uuid references profiles(id) on delete set null,
+  book         text not null check (book in ('ahsanul_qawaid', 'nuraniyah', 'baghdadiyah')),
+  lesson       int not null check (lesson between 1 and 60),
+  status       text not null default 'assigned' check (status in ('assigned', 'passed', 'repeat')),
+  note         text check (char_length(note) <= 500),
+  assigned_at  timestamptz not null default now(),
+  passed_at    timestamptz,
+  updated_at   timestamptz not null default now()
+);
+alter table qaidah_assignments enable row level security;
+create index if not exists idx_qaidah_assignments_student on qaidah_assignments(student_id, assigned_at desc);
+create index if not exists idx_qaidah_assignments_school on qaidah_assignments(school_id, assigned_at desc);
+
+-- The school's teachers and office set and read every child's lesson: a
+-- child moves between halaqas, teachers cover for each other, and which
+-- lesson a child is on is nothing private. Only for their own school's
+-- children, and nothing for a switched-off account (my_role, my_school_id).
+drop policy if exists "School staff manage Qaidah lessons" on qaidah_assignments;
+create policy "School staff manage Qaidah lessons" on qaidah_assignments
+  for all using (
+    school_id = my_school_id() and my_role() in ('admin', 'teacher')
+  ) with check (
+    school_id = my_school_id() and my_role() in ('admin', 'teacher')
+    and student_school_id(student_id) = school_id
+  );
+drop policy if exists "Students read their own Qaidah lessons" on qaidah_assignments;
+create policy "Students read their own Qaidah lessons" on qaidah_assignments
+  for select using (student_id in (select id from students where profile_id = auth.uid()));
+drop policy if exists "Parents read their children's Qaidah lessons" on qaidah_assignments;
+create policy "Parents read their children's Qaidah lessons" on qaidah_assignments
+  for select using (student_id in (select my_children_student_ids()));
+
+-- ══════════════════════════════════════
 -- Switched-off accounts
 -- ══════════════════════════════════════
 -- Switching a teacher or parent off (the office's Teachers and Parents

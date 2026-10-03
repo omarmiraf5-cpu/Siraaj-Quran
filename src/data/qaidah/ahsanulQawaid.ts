@@ -9,37 +9,9 @@
 // lesson carries an English name and an explanation of what is being learnt
 // rather than a rendering of the rows.
 
-export interface Readings {
-  /** What the group shows, where a lesson has more than one. */
-  label?: string;
-  /** Each word as [printed, as read]. */
-  words: [string, string][];
-}
+import { together as shapes, type QaidahBook, type QaidahLesson } from "./types";
 
-export interface QaidahLesson {
-  /** The lesson's number in the printed book. */
-  id: number;
-  /** English name of the lesson, with the book's own word for it where teachers use that. */
-  title: string;
-  /** Arabic name of the lesson. */
-  arabicTitle: string;
-  /** What the child is learning to do. */
-  teaches: string;
-  /**
-   * Words whose reading differs from their printing — letters that are
-   * skipped, a stop at the end — shown as printed and as read.
-   */
-  readings?: Readings[];
-  /** Rows of Arabic to read aloud, right to left. */
-  rows: string[][];
-  /** A point for the teacher or parent sitting with them. */
-  note?: string;
-}
-
-/** A letter's shapes in one tile, an em space apart so they read as separate forms. */
-const shapes = (...forms: string[]) => forms.join("\u2003");
-
-export const QAIDAH_LESSONS: QaidahLesson[] = [
+const LESSONS: QaidahLesson[] = [
   {
     id: 1,
     title: "The single letters",
@@ -523,6 +495,12 @@ export const QAIDAH_LESSONS: QaidahLesson[] = [
   },
 ];
 
-export function qaidahLesson(id: number): QaidahLesson | undefined {
-  return QAIDAH_LESSONS.find((l) => l.id === id);
-}
+export const AHSANUL_QAWAID: QaidahBook = {
+  id: "ahsanul_qawaid",
+  name: "Ahsanul Qawaid",
+  shortName: "Ahsanul Qawaid",
+  arabicName: "أَحْسَنُ الْقَوَاعِدِ",
+  summary:
+    "The 29 lessons of Ahsanul Qawaid, numbered as in the book, from the letters to stopping at the end of an ayah. The Arabic is written the way the book writes it, in the Indo-Pak style.",
+  lessons: LESSONS,
+};

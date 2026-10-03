@@ -1,6 +1,6 @@
 "use client";
 
-import { QAIDAH_LESSONS } from "@/data/qaidah";
+import { QAIDAH_BOOKS } from "@/data/qaidah";
 import { ARBAEEN } from "@/data/arbaeen";
 import { getAllTajweedRules } from "@/lib/tajweed-rules";
 import { GRAD_CLASS } from "@/components/student-ui";
@@ -15,9 +15,9 @@ const SHELF = [
     colour: "verdigris" as const,
     icon: <IconBookOpen size={22} />,
     title: "Qa'idah",
-    arabic: "أَحْسَنُ الْقَوَاعِدِ",
-    sub: "Learn to read Arabic with Ahsanul Qawaid, from the letters up.",
-    count: `${QAIDAH_LESSONS.length} lessons`,
+    arabic: "الْقَاعِدَةُ",
+    sub: "Learn to read Arabic from the letters up: Ahsanul Qawaid, the Noorani Qaida or the Baghdadi Qaida.",
+    count: `${QAIDAH_BOOKS.length} books`,
   },
   {
     href: "/student/tajweed",
