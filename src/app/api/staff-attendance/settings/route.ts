@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest) {
       if (body.accuracy !== undefined && Number(body.accuracy) > MAX_ACCURACY_M) {
         return NextResponse.json(
           {
-            error: `Your device could only place you to within ${formatDistance(Number(body.accuracy))}. Try again on a phone with location turned on, standing at the school, or type the coordinates in from a map.`,
+            error: `Your device could only place you to within ${formatDistance(Number(body.accuracy))}. Try again on a phone with location turned on, standing at the school, or put the school's pin on the map instead.`,
           },
           { status: 400 }
         );

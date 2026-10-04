@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { StatusPill, currentPosition, timesLine, useAttendanceApi, statusLabel } from "@/components/attendance-ui";
@@ -14,6 +15,43 @@ import {
 } from "@/lib/attendanceRules";
 import { formatDay } from "@/data/demo";
 import { useLanguage } from "@/components/LanguageProvider";
+import { createClient } from "@/lib/supabase/client";
+import type { MapPoint } from "@/components/LocationMap";
+
+// Leaflet needs the browser, so the map loads there, when it's asked for.
+const LocationMap = dynamic(() => import("@/components/LocationMap"), {
+  ssr: false,
+  loading: () => <div className="h-[340px] rounded-2xl bg-surface-bg-warm animate-pulse" />,
+});
+
+/** A place an address search found. */
+interface Place {
+  name: string;
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Places matching an address, from OpenStreetMap's own search (Nominatim):
+ * asked only when a search is sent, never as the person types, as its terms
+ * of use require. `country` keeps it to one country.
+ */
+async function findPlaces(query: string, country: string | null, language: string, limit = 5): Promise<Place[]> {
+  const params = new URLSearchParams({ q: query, format: "jsonv2", limit: String(limit), "accept-language": language });
+  if (country) params.set("countrycodes", country.toLowerCase());
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`);
+  if (!res.ok) throw new Error("search failed");
+  const list = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
+  return list
+    .map((p) => ({ name: p.display_name, lat: Number(p.lat), lng: Number(p.lon) }))
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+}
+
+/** "53.5461, -113.4938", as Google Maps copies a spot: both numbers at once. */
+function bothNumbers(text: string): [string, string] | null {
+  const m = text.match(/^\s*(-?\d{1,3}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
+  return m ? [m[1], m[2]] : null;
+}
 
 /**
  * The office's view of staff attendance: who is in today and when they
@@ -352,9 +390,115 @@ function SettingsCard({
   const [grace, setGrace] = useState(settings.grace_minutes);
   const [busy, setBusy] = useState<"" | "locating" | "saving">("");
   const [error, setError] = useState<string | null>(null);
+  const [locateError, setLocateError] = useState<string | null>(null);
+  const { language } = useLanguage();
+
+  // Picking the spot on a map: the pin is the two numbers above.
+  const [mapOpen, setMapOpen] = useState(false);
+  const [view, setView] = useState<{ center: MapPoint; zoom: number } | null>(null);
+  const [query, setQuery] = useState("");
+  const [places, setPlaces] = useState<Place[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
+  // Where the school says it is: its country, which a search looks in
+  // first, and its town, for the map to start on. Each asked for once.
+  const school = useRef<Promise<{ city: string | null; country: string | null }> | null>(null);
+  const town = useRef<Promise<MapPoint | null> | null>(null);
+  const point = useMemo<MapPoint | null>(() => {
+    const la = Number(lat);
+    const ln = Number(lng);
+    if (!lat.trim() || !lng.trim() || !Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) {
+      return null;
+    }
+    return { lat: la, lng: ln };
+  }, [lat, lng]);
+  const pickPoint = useCallback((p: MapPoint) => {
+    setLat(p.lat.toFixed(6));
+    setLng(p.lng.toFixed(6));
+    setAccuracy(null);
+    setLocateError(null);
+  }, []);
+  // One of the two boxes, typed in — or both numbers pasted into either.
+  const typed = (which: "lat" | "lng", text: string) => {
+    const both = bothNumbers(text);
+    if (both) {
+      setLat(both[0]);
+      setLng(both[1]);
+    } else if (which === "lat") {
+      setLat(text);
+    } else {
+      setLng(text);
+    }
+    setAccuracy(null);
+    setLocateError(null);
+  };
+
+  const whichSchool = () =>
+    (school.current ??= (async () => {
+      // The sample school is in Edmonton, and already on the map.
+      if (settings.demo) return { city: null, country: "CA" };
+      const { data } = await createClient().from("schools").select("city, country").single();
+      return { city: data?.city ?? null, country: data?.country ?? null };
+    })().catch(() => ({ city: null, country: null })));
+  const whereIsTown = () =>
+    (town.current ??= whichSchool()
+      .then(async ({ city, country }) => {
+        const [found] = city ? await findPlaces(city, country, language, 1) : [];
+        return found ? { lat: found.lat, lng: found.lng } : null;
+      })
+      .catch(() => null));
+  // The spot as it is now, for answers that arrive after it has changed.
+  const latest = useRef(point);
+  latest.current = point;
+
+  const showMap = async () => {
+    setMapOpen(true);
+    if (point) return;
+    // No spot yet: start on the school's town rather than the whole world.
+    const center = await whereIsTown();
+    if (center && !latest.current) setView((v) => v ?? { center, zoom: 13 });
+  };
+  const toggleMap = () => {
+    if (!mapOpen) return showMap();
+    setMapOpen(false);
+    setView(null);
+  };
+
+  const search = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setPlaces(null);
+    setSearchFailed(false);
+    try {
+      const { country } = await whichSchool();
+      let found = await findPlaces(q, country, language);
+      if (found.length === 0 && country) {
+        // Nothing in the school's own country: look everywhere — a moment
+        // later, as the search asks for no more than one request a second.
+        await new Promise((r) => setTimeout(r, 1100));
+        found = await findPlaces(q, null, language);
+      }
+      setPlaces(found);
+      if (found.length === 1) choosePlace(found[0]);
+    } catch {
+      setSearchFailed(true);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // A search result: there, close in, with the pin on it to move onto the
+  // building itself.
+  const choosePlace = (place: Place) => {
+    setView({ center: { lat: place.lat, lng: place.lng }, zoom: 18 });
+    pickPoint({ lat: place.lat, lng: place.lng });
+    setPlaces(null);
+  };
 
   const here = async () => {
-    setError(null);
+    setLocateError(null);
     setBusy("locating");
     try {
       const fix = await currentPosition();
@@ -362,7 +506,9 @@ function SettingsCard({
       setLng(fix.longitude.toFixed(6));
       setAccuracy(Math.round(fix.accuracy));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't get your location");
+      setLocateError(e instanceof Error ? e.message : "Couldn't get your location");
+      // The map needs no permission: offer it straight away.
+      if (!mapOpen) showMap();
     } finally {
       setBusy("");
     }
@@ -399,11 +545,15 @@ function SettingsCard({
         <p className="text-[13px] text-ink-body leading-relaxed mb-4">
           Teachers can only sign in on the school premises, so first the portal needs to know where the school is.
           The easiest way: stand inside the school with your phone and tap <strong>Use my current location</strong>.
+          Or tap <strong>Pick on a map</strong> and put the pin on the school&apos;s building.
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={here} disabled={busy !== ""} className={primary}>
           {busy === "locating" ? "Finding you…" : "Use my current location"}
+        </button>
+        <button type="button" onClick={toggleMap} aria-expanded={mapOpen} className={ghost}>
+          {mapOpen ? "Hide the map" : "Pick on a map"}
         </button>
         {accuracy != null && (
           <span className="text-[12px] text-ink-muted">
@@ -412,19 +562,72 @@ function SettingsCard({
           </span>
         )}
       </div>
+      {locateError && (
+        <p role="alert" className="text-[12.5px] text-red-700 dark:text-red-300 mt-3">
+          {locateError}
+          {mapOpen && " Or put the pin on the map below — that needs no permission."}
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3 mt-4">
         <label className="block">
           <span className="eyebrow block mb-1.5">Latitude</span>
-          <input value={lat} onChange={(e) => { setLat(e.target.value); setAccuracy(null); }} placeholder="53.546100" className={input} inputMode="decimal" />
+          <input value={lat} onChange={(e) => typed("lat", e.target.value)} placeholder="53.546100" className={input} inputMode="decimal" dir="ltr" />
         </label>
         <label className="block">
           <span className="eyebrow block mb-1.5">Longitude</span>
-          <input value={lng} onChange={(e) => { setLng(e.target.value); setAccuracy(null); }} placeholder="-113.493800" className={input} inputMode="decimal" />
+          <input value={lng} onChange={(e) => typed("lng", e.target.value)} placeholder="-113.493800" className={input} inputMode="decimal" dir="ltr" />
         </label>
       </div>
       <p className="text-[11.5px] text-ink-muted mt-2">
         Or copy them from Google Maps: press and hold on the school&apos;s building, and the two numbers appear at the top.
       </p>
+
+      {mapOpen && (
+        <div className="mt-4 space-y-2.5">
+          <form onSubmit={search} className="flex gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="The school's address"
+              aria-label="Search for the school's address"
+              className={input}
+            />
+            <button type="submit" disabled={searching || !query.trim()} className={ghost}>
+              {searching ? "Searching…" : "Search"}
+            </button>
+          </form>
+          {places && places.length > 1 && (
+            <ul className="rounded-xl border border-surface-border divide-y divide-surface-border overflow-hidden bg-surface-card">
+              {places.map((place, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    onClick={() => choosePlace(place)}
+                    className="w-full text-start px-3.5 py-2.5 text-[13px] text-ink hover:bg-surface-bg-warm"
+                  >
+                    {place.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {places && places.length === 0 && (
+            <p className="text-[12.5px] text-ink-muted">
+              Nothing found for that. Try the street and the town, or find the school on the map and tap it.
+            </p>
+          )}
+          {searchFailed && (
+            <p className="text-[12.5px] text-ink-muted">
+              The search isn&apos;t answering just now. Find the school on the map and tap it instead.
+            </p>
+          )}
+          <LocationMap point={point} radius={radius} view={view} onPick={pickPoint} />
+          <p className="text-[11.5px] text-ink-muted">
+            Tap the school&apos;s building to put the pin on it, or drag the pin. The circle is how close teachers have to
+            be to sign in.
+          </p>
+        </div>
+      )}
 
       <p className="eyebrow mt-5 mb-2">How close counts as on the premises</p>
       <div className="flex flex-wrap gap-2">
