@@ -30,7 +30,9 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const result = await deleteSchoolAndAccounts(createAdminClient(), schoolId);
+  // The platform's operators keep their own logins, should they be one of
+  // the school's people.
+  const result = await deleteSchoolAndAccounts(createAdminClient(), schoolId, { keepPlatformOwners: true });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

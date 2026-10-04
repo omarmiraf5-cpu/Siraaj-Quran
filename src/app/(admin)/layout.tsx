@@ -1,4 +1,7 @@
+"use client";
+
 import { SidebarNav } from "@/components/SidebarNav";
+import { useStaffRoles } from "@/hooks/useStaffRoles";
 
 const NAV = [
   {
@@ -59,10 +62,21 @@ const NAV = [
   },
 ];
 
+// For an admin who also teaches a halaqa: their teacher's pages.
+const MY_HALAQA = {
+  href: "/teacher",
+  labelKey: "nav.myHalaqa",
+  // An open book, as the teacher's Qa'idah has.
+  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z"/><path d="M12 6.5v13.2"/></svg>,
+};
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { teaches } = useStaffRoles();
+  // Straight after the dashboard: teaching is part of their every day.
+  const items = teaches ? [NAV[0], MY_HALAQA, ...NAV.slice(1)] : NAV;
   return (
     <div className="flex min-h-screen bg-surface-bg">
-      <SidebarNav items={NAV} roleKey="role.admin" />
+      <SidebarNav items={items} roleKey="role.admin" />
       <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-20 md:pb-6 overflow-auto">{children}</main>
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { countriesByName, countryOfTimeZone, countryTimeZones, placeLabel, timeZoneLabel } from "@/lib/places";
+import { createClient } from "@/lib/supabase/client";
 
 type Step =
   | "welcome"
@@ -134,6 +135,10 @@ export default function OnboardPage() {
   const [result, setResult] = useState<{
     slug: string;
     adminEmail: string;
+    /** The admin's own login, already theirs, made this school's. */
+    existingAccount?: boolean;
+    /** The halaqas the admin teaches, with that same login. */
+    adminTeaches?: string[];
     teachers: TeacherLogin[];
     students: StudentPin[];
     parents: ParentLogin[];
@@ -165,6 +170,20 @@ export default function OnboardPage() {
     if (country) setSchool((s) => ({ ...s, ...placeFor(country, zone) }));
   }, []);
   const [admin, setAdmin] = useState<AdminForm>({ fullName: "", email: "", password: "" });
+  // Who is signed in on this device, if anyone: someone with a MyDiiwaan
+  // login of their own (the platform's owner) can make it the new school's
+  // admin, and keep its password.
+  const [signedIn, setSignedIn] = useState<string | null>(null);
+  useEffect(() => {
+    createClient()
+      .auth.getUser()
+      .then(({ data: { user } }) => setSignedIn(user?.email?.toLowerCase() ?? null))
+      .catch(() => {});
+  }, []);
+  const adminEmail = admin.email.trim().toLowerCase();
+  const ownLogin = !!signedIn && adminEmail === signedIn;
+  // The admin, listed as a teacher too: they teach with the same login.
+  const isAdminEmail = (email: string) => !!adminEmail && email.trim().toLowerCase() === adminEmail;
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
@@ -364,7 +383,7 @@ export default function OnboardPage() {
           (school.country !== "CA" || school.province)
         );
       case "admin":
-        return admin.fullName.trim() && admin.email.trim() && admin.password.length >= 8;
+        return admin.fullName.trim() && admin.email.trim() && (ownLogin || admin.password.length >= 8);
       case "teachers":
         return teachers.length > 0;
       case "students":
@@ -392,7 +411,8 @@ export default function OnboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           school,
-          admin,
+          // A login of their own keeps its password: none is sent for it.
+          admin: ownLogin ? { ...admin, password: "" } : admin,
           teachers: teachers.map((t) => ({ name: t.name, email: t.email, halaqa: t.halaqa })),
           students: students.map((s) => ({ name: s.name, age: parseInt(s.age, 10) || 0, halaqa: s.halaqa })),
           // Children go over as positions in the students array above, not
@@ -578,17 +598,37 @@ export default function OnboardPage() {
                 placeholder="you@yourschool.com"
                 className={inputClass}
               />
+              {signedIn && !admin.email.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setAdmin({ ...admin, email: signedIn })}
+                  className="mt-2 text-sm font-semibold text-emerald-700 hover:underline"
+                >
+                  Use your login, {signedIn}
+                </button>
+              )}
             </div>
-            <div>
-              <label className={labelClass}>Password</label>
-              <input
-                type="password"
-                value={admin.password}
-                onChange={(e) => setAdmin({ ...admin, password: e.target.value })}
-                placeholder="At least 8 characters"
-                className={inputClass}
-              />
-            </div>
+            {ownLogin ? (
+              <p className="text-sm text-status-info-text bg-status-info-bg rounded-2xl px-4 py-3">
+                You&apos;re signed in as {signedIn}. That login becomes this school&apos;s admin, and keeps
+                the password it already has.
+              </p>
+            ) : (
+              <div>
+                <label className={labelClass}>Password</label>
+                <input
+                  type="password"
+                  value={admin.password}
+                  onChange={(e) => setAdmin({ ...admin, password: e.target.value })}
+                  placeholder="At least 8 characters"
+                  className={inputClass}
+                />
+                <p className="text-xs text-ink-muted mt-2">
+                  If this email already has a MyDiiwaan login with no school yet, enter its password, or sign in
+                  to it first.
+                </p>
+              </div>
+            )}
             <div className="flex justify-between pt-2">
               <button onClick={goBack} className={ghostBtn}>← Back</button>
               <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>Next →</button>
@@ -600,6 +640,12 @@ export default function OnboardPage() {
           <div className="card-quiet p-8 space-y-5">
             <h2 className="text-xl font-bold text-ink">Add your teachers</h2>
             <p className="text-ink-muted text-sm">Each teacher gets their own halaqa (class).</p>
+            {adminEmail && (
+              <p className="text-ink-muted text-sm">
+                Teaching a halaqa yourself? Add yourself with your admin email, {adminEmail}: you&apos;ll teach
+                it with the same login.
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <input
                 value={tempTeacher.name}
@@ -633,7 +679,10 @@ export default function OnboardPage() {
                   <li key={t.id} className="flex items-center justify-between py-2.5">
                     <div>
                       <p className="text-sm font-semibold text-ink">{t.name}</p>
-                      <p className="text-xs text-ink-muted">{t.email} · {t.halaqa}</p>
+                      <p className="text-xs text-ink-muted">
+                        {t.email} · {t.halaqa}
+                        {isAdminEmail(t.email) && " · you, with your admin login"}
+                      </p>
                     </div>
                     <button onClick={() => removeTeacher(t.id)} className="text-status-error-text text-sm hover:underline">
                       Remove
@@ -926,7 +975,13 @@ export default function OnboardPage() {
               <p><span className="text-ink-muted">School:</span> <span className="font-semibold text-ink">{school.name}, {placeLabel(school.city, school.province, school.country)}</span></p>
               <p><span className="text-ink-muted">Time zone:</span> <span className="font-semibold text-ink">{school.timezone ? timeZoneLabel(school.timezone) : "—"}</span></p>
               <p><span className="text-ink-muted">Admin:</span> <span className="font-semibold text-ink">{admin.fullName} ({admin.email})</span></p>
-              <p><span className="text-ink-muted">Teachers:</span> <span className="font-semibold text-ink">{teachers.length}</span></p>
+              <p>
+                <span className="text-ink-muted">Teachers:</span>{" "}
+                <span className="font-semibold text-ink">
+                  {new Set(teachers.map((t) => t.email.trim().toLowerCase())).size}
+                  {teachers.some((t) => isAdminEmail(t.email)) && " — including you"}
+                </span>
+              </p>
               <p><span className="text-ink-muted">Students:</span> <span className="font-semibold text-ink">{students.length}</span></p>
               <p>
                 <span className="text-ink-muted">Parents:</span>{" "}
@@ -954,8 +1009,15 @@ export default function OnboardPage() {
               <div className="text-5xl">🎉</div>
               <h2 className="text-xl font-bold text-ink">Your school is ready!</h2>
               <p className="text-ink-muted text-sm">
-                Sign in at <span className="font-semibold text-ink">/login</span> with <span className="font-semibold text-ink">{result.adminEmail}</span> and the password you chose.
+                Sign in at <span className="font-semibold text-ink">/login</span> with <span className="font-semibold text-ink">{result.adminEmail}</span> and{" "}
+                {result.existingAccount ? "the password you already use" : "the password you chose"}.
               </p>
+              {result.adminTeaches && result.adminTeaches.length > 0 && (
+                <p className="text-ink-muted text-sm">
+                  You teach <span className="font-semibold text-ink">{result.adminTeaches.join(", ")}</span> with
+                  that same login: open <span className="font-semibold text-ink">My halaqa</span> in your admin menu.
+                </p>
+              )}
               <div className="bg-status-info-bg rounded-2xl p-4 text-start space-y-1.5">
                 <p className="text-sm font-semibold text-status-info-text">Your students&apos; login link</p>
                 <p className="font-mono text-[12px] text-status-info-text break-all">

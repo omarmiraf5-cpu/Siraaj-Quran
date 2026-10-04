@@ -1,4 +1,5 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, passwordUser } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { sendNewSchoolAlert } from "@/lib/newSchoolAlert";
 import { sendSchoolWelcome } from "@/lib/schoolWelcome";
 import { sendAccountWelcomes, type NewAccount } from "@/lib/accountWelcome";
@@ -66,6 +67,23 @@ function randomPin() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+/**
+ * Whether whoever is signing up is the person behind this existing login:
+ * signed in to it in this browser, or holding its password.
+ */
+async function isTheirs(userId: string, email: string, password: string): Promise<boolean> {
+  try {
+    const session = await createClient();
+    const {
+      data: { user },
+    } = await session.auth.getUser();
+    if (user?.id === userId) return true;
+  } catch {
+    // Not signed in: the password has to show it.
+  }
+  return (await passwordUser(email, password)) === userId;
+}
+
 export async function POST(request: NextRequest) {
   const admin = createAdminClient();
 
@@ -75,11 +93,14 @@ export async function POST(request: NextRequest) {
   // admin account instead of a clean second attempt.
   let schoolId: string | undefined;
   const createdUserIds: string[] = [];
+  // A login that already existed and was made this school's admin: put back
+  // as it was if the school can't be finished, never deleted.
+  let adopted: { id: string; role: string; full_name: string } | null = null;
 
   try {
     const data: OnboardingData = await request.json();
 
-    if (!data.school?.name || !data.admin?.email || !data.admin?.password) {
+    if (!data.school?.name || !data.admin?.email) {
       return NextResponse.json({ error: "School name, admin email, and password are required" }, { status: 400 });
     }
     // Any country's zone, but a real one: every date a school sees (today's
@@ -100,9 +121,16 @@ export async function POST(request: NextRequest) {
     const studentList = data.students ?? [];
     const parentList = data.parents ?? [];
 
+    // The admin may teach as well: listed as a teacher under their own
+    // email, they teach that halaqa with the admin's login rather than a
+    // second one, since an email can only have one. Every other address
+    // still needs to be someone else's.
+    const adminEmail = data.admin.email.trim().toLowerCase();
+    const isAdmin = (teacher: { email: string }) => teacher.email.trim().toLowerCase() === adminEmail;
+    const adminHalaqas = Array.from(new Set(teacherList.filter(isAdmin).map((t) => t.halaqa).filter(Boolean)));
     const emails = [
-      data.admin.email.trim().toLowerCase(),
-      ...teacherList.map((t) => t.email.trim().toLowerCase()),
+      adminEmail,
+      ...teacherList.filter((t) => !isAdmin(t)).map((t) => t.email.trim().toLowerCase()),
       ...parentList.map((p) => p.email.trim().toLowerCase()),
     ];
     const duplicateWithinSubmission = emails.find((e, i) => emails.indexOf(e) !== i);
@@ -128,13 +156,34 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    const { data: alreadyRegistered } = await admin.from("profiles").select("email").in("email", emails);
-    if (alreadyRegistered && alreadyRegistered.length > 0) {
-      const taken = alreadyRegistered.map((p) => p.email).join(", ");
+    const { data: alreadyRegistered } = await admin
+      .from("profiles")
+      .select("id, email, role, full_name, school_id")
+      .in("email", emails);
+    // The admin's email may already be a login that belongs to no school —
+    // the platform owner's, made outside this sign-up — and that login
+    // becomes the school's admin, once whoever is signing up shows it's
+    // theirs. A login that is already some school's stays where it is.
+    const existingAdmin = (alreadyRegistered ?? []).find(
+      (p) => (p.email ?? "").toLowerCase() === adminEmail && !p.school_id
+    );
+    if (existingAdmin && !(await isTheirs(existingAdmin.id, adminEmail, data.admin.password ?? ""))) {
       return NextResponse.json(
-        { error: `Already registered: ${taken}. Use different email addresses and try again.` },
+        {
+          error: `${adminEmail} already has a MyDiiwaan login. To make it this school's admin, sign in to it first, or enter its password on the Admin step.`,
+        },
         { status: 400 }
       );
+    }
+    const taken = (alreadyRegistered ?? []).filter((p) => p !== existingAdmin);
+    if (taken.length > 0) {
+      return NextResponse.json(
+        { error: `Already registered: ${taken.map((p) => p.email).join(", ")}. Use different email addresses and try again.` },
+        { status: 400 }
+      );
+    }
+    if (!existingAdmin && !data.admin.password) {
+      return NextResponse.json({ error: "School name, admin email, and password are required" }, { status: 400 });
     }
 
     const baseSlug = slugify(data.school.name);
@@ -167,18 +216,32 @@ export async function POST(request: NextRequest) {
 
     schoolId = school.id as string;
 
-    // handle_new_user() (schema.sql) auto-inserts the matching profiles row
-    // from this metadata the moment the auth user exists, so admin/teacher
-    // profiles are never inserted by hand here.
-    const { data: adminAuth, error: adminError } = await admin.auth.admin.createUser({
-      email: data.admin.email.trim().toLowerCase(),
-      password: data.admin.password,
-      email_confirm: true,
-      app_metadata: PROVISIONED,
-      user_metadata: { role: "admin", full_name: data.admin.fullName.trim(), school_id: schoolId },
-    });
-    if (adminError) throw new Error(`Admin account failed: ${adminError.message}`);
-    createdUserIds.push(adminAuth.user.id);
+    let adminId: string;
+    if (existingAdmin) {
+      // Their own login, made this school's admin. Its password stays the
+      // one they have.
+      adopted = { id: existingAdmin.id, role: existingAdmin.role, full_name: existingAdmin.full_name };
+      const { error: adoptError } = await admin
+        .from("profiles")
+        .update({ role: "admin", school_id: schoolId, full_name: data.admin.fullName.trim() || existingAdmin.full_name })
+        .eq("id", existingAdmin.id);
+      if (adoptError) throw new Error(`Admin account failed: ${adoptError.message}`);
+      adminId = existingAdmin.id;
+    } else {
+      // handle_new_user() (schema.sql) auto-inserts the matching profiles row
+      // from this metadata the moment the auth user exists, so admin/teacher
+      // profiles are never inserted by hand here.
+      const { data: adminAuth, error: adminError } = await admin.auth.admin.createUser({
+        email: adminEmail,
+        password: data.admin.password,
+        email_confirm: true,
+        app_metadata: PROVISIONED,
+        user_metadata: { role: "admin", full_name: data.admin.fullName.trim(), school_id: schoolId },
+      });
+      if (adminError) throw new Error(`Admin account failed: ${adminError.message}`);
+      createdUserIds.push(adminAuth.user.id);
+      adminId = adminAuth.user.id;
+    }
 
     // Each teacher's temporary password goes back to the caller with them.
     // It used to be generated here and discarded, which left every teacher a
@@ -193,6 +256,13 @@ export async function POST(request: NextRequest) {
     // the way in if the email doesn't arrive.
     const welcomes: NewAccount[] = [];
     for (const teacher of teacherList) {
+      // The admin, teaching with their own login.
+      if (isAdmin(teacher)) {
+        if (teacher.halaqa && !teacherIdsByHalaqa[teacher.halaqa]?.includes(adminId)) {
+          (teacherIdsByHalaqa[teacher.halaqa] ??= []).push(adminId);
+        }
+        continue;
+      }
       const email = teacher.email.trim().toLowerCase();
       const password = `Temp${randomPin()}${randomPin()}!`;
       const { data: teacherAuth, error: teacherError } = await admin.auth.admin.createUser({
@@ -364,11 +434,10 @@ export async function POST(request: NextRequest) {
     // unwind below.
     const counts = {
       halaqas: halaqaNames.length,
-      teachers: teacherLogins.length,
+      teachers: teacherLogins.length + (adminHalaqas.length > 0 ? 1 : 0),
       students: studentPins.length,
       parents: parentLogins.length,
     };
-    const adminEmail = data.admin.email.trim().toLowerCase();
     after(() =>
       sendSchoolWelcome({
         name: school.name,
@@ -400,6 +469,11 @@ export async function POST(request: NextRequest) {
         schoolId,
         slug,
         adminEmail: data.admin.email,
+        // Their own login, made this school's: signed into with the password
+        // it already had.
+        existingAccount: !!existingAdmin,
+        // The halaqas the admin teaches, with that same login.
+        adminTeaches: adminHalaqas,
         teachers: teacherLogins,
         students: studentPins,
         parents: parentLogins,
@@ -415,6 +489,14 @@ export async function POST(request: NextRequest) {
     // cascades away its profiles/classes/students rows; auth users aren't
     // tied to the school row, so they're removed separately.
     try {
+      // A login that was already someone's goes back as it was, before the
+      // school does: deleting the school deletes its people's profiles too.
+      if (adopted) {
+        await admin
+          .from("profiles")
+          .update({ role: adopted.role, school_id: null, full_name: adopted.full_name })
+          .eq("id", adopted.id);
+      }
       if (schoolId) {
         await admin.from("schools").delete().eq("id", schoolId);
       }

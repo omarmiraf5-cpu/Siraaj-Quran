@@ -2,6 +2,7 @@
 
 import { SidebarNav } from "@/components/SidebarNav";
 import { useRequirePasswordChange } from "@/hooks/useRequirePasswordChange";
+import { useStaffRoles } from "@/hooks/useStaffRoles";
 
 // Ordered so the four things a teacher actually opens every day come
 // first — SidebarNav keeps only that many as mobile tabs and folds
@@ -76,12 +77,23 @@ const NAV = [
   },
 ];
 
+// For the school's admin, teaching a halaqa here: back to running the school.
+const SCHOOL_OFFICE = {
+  href: "/admin",
+  labelKey: "nav.office",
+  // A building with a door.
+  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M10 21v-5h4v5"/></svg>,
+};
+
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   useRequirePasswordChange();
+  const { admin } = useStaffRoles();
+  // Just before their own account, at the end.
+  const items = admin ? [...NAV.slice(0, -1), SCHOOL_OFFICE, NAV[NAV.length - 1]] : NAV;
 
   return (
     <div className="flex min-h-screen bg-surface-bg">
-      <SidebarNav items={NAV} roleKey="role.teacher" />
+      <SidebarNav items={items} roleKey={admin ? "role.admin" : "role.teacher"} />
       <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-20 md:pb-6 overflow-auto">{children}</main>
     </div>
   );
