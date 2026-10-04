@@ -27,20 +27,24 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { loadSchoolTeachers, saveOtherTeachers, splitTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
 
 /**
  * The school's teachers as chips: tap to add one to the halaqa, tap again to
  * take them off. Everyone ticked teaches its children. Switched-off teachers
- * are left out unless they're already on it.
+ * are left out unless they're already on it. The school's admins are here
+ * too, to teach with their own login.
  */
 function TeacherPicker({
   teachers,
   selected,
   onChange,
+  meId,
 }: {
   teachers: DemoTeacher[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  meId: string | null;
 }) {
   const shown = teachers.filter((t) => t.active !== false || selected.includes(t.id));
   if (shown.length === 0) {
@@ -64,6 +68,7 @@ function TeacherPicker({
           >
             {on ? "✓ " : ""}
             {t.name}
+            {t.admin && <span className="font-normal opacity-80">{t.id === meId ? " · you" : " · admin"}</span>}
           </button>
         );
       })}
@@ -71,17 +76,12 @@ function TeacherPicker({
   );
 }
 
-/** Its first teacher (kept if still ticked) and the others, from the teachers ticked. */
-function splitTeachers(ids: string[], current: string | null): { lead: string | null; others: string[] } {
-  const lead = current && ids.includes(current) ? current : ids[0] ?? null;
-  return { lead, others: ids.filter((id) => id !== lead) };
-}
-
 export default function AdminHalaqasPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
+  const [meId, setMeId] = useState<string | null>(null);
 
   const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
   const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
@@ -124,31 +124,6 @@ export default function AdminHalaqasPage() {
       teacherId: c.teacher_id,
       coTeacherIds: othersOf.get(c.id) ?? [],
       schedule: c.schedule ?? "",
-    }));
-  };
-
-  /** Puts a halaqa's other teachers in place: exactly these, no one else. */
-  const setOtherTeachers = async (classId: string, others: string[]) => {
-    const { error: clearError } = await supabase.from("class_teachers").delete().eq("class_id", classId);
-    if (clearError) throw clearError;
-    if (others.length === 0) return;
-    const { error } = await supabase
-      .from("class_teachers")
-      .insert(others.map((teacher_id) => ({ class_id: classId, teacher_id })));
-    if (error) throw error;
-  };
-
-  const loadRealTeachers = async (): Promise<DemoTeacher[]> => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, active")
-      .eq("role", "teacher")
-      .order("full_name");
-    return (data ?? []).map((p) => ({
-      id: p.id,
-      name: p.full_name,
-      email: p.email ?? "",
-      active: p.active,
     }));
   };
 
@@ -207,9 +182,10 @@ export default function AdminHalaqasPage() {
         .eq("id", user.id)
         .single();
       setSchoolId(profile?.school_id ?? null);
+      setMeId(user.id);
       await Promise.all([
         loadRealHalaqas().then(setHalaqas),
-        loadRealTeachers().then(setTeachers),
+        loadSchoolTeachers(supabase, { everyAdmin: true }).then(setTeachers),
         loadRealStudents().then(setStudents),
       ]);
     };
@@ -262,9 +238,10 @@ export default function AdminHalaqasPage() {
         .select("id")
         .single();
       if (error) throw error;
-      if (others.length > 0) await setOtherTeachers(cls.id, others);
+      if (others.length > 0) await saveOtherTeachers(cls.id, others);
 
       setHalaqas(await loadRealHalaqas());
+      if (meId && newTeacherIds.includes(meId)) staffRolesChanged();
       setNewName("");
       setNewSchedule("");
       setNewTeacherIds([]);
@@ -314,8 +291,9 @@ export default function AdminHalaqasPage() {
         .eq("id", h.id);
       if (error) throw error;
       const before = (h.coTeacherIds ?? []).slice().sort().join();
-      if (others.slice().sort().join() !== before) await setOtherTeachers(h.id, others);
+      if (others.slice().sort().join() !== before) await saveOtherTeachers(h.id, others);
       setHalaqas(await loadRealHalaqas());
+      if (meId && halaqaTeacherIds(h).includes(meId) !== draftTeacherIds.includes(meId)) staffRolesChanged();
       setEditingId(null);
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "That didn't save. Please try again.");
@@ -370,7 +348,7 @@ export default function AdminHalaqasPage() {
           <div>
             <label className="block text-sm font-semibold text-ink mb-1">Teachers (optional)</label>
             <p className="text-xs text-ink-muted mb-2">Tap everyone who teaches it. More than one can.</p>
-            <TeacherPicker teachers={teachers} selected={newTeacherIds} onChange={setNewTeacherIds} />
+            <TeacherPicker teachers={teachers} selected={newTeacherIds} onChange={setNewTeacherIds} meId={meId} />
           </div>
           {formError && <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>}
           <button
@@ -443,7 +421,7 @@ export default function AdminHalaqasPage() {
                         <p className="text-[11px] text-ink-muted mb-2">
                           Tap to add or take off. Everyone ticked sees and teaches this halaqa&apos;s children.
                         </p>
-                        <TeacherPicker teachers={teachers} selected={draftTeacherIds} onChange={setDraftTeacherIds} />
+                        <TeacherPicker teachers={teachers} selected={draftTeacherIds} onChange={setDraftTeacherIds} meId={meId} />
                       </div>
                       <p className="text-xs text-ink-muted">
                         {count} student{count === 1 ? "" : "s"} currently in this halaqa.

@@ -17,6 +17,44 @@ function generateTempPassword() {
 const ALLOWED_ROLES = ACCOUNT_ROLES;
 type AllowedRole = AccountRole;
 
+/**
+ * Why an email that already signs in to MyDiiwaan can't have a second login,
+ * and what to do instead — Supabase's own "already been registered" said
+ * nothing about whose it is. Null when nobody has it.
+ */
+async function loginInTheWay(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string,
+  role: AllowedRole,
+  caller: { school_id: string | null },
+  callerId: string
+): Promise<string | null> {
+  const { data: holder } = await admin
+    .from("profiles")
+    .select("id, role, school_id, full_name")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+  if (!holder) return null;
+  const name = holder.full_name || email;
+  if (holder.school_id !== caller.school_id) {
+    return `${email} already has a MyDiiwaan login, so it can't be used for a new one. Use another email.`;
+  }
+  if (holder.id === callerId) {
+    return role === "teacher"
+      ? "That's your own login, and you can teach with it — there's no second login to make. Tick yourself as a teacher on your halaqa, under Halaqas."
+      : "That's your own login, which runs the school. A parent needs a login of their own — use another email.";
+  }
+  if (holder.role === role) {
+    return `${name} is already one of your ${role}s.`;
+  }
+  if (holder.role === "admin") {
+    return role === "teacher"
+      ? `${name} is an admin here and can teach with that same login — tick them as a teacher on the halaqa, under Halaqas.`
+      : `${email} is ${name}'s admin login here. A parent needs a login of their own — use another email.`;
+  }
+  return `${email} is ${name}'s ${holder.role} login here. One login can't be both, so use another email for this ${role}.`;
+}
+
 // Creating any account needs Supabase's admin API (to write the auth.users
 // row), which requires the service-role key — an RLS-scoped session can
 // never do that on its own, so this always goes through the server.
@@ -51,6 +89,8 @@ export async function POST(req: NextRequest) {
     // new profiles row, so the account lands in the right school with the
     // right role the moment it exists.
     const admin = createAdminClient();
+    const inTheWay = await loginInTheWay(admin, email.trim(), role as AllowedRole, caller, user.id);
+    if (inTheWay) return NextResponse.json({ error: inTheWay }, { status: 409 });
     const tempPassword = generateTempPassword();
     const { data, error } = await admin.auth.admin.createUser({
       email: email.trim(),
@@ -68,7 +108,16 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      // A login with no profile to say whose it is.
+      if (error.code === "email_exists" || /already (been )?registered/i.test(error.message)) {
+        return NextResponse.json(
+          { error: `${email.trim()} already has a MyDiiwaan login, so it can't be used for a new one. Use another email.` },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     // Linking a parent to their children runs as the admin's own session,
     // not the service role — the "Admins can manage parent links" policy

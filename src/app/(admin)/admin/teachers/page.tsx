@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   DEMO_TEACHERS,
   DEMO_HALAQAS,
@@ -23,6 +24,51 @@ import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { welcomeNote } from "@/lib/welcomeNote";
 import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
+import { loadSchoolTeachers, saveHalaqaTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
+
+/** The halaqas as chips, to tick the ones someone teaches. */
+function HalaqaChips({
+  halaqas,
+  selected,
+  onChange,
+}: {
+  halaqas: DemoHalaqa[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  if (halaqas.length === 0) {
+    return (
+      <p className="text-xs text-ink-muted">
+        There are no halaqas yet. Add one under{" "}
+        <Link href="/admin/halaqas" className="font-semibold underline underline-offset-2">
+          Halaqas
+        </Link>{" "}
+        and tick yourself as its teacher.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {halaqas.map((h) => {
+        const on = selected.includes(h.id);
+        return (
+          <button
+            key={h.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(on ? selected.filter((id) => id !== h.id) : [...selected, h.id])}
+            className={`px-3 py-1.5 rounded-full text-[12.5px] font-semibold transition-all ${
+              on ? "gradient-emerald text-white" : "bg-surface-card border border-surface-border text-ink-muted hover:text-ink"
+            }`}
+          >
+            {on ? "✓ " : ""}
+            {h.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AdminTeachersPage() {
   const supabase = createClient();
@@ -39,6 +85,14 @@ export default function AdminTeachersPage() {
   const [newEmail, setNewEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
+
+  // The signed-in admin, who can teach with their own login: typing their
+  // own email here picks their halaqas rather than making a second login.
+  const [me, setMe] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [mine, setMine] = useState<string[]>([]);
+  const [teachError, setTeachError] = useState<string | null>(null);
+  const isSelf = !!me && newEmail.trim().toLowerCase() === me.email.toLowerCase();
+  const myHalaqaIds = (list: DemoHalaqa[]) => (me ? list.filter((h) => halaqaTeacherIds(h).includes(me.id)).map((h) => h.id) : []);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
@@ -68,19 +122,7 @@ export default function AdminTeachersPage() {
   };
 
   const loadRealTeachers = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, active")
-      .eq("role", "teacher")
-      .order("full_name");
-    setTeachers(
-      (data ?? []).map((p) => ({
-        id: p.id,
-        name: p.full_name,
-        email: p.email ?? "",
-        active: p.active,
-      }))
-    );
+    setTeachers(await loadSchoolTeachers(supabase));
   };
 
   useEffect(() => {
@@ -105,13 +147,70 @@ export default function AdminTeachersPage() {
         return;
       }
 
+      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+      setMe({ id: user.id, email: user.email ?? "", name: profile?.full_name ?? "" });
       await Promise.all([loadRealTeachers(), loadRealHalaqas().then(setHalaqas)]);
     };
     load().finally(() => setReady(true));
   }, []);
 
+  // Their own email typed in: start from the halaqas they already teach.
+  useEffect(() => {
+    if (isSelf) {
+      setMine(myHalaqaIds(halaqas));
+      setTeachError(null);
+    }
+    // Only as the email comes to match; the halaqas don't change meanwhile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSelf]);
+
+  /**
+   * The signed-in admin teaches exactly the halaqas in `chosen`, under the
+   * name given: their own login, put on each halaqa or taken off it.
+   */
+  const saveMyTeaching = async (chosen: string[], name: string) => {
+    if (!me) return;
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== me.name) {
+      const { error } = await supabase.from("profiles").update({ full_name: trimmed }).eq("id", me.id);
+      if (error) throw error;
+    }
+    for (const h of halaqas) {
+      const ids = halaqaTeacherIds(h);
+      const want = chosen.includes(h.id);
+      if (ids.includes(me.id) === want) continue;
+      await saveHalaqaTeachers(supabase, h, want ? [...ids, me.id] : ids.filter((id) => id !== me.id));
+    }
+    setMe({ ...me, name: trimmed || me.name });
+    const [list, fresh] = await Promise.all([loadSchoolTeachers(supabase), loadRealHalaqas()]);
+    setTeachers(list);
+    setHalaqas(fresh);
+    staffRolesChanged();
+    return halaqas.filter((h) => chosen.includes(h.id)).map((h) => h.name);
+  };
+
   const addTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSelf) {
+      setInviting(true);
+      setTeachError(null);
+      try {
+        const names = (await saveMyTeaching(mine, newName)) ?? [];
+        setNewName("");
+        setNewEmail("");
+        setShowForm(false);
+        setInviteNote(
+          names.length > 0
+            ? `You teach ${names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0]} with your own login — open My halaqa in the menu to get to your students.`
+            : "You don't teach a halaqa now."
+        );
+      } catch (err) {
+        setTeachError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+      } finally {
+        setInviting(false);
+      }
+      return;
+    }
     if (!newName.trim() || !newEmail.trim()) return;
 
     if (isDemo) {
@@ -165,6 +264,21 @@ export default function AdminTeachersPage() {
     setDraftActive(t.active !== false);
     setResetNote(null);
     setSaveError(null);
+    if (t.id === me?.id) setMine(myHalaqaIds(halaqas));
+  };
+
+  // Their own row: the name parents and children see, and what they teach.
+  const saveMine = async () => {
+    setSavingEdit(true);
+    setSaveError(null);
+    try {
+      await saveMyTeaching(mine, draftName);
+      setEditingId(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   // A teacher's temporary password is shown once, when the account is made.
@@ -248,11 +362,13 @@ export default function AdminTeachersPage() {
       {showForm && (
         <form onSubmit={addTeacher} className="card-quiet p-5 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Full name *</label>
+            <label className="block text-sm font-semibold text-ink mb-2">
+              {isSelf ? "Your name, as parents and children see it" : "Full name *"}
+            </label>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Ustadha Warsan"
+              placeholder={isSelf ? me?.name || "e.g. Ustadh Omar" : "e.g. Ustadha Warsan"}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
@@ -266,17 +382,29 @@ export default function AdminTeachersPage() {
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
-          <p className="text-xs text-ink-muted">
-            {isDemo
-              ? "New teachers start without a halaqa — assign one from the Halaqas page."
-              : "We'll email them a link to choose their own password, and you'll get a temporary password to share in case the email doesn't reach them. They start without a halaqa assigned."}
-          </p>
+          {isSelf ? (
+            <div className="rounded-2xl border border-emerald-600/30 bg-surface-bg-warm p-4 space-y-3">
+              <p className="text-sm text-ink leading-relaxed">
+                That&apos;s you. Your admin login works for teaching too, so there&apos;s no second login to make —
+                tick the halaqas you teach.
+              </p>
+              <HalaqaChips halaqas={halaqas} selected={mine} onChange={setMine} />
+              {teachError && <p className="text-xs text-red-600 dark:text-red-400">{teachError}</p>}
+            </div>
+          ) : (
+            <p className="text-xs text-ink-muted">
+              {isDemo
+                ? "New teachers start without a halaqa — assign one from the Halaqas page."
+                : "We'll email them a link to choose their own password, and you'll get a temporary password to share in case the email doesn't reach them. They start without a halaqa assigned."}
+              {me && ` Teaching a halaqa yourself? Enter your own email, ${me.email}.`}
+            </p>
+          )}
           <button
             type="submit"
-            disabled={!newName.trim() || !newEmail.trim() || inviting}
+            disabled={isSelf ? inviting || halaqas.length === 0 : !newName.trim() || !newEmail.trim() || inviting}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            {isDemo ? "Add teacher" : inviting ? "Creating…" : "Create login"}
+            {isSelf ? (inviting ? "Saving…" : "Teach with my login") : isDemo ? "Add teacher" : inviting ? "Creating…" : "Create login"}
           </button>
         </form>
       )}
@@ -324,6 +452,11 @@ export default function AdminTeachersPage() {
                         {theirHalaqas.length > 0 && ` · ${theirHalaqas.map((h) => h.name).join(", ")}`}
                       </p>
                     </div>
+                    {t.admin && (
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex-shrink-0">
+                        {t.id === me?.id ? "You · admin" : "Admin"}
+                      </span>
+                    )}
                     {inactive && (
                       <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
                         Inactive
@@ -334,7 +467,58 @@ export default function AdminTeachersPage() {
                     </span>
                   </button>
 
-                  {isOpen && (
+                  {isOpen && t.admin && (
+                    <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                      {t.id === me?.id ? (
+                        <>
+                          <p className="text-[12.5px] text-ink-body leading-relaxed">
+                            This is your own login: you run the school with it, and teach with it too.
+                          </p>
+                          <div>
+                            <label className="block text-xs font-semibold text-ink mb-1.5">Your name, as parents and children see it</label>
+                            <input
+                              value={draftName}
+                              onChange={(e) => setDraftName(e.target.value)}
+                              className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                            />
+                          </div>
+                          <div>
+                            <p className="block text-xs font-semibold text-ink mb-1.5">The halaqas you teach</p>
+                            <HalaqaChips halaqas={halaqas} selected={mine} onChange={setMine} />
+                          </div>
+                          {saveError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{saveError}</p>}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={saveMine}
+                              disabled={savingEdit}
+                              className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
+                            >
+                              {savingEdit ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-[12.5px] text-ink-body leading-relaxed">
+                          {t.name} runs the school with this login, and teaches with it too. Which halaqas they teach is
+                          set under{" "}
+                          <Link href="/admin/halaqas" className="font-semibold underline underline-offset-2">
+                            Halaqas
+                          </Link>
+                          .
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {isOpen && !t.admin && (
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                       <div>
                         <label className="block text-xs font-semibold text-ink mb-1.5">Full name</label>

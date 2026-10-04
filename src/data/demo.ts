@@ -63,6 +63,8 @@ export interface DemoTeacher {
   name: string;
   email: string;
   active?: boolean;
+  /** Runs the school, and teaches with that same login. */
+  admin?: boolean;
 }
 
 // Every existing assignment and message uses teacher_id "t1", so that one

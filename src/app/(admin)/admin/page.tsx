@@ -19,6 +19,7 @@ import {
   allStudents,
   allTeachers,
   allHalaqas,
+  halaqaTeacherIds,
   schoolAttendanceRate,
   studentsInHalaqa,
   type StudentOverride,
@@ -32,6 +33,7 @@ import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { useLanguage } from "@/components/LanguageProvider";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 
@@ -57,24 +59,18 @@ export default function AdminDashboard() {
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [absenceItems, setAbsenceItems] = useState<AbsenceItem[]>([]);
 
-  const loadRealTeachers = async (): Promise<DemoTeacher[]> => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, active")
-      .eq("role", "teacher")
-      .order("full_name");
-    return (data ?? []).map((p) => ({ id: p.id, name: p.full_name, email: "", active: p.active }));
-  };
-
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
-    const { data } = await supabase
-      .from("classes")
-      .select("id, name, teacher_id, schedule")
-      .order("name");
+    const [{ data }, { data: others }] = await Promise.all([
+      supabase.from("classes").select("id, name, teacher_id, schedule").order("name"),
+      supabase.from("class_teachers").select("class_id, teacher_id"),
+    ]);
+    const othersOf = new Map<string, string[]>();
+    for (const o of others ?? []) othersOf.set(o.class_id, [...(othersOf.get(o.class_id) ?? []), o.teacher_id]);
     return (data ?? []).map((c) => ({
       id: c.id,
       name: c.name,
       teacherId: c.teacher_id,
+      coTeacherIds: othersOf.get(c.id) ?? [],
       schedule: c.schedule ?? "",
     }));
   };
@@ -186,7 +182,7 @@ export default function AdminDashboard() {
 
       const [realTeachers, realHalaqas, realReview, realAbsences, realAttendance] =
         await Promise.all([
-          loadRealTeachers(),
+          loadSchoolTeachers(supabase),
           loadRealHalaqas(),
           loadRealReviewItems(),
           loadRealAbsences(),
@@ -263,7 +259,7 @@ export default function AdminDashboard() {
       <SectionCard title={t("nav.teachers")} note={`${teachers.length} ${t("common.total")}`}>
         <ul className="divide-y divide-surface-border -my-1">
           {teachers.map((teacher) => {
-            const theirHalaqas = halaqas.filter((h) => h.teacherId === teacher.id);
+            const theirHalaqas = halaqas.filter((h) => halaqaTeacherIds(h).includes(teacher.id));
             return (
               <li key={teacher.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
