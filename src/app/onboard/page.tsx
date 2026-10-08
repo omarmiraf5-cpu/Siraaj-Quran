@@ -168,8 +168,6 @@ export default function OnboardPage() {
     kind: "quran",
     campuses: "",
   });
-  const academic = school.kind === "academic";
-  const steps = academic ? ACADEMIC_STEPS : STEPS;
   const countries = useMemo(() => countriesByName("en"), []);
   const zones = useMemo(() => countryTimeZones(school.country), [school.country]);
   const pickCountry = (country: string) => setSchool((s) => ({ ...s, ...placeFor(country, deviceZone()) }));
@@ -187,12 +185,23 @@ export default function OnboardPage() {
   // login of their own (the platform's owner) can make it the new school's
   // admin, and keep its password.
   const [signedIn, setSignedIn] = useState<string | null>(null);
+  // Only the platform's owner sets up an academic school (one kept in
+  // grades, with campuses): everyone else signs up a Qur'an school.
+  const [platformOwner, setPlatformOwner] = useState(false);
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data: { user } }) => setSignedIn(user?.email?.toLowerCase() ?? null))
+    const supabase = createClient();
+    supabase.auth
+      .getUser()
+      .then(async ({ data: { user } }) => {
+        setSignedIn(user?.email?.toLowerCase() ?? null);
+        if (!user) return;
+        const { data } = await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
+        setPlatformOwner(data?.is_platform_admin === true);
+      })
       .catch(() => {});
   }, []);
+  const academic = platformOwner && school.kind === "academic";
+  const steps = academic ? ACADEMIC_STEPS : STEPS;
   const adminEmail = admin.email.trim().toLowerCase();
   const ownLogin = !!signedIn && adminEmail === signedIn;
   // The admin, listed as a teacher too: they teach with the same login.
@@ -589,8 +598,10 @@ export default function OnboardPage() {
                 ))}
               </select>
             </div>
+            {platformOwner && (
             <fieldset>
               <legend className={labelClass}>What kind of school is it?</legend>
+              <p className="text-xs text-ink-muted -mt-1 mb-2">Only you see this choice, as MyDiiwaan&apos;s owner.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {([
                   ["quran", "A Qur'an school", "Students in halaqas."],
@@ -616,6 +627,7 @@ export default function OnboardPage() {
                 ))}
               </div>
             </fieldset>
+            )}
             {academic && (
               <div>
                 <label className={labelClass}>

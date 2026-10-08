@@ -78,6 +78,21 @@ function randomPin() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+/** Whether whoever is signing up is MyDiiwaan's own owner, signed in. */
+async function isPlatformOwner(): Promise<boolean> {
+  try {
+    const session = await createClient();
+    const {
+      data: { user },
+    } = await session.auth.getUser();
+    if (!user) return false;
+    const { data } = await session.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
+    return data?.is_platform_admin === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Whether whoever is signing up is the person behind this existing login:
  * signed in to it in this browser, or holding its password.
@@ -118,6 +133,14 @@ export async function POST(request: NextRequest) {
     // attendance, due dates, the calendar) is worked out in it.
     if (!isTimeZone(data.school.timezone)) {
       return NextResponse.json({ error: "Choose your school's time zone." }, { status: 400 });
+    }
+    // An academic school (kept in grades, with campuses) is set up by the
+    // platform's owner alone; everyone else signs up a Qur'an school.
+    if (data.school.organisedByGrade === true && !(await isPlatformOwner())) {
+      return NextResponse.json(
+        { error: "An academic school is set up by MyDiiwaan itself. Please contact us." },
+        { status: 403 }
+      );
     }
     // Missing only from a sign-up form loaded before countries were offered,
     // which listed Canadian provinces and zones alone.
