@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
-import { localClock, type StaffPolicy } from "@/lib/attendanceRules";
+import { localClock, type SchoolPlace, type StaffPolicy } from "@/lib/attendanceRules";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type Db = SupabaseClient<any, "public", any>;
@@ -57,6 +57,10 @@ export interface SchoolSettings {
   timeZone: string;
   location: { latitude: number; longitude: number; radius_m: number } | null;
   radius_m: number;
+  /** The school's campuses, each with its own pin for staff, once it's set. */
+  campuses: Array<{ id: string; name: string; latitude: number | null; longitude: number | null; radius_m: number }>;
+  /** Everywhere staff can sign in: the school's own pin and each campus's that's set. */
+  places: SchoolPlace[];
   startTime: string;
   graceMinutes: number;
   cal: SchoolCalendar;
@@ -64,23 +68,40 @@ export interface SchoolSettings {
 
 /** Where the school is, when staff are due, and which days are school days. */
 export async function loadSchoolSettings(supabase: Db, schoolId: string): Promise<SchoolSettings> {
-  const [{ data: school, error }, { data: closed }] = await Promise.all([
+  const [{ data: school, error }, { data: closed }, { data: campusRows, error: campusError }] = await Promise.all([
     supabase
       .from("schools")
       .select("timezone, latitude, longitude, geofence_radius_m, staff_start_time, staff_late_grace_minutes, instructional_weekdays")
       .eq("id", schoolId)
       .maybeSingle(),
     supabase.from("school_calendar_days").select("date").eq("school_id", schoolId),
+    // None before the grades update has made the table.
+    supabase.from("campuses").select("id, name, latitude, longitude, geofence_radius_m").eq("school_id", schoolId).order("name"),
   ]);
   if (error) throw error;
   const radius = Number(school?.geofence_radius_m ?? 150);
   const hasLocation = school?.latitude != null && school?.longitude != null;
+  const location = hasLocation
+    ? { latitude: Number(school!.latitude), longitude: Number(school!.longitude), radius_m: radius }
+    : null;
+  const campuses = (campusError ? [] : campusRows ?? []).map((c) => ({
+    id: c.id as string,
+    name: c.name as string,
+    latitude: c.latitude == null ? null : Number(c.latitude),
+    longitude: c.longitude == null ? null : Number(c.longitude),
+    radius_m: Number(c.geofence_radius_m ?? 150),
+  }));
   return {
     timeZone: (school?.timezone as string) || "America/Edmonton",
-    location: hasLocation
-      ? { latitude: Number(school!.latitude), longitude: Number(school!.longitude), radius_m: radius }
-      : null,
+    location,
     radius_m: radius,
+    campuses,
+    places: [
+      ...(location ? [{ ...location, name: null }] : []),
+      ...campuses
+        .filter((c) => c.latitude != null && c.longitude != null)
+        .map((c) => ({ latitude: c.latitude as number, longitude: c.longitude as number, radius_m: c.radius_m, name: c.name })),
+    ],
     startTime: String(school?.staff_start_time ?? "09:00").slice(0, 5),
     graceMinutes: Number(school?.staff_late_grace_minutes ?? 5),
     cal: buildCalendar(

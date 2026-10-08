@@ -60,6 +60,24 @@ export function checkPremises(school: SchoolLocation, pos: DevicePosition): Prem
   return { ok: true, distance, accuracy };
 }
 
+/** One of the places a school's staff can sign in at: its own pin, or a campus's. */
+export interface SchoolPlace extends SchoolLocation {
+  /** The campus's name; null for the school's own pin. */
+  name: string | null;
+}
+
+/**
+ * Whether a phone is on any of a school's premises, when it has more than
+ * one: the nearest it's inside, or else simply the nearest, to say how far
+ * off it is. Null with nowhere to check against.
+ */
+export function checkAnyPremises(places: SchoolPlace[], pos: DevicePosition): (PremisesCheck & { place: SchoolPlace }) | null {
+  const checks = places
+    .map((place) => ({ ...checkPremises(place, pos), place }))
+    .sort((a, b) => a.distance - b.distance);
+  return checks.find((c) => c.ok) ?? checks[0] ?? null;
+}
+
 /** "40 m" or "3.2 km" — how far away a teacher was, in words they'd use. */
 export function formatDistance(metres: number): string {
   return metres < 1000 ? `${Math.round(metres)} m` : `${(Math.round(metres / 100) / 10).toFixed(1)} km`;

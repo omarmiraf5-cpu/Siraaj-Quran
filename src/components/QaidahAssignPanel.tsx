@@ -22,6 +22,7 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { ILLUM_CLASS, type IllumColour } from "@/components/student-ui";
 import { IconCheck } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
+import { myHalaqaStudents } from "@/lib/teacherScope";
 
 interface Student {
   id: string;
@@ -55,11 +56,13 @@ export function useQaidahClassroom() {
         setMode("demo");
         return;
       }
-      const [{ data: studentRows }, { data: classRows }, { data: enrolments }] = await Promise.all([
+      const [{ data: studentRows }, { data: classRows }, { data: enrolments }, mine] = await Promise.all([
         supabase.from("students").select("id, full_name").eq("active", true).order("full_name"),
         // Only the halaqas this teacher teaches come back, and only their children.
         supabase.from("classes").select("id, name"),
         supabase.from("class_enrollments").select("class_id, student_id"),
+        // In an academic school, just the children of their own halaqas.
+        myHalaqaStudents(supabase),
       ]);
       const className = new Map((classRows ?? []).map((c) => [c.id as string, c.name as string]));
       const halaqaOf = new Map<string, string>();
@@ -68,11 +71,13 @@ export function useQaidahClassroom() {
         if (name && !halaqaOf.has(e.student_id)) halaqaOf.set(e.student_id, name);
       }
       setStudents(
-        (studentRows ?? []).map((s) => ({
-          id: s.id,
-          name: s.full_name,
-          halaqa: halaqaOf.get(s.id) ?? null,
-        }))
+        (studentRows ?? [])
+          .filter((s) => !mine || mine.has(s.id))
+          .map((s) => ({
+            id: s.id,
+            name: s.full_name,
+            halaqa: mine?.get(s.id) ?? halaqaOf.get(s.id) ?? null,
+          }))
       );
       setMode("real");
     };

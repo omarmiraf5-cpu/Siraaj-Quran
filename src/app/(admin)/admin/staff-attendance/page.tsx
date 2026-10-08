@@ -80,9 +80,19 @@ interface Payload {
     start_time: string;
     grace_minutes: number;
     demo?: boolean;
+    /** Each campus, with its own pin for staff, when the school has more than one site. */
+    campuses?: CampusPlace[];
   };
   teachers: TeacherRow[];
   reports: Array<AbsenceReport & { teacher_name: string }>;
+}
+
+interface CampusPlace {
+  id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  radius_m: number;
 }
 
 const RADII = [100, 150, 250, 500];
@@ -100,6 +110,8 @@ export default function StaffAttendancePage() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [editingSettings, setEditingSettings] = useState(false);
+  // Which campus's pin is being set, when the school has campuses.
+  const [campusShown, setCampusShown] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await api("/api/staff-attendance?scope=school");
@@ -135,6 +147,12 @@ export default function StaffAttendancePage() {
     { late: 0, absent: 0, reported: 0 }
   );
   const upcoming = data.reports.filter((r) => r.to_date >= data.today);
+  const campuses = data.settings.campuses ?? [];
+  const pinned = (c: CampusPlace) => c.latitude != null && c.longitude != null;
+  // The campus being set: the one chosen, or the first still without a pin.
+  const campus = campuses.length
+    ? campuses.find((c) => c.id === campusShown) ?? campuses.find((c) => !pinned(c)) ?? campuses[0]
+    : null;
   const when = (r: AbsenceReport) =>
     r.from_date === r.to_date ? formatDay(r.from_date, language) : `${formatDay(r.from_date, language)} – ${formatDay(r.to_date, language)}`;
 
@@ -148,7 +166,11 @@ export default function StaffAttendancePage() {
 
       {(!data.settings.configured || editingSettings) && (
         <SettingsCard
+          key={campus?.id ?? "school"}
           settings={data.settings}
+          campus={campus}
+          campuses={campuses}
+          onChooseCampus={setCampusShown}
           api={api}
           onSaved={async () => {
             setEditingSettings(false);
@@ -260,16 +282,49 @@ export default function StaffAttendancePage() {
 
       {data.settings.configured && !editingSettings && (
         <SectionCard title="Sign-in settings" note={data.settings.demo ? "Sample school" : undefined}>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <p className="text-[13px] text-ink-body leading-relaxed">
-              Teachers can sign in within <strong>{formatDistance(data.settings.radius_m)}</strong> of the school&apos;s
-              pin. Staff are due at <strong>{formatClock(data.settings.start_time)}</strong>, and a sign-in more than{" "}
-              <strong>{data.settings.grace_minutes} minutes</strong> after that counts as late.
-            </p>
-            <button type="button" onClick={() => setEditingSettings(true)} className={ghost}>
-              Change
-            </button>
-          </div>
+          {campuses.length > 0 ? (
+            <div className="space-y-3">
+              <ul className="divide-y divide-surface-border -my-1">
+                {campuses.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <p className="text-[13px] text-ink-body leading-relaxed">
+                      <strong>{c.name} campus</strong>
+                      {pinned(c) ? (
+                        <> — teachers sign in within {formatDistance(c.radius_m)} of its pin.</>
+                      ) : (
+                        <span className="text-amber-700 dark:text-amber-300"> — no pin yet, so teachers there can&apos;t sign in.</span>
+                      )}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCampusShown(c.id);
+                        setEditingSettings(true);
+                      }}
+                      className={ghost}
+                    >
+                      {pinned(c) ? "Change" : "Set its pin"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12.5px] text-ink-muted leading-relaxed">
+                Staff are due at <strong>{formatClock(data.settings.start_time)}</strong>, and a sign-in more than{" "}
+                <strong>{data.settings.grace_minutes} minutes</strong> after that counts as late, on every campus.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <p className="text-[13px] text-ink-body leading-relaxed">
+                Teachers can sign in within <strong>{formatDistance(data.settings.radius_m)}</strong> of the school&apos;s
+                pin. Staff are due at <strong>{formatClock(data.settings.start_time)}</strong>, and a sign-in more than{" "}
+                <strong>{data.settings.grace_minutes} minutes</strong> after that counts as late.
+              </p>
+              <button type="button" onClick={() => setEditingSettings(true)} className={ghost}>
+                Change
+              </button>
+            </div>
+          )}
         </SectionCard>
       )}
 
@@ -373,19 +428,27 @@ function TeacherDays({
 
 function SettingsCard({
   settings,
+  campus,
+  campuses,
+  onChooseCampus,
   api,
   onSaved,
   onCancel,
 }: {
   settings: Payload["settings"];
+  /** The campus whose pin this sets; null for the school's own. */
+  campus: CampusPlace | null;
+  campuses: CampusPlace[];
+  onChooseCampus: (id: string) => void;
   api: ReturnType<typeof useAttendanceApi>["api"];
   onSaved: () => void;
   onCancel?: () => void;
 }) {
-  const [lat, setLat] = useState(settings.latitude != null ? String(settings.latitude) : "");
-  const [lng, setLng] = useState(settings.longitude != null ? String(settings.longitude) : "");
+  const placeNow = campus ?? settings;
+  const [lat, setLat] = useState(placeNow.latitude != null ? String(placeNow.latitude) : "");
+  const [lng, setLng] = useState(placeNow.longitude != null ? String(placeNow.longitude) : "");
   const [accuracy, setAccuracy] = useState<number | null>(null);
-  const [radius, setRadius] = useState(settings.radius_m);
+  const [radius, setRadius] = useState(placeNow.radius_m);
   const [start, setStart] = useState(settings.start_time);
   const [grace, setGrace] = useState(settings.grace_minutes);
   const [busy, setBusy] = useState<"" | "locating" | "saving">("");
@@ -527,6 +590,7 @@ function SettingsCard({
           radius_m: radius,
           start_time: start,
           grace_minutes: grace,
+          ...(campus ? { campus_id: campus.id } : {}),
         }),
       });
       const body = await res.json();
@@ -541,12 +605,39 @@ function SettingsCard({
 
   return (
     <SectionCard title={settings.configured ? "Sign-in settings" : "Switch on staff sign-in"} note="Only the office can change these">
-      {!settings.configured && (
+      {campuses.length > 0 && (
+        <div role="tablist" aria-label="Campus" className="flex flex-wrap gap-2 mb-4">
+          {campuses.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-selected={c.id === campus?.id}
+              onClick={() => onChooseCampus(c.id)}
+              className={`px-3.5 py-2 rounded-full text-[13px] font-semibold transition-all ${
+                c.id === campus?.id ? "bg-brand-navy text-white" : "bg-surface-card border border-surface-border text-ink-muted hover:text-ink"
+              }`}
+            >
+              {c.name}
+              {c.latitude == null && <span className="font-normal opacity-80"> · no pin</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {campus ? (
         <p className="text-[13px] text-ink-body leading-relaxed mb-4">
-          Teachers can only sign in on the school premises, so first the portal needs to know where the school is.
-          The easiest way: stand inside the school with your phone and tap <strong>Use my current location</strong>.
-          Or tap <strong>Pick on a map</strong> and put the pin on the school&apos;s building.
+          Teachers sign in at whichever campus they&apos;re on, so each needs its pin. For the{" "}
+          <strong>{campus.name}</strong> campus: stand inside it with your phone and tap{" "}
+          <strong>Use my current location</strong>, or tap <strong>Pick on a map</strong> and put the pin on its building.
         </p>
+      ) : (
+        !settings.configured && (
+          <p className="text-[13px] text-ink-body leading-relaxed mb-4">
+            Teachers can only sign in on the school premises, so first the portal needs to know where the school is.
+            The easiest way: stand inside the school with your phone and tap <strong>Use my current location</strong>.
+            Or tap <strong>Pick on a map</strong> and put the pin on the school&apos;s building.
+          </p>
+        )
       )}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={here} disabled={busy !== ""} className={primary}>

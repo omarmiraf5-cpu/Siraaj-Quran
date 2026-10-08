@@ -11,7 +11,8 @@ import { isError, requireMember, type Db } from "@/lib/attendanceServer";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-// PATCH { latitude?, longitude?, accuracy?, radius_m?, start_time?, grace_minutes? }
+// PATCH { latitude?, longitude?, accuracy?, radius_m?, start_time?, grace_minutes?, campus_id? }
+// With campus_id, the pin and circle are that campus's; the times are the school's either way.
 export async function PATCH(req: NextRequest) {
   const supabase = (await createClient()) as unknown as Db;
   const me = await requireMember(supabase, ["admin"]);
@@ -20,6 +21,8 @@ export async function PATCH(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => null)) ?? {};
     const patch: Record<string, unknown> = {};
+    const campusId = typeof body.campus_id === "string" && body.campus_id ? body.campus_id : null;
+    const place: Record<string, unknown> = {};
 
     if (body.latitude !== undefined || body.longitude !== undefined) {
       const latitude = Number(body.latitude);
@@ -38,15 +41,15 @@ export async function PATCH(req: NextRequest) {
           { status: 400 }
         );
       }
-      patch.latitude = latitude;
-      patch.longitude = longitude;
+      place.latitude = latitude;
+      place.longitude = longitude;
     }
     if (body.radius_m !== undefined) {
       const r = Math.round(Number(body.radius_m));
       if (!(r >= 25 && r <= 2000)) {
         return NextResponse.json({ error: "The premises radius must be between 25 m and 2 km" }, { status: 400 });
       }
-      patch.geofence_radius_m = r;
+      place.geofence_radius_m = r;
     }
     if (body.start_time !== undefined) {
       if (!TIME.test(String(body.start_time))) {
@@ -61,14 +64,29 @@ export async function PATCH(req: NextRequest) {
       }
       patch.staff_late_grace_minutes = g;
     }
-    if (Object.keys(patch).length === 0) {
+    if (!campusId) Object.assign(patch, place);
+    if (Object.keys(patch).length === 0 && (!campusId || Object.keys(place).length === 0)) {
       return NextResponse.json({ error: "Nothing to change" }, { status: 400 });
     }
 
-    const { data, error } = await supabase.from("schools").update(patch).eq("id", me.school_id).select("id");
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      return NextResponse.json({ error: "Your account can't change the school's settings" }, { status: 403 });
+    if (campusId && Object.keys(place).length > 0) {
+      const { data, error } = await supabase
+        .from("campuses")
+        .update(place)
+        .eq("id", campusId)
+        .eq("school_id", me.school_id)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        return NextResponse.json({ error: "That campus isn't one of your school's" }, { status: 404 });
+      }
+    }
+    if (Object.keys(patch).length > 0) {
+      const { data, error } = await supabase.from("schools").update(patch).eq("id", me.school_id).select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        return NextResponse.json({ error: "Your account can't change the school's settings" }, { status: 403 });
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

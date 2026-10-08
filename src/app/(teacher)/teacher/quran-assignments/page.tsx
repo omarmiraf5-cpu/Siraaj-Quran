@@ -43,6 +43,7 @@ import {
 } from "@/lib/demoPlans";
 import { statusForRating } from "@/lib/planLessons";
 import { useLanguage } from "@/components/LanguageProvider";
+import { myHalaqaStudents } from "@/lib/teacherScope";
 import {
   DIRECTION_HINT,
   DIRECTION_LABEL,
@@ -195,11 +196,14 @@ export default function QuranAssignmentsPage() {
           return;
         }
 
-        const { data: studentData, error: studentError } = await supabase
-          .from("students")
-          .select("id, full_name")
-          .order("full_name");
+        const [{ data: allStudentData, error: studentError }, mine] = await Promise.all([
+          supabase.from("students").select("id, full_name").order("full_name"),
+          // In an academic school, just the children of their own halaqas:
+          // every one of a school's hundreds is synced below otherwise.
+          myHalaqaStudents(supabase),
+        ]);
         if (studentError) throw studentError;
+        const studentData = mine ? (allStudentData ?? []).filter((s) => mine.has(s.id)) : allStudentData;
 
         if (studentData) {
           setStudents(studentData);
@@ -243,7 +247,9 @@ export default function QuranAssignmentsPage() {
           .order("assigned_at", { ascending: false });
         if (assignmentError) throw assignmentError;
 
-        setRealAssignments((assignmentData ?? []) as QuranicAssignment[]);
+        setRealAssignments(
+          ((assignmentData ?? []) as QuranicAssignment[]).filter((a) => !mine || mine.has(a.student_id))
+        );
       } catch (err) {
         console.error("Error loading data:", err);
         setLoadError(

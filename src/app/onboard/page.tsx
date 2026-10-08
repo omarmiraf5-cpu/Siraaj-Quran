@@ -41,7 +41,16 @@ interface SchoolForm {
   province: string;
   /** IANA zone; "" until one is chosen in a country with several. */
   timezone: string;
+  /** A Qur'an school's students are in halaqas; an academic school's in grades, with halaqas inside each. */
+  kind: "quran" | "academic";
+  /** An academic school's sites, as typed: "North, South". */
+  campuses: string;
 }
+
+// An academic school brings its students and their parents in afterwards,
+// from its own spreadsheet, grade by grade — so it skips those steps.
+const ACADEMIC_STEPS: Step[] = ["welcome", "school", "admin", "teachers", "review"];
+const campusList = (text: string) => [...new Set(text.split(/[,\n]/).map((c) => c.trim()).filter(Boolean))];
 
 const CA_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"];
 
@@ -156,7 +165,11 @@ export default function OnboardPage() {
     country: "CA",
     province: "AB",
     timezone: "America/Edmonton",
+    kind: "quran",
+    campuses: "",
   });
+  const academic = school.kind === "academic";
+  const steps = academic ? ACADEMIC_STEPS : STEPS;
   const countries = useMemo(() => countriesByName("en"), []);
   const zones = useMemo(() => countryTimeZones(school.country), [school.country]);
   const pickCountry = (country: string) => setSchool((s) => ({ ...s, ...placeFor(country, deviceZone()) }));
@@ -202,7 +215,7 @@ export default function OnboardPage() {
   const [importNotice, setImportNotice] = useState<string | null>(null);
 
   const addTeacher = () => {
-    if (!tempTeacher.name || !tempTeacher.email || !tempTeacher.halaqa) return;
+    if (!tempTeacher.name || !tempTeacher.email || (!academic && !tempTeacher.halaqa)) return;
     setTeachers([...teachers, { id: crypto.randomUUID(), ...tempTeacher }]);
     setTempTeacher({ name: "", email: "", halaqa: "" });
   };
@@ -385,7 +398,7 @@ export default function OnboardPage() {
       case "admin":
         return admin.fullName.trim() && admin.email.trim() && (ownLogin || admin.password.length >= 8);
       case "teachers":
-        return teachers.length > 0;
+        return academic || teachers.length > 0;
       case "students":
         return students.length > 0;
       default:
@@ -394,12 +407,12 @@ export default function OnboardPage() {
   };
 
   const goNext = () => {
-    const i = STEPS.indexOf(step);
-    if (i < STEPS.length - 1) setStep(STEPS[i + 1]);
+    const i = steps.indexOf(step);
+    if (i < steps.length - 1) setStep(steps[i + 1]);
   };
   const goBack = () => {
-    const i = STEPS.indexOf(step);
-    if (i > 0) setStep(STEPS[i - 1]);
+    const i = steps.indexOf(step);
+    if (i > 0) setStep(steps[i - 1]);
   };
 
   const submit = async () => {
@@ -410,16 +423,23 @@ export default function OnboardPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          school,
+          school: {
+            name: school.name,
+            city: school.city,
+            country: school.country,
+            province: school.province,
+            timezone: school.timezone,
+            ...(academic ? { organisedByGrade: true, campuses: campusList(school.campuses) } : {}),
+          },
           // A login of their own keeps its password: none is sent for it.
           admin: ownLogin ? { ...admin, password: "" } : admin,
-          teachers: teachers.map((t) => ({ name: t.name, email: t.email, halaqa: t.halaqa })),
-          students: students.map((s) => ({ name: s.name, age: parseInt(s.age, 10) || 0, halaqa: s.halaqa })),
+          teachers: teachers.map((t) => ({ name: t.name, email: t.email, halaqa: academic ? "" : t.halaqa })),
+          students: academic ? [] : students.map((s) => ({ name: s.name, age: parseInt(s.age, 10) || 0, halaqa: s.halaqa })),
           // Children go over as positions in the students array above, not
           // names: the server inserts students in that order and links each
           // parent to the ids it gets back, so two children with the same
           // name can't be confused for one another.
-          parents: parents.map((p) => ({
+          parents: (academic ? [] : parents).map((p) => ({
             name: p.name,
             email: p.email,
             studentIndexes: p.childIds
@@ -454,18 +474,18 @@ export default function OnboardPage() {
       {step !== "complete" && (
         <div className="max-w-4xl mx-auto px-6 pt-6">
           <div className="flex justify-between">
-            {STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <div key={s} className="flex flex-col items-center flex-1">
                 <div
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1.5 transition-colors ${
                     s === step
                       ? "bg-brand-navy text-white"
-                      : STEPS.indexOf(step) > i
+                      : steps.indexOf(step) > i
                       ? "bg-brand-emerald text-white"
                       : "bg-surface-border text-ink-muted"
                   }`}
                 >
-                  {STEPS.indexOf(step) > i ? "✓" : i + 1}
+                  {steps.indexOf(step) > i ? "✓" : i + 1}
                 </div>
                 <span className="text-[10px] text-center text-ink-muted">{STEP_LABELS[s]}</span>
               </div>
@@ -569,6 +589,50 @@ export default function OnboardPage() {
                 ))}
               </select>
             </div>
+            <fieldset>
+              <legend className={labelClass}>What kind of school is it?</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {([
+                  ["quran", "A Qur'an school", "Students in halaqas."],
+                  ["academic", "An academic school", "Students in grades, Kindergarten to Grade 12, with halaqas inside each grade."],
+                ] as const).map(([kind, title, note]) => (
+                  <label
+                    key={kind}
+                    className={`block rounded-2xl border p-4 cursor-pointer transition ${
+                      school.kind === kind ? "border-emerald-600 ring-1 ring-emerald-600/40 bg-surface-card" : "border-surface-border bg-surface-card hover:border-emerald-600/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="school-kind"
+                      value={kind}
+                      checked={school.kind === kind}
+                      onChange={() => setSchool({ ...school, kind })}
+                      className="sr-only"
+                    />
+                    <span className="block text-sm font-semibold text-ink">{title}</span>
+                    <span className="block text-xs text-ink-muted mt-1 leading-relaxed">{note}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {academic && (
+              <div>
+                <label className={labelClass}>
+                  Campuses <span className="font-normal text-ink-muted">(if it has more than one)</span>
+                </label>
+                <input
+                  value={school.campuses}
+                  onChange={(e) => setSchool({ ...school, campuses: e.target.value })}
+                  placeholder="e.g., North, South"
+                  className={inputClass}
+                />
+                <p className="text-xs text-ink-muted mt-1.5">
+                  Each campus has the same grades, and its own pin for staff sign-in. You bring your students in after
+                  setup, from a spreadsheet.
+                </p>
+              </div>
+            )}
             <div className="flex justify-between pt-2">
               <button onClick={goBack} className={ghostBtn}>← Back</button>
               <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>Next →</button>
@@ -639,14 +703,18 @@ export default function OnboardPage() {
         {step === "teachers" && (
           <div className="card-quiet p-8 space-y-5">
             <h2 className="text-xl font-bold text-ink">Add your teachers</h2>
-            <p className="text-ink-muted text-sm">Each teacher gets their own halaqa (class).</p>
-            {adminEmail && (
+            <p className="text-ink-muted text-sm">
+              {academic
+                ? "Each gets their own login. You'll put them on their halaqas after setup, once your students' spreadsheet has made them — or add teachers later, from Admin → Teachers."
+                : "Each teacher gets their own halaqa (class)."}
+            </p>
+            {adminEmail && !academic && (
               <p className="text-ink-muted text-sm">
                 Teaching a halaqa yourself? Add yourself with your admin email, {adminEmail}: you&apos;ll teach
                 it with the same login.
               </p>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`grid grid-cols-1 gap-3 ${academic ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
               <input
                 value={tempTeacher.name}
                 onChange={(e) => setTempTeacher({ ...tempTeacher, name: e.target.value })}
@@ -659,16 +727,18 @@ export default function OnboardPage() {
                 placeholder="Email"
                 className={inputClass}
               />
-              <input
-                value={tempTeacher.halaqa}
-                onChange={(e) => setTempTeacher({ ...tempTeacher, halaqa: e.target.value })}
-                placeholder="Halaqa (e.g., Halaqa A)"
-                className={inputClass}
-              />
+              {!academic && (
+                <input
+                  value={tempTeacher.halaqa}
+                  onChange={(e) => setTempTeacher({ ...tempTeacher, halaqa: e.target.value })}
+                  placeholder="Halaqa (e.g., Halaqa A)"
+                  className={inputClass}
+                />
+              )}
             </div>
             <button
               onClick={addTeacher}
-              disabled={!tempTeacher.name || !tempTeacher.email || !tempTeacher.halaqa}
+              disabled={!tempTeacher.name || !tempTeacher.email || (!academic && !tempTeacher.halaqa)}
               className="w-full py-2.5 rounded-2xl border-2 border-dashed border-surface-border text-ink-muted hover:border-emerald-600 hover:text-emerald-600 disabled:opacity-40 transition"
             >
               + Add teacher
@@ -680,7 +750,8 @@ export default function OnboardPage() {
                     <div>
                       <p className="text-sm font-semibold text-ink">{t.name}</p>
                       <p className="text-xs text-ink-muted">
-                        {t.email} · {t.halaqa}
+                        {t.email}
+                        {!academic && ` · ${t.halaqa}`}
                         {isAdminEmail(t.email) && " · you, with your admin login"}
                       </p>
                     </div>
@@ -982,14 +1053,33 @@ export default function OnboardPage() {
                   {teachers.some((t) => isAdminEmail(t.email)) && " — including you"}
                 </span>
               </p>
-              <p><span className="text-ink-muted">Students:</span> <span className="font-semibold text-ink">{students.length}</span></p>
-              <p>
-                <span className="text-ink-muted">Parents:</span>{" "}
-                <span className="font-semibold text-ink">
-                  {parents.length === 0 ? "none — add them later from Admin → Parents" : parents.length}
-                </span>
-              </p>
-              <p><span className="text-ink-muted">Halaqas:</span> <span className="font-semibold text-ink">{halaqas.length}</span></p>
+              {academic ? (
+                <>
+                  <p>
+                    <span className="text-ink-muted">Kind:</span>{" "}
+                    <span className="font-semibold text-ink">Academic school — Kindergarten to Grade 12, halaqas inside each grade</span>
+                  </p>
+                  <p>
+                    <span className="text-ink-muted">Campuses:</span>{" "}
+                    <span className="font-semibold text-ink">{campusList(school.campuses).join(", ") || "just the one"}</span>
+                  </p>
+                  <p>
+                    <span className="text-ink-muted">Students, parents and halaqas:</span>{" "}
+                    <span className="font-semibold text-ink">after setup, from your spreadsheet (Admin → Students → Import)</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p><span className="text-ink-muted">Students:</span> <span className="font-semibold text-ink">{students.length}</span></p>
+                  <p>
+                    <span className="text-ink-muted">Parents:</span>{" "}
+                    <span className="font-semibold text-ink">
+                      {parents.length === 0 ? "none — add them later from Admin → Parents" : parents.length}
+                    </span>
+                  </p>
+                  <p><span className="text-ink-muted">Halaqas:</span> <span className="font-semibold text-ink">{halaqas.length}</span></p>
+                </>
+              )}
             </div>
             {error && (
               <p className="text-status-error-text bg-status-error-bg rounded-card px-4 py-2.5 text-sm">{error}</p>
@@ -1017,6 +1107,19 @@ export default function OnboardPage() {
                   You teach <span className="font-semibold text-ink">{result.adminTeaches.join(", ")}</span> with
                   that same login: open <span className="font-semibold text-ink">My halaqa</span> in your admin menu.
                 </p>
+              )}
+              {academic && (
+                <div className="rounded-2xl border border-emerald-600/30 p-4 text-start space-y-1.5">
+                  <p className="text-sm font-semibold text-ink">Next: your students</p>
+                  <p className="text-[13px] text-ink-muted leading-relaxed">
+                    Sign in, open <span className="font-semibold text-ink">Students</span> and tap{" "}
+                    <span className="font-semibold text-ink">Import from a spreadsheet</span>. One row per student, with
+                    their Name, Grade (K, or 1 to 12), Campus, Halaqa, and Parent Name and Parent Email. Each grade&apos;s
+                    halaqas are made from it, every student gets a PIN, and every parent a login. Then put your teachers
+                    on their halaqas under <span className="font-semibold text-ink">Halaqas</span>, and set each
+                    campus&apos;s pin under <span className="font-semibold text-ink">Staff attendance</span>.
+                  </p>
+                </div>
               )}
               <div className="bg-status-info-bg rounded-2xl p-4 text-start space-y-1.5">
                 <p className="text-sm font-semibold text-status-info-text">Your students&apos; login link</p>

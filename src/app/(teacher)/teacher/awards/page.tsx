@@ -32,6 +32,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
 
 export default function TeacherAwardsPage() {
   const supabase = createClient();
@@ -115,12 +116,16 @@ export default function TeacherAwardsPage() {
         .single();
       setSchoolId(profile?.school_id ?? null);
 
-      const { data: studentRows } = await supabase
-        .from("students")
-        .select("id, full_name, active")
-        .order("full_name");
+      const [{ data: studentRows }, mine] = await Promise.all([
+        supabase.from("students").select("id, full_name, active").order("full_name"),
+        // In an academic school, just the children of their own halaqas.
+        myHalaqaStudents(supabase),
+      ]);
       setStudents(
-        (studentRows ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: "", active: s.active }))
+        narrowToMine(
+          (studentRows ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: "", active: s.active })),
+          mine
+        )
       );
       await loadReal();
     };

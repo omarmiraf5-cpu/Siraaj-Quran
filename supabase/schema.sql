@@ -2015,6 +2015,64 @@ create policy "School staff manage Qaidah recordings" on qaidah_recordings
   );
 
 -- ══════════════════════════════════════
+-- Academic schools: grades and campuses
+-- ══════════════════════════════════════
+-- A school that teaches more than the Qur'an keeps its students in grades,
+-- with halaqas inside each grade: students.grade and classes.grade say
+-- which (0 is Kindergarten, then 1 to 12). Qur'an schools keep a plain list
+-- of halaqas, and their grades mean nothing.
+alter table schools add column if not exists organised_by_grade boolean not null default false;
+
+-- A school's sites, when it has more than one, each with the same grades:
+-- every halaqa can say which it meets at, and each has its own pin and
+-- circle for staff to sign in within.
+create table if not exists campuses (
+  id                 uuid primary key default gen_random_uuid(),
+  school_id          uuid not null references schools(id) on delete cascade,
+  name               text not null check (char_length(trim(name)) between 1 and 60),
+  latitude           double precision check (latitude between -90 and 90),
+  longitude          double precision check (longitude between -180 and 180),
+  geofence_radius_m  int not null default 150 check (geofence_radius_m between 25 and 2000),
+  created_at         timestamptz default now(),
+  unique (school_id, name)
+);
+alter table campuses enable row level security;
+create index if not exists idx_campuses_school on campuses(school_id);
+
+drop policy if exists "School members read their campuses" on campuses;
+create policy "School members read their campuses" on campuses
+  for select using (school_id = my_school_id());
+drop policy if exists "Admins manage their campuses" on campuses;
+create policy "Admins manage their campuses" on campuses
+  for all using (
+    school_id = my_school_id() and my_role() = 'admin'
+  ) with check (
+    school_id = my_school_id() and my_role() = 'admin'
+  );
+
+alter table classes add column if not exists campus_id uuid references campuses(id) on delete set null;
+create index if not exists idx_classes_campus on classes(campus_id);
+
+-- A halaqa meets at one of its own school's campuses, never another's.
+create or replace function check_class_campus()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.campus_id is not null and not exists (
+    select 1 from campuses where id = new.campus_id and school_id = new.school_id
+  ) then
+    raise exception 'That campus belongs to another school' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists check_class_campus on classes;
+create trigger check_class_campus
+  before insert or update of campus_id, school_id on classes
+  for each row execute function check_class_campus();
+
+-- ══════════════════════════════════════
 -- Switched-off accounts
 -- ══════════════════════════════════════
 -- Switching a teacher or parent off (the office's Teachers and Parents

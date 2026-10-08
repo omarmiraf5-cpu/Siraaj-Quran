@@ -14,6 +14,7 @@ import { LoadingNote, EmptyNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
 
 // Shared with the parent portal so a reply sent here shows up there, and a
 // parent's message shows up here, within the same browser (demo mode only).
@@ -61,20 +62,25 @@ export default function TeacherMessagesPage() {
         return;
       }
 
-      const [{ data: profile }, { data: studentRows }] = await Promise.all([
+      const [{ data: profile }, { data: studentRows }, mine] = await Promise.all([
         supabase.from("profiles").select("school_id, full_name").eq("id", user.id).single(),
         supabase.from("students").select("id, full_name, grade").eq("active", true).order("full_name"),
+        // In an academic school, just the children of their own halaqas.
+        myHalaqaStudents(supabase),
       ]);
 
       setUserId(user.id);
       setSchoolId(profile?.school_id ?? null);
       setTeacherName(profile?.full_name ?? "You");
 
-      const roster = (studentRows ?? []).map((s) => ({
-        id: s.id,
-        name: s.full_name,
-        halaqa: `Grade ${s.grade}`,
-      }));
+      const roster = narrowToMine(
+        (studentRows ?? []).map((s) => ({
+          id: s.id,
+          name: s.full_name,
+          halaqa: `Grade ${s.grade}`,
+        })),
+        mine
+      );
       setStudents(roster);
       if (roster.length > 0) setSelected(roster[0].id);
 

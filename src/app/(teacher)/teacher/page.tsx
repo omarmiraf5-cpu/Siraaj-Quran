@@ -32,6 +32,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
+import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
@@ -98,7 +99,7 @@ export default function TeacherDashboard() {
       const todayStr = todayIso();
       setToday(todayStr);
 
-      const [{ data: profile }, { data: studentRows }, { data: assignmentRows }, { data: attendanceRows }] =
+      const [{ data: profile }, { data: studentRows }, { data: assignmentRows }, { data: attendanceRows }, mine] =
         await Promise.all([
           supabase.from("profiles").select("full_name").eq("id", user.id).single(),
           supabase.from("students").select("id, full_name, grade").eq("active", true).order("full_name"),
@@ -106,15 +107,23 @@ export default function TeacherDashboard() {
           // (with others, too): the policies on both tables decide.
           supabase.from("quranic_assignments").select("*"),
           supabase.from("attendance").select("student_id, class_date, status"),
+          // In an academic school, just the children of their own halaqas.
+          myHalaqaStudents(supabase),
         ]);
 
       setTeacherName(profile?.full_name ?? null);
-      setStudents((studentRows ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: `Grade ${s.grade}` })));
-      setAssignments((assignmentRows ?? []) as QuranicAssignment[]);
+      const roster = narrowToMine(
+        (studentRows ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: `Grade ${s.grade}` })),
+        mine
+      );
+      const theirs = new Set(roster.map((s) => s.id));
+      setStudents(roster);
+      setAssignments(((assignmentRows ?? []) as QuranicAssignment[]).filter((a) => !mine || theirs.has(a.student_id)));
 
       const history: Record<string, AttendanceDay[]> = {};
       const todayMarks: Record<string, AttendanceStatus> = {};
       for (const row of attendanceRows ?? []) {
+        if (mine && !theirs.has(row.student_id)) continue;
         const day: AttendanceDay = { date: row.class_date, status: row.status as AttendanceStatus };
         (history[row.student_id] ??= []).push(day);
         if (row.class_date === todayStr) todayMarks[row.student_id] = day.status;

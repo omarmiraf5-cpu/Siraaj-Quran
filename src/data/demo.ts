@@ -16,6 +16,11 @@ export interface DemoStudent {
       portal's deactivate action, so the seven seed students below don't
       all need touching. */
   active?: boolean;
+  /** In a real school: the halaqa's own id, where its name may repeat
+      across a school's grades and campuses. */
+  halaqaId?: string;
+  /** In a school kept in grades: the grade they're in (0 is Kindergarten). */
+  grade?: number;
 }
 
 export const DEMO_STUDENTS: DemoStudent[] = [
@@ -111,6 +116,10 @@ export interface DemoHalaqa {
   /** Its other teachers, when more than one teaches it (class_teachers). */
   coTeacherIds?: string[];
   schedule: string;
+  /** In a school kept in grades: the grade it's for (0 is Kindergarten). */
+  grade?: number;
+  /** The campus it meets at, when the school has more than one. */
+  campusId?: string | null;
 }
 
 export const DEMO_HALAQAS: DemoHalaqa[] = [

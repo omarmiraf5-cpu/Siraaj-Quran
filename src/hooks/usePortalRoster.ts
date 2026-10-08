@@ -18,6 +18,7 @@ import {
 import type { QuranicAssignment, HifzPortion, DailyRating } from "@/hooks/useQuranicAssignments";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
 
 export type PortalMode = "loading" | "demo" | "real";
 
@@ -29,7 +30,7 @@ export type PortalMode = "loading" | "demo" | "real";
  * each portal carrying its own idea of scope that could drift from the
  * policy that actually enforces it.
  */
-export function usePortalRoster(demoFallback: DemoStudent[] = DEMO_CHILDREN) {
+export function usePortalRoster(demoFallback: DemoStudent[] = DEMO_CHILDREN, { mineOnly = false } = {}) {
   const [mode, setMode] = useState<PortalMode>("loading");
   const [students, setStudents] = useState<DemoStudent[]>([]);
 
@@ -47,12 +48,12 @@ export function usePortalRoster(demoFallback: DemoStudent[] = DEMO_CHILDREN) {
         return;
       }
 
-      const { data } = await supabase
-        .from("students")
-        .select("id, full_name, active")
-        .eq("active", true)
-        .order("full_name");
-      setStudents((data ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: "" })));
+      const [{ data }, mine] = await Promise.all([
+        supabase.from("students").select("id, full_name, active").eq("active", true).order("full_name"),
+        // A teacher in an academic school: just the children of their own halaqas.
+        mineOnly ? myHalaqaStudents(supabase) : Promise.resolve(null),
+      ]);
+      setStudents(narrowToMine((data ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: "" })), mine));
       setMode("real");
     };
 
@@ -69,9 +70,10 @@ export function usePortalRoster(demoFallback: DemoStudent[] = DEMO_CHILDREN) {
 }
 
 /** The whole roster rather than just this user's slice — for the admin and
- *  teacher views that list every child in the school. */
+ *  teacher views that list every child in the school; in an academic
+ *  school, a teacher's own halaqas'. */
 export function useSchoolRoster() {
-  return usePortalRoster(DEMO_STUDENTS);
+  return usePortalRoster(DEMO_STUDENTS, { mineOnly: true });
 }
 
 export interface StudentRecord {

@@ -16,7 +16,18 @@ import { PROVISIONED } from "@/lib/accountProvisioning";
 interface OnboardingData {
   // country: ISO 3166 code. province: a Canadian province's code, or
   // elsewhere whatever state or region was typed, possibly blank.
-  school: { name: string; city: string; country?: string; province?: string; timezone: string };
+  // organisedByGrade: an academic school, its students in grades (K to 12)
+  // with halaqas inside each grade; campuses: its sites, when it has more
+  // than one. Its students come in afterwards, from a spreadsheet.
+  school: {
+    name: string;
+    city: string;
+    country?: string;
+    province?: string;
+    timezone: string;
+    organisedByGrade?: boolean;
+    campuses?: string[];
+  };
   admin: { fullName: string; email: string; password: string };
   teachers: Array<{ name: string; email: string; halaqa: string }>;
   students: Array<{ name: string; age: number; halaqa: string }>;
@@ -194,12 +205,22 @@ export async function POST(request: NextRequest) {
       slug = `${baseSlug}-${i}`;
     }
 
+    const academic = data.school.organisedByGrade === true;
+    // Each campus once, as it was first written, whatever its capitals.
+    const campusNames = academic
+      ? (data.school.campuses ?? [])
+          .map((c) => String(c).trim().slice(0, 60))
+          .filter((c, i, all) => c && all.findIndex((x) => x.toLowerCase() === c.toLowerCase()) === i)
+          .slice(0, 10)
+      : [];
     const schoolRow = {
       name: data.school.name.trim(),
       slug,
       city: (data.school.city ?? "").trim(),
       province: (data.school.province ?? "").trim(),
       timezone: data.school.timezone,
+      // Only an academic school needs the grades update to have been run.
+      ...(academic ? { organised_by_grade: true } : {}),
     };
     let { data: school, error: schoolError } = await admin
       .from("schools")
@@ -212,9 +233,19 @@ export async function POST(request: NextRequest) {
     if (schoolError && /country/.test(schoolError.message) && ["PGRST204", "42703"].includes(schoolError.code)) {
       ({ data: school, error: schoolError } = await admin.from("schools").insert(schoolRow).select().single());
     }
+    if (schoolError && academic && /organised_by_grade/.test(schoolError.message)) {
+      throw new Error("Academic schools need the grades update run in Supabase first (mydiiwaan-update-7.sql).");
+    }
     if (schoolError) throw new Error(`School creation failed: ${schoolError.message}`);
 
     schoolId = school.id as string;
+
+    if (campusNames.length > 0) {
+      const { error: campusError } = await admin
+        .from("campuses")
+        .insert(campusNames.map((name) => ({ school_id: schoolId, name })));
+      if (campusError) throw new Error(`Campuses failed: ${campusError.message}`);
+    }
 
     let adminId: string;
     if (existingAdmin) {

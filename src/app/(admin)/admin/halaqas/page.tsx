@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  DEMO_HALAQAS,
-  DEMO_TEACHERS,
-  DEMO_STUDENTS,
   DEMO_CREATED_HALAQAS_KEY,
   DEMO_HALAQA_OVERRIDES_KEY,
   DEMO_CREATED_TEACHERS_KEY,
@@ -28,6 +25,13 @@ import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { loadSchoolTeachers, saveOtherTeachers, splitTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
+import { GRADES, gradeLabel } from "@/lib/grades";
+import { loadCampuses, loadSchoolShape, type Campus } from "@/lib/schoolStructure";
+
+const bigField =
+  "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
+const smallField =
+  "w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
 
 /**
  * The school's teachers as chips: tap to add one to the halaqa, tap again to
@@ -76,12 +80,67 @@ function TeacherPicker({
   );
 }
 
+/** Where a halaqa is, in a school with grades or campuses: which campus, and which grade. */
+function PlaceFields({
+  graded,
+  campuses,
+  grade,
+  campusId,
+  onGrade,
+  onCampus,
+  small,
+}: {
+  graded: boolean;
+  campuses: Campus[];
+  grade: string;
+  campusId: string;
+  onGrade: (grade: string) => void;
+  onCampus: (campusId: string) => void;
+  small?: boolean;
+}) {
+  if (!graded && campuses.length === 0) return null;
+  const label = small ? "block text-xs font-semibold text-ink mb-1.5" : "block text-sm font-semibold text-ink mb-2";
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {campuses.length > 0 && (
+        <label className="block">
+          <span className={label}>Campus *</span>
+          <select value={campusId} onChange={(e) => onCampus(e.target.value)} className={small ? smallField : bigField}>
+            <option value="">Choose…</option>
+            {campuses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {graded && (
+        <label className="block">
+          <span className={label}>Grade *</span>
+          <select value={grade} onChange={(e) => onGrade(e.target.value)} className={small ? smallField : bigField}>
+            <option value="">Choose…</option>
+            {GRADES.map((g) => (
+              <option key={g} value={g}>
+                {gradeLabel(g)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
+  );
+}
+
 export default function AdminHalaqasPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+  // An academic school keeps its halaqas inside grades, and may have campuses.
+  const [graded, setGraded] = useState(false);
+  const [campuses, setCampuses] = useState<Campus[]>([]);
 
   const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
   const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
@@ -93,6 +152,8 @@ export default function AdminHalaqasPage() {
   const [newName, setNewName] = useState("");
   const [newSchedule, setNewSchedule] = useState("");
   const [newTeacherIds, setNewTeacherIds] = useState<string[]>([]);
+  const [newGrade, setNewGrade] = useState("");
+  const [newCampusId, setNewCampusId] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -102,28 +163,40 @@ export default function AdminHalaqasPage() {
   const [draftName, setDraftName] = useState("");
   const [draftSchedule, setDraftSchedule] = useState("");
   const [draftTeacherIds, setDraftTeacherIds] = useState<string[]>([]);
+  const [draftGrade, setDraftGrade] = useState("");
+  const [draftCampusId, setDraftCampusId] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  const [newCampus, setNewCampus] = useState("");
+  const [campusBusy, setCampusBusy] = useState(false);
+  const [campusError, setCampusError] = useState<string | null>(null);
+
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
-    const [{ data, error }, { data: others }] = await Promise.all([
-      supabase.from("classes").select("id, name, teacher_id, schedule").order("name"),
+    const [first, { data: others }] = await Promise.all([
+      supabase.from("classes").select("id, name, teacher_id, schedule, grade, campus_id").order("name"),
       // A database without class_teachers yet answers with an error here;
       // the halaqas still load, each with its one teacher.
       supabase.from("class_teachers").select("class_id, teacher_id"),
     ]);
+    // Before the grades update, there's no campus to ask for.
+    const { data, error } = first.error
+      ? await supabase.from("classes").select("id, name, teacher_id, schedule, grade").order("name")
+      : first;
     // Surfaced rather than swallowed: a failure here is indistinguishable
     // from a school with no halaqas yet, which sent us hunting through
     // permissions and account links for something the error said outright.
     if (error) throw new Error(`Couldn't load halaqas: ${error.message}`);
     const othersOf = new Map<string, string[]>();
     for (const o of others ?? []) othersOf.set(o.class_id, [...(othersOf.get(o.class_id) ?? []), o.teacher_id]);
-    return (data ?? []).map((c) => ({
+    return ((data ?? []) as Array<{ id: string; name: string; teacher_id: string | null; schedule: string | null; grade: number; campus_id?: string | null }>).map((c) => ({
       id: c.id,
       name: c.name,
       teacherId: c.teacher_id,
       coTeacherIds: othersOf.get(c.id) ?? [],
       schedule: c.schedule ?? "",
+      grade: c.grade,
+      campusId: c.campus_id ?? null,
     }));
   };
 
@@ -134,16 +207,17 @@ export default function AdminHalaqasPage() {
       .order("full_name");
     const { data: enrollments } = await supabase
       .from("class_enrollments")
-      .select("student_id, classes(name)");
-    const halaqaByStudent = new Map<string, string>();
+      .select("student_id, class_id, classes(name)");
+    const halaqaByStudent = new Map<string, { id: string; name: string }>();
     for (const e of enrollments ?? []) {
       const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
-      if (className) halaqaByStudent.set(e.student_id, className);
+      if (className) halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
     }
     return (studentRows ?? []).map((s) => ({
       id: s.id,
       name: s.full_name,
-      halaqa: halaqaByStudent.get(s.id) ?? "",
+      halaqa: halaqaByStudent.get(s.id)?.name ?? "",
+      halaqaId: halaqaByStudent.get(s.id)?.id,
       active: s.active,
     }));
   };
@@ -184,6 +258,10 @@ export default function AdminHalaqasPage() {
       setSchoolId(profile?.school_id ?? null);
       setMeId(user.id);
       await Promise.all([
+        loadSchoolShape(supabase, profile?.school_id ?? null).then((shape) => {
+          setGraded(shape.graded);
+          setCampuses(shape.campuses);
+        }),
         loadRealHalaqas().then(setHalaqas),
         loadSchoolTeachers(supabase, { everyAdmin: true }).then(setTeachers),
         loadRealStudents().then(setStudents),
@@ -194,9 +272,17 @@ export default function AdminHalaqasPage() {
       .finally(() => setReady(true));
   }, []);
 
+  // A grade and campus, as the database keeps them, when the school has them.
+  const placeOf = (grade: string, campusId: string) => ({
+    ...(graded ? { grade: Number(grade) } : {}),
+    ...(campuses.length > 0 ? { campus_id: campusId || null } : {}),
+  });
+  const placeMissing = (grade: string, campusId: string) =>
+    (graded && grade === "") || (campuses.length > 0 && !campusId);
+
   const addHalaqa = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newSchedule.trim()) return;
+    if (!newName.trim() || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId)) return;
 
     const { lead, others } = splitTeachers(newTeacherIds, null);
     if (isDemo) {
@@ -234,6 +320,7 @@ export default function AdminHalaqasPage() {
           schedule: newSchedule.trim(),
           teacher_id: lead,
           school_id: schoolId,
+          ...placeOf(newGrade, newCampusId),
         })
         .select("id")
         .single();
@@ -258,6 +345,8 @@ export default function AdminHalaqasPage() {
     setDraftName(h.name);
     setDraftSchedule(h.schedule);
     setDraftTeacherIds(halaqaTeacherIds(h));
+    setDraftGrade(h.grade != null ? String(h.grade) : "");
+    setDraftCampusId(h.campusId ?? "");
     setEditError(null);
   };
 
@@ -278,6 +367,10 @@ export default function AdminHalaqasPage() {
       return;
     }
 
+    if (placeMissing(draftGrade, draftCampusId)) {
+      setEditError(graded ? "Choose its grade and campus." : "Choose its campus.");
+      return;
+    }
     setSavingEdit(true);
     setEditError(null);
     try {
@@ -287,6 +380,7 @@ export default function AdminHalaqasPage() {
           name: draftName.trim() || h.name,
           schedule: draftSchedule.trim() || h.schedule,
           teacher_id: lead,
+          ...placeOf(draftGrade, draftCampusId),
         })
         .eq("id", h.id);
       if (error) throw error;
@@ -302,12 +396,157 @@ export default function AdminHalaqasPage() {
     }
   };
 
+  const addCampus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newCampus.trim();
+    if (!name || !schoolId) return;
+    setCampusBusy(true);
+    setCampusError(null);
+    const { error } = await supabase.from("campuses").insert({ school_id: schoolId, name });
+    if (error) {
+      setCampusError(error.code === "23505" ? `There's already a campus called ${name}.` : error.message);
+    } else {
+      setNewCampus("");
+      setCampuses(await loadCampuses(supabase));
+    }
+    setCampusBusy(false);
+  };
+
+  const removeCampus = async (c: Campus) => {
+    const using = halaqas.filter((h) => h.campusId === c.id).length;
+    const question = using
+      ? `Remove ${c.name}? Its ${using} halaqa${using === 1 ? "" : "s"} stay, with no campus until you choose one, and teachers can no longer sign in at its pin.`
+      : `Remove ${c.name}?`;
+    if (!window.confirm(question)) return;
+    setCampusBusy(true);
+    setCampusError(null);
+    const { error } = await supabase.from("campuses").delete().eq("id", c.id);
+    if (error) setCampusError(error.message);
+    const [fresh, list] = await Promise.all([loadCampuses(supabase), loadRealHalaqas()]);
+    setCampuses(fresh);
+    setHalaqas(list);
+    setCampusBusy(false);
+  };
+
+  // How many children are in a halaqa: by its id where names repeat across
+  // grades and campuses; by name in the sample school, which has no ids.
+  const countOf = (h: DemoHalaqa) =>
+    isDemo ? studentsInHalaqa(h.name, students).length : students.filter((s) => s.halaqaId === h.id).length;
+  const placed = isDemo ? students.length : students.filter((s) => s.halaqaId).length;
+
+  // An academic school's halaqas: by campus (when it has them), then grade.
+  const sections = (() => {
+    if (!graded && campuses.length === 0) return null;
+    const places: Array<{ key: string; title: string | null; halaqas: DemoHalaqa[] }> =
+      campuses.length > 0
+        ? [
+            ...campuses.map((c) => ({ key: c.id, title: `${c.name} campus`, halaqas: halaqas.filter((h) => h.campusId === c.id) })),
+            { key: "none", title: "No campus yet", halaqas: halaqas.filter((h) => !campuses.some((c) => c.id === h.campusId)) },
+          ]
+        : [{ key: "all", title: null, halaqas }];
+    return places
+      .filter((p) => p.halaqas.length > 0)
+      .map((p) => ({
+        ...p,
+        grades: graded
+          ? GRADES.map((g) => ({ grade: g as number | null, halaqas: p.halaqas.filter((h) => (h.grade ?? 0) === g) })).filter((x) => x.halaqas.length > 0)
+          : [{ grade: null, halaqas: p.halaqas }],
+      }));
+  })();
+
+  const renderHalaqa = (h: DemoHalaqa) => {
+    const isOpen = editingId === h.id;
+    const count = countOf(h);
+    return (
+      <li key={h.id}>
+        <button
+          type="button"
+          onClick={() => startEditing(h)}
+          aria-expanded={isOpen}
+          className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+        >
+          <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
+            {count}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-ink truncate">{h.name}</p>
+            <p className="text-[11px] text-ink-muted truncate">
+              {[halaqaTeacherNames(h, teachers), h.schedule].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          {halaqaTeacherIds(h).length === 0 && (
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 flex-shrink-0">
+              Unassigned
+            </span>
+          )}
+          <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
+            <IconArrow size={14} />
+          </span>
+        </button>
+
+        {isOpen && (
+          <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1.5">Name</label>
+              <input value={draftName} onChange={(e) => setDraftName(e.target.value)} className={smallField} />
+            </div>
+            <PlaceFields
+              graded={graded}
+              campuses={campuses}
+              grade={draftGrade}
+              campusId={draftCampusId}
+              onGrade={setDraftGrade}
+              onCampus={setDraftCampusId}
+              small
+            />
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1.5">Schedule</label>
+              <input value={draftSchedule} onChange={(e) => setDraftSchedule(e.target.value)} className={smallField} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1">Teachers</label>
+              <p className="text-[11px] text-ink-muted mb-2">
+                Tap to add or take off. Everyone ticked sees and teaches this halaqa&apos;s children.
+              </p>
+              <TeacherPicker teachers={teachers} selected={draftTeacherIds} onChange={setDraftTeacherIds} meId={meId} />
+            </div>
+            <p className="text-xs text-ink-muted">
+              {count} student{count === 1 ? "" : "s"} currently in this halaqa.
+            </p>
+            {editError && <p className="text-xs text-red-600 dark:text-red-400">{editError}</p>}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => saveEdit(h)}
+                disabled={savingEdit}
+                className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
+              >
+                {savingEdit ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingId(null)}
+                className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow="Classes"
         title="Halaqas"
-        meta={[`${halaqas.length} total`, `${students.length} students placed`]}
+        meta={[
+          `${halaqas.length} total`,
+          ...(campuses.length > 0 ? [`${campuses.length} campuses`] : []),
+          `${placed} students placed`,
+        ]}
         actions={
           <button
             type="button"
@@ -325,6 +564,51 @@ export default function AdminHalaqasPage() {
         </div>
       )}
 
+      {/* An academic school's sites: each with the same grades, and its own
+          pin for staff sign-in (set under Staff attendance). */}
+      {!isDemo && (graded || campuses.length > 0) && (
+        <section aria-label="Campuses" className="card-quiet p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="eyebrow me-1">Campuses</span>
+            {campuses.length === 0 && <span className="text-[12.5px] text-ink-muted">Just the one so far.</span>}
+            {campuses.map((c) => (
+              <span
+                key={c.id}
+                className="inline-flex items-center gap-1.5 ps-3 pe-1.5 py-1 rounded-full bg-surface-card border border-surface-border text-[12.5px] font-semibold text-ink"
+              >
+                {c.name}
+                <button
+                  type="button"
+                  onClick={() => removeCampus(c)}
+                  disabled={campusBusy}
+                  aria-label={`Remove ${c.name}`}
+                  className="w-5 h-5 rounded-full text-ink-muted hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 leading-none"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <form onSubmit={addCampus} className="inline-flex items-center gap-1.5">
+              <input
+                value={newCampus}
+                onChange={(e) => setNewCampus(e.target.value.slice(0, 60))}
+                placeholder="e.g. North"
+                aria-label="New campus name"
+                className="w-32 bg-surface-card border border-surface-border rounded-full px-3 py-1 text-[12.5px] text-ink focus:outline-none focus:border-emerald-600"
+              />
+              <button
+                type="submit"
+                disabled={!newCampus.trim() || campusBusy}
+                className="text-[12.5px] font-semibold text-emerald-700 dark:text-emerald-400 disabled:opacity-40 px-1"
+              >
+                + Add campus
+              </button>
+            </form>
+          </div>
+          {campusError && <p className="text-xs text-red-600 dark:text-red-400">{campusError}</p>}
+        </section>
+      )}
+
       {showForm && (
         <form onSubmit={addHalaqa} className="card-quiet p-5 space-y-4">
           <div>
@@ -332,17 +616,27 @@ export default function AdminHalaqasPage() {
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Halaqa C"
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+              placeholder={graded ? "e.g. Halaqa A, or Boys 1" : "e.g. Halaqa C"}
+              className={bigField}
             />
           </div>
+          <PlaceFields
+            graded={graded}
+            campuses={campuses}
+            grade={newGrade}
+            campusId={newCampusId}
+            onGrade={setNewGrade}
+            onCampus={setNewCampusId}
+          />
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Schedule *</label>
+            <label className="block text-sm font-semibold text-ink mb-2">
+              Schedule {graded ? <span className="font-normal text-ink-muted">(optional)</span> : "*"}
+            </label>
             <input
               value={newSchedule}
               onChange={(e) => setNewSchedule(e.target.value)}
               placeholder="e.g. Sat–Sun · 10:00–11:30am"
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+              className={bigField}
             />
           </div>
           <div>
@@ -353,7 +647,7 @@ export default function AdminHalaqasPage() {
           {formError && <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>}
           <button
             type="submit"
-            disabled={!newName.trim() || !newSchedule.trim() || saving}
+            disabled={!newName.trim() || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId) || saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
             {saving ? "Adding…" : "Add halaqa"}
@@ -361,97 +655,45 @@ export default function AdminHalaqasPage() {
         </form>
       )}
 
-      <SectionCard title="All halaqas" note={`${halaqas.length} total`}>
-        {!ready ? (
+      {!ready ? (
+        <SectionCard title="All halaqas">
           <LoadingNote />
-        ) : halaqas.length === 0 ? (
-          <EmptyNote>No halaqas yet.</EmptyNote>
-        ) : (
-          <ul className="divide-y divide-surface-border -my-1">
-            {halaqas.map((h) => {
-              const isOpen = editingId === h.id;
-              const count = studentsInHalaqa(h.name, students).length;
-              return (
-                <li key={h.id}>
-                  <button
-                    type="button"
-                    onClick={() => startEditing(h)}
-                    aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
-                  >
-                    <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
-                      {count}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">{h.name}</p>
-                      <p className="text-[11px] text-ink-muted truncate">
-                        {halaqaTeacherNames(h, teachers)} · {h.schedule}
-                      </p>
-                    </div>
-                    {halaqaTeacherIds(h).length === 0 && (
-                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 flex-shrink-0">
-                        Unassigned
-                      </span>
-                    )}
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
-                    </span>
-                  </button>
-
-                  {isOpen && (
-                    <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-ink mb-1.5">Name</label>
-                        <input
-                          value={draftName}
-                          onChange={(e) => setDraftName(e.target.value)}
-                          className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-ink mb-1.5">Schedule</label>
-                        <input
-                          value={draftSchedule}
-                          onChange={(e) => setDraftSchedule(e.target.value)}
-                          className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-ink mb-1">Teachers</label>
-                        <p className="text-[11px] text-ink-muted mb-2">
-                          Tap to add or take off. Everyone ticked sees and teaches this halaqa&apos;s children.
-                        </p>
-                        <TeacherPicker teachers={teachers} selected={draftTeacherIds} onChange={setDraftTeacherIds} meId={meId} />
-                      </div>
-                      <p className="text-xs text-ink-muted">
-                        {count} student{count === 1 ? "" : "s"} currently in this halaqa.
-                      </p>
-                      {editError && <p className="text-xs text-red-600 dark:text-red-400">{editError}</p>}
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => saveEdit(h)}
-                          disabled={savingEdit}
-                          className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
-                        >
-                          {savingEdit ? "Saving…" : "Save"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(null)}
-                          className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
+        </SectionCard>
+      ) : halaqas.length === 0 ? (
+        <SectionCard title="All halaqas" note="0 total">
+          <EmptyNote>
+            {graded
+              ? "No halaqas yet. Add them here, or import your students from a spreadsheet under Students — its halaqas are made for you."
+              : "No halaqas yet."}
+          </EmptyNote>
+        </SectionCard>
+      ) : sections ? (
+        sections.map((section) => (
+          <SectionCard
+            key={section.key}
+            title={section.title ?? "All halaqas"}
+            note={`${section.halaqas.length} halaqa${section.halaqas.length === 1 ? "" : "s"} · ${section.halaqas.reduce((n, h) => n + countOf(h), 0)} students`}
+          >
+            <div className="space-y-4 -my-1">
+              {section.grades.map(({ grade, halaqas: inGrade }) => (
+                <div key={grade ?? "all"}>
+                  {grade != null && (
+                    <p className="eyebrow pt-1">
+                      {gradeLabel(grade)} · {inGrade.length} halaqa{inGrade.length === 1 ? "" : "s"} ·{" "}
+                      {inGrade.reduce((n, h) => n + countOf(h), 0)} students
+                    </p>
                   )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </SectionCard>
+                  <ul className="divide-y divide-surface-border">{inGrade.map(renderHalaqa)}</ul>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        ))
+      ) : (
+        <SectionCard title="All halaqas" note={`${halaqas.length} total`}>
+          <ul className="divide-y divide-surface-border -my-1">{halaqas.map(renderHalaqa)}</ul>
+        </SectionCard>
+      )}
     </div>
   );
 }

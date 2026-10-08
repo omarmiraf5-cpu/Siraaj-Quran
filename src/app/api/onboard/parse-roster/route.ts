@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { matchColumn, parseCsv, parseXlsx } from "@/lib/parseDelimited";
+import { parseGrade } from "@/lib/grades";
 
 // Reads a school's existing roster out of a spreadsheet or Word document so
 // an admin isn't stuck typing every student in by hand during onboarding.
@@ -28,12 +29,19 @@ interface ParsedStudent {
   // grouping happens on the client, which owns the parent list.
   parentName: string;
   parentEmail: string;
+  // For a school kept in grades (Admin → Students → Import): the grade as a
+  // number (0 is Kindergarten) when the sheet's Grade cell reads as one, the
+  // cell as written either way, and the campus it names.
+  grade: number | null;
+  gradeText: string;
+  campus: string;
 }
 
 const NAME_PATTERNS = [/^(full[ _-]?name|student[ _-]?name|name)$/i];
 const AGE_PATTERNS = [/^age$/i];
 const GRADE_PATTERNS = [/^grade$/i];
 const HALAQA_PATTERNS = [/^(halaqa|class|group|section)$/i];
+const CAMPUS_PATTERNS = [/^(campus|site|branch|location)$/i];
 // Ordered: the more specific header wins, so a sheet with both "Parent
 // Email" and a bare "Email" column doesn't mistake the student's own
 // address for the parent's.
@@ -57,6 +65,7 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
   const halaqaCol = matchColumn(headers, HALAQA_PATTERNS);
   const parentNameCol = matchColumn(headers, PARENT_NAME_PATTERNS);
   const parentEmailCol = matchColumn(headers, PARENT_EMAIL_PATTERNS);
+  const campusCol = matchColumn(headers, CAMPUS_PATTERNS);
 
   if (nameCol === -1) {
     const found = headers.filter(Boolean).join(", ");
@@ -77,10 +86,9 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
       const raw = Number(row[ageCol]);
       if (Number.isFinite(raw) && raw > 0) age = Math.round(raw);
     }
-    if (age === null && gradeCol !== -1) {
-      const raw = Number(row[gradeCol]);
-      if (Number.isFinite(raw)) age = Math.round(raw) + 6;
-    }
+    const gradeText = gradeCol !== -1 ? String(row[gradeCol] ?? "").trim() : "";
+    const grade = parseGrade(gradeText);
+    if (age === null && grade !== null) age = grade + 6;
 
     const halaqa = halaqaCol !== -1 ? String(row[halaqaCol] ?? "").trim() : "";
 
@@ -95,7 +103,9 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
       ? rawParentName || `${name}'s parent`
       : "";
 
-    students.push({ name, age, halaqa, parentName, parentEmail: parentEmail || "" });
+    const campus = campusCol !== -1 ? String(row[campusCol] ?? "").trim() : "";
+
+    students.push({ name, age, halaqa, parentName, parentEmail: parentEmail || "", grade, gradeText, campus });
   }
 
   if (ageCol === -1 && gradeCol === -1) {

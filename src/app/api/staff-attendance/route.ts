@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { addDays } from "@/lib/planDates";
 import {
-  checkPremises,
+  checkAnyPremises,
   daysBetweenInclusive,
   formatDistance,
   localClock,
@@ -38,14 +38,14 @@ const REPORT_COLUMNS = "id, teacher_id, from_date, to_date, reason, note, cancel
 
 function settingsPayload(s: Awaited<ReturnType<typeof loadSchoolSettings>>, isAdmin: boolean) {
   return {
-    configured: s.location != null,
+    configured: s.places.length > 0,
     radius_m: s.radius_m,
     start_time: s.startTime,
     grace_minutes: s.graceMinutes,
     time_zone: s.timeZone,
     weekdays: s.cal.weekdays,
     // Only the office needs the school's coordinates, to show and adjust them.
-    ...(isAdmin ? { latitude: s.location?.latitude ?? null, longitude: s.location?.longitude ?? null } : {}),
+    ...(isAdmin ? { latitude: s.location?.latitude ?? null, longitude: s.location?.longitude ?? null, campuses: s.campuses } : {}),
   };
 }
 
@@ -162,7 +162,8 @@ export async function POST(req: NextRequest) {
     }
 
     const settings = await loadSchoolSettings(supabase, me.school_id);
-    if (!settings.location) {
+    const check = checkAnyPremises(settings.places, { latitude, longitude, accuracy });
+    if (!check) {
       return NextResponse.json(
         {
           error: "The school's location hasn't been set yet, so signing in can't be checked. Ask the office to set it under Staff attendance.",
@@ -172,7 +173,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const check = checkPremises(settings.location, { latitude, longitude, accuracy });
     if (!check.ok) {
       return NextResponse.json(
         check.reason === "imprecise"
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
               accuracy_m: check.accuracy,
             }
           : {
-              error: `You're about ${formatDistance(check.distance)} from the school. You can only sign ${action === "sign_in" ? "in" : "out"} on the school premises.`,
+              error: `You're about ${formatDistance(check.distance)} from ${check.place.name ? `the ${check.place.name} campus` : "the school"}. You can only sign ${action === "sign_in" ? "in" : "out"} on the school premises.`,
               code: "too_far",
               distance_m: check.distance,
               accuracy_m: check.accuracy,

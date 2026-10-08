@@ -23,6 +23,7 @@ import { LoadingNote } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { demoAttendanceFetch } from "@/lib/demoAttendance";
 import { PlanAlertBanner } from "@/components/yearly-plan-ui";
+import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
 
 /** A child whose absences just reached a run long enough to tell home about. */
 interface LongAbsence {
@@ -98,21 +99,26 @@ export default function TeacherAttendancePage() {
       const todayStr = todayIso();
       setToday(todayStr);
 
-      const [{ data: studentRows }, { data: attendanceRows }] = await Promise.all([
+      const [{ data: studentRows }, { data: attendanceRows }, mine] = await Promise.all([
         supabase.from("students").select("id, full_name, grade, active").eq("active", true).order("full_name"),
         // What this teacher recorded, and any marks for the children of a
         // halaqa they teach, whoever took them: the attendance policy
         // decides, so teachers sharing a halaqa see one register.
         supabase.from("attendance").select("student_id, class_date, status"),
+        // In an academic school, just the children of their own halaqas.
+        myHalaqaStudents(supabase),
       ]);
 
       setStudents(
-        (studentRows ?? []).map((s) => ({
-          id: s.id,
-          name: s.full_name,
-          halaqa: `Grade ${s.grade}`,
-          active: s.active,
-        }))
+        narrowToMine(
+          (studentRows ?? []).map((s) => ({
+            id: s.id,
+            name: s.full_name,
+            halaqa: `Grade ${s.grade}`,
+            active: s.active,
+          })),
+          mine
+        )
       );
 
       const byStudent: Record<string, AttendanceDay[]> = {};
