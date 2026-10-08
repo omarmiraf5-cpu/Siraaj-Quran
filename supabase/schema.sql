@@ -249,13 +249,29 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
 
+-- Supabase writes a new login's app_metadata only after inserting it, so
+-- this trigger never sees the provisioned mark and every login the app
+-- made came out a parent with no school. The app now sets each profile
+-- itself (createProvisionedUser); this puts back the ones made before:
+-- each in the school and role the app made it for.
+update profiles p
+set role = u.raw_user_meta_data->>'role',
+    school_id = (u.raw_user_meta_data->>'school_id')::uuid
+from auth.users u
+where p.id = u.id
+  and u.raw_app_meta_data->>'provisioned' = 'true'
+  and p.role = 'parent'
+  and p.school_id is null
+  and u.raw_user_meta_data->>'role' in ('admin', 'teacher', 'parent', 'student')
+  and exists (select 1 from schools s where s.id::text = u.raw_user_meta_data->>'school_id');
+
 -- ══════════════════════════════════════
 -- Students
 -- ══════════════════════════════════════
 create table if not exists students (
   id              uuid primary key default gen_random_uuid(),
   full_name       text not null,
-  grade           int not null check (grade between 0 and 10),
+  grade           int not null check (grade between 0 and 12),
   date_of_birth   date,
   gender          text check (gender in ('male', 'female')),
   avatar_initials text not null,
@@ -356,7 +372,7 @@ create table if not exists classes (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   subject     text not null,
-  grade       int not null check (grade between 0 and 10),
+  grade       int not null check (grade between 0 and 12),
   section     text,
   schedule    text,
   teacher_id  uuid references profiles(id),
@@ -2022,6 +2038,22 @@ create policy "School staff manage Qaidah recordings" on qaidah_recordings
 -- which (0 is Kindergarten, then 1 to 12). Qur'an schools keep a plain list
 -- of halaqas, and their grades mean nothing.
 alter table schools add column if not exists organised_by_grade boolean not null default false;
+
+-- Up to Grade 12: databases made before this stopped students and halaqas
+-- at Grade 10. Whatever the old check was called, it goes.
+do $$
+declare c record;
+begin
+  for c in
+    select conrelid::regclass as tbl, conname from pg_constraint
+    where contype = 'c' and conrelid in ('public.students'::regclass, 'public.classes'::regclass)
+      and pg_get_constraintdef(oid) ilike '%grade%'
+  loop
+    execute format('alter table %s drop constraint %I', c.tbl, c.conname);
+  end loop;
+end $$;
+alter table students add constraint students_grade_check check (grade between 0 and 12);
+alter table classes add constraint classes_grade_check check (grade between 0 and 12);
 
 -- A school's sites, when it has more than one, each with the same grades:
 -- every halaqa can say which it meets at, and each has its own pin and

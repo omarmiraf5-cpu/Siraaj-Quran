@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse, after } from "next/server";
 import { randomBytes } from "crypto";
-import { PROVISIONED } from "@/lib/accountProvisioning";
+import { createProvisionedUser } from "@/lib/accountProvisioning";
 import { sendAccountWelcomes, type NewAccount } from "@/lib/accountWelcome";
 import { requireAdmin } from "@/lib/adminAccounts";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
@@ -162,11 +162,9 @@ export async function POST(req: NextRequest) {
       } else {
         const name = String(row.parentName ?? "").trim() || `${childName}'s parent`;
         const password = randomBytes(9).toString("base64url");
-        const { data, error } = await admin.auth.admin.createUser({
+        const { data, error } = await createProvisionedUser(admin, {
           email,
           password,
-          email_confirm: true,
-          app_metadata: PROVISIONED,
           user_metadata: { role: "parent", full_name: name, school_id: schoolId, must_change_password: true },
         });
         if (error || !data.user) {
@@ -229,11 +227,9 @@ export async function POST(req: NextRequest) {
 
         // Their sign-in: four digits on the school's login screen.
         const pin = randomPin();
-        const { data: login, error: loginError } = await admin.auth.admin.createUser({
+        const { data: login, error: loginError } = await createProvisionedUser(admin, {
           email: studentLoginEmail(student.id),
           password: studentLoginPassword(student.id, pin),
-          email_confirm: true,
-          app_metadata: PROVISIONED,
           user_metadata: { role: "student", full_name: name, school_id: schoolId },
         });
         if (loginError || !login.user) {

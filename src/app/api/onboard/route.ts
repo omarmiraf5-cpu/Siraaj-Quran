@@ -6,7 +6,7 @@ import { sendAccountWelcomes, type NewAccount } from "@/lib/accountWelcome";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 import { isTimeZone } from "@/lib/places";
 import { after, NextRequest, NextResponse } from "next/server";
-import { PROVISIONED } from "@/lib/accountProvisioning";
+import { createProvisionedUser } from "@/lib/accountProvisioning";
 
 // Bootstraps a brand-new school: no admin session exists yet to gate this
 // behind (unlike /api/admin/accounts, which requires one), so this is the
@@ -282,14 +282,11 @@ export async function POST(request: NextRequest) {
       if (adoptError) throw new Error(`Admin account failed: ${adoptError.message}`);
       adminId = existingAdmin.id;
     } else {
-      // handle_new_user() (schema.sql) auto-inserts the matching profiles row
-      // from this metadata the moment the auth user exists, so admin/teacher
-      // profiles are never inserted by hand here.
-      const { data: adminAuth, error: adminError } = await admin.auth.admin.createUser({
+      // createProvisionedUser gives the login its profile: this school, as
+      // its admin (the database's own trigger alone would make a parent).
+      const { data: adminAuth, error: adminError } = await createProvisionedUser(admin, {
         email: adminEmail,
         password: data.admin.password,
-        email_confirm: true,
-        app_metadata: PROVISIONED,
         user_metadata: { role: "admin", full_name: data.admin.fullName.trim(), school_id: schoolId },
       });
       if (adminError) throw new Error(`Admin account failed: ${adminError.message}`);
@@ -319,11 +316,9 @@ export async function POST(request: NextRequest) {
       }
       const email = teacher.email.trim().toLowerCase();
       const password = `Temp${randomPin()}${randomPin()}!`;
-      const { data: teacherAuth, error: teacherError } = await admin.auth.admin.createUser({
+      const { data: teacherAuth, error: teacherError } = await createProvisionedUser(admin, {
         email,
         password,
-        email_confirm: true,
-        app_metadata: PROVISIONED,
         user_metadata: {
           role: "teacher",
           full_name: teacher.name.trim(),
@@ -394,11 +389,9 @@ export async function POST(request: NextRequest) {
       if (studentError) throw new Error(`Student "${student.name}" failed: ${studentError.message}`);
 
       const pin = randomPin();
-      const { data: studentAuth, error: studentAuthError } = await admin.auth.admin.createUser({
+      const { data: studentAuth, error: studentAuthError } = await createProvisionedUser(admin, {
         email: studentLoginEmail(studentRow.id),
         password: studentLoginPassword(studentRow.id, pin),
-        email_confirm: true,
-        app_metadata: PROVISIONED,
         user_metadata: { role: "student", full_name: student.name.trim(), school_id: schoolId },
       });
       if (studentAuthError) throw new Error(`Student login for "${student.name}" failed: ${studentAuthError.message}`);
@@ -436,11 +429,9 @@ export async function POST(request: NextRequest) {
     for (const parent of parentList) {
       const email = parent.email.trim().toLowerCase();
       const password = `Temp${randomPin()}${randomPin()}!`;
-      const { data: parentAuth, error: parentError } = await admin.auth.admin.createUser({
+      const { data: parentAuth, error: parentError } = await createProvisionedUser(admin, {
         email,
         password,
-        email_confirm: true,
-        app_metadata: PROVISIONED,
         user_metadata: {
           role: "parent",
           full_name: parent.name.trim(),

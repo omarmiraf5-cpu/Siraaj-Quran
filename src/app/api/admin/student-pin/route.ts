@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { studentLoginEmail, studentLoginPassword, isValidPin } from "@/lib/studentAuth";
 import { NextRequest, NextResponse } from "next/server";
-import { PROVISIONED } from "@/lib/accountProvisioning";
+import { createProvisionedUser } from "@/lib/accountProvisioning";
 
 // Setting a child's PIN is really three things at once: create their auth
 // account the first time, move its password to match the new PIN, and record
@@ -69,11 +69,9 @@ export async function POST(req: NextRequest) {
       const { error } = await admin.auth.admin.updateUserById(profileId, { password });
       if (error) throw error;
     } else {
-      const { data: created, error } = await admin.auth.admin.createUser({
+      const { data: created, error } = await createProvisionedUser(admin, {
         email,
         password,
-        email_confirm: true,
-        app_metadata: PROVISIONED,
         user_metadata: {
           role: "student",
           full_name: student.full_name,

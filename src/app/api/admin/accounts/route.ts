@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { PROVISIONED } from "@/lib/accountProvisioning";
+import { createProvisionedUser } from "@/lib/accountProvisioning";
 import { sendAccountWelcomes } from "@/lib/accountWelcome";
 import { ACCOUNT_ROLES, requireAdmin, schoolAccount, type AccountRole } from "@/lib/adminAccounts";
 
@@ -85,18 +85,15 @@ export async function POST(req: NextRequest) {
     if (auth.error) return auth.error;
     const { caller, user } = auth;
 
-    // The on_auth_user_created trigger reads this metadata to fill in the
-    // new profiles row, so the account lands in the right school with the
-    // right role the moment it exists.
+    // createProvisionedUser gives the new login its profile, so the account
+    // lands in the right school with the right role the moment it exists.
     const admin = createAdminClient();
     const inTheWay = await loginInTheWay(admin, email.trim(), role as AllowedRole, caller, user.id);
     if (inTheWay) return NextResponse.json({ error: inTheWay }, { status: 409 });
     const tempPassword = generateTempPassword();
-    const { data, error } = await admin.auth.admin.createUser({
+    const { data, error } = await createProvisionedUser(admin, {
       email: email.trim(),
       password: tempPassword,
-      email_confirm: true,
-      app_metadata: PROVISIONED,
       user_metadata: {
         role: role as AllowedRole,
         full_name: full_name.trim(),
