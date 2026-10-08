@@ -2073,6 +2073,37 @@ create trigger check_class_campus
   for each row execute function check_class_campus();
 
 -- ══════════════════════════════════════
+-- Weekly progress reports
+-- ══════════════════════════════════════
+-- Every Friday afternoon each parent is emailed about their children's
+-- week, and each school's office a summary of it. Only children a teacher
+-- recorded learning for that week are reported on — a child kept for
+-- attendance alone never gets one — and the office can switch the reports
+-- off for a child, a whole grade, or the school.
+alter table schools add column if not exists weekly_reports boolean not null default true;
+alter table students add column if not exists weekly_report boolean not null default true;
+
+-- What has been sent: one row per recipient per school per week, claimed
+-- before the email goes, so a job that runs twice (more than one
+-- deployment, a retry) sends each report once.
+create table if not exists weekly_report_sends (
+  school_id     uuid not null references schools(id) on delete cascade,
+  week_ending   date not null,
+  recipient_id  uuid not null references profiles(id) on delete cascade,
+  kind          text not null check (kind in ('parent', 'office')),
+  students      int not null default 0,
+  sent_at       timestamptz not null default now(),
+  primary key (school_id, week_ending, recipient_id, kind)
+);
+alter table weekly_report_sends enable row level security;
+create index if not exists idx_weekly_report_sends_week on weekly_report_sends(school_id, week_ending desc);
+
+-- Written by the server alone; the office can see what went out.
+drop policy if exists "Admins read their school's weekly report sends" on weekly_report_sends;
+create policy "Admins read their school's weekly report sends" on weekly_report_sends
+  for select using (school_id = my_school_id() and my_role() = 'admin');
+
+-- ══════════════════════════════════════
 -- Switched-off accounts
 -- ══════════════════════════════════════
 -- Switching a teacher or parent off (the office's Teachers and Parents

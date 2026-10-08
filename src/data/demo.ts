@@ -21,6 +21,8 @@ export interface DemoStudent {
   halaqaId?: string;
   /** In a school kept in grades: the grade they're in (0 is Kindergarten). */
   grade?: number;
+  /** Whether their parents get the Friday report; false when the office has switched it off. */
+  weeklyReport?: boolean;
 }
 
 export const DEMO_STUDENTS: DemoStudent[] = [

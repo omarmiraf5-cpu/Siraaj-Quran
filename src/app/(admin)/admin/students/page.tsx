@@ -17,6 +17,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import StudentImport from "@/components/StudentImport";
+import WeeklyReportsCard from "@/components/WeeklyReportsCard";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { GRADES, gradeLabel } from "@/lib/grades";
@@ -69,6 +70,10 @@ export default function AdminStudentsPage() {
   const [draftHalaqa, setDraftHalaqa] = useState("");
   const [draftGrade, setDraftGrade] = useState("");
   const [draftActive, setDraftActive] = useState(true);
+  const [draftReport, setDraftReport] = useState(true);
+  // Whether the weekly reports update has been run, so each child has a switch.
+  const [reportsReady, setReportsReady] = useState(false);
+  const [gradeBusy, setGradeBusy] = useState<number | null>(null);
   const [draftPin, setDraftPin] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
   const [pinNote, setPinNote] = useState<string | null>(null);
@@ -95,10 +100,11 @@ export default function AdminStudentsPage() {
   // it back down to one halaqa per student, by id as well as name, since a
   // name can repeat across an academic school's grades and campuses.
   const loadRealStudents = async () => {
-    const { data: studentRows } = await supabase
-      .from("students")
-      .select("id, full_name, active, grade")
-      .order("full_name");
+    const first = await supabase.from("students").select("id, full_name, active, grade, weekly_report").order("full_name");
+    setReportsReady(!first.error);
+    const { data: studentRows } = first.error
+      ? await supabase.from("students").select("id, full_name, active, grade").order("full_name")
+      : first;
     const { data: enrollments } = await supabase
       .from("class_enrollments")
       .select("student_id, class_id, classes(name)");
@@ -108,13 +114,14 @@ export default function AdminStudentsPage() {
       if (className) halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
     }
     setStudents(
-      (studentRows ?? []).map((s) => ({
+      ((studentRows ?? []) as Array<{ id: string; full_name: string; active: boolean; grade: number; weekly_report?: boolean }>).map((s) => ({
         id: s.id,
         name: s.full_name,
         halaqa: halaqaByStudent.get(s.id)?.name ?? "",
         halaqaId: halaqaByStudent.get(s.id)?.id,
         grade: s.grade,
         active: s.active,
+        weeklyReport: s.weekly_report !== false,
       }))
     );
   };
@@ -250,6 +257,7 @@ export default function AdminStudentsPage() {
     setDraftHalaqa(studentHalaqa(s)?.id ?? "");
     setDraftGrade(String(s.grade ?? 0));
     setDraftActive(s.active !== false);
+    setDraftReport(s.weeklyReport !== false);
     setDraftPin("");
     setPinNote(null);
     setEditError(null);
@@ -297,6 +305,7 @@ export default function AdminStudentsPage() {
           full_name: draftName.trim() || s.name,
           active: draftActive,
           ...(graded ? { grade: Number(draftGrade) } : {}),
+          ...(reportsReady ? { weekly_report: draftReport } : {}),
         })
         .eq("id", s.id);
       if (error) throw error;
@@ -347,6 +356,17 @@ export default function AdminStudentsPage() {
     ? GRADES.map((g) => ({ grade: g, students: filtered.filter((s) => (s.grade ?? 0) === g) })).filter((x) => x.students.length > 0)
     : null;
 
+  // A whole grade's weekly reports, on or off at once — both campuses.
+  const gradeAllOn = (grade: number) => students.filter((s) => (s.grade ?? 0) === grade).every((s) => s.weeklyReport !== false);
+  const setGradeReports = async (grade: number, on: boolean) => {
+    if (!schoolId) return;
+    setGradeBusy(grade);
+    const { error } = await supabase.from("students").update({ weekly_report: on }).eq("school_id", schoolId).eq("grade", grade);
+    if (error) window.alert(error.message);
+    await loadRealStudents();
+    setGradeBusy(null);
+  };
+
   const halaqaOptions = (grade: string) =>
     halaqasFor(grade).map((h) => (
       <option key={h.id} value={h.id}>
@@ -383,6 +403,11 @@ export default function AdminStudentsPage() {
               {graded ? (halaqa ? halaqaInGrade(halaqa) : "No halaqa yet") : s.halaqa}
             </p>
           </div>
+          {!isDemo && reportsReady && s.weeklyReport === false && !inactive && (
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
+              No weekly report
+            </span>
+          )}
           {inactive && (
             <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
               Inactive
@@ -437,6 +462,22 @@ export default function AdminStudentsPage() {
               />
               Active
             </label>
+            {!isDemo && reportsReady && (
+              <label className="flex items-start gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={draftReport}
+                  onChange={(e) => setDraftReport(e.target.checked)}
+                  className="w-4 h-4 rounded mt-0.5"
+                />
+                <span>
+                  Weekly progress report
+                  <span className="block text-[11px] text-ink-muted">
+                    Their parents get one on Fridays when they&apos;ve had lessons that week. Untick to leave them out.
+                  </span>
+                </span>
+              </label>
+            )}
 
             {/* A child signs in with four digits rather than an
                 email, so the PIN is set here and read back to
@@ -634,6 +675,8 @@ export default function AdminStudentsPage() {
         </div>
       )}
 
+      {!isDemo && schoolId && <WeeklyReportsCard schoolId={schoolId} graded={graded} />}
+
       {showImport && (
         <StudentImport
           graded={graded}
@@ -715,7 +758,28 @@ export default function AdminStudentsPage() {
         </SectionCard>
       ) : byGrade ? (
         byGrade.map(({ grade, students: inGrade }) => (
-          <SectionCard key={grade} title={gradeLabel(grade)} note={`${inGrade.length} student${inGrade.length === 1 ? "" : "s"}`}>
+          <SectionCard
+            key={grade}
+            title={gradeLabel(grade)}
+            note={
+              <>
+                {inGrade.length} student{inGrade.length === 1 ? "" : "s"}
+                {reportsReady && (
+                  <>
+                    {" · "}
+                    <button
+                      type="button"
+                      onClick={() => setGradeReports(grade, !gradeAllOn(grade))}
+                      disabled={gradeBusy !== null}
+                      className="underline underline-offset-2 hover:text-ink disabled:opacity-50"
+                    >
+                      {gradeBusy === grade ? "Saving…" : gradeAllOn(grade) ? "Weekly reports off for this grade" : "Weekly reports on for this grade"}
+                    </button>
+                  </>
+                )}
+              </>
+            }
+          >
             <ul className="divide-y divide-surface-border -my-1">{inGrade.map(renderStudent)}</ul>
           </SectionCard>
         ))
