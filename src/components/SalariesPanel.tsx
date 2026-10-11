@@ -61,6 +61,15 @@ function demoSeed(staff: DemoTeacher[], thisMonth: string) {
   return { rates, payments };
 }
 
+/** The sample school's salary payments, as the Salaries tab keeps them. */
+export function demoSalaryPayments(thisMonth: string): SalaryPayment[] {
+  const people = allTeachers(
+    readDemoStore(DEMO_CREATED_TEACHERS_KEY, []),
+    readDemoStore<Record<string, TeacherOverride>>(DEMO_TEACHER_OVERRIDES_KEY, {})
+  );
+  return readDemoStore<SalaryPayment[]>(DEMO_PAYMENTS_KEY, demoSeed(people, thisMonth).payments);
+}
+
 export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; schoolId: string | null; userId: string | null }) {
   const supabase = createClient();
   const thisMonth = monthOf(todayIso());

@@ -28,6 +28,9 @@ import {
 
 const DEMO_EXPENSES_KEY = "demo_expenses";
 
+/** The sample school's expenses, as the Expenses tab keeps them. */
+export const demoExpenses = (thisMonth: string) => readDemoStore<Expense[]>(DEMO_EXPENSES_KEY, demoSeed(thisMonth));
+
 function demoSeed(thisMonth: string): Expense[] {
   const at = (month: string, day: number) => `${month.slice(0, 7)}-${String(day).padStart(2, "0")}`;
   const last = shiftMonth(thisMonth, -1);

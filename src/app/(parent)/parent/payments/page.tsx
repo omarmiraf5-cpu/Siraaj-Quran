@@ -19,6 +19,8 @@ import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/port
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { balanceFor, balancesByStudent } from "@/lib/balances";
+import { monthOf, todayIso } from "@/lib/finance";
 
 export default function ParentPaymentsPage() {
   const supabase = createClient();
@@ -38,6 +40,7 @@ export default function ParentPaymentsPage() {
         const o = readDemoStore<Record<string, FeeOverride>>(DEMO_FEE_OVERRIDES_KEY, {});
         const childIds = new Set(DEMO_CHILDREN.map((s) => s.id));
         setFees(allFees(c, o).filter((f) => childIds.has(f.studentId)));
+        setChildren(DEMO_CHILDREN);
         return;
       }
 
@@ -72,7 +75,11 @@ export default function ParentPaymentsPage() {
 
   const billed = fees.reduce((sum, f) => sum + f.amountDue, 0);
   const paid = fees.reduce((sum, f) => sum + f.amountPaid, 0);
-  const outstanding = billed - paid;
+  // Seen from this month: unpaid from earlier months, this month's, and both.
+  const month = monthOf(todayIso());
+  const balance = balanceFor(fees, month);
+  const outstanding = balance.outstanding;
+  const perChild = balancesByStudent(fees, month);
 
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
@@ -86,11 +93,33 @@ export default function ParentPaymentsPage() {
         }
       />
 
-      <div className="grid grid-cols-3 gap-3">
-        <StatTile value={money(billed)} label={t("common.billed")} sub={`${fees.length} ${t("common.charges")}`} />
-        <StatTile value={money(paid)} label={t("common.paid")} sub={t("common.thankYou")} />
-        <StatTile value={money(outstanding)} label={t("common.outstanding")} sub={t("common.stillOwed")} />
+      <div className="grid grid-cols-3 gap-3" data-section="balances">
+        <StatTile value={money(balance.old)} label={t("parent.payments.oldBalance")} sub={t("parent.payments.fromEarlierMonths")} />
+        <StatTile value={money(balance.monthOwed)} label={t("parent.payments.monthlyBalance")} sub={t("parent.payments.owedThisMonth")} />
+        <StatTile value={money(balance.outstanding)} label={t("parent.payments.outstandingBalance")} sub={t("parent.payments.oldPlusMonthly")} />
       </div>
+      <p className="text-[12px] text-ink-muted px-1" dir="auto">
+        {money(paid)} {t("common.paid").toLowerCase()} · {money(billed)} {t("common.billed").toLowerCase()} · {fees.length} {t("common.charges")}
+        {balance.upcoming > 0 && ` · ${money(balance.upcoming)} ${t("parent.payments.notDueYet")}`}
+      </p>
+
+      {perChild.length > 1 && (
+        <SectionCard title={t("parent.payments.byChild")}>
+          <ul className="divide-y divide-surface-border -my-1" data-section="by-child">
+            {perChild.map((b) => (
+              <li key={b.studentId} className="py-3 flex items-center justify-between gap-3">
+                <p className="text-[13px] font-semibold text-ink truncate">{childName(b.studentId)}</p>
+                <p className="text-[12px] text-ink-muted text-end" dir="ltr">
+                  {t("parent.payments.oldBalance")} {money(b.old)} · {t("parent.payments.monthlyBalance")} {money(b.monthOwed)} ·{" "}
+                  <span className={`font-semibold ${b.outstanding > 0 ? "text-red-800 dark:text-red-300" : "text-ink"}`}>
+                    {t("parent.payments.outstandingBalance")} {money(b.outstanding)}
+                  </span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
 
       <SectionCard title={t("common.yourCharges")} note={`${fees.length} ${t("common.total")}`}>
         {!ready ? (

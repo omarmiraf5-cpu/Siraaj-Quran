@@ -27,9 +27,13 @@ import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { SalariesPanel } from "@/components/SalariesPanel";
 import { ExpensesPanel } from "@/components/ExpensesPanel";
+import { FinanceOverview } from "@/components/FinanceOverview";
+import { balanceFor } from "@/lib/balances";
+import { monthOf, todayIso } from "@/lib/finance";
 
-type Tab = "fees" | "salaries" | "expenses";
+type Tab = "overview" | "fees" | "salaries" | "expenses";
 const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "overview", label: "Overview" },
   { id: "fees", label: "Fees" },
   { id: "salaries", label: "Salaries" },
   { id: "expenses", label: "Expenses" },
@@ -43,11 +47,11 @@ export default function AdminPaymentsPage() {
   const [schoolId, setSchoolId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   // The tab the office was last on, on this device.
-  const [tab, setTab] = useState<Tab>("fees");
+  const [tab, setTab] = useState<Tab>("overview");
   useEffect(() => {
     try {
       const saved = localStorage.getItem(TAB_KEY);
-      if (saved === "salaries" || saved === "expenses") setTab(saved);
+      if (saved === "fees" || saved === "salaries" || saved === "expenses") setTab(saved);
     } catch {
       /* private mode */
     }
@@ -240,7 +244,9 @@ export default function AdminPaymentsPage() {
         meta={
           tab === "fees"
             ? [`${money(collected)} collected`, `${money(outstanding)} outstanding`]
-            : [tab === "salaries" ? "What the school pays its staff" : "What the school spends"]
+            : tab === "overview"
+              ? [`${money(balanceFor(fees, monthOf(todayIso())).outstanding)} outstanding`, "Fees, salaries and expenses together"]
+              : [tab === "salaries" ? "What the school pays its staff" : "What the school spends"]
         }
         actions={
           tab === "fees" ? (
@@ -272,6 +278,7 @@ export default function AdminPaymentsPage() {
         ))}
       </div>
 
+      {tab === "overview" && <FinanceOverview isDemo={isDemo} fees={fees} students={students} feesReady={ready} />}
       {tab === "salaries" && ready && <SalariesPanel isDemo={isDemo} schoolId={schoolId} userId={userId} />}
       {tab === "expenses" && ready && <ExpensesPanel isDemo={isDemo} schoolId={schoolId} userId={userId} />}
 
