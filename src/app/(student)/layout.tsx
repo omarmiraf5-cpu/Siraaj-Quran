@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ILLUM_CLASS } from "@/components/student-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
+import { useSignInGuard } from "@/hooks/useSignInGuard";
 import {
   IconHome,
   IconBook,
@@ -83,6 +84,10 @@ function StudentTabBar() {
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   useRecordVisit();
+  // A student's pages are for a student's login only, and a login that has
+  // run out goes back to the PIN pad rather than to sample pages.
+  const { blocked } = useSignInGuard();
+  if (blocked) return <div className="min-h-screen bg-surface-bg" />;
   return (
     <div className="min-h-screen bg-surface-bg pb-28">
       <div className="max-w-5xl mx-auto">{children}</div>

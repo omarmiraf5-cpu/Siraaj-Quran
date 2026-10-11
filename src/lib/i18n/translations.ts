@@ -34,6 +34,8 @@ export const ASSIGNMENT_STATUS_KEY: Record<
 // content stays Arabic + English in every language for now.
 export const translations: Record<Language, Record<string, string>> = {
   en: {
+    "student.changePin": "Change PIN",
+    "student.signOutConfirm": "Sign out now? You'll need your PIN to come back in.",
     "common.signOut": "Sign out",
     "common.dark": "Dark",
     "common.light": "Light",
@@ -554,6 +556,8 @@ export const translations: Record<Language, Record<string, string>> = {
   },
 
   so: {
+    "student.changePin": "Beddel PIN-ka",
+    "student.signOutConfirm": "Ma rabtaa inaad ka baxdo? PIN-kaaga ayaad u baahan doontaa si aad dib ugu soo gasho.",
     "common.signOut": "Ka bax",
     "common.dark": "Hab Habeen",
     "common.light": "Iftiin",
@@ -1074,6 +1078,8 @@ export const translations: Record<Language, Record<string, string>> = {
   },
 
   ar: {
+    "student.changePin": "تغيير الرمز",
+    "student.signOutConfirm": "هل تريد تسجيل الخروج؟ ستحتاج إلى رمزك للعودة.",
     "common.signOut": "تسجيل الخروج",
     "common.dark": "داكن",
     "common.light": "فاتح",

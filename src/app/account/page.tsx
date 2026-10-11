@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SUPPORT_EMAIL } from "@/lib/site";
+import { StudentPinForm } from "@/components/StudentPinForm";
 
 /**
  * Your account, for every role: who you are, your password, the privacy
@@ -138,6 +139,8 @@ export default function AccountPage() {
             </p>
             {info?.email && <p className="text-[13px] text-ink-muted mt-0.5">{info.email}</p>}
           </section>
+
+          {role === "student" && <StudentPinForm demo={!info} />}
 
           <section className="card-quiet divide-y divide-surface-border">
             {role !== "student" && <Row href="/change-password" label="Change password" />}

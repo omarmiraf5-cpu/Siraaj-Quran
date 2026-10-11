@@ -2209,6 +2209,37 @@ begin
 end $$;
 
 -- ══════════════════════════════════════
+-- Only staff write the school's records
+-- ══════════════════════════════════════
+-- The teachers' rules above let a row in when it names the caller as its
+-- teacher (teacher_id = auth.uid()). That's meant for teachers, but on its
+-- own it would let any login — a student's or a parent's — add a register
+-- mark or a lesson by naming itself. Restrictive, so it only narrows: these
+-- are written by teachers and the office alone. (The app's server writes
+-- with the service role, which row-level security doesn't apply to.)
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'classes', 'lessons', 'assignments', 'quranic_assignments', 'surah_test_confirmations', 'attendance',
+    'subject_grades', 'recitation_log', 'student_stars', 'student_badges', 'staff_attendance', 'staff_absence_reports'
+  ] loop
+    execute format('drop policy if exists "Only staff add records" on %I', t);
+    execute format('drop policy if exists "Only staff change records" on %I', t);
+    execute format('drop policy if exists "Only staff remove records" on %I', t);
+    execute format(
+      'create policy "Only staff add records" on %I as restrictive for insert '
+      'with check (my_role() in (''teacher'', ''admin''))', t);
+    execute format(
+      'create policy "Only staff change records" on %I as restrictive for update '
+      'using (my_role() in (''teacher'', ''admin'')) with check (my_role() in (''teacher'', ''admin''))', t);
+    execute format(
+      'create policy "Only staff remove records" on %I as restrictive for delete '
+      'using (my_role() in (''teacher'', ''admin''))', t);
+  end loop;
+end $$;
+
+-- ══════════════════════════════════════
 -- Salaries and expenses
 -- ══════════════════════════════════════
 -- The office's side of the money, beside the fees: what it pays its staff

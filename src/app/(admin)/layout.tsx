@@ -1,6 +1,7 @@
 "use client";
 
 import { SidebarNav } from "@/components/SidebarNav";
+import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
 
 const NAV = [
@@ -72,12 +73,13 @@ const MY_HALAQA = {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { teaches } = useStaffRoles();
+  const { blocked } = useSignInGuard();
   // Straight after the dashboard: teaching is part of their every day.
   const items = teaches ? [NAV[0], MY_HALAQA, ...NAV.slice(1)] : NAV;
   return (
     <div className="flex min-h-screen bg-surface-bg">
       <SidebarNav items={items} roleKey="role.admin" />
-      <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-20 md:pb-6 overflow-auto">{children}</main>
+      <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-20 md:pb-6 overflow-auto">{blocked ? null : children}</main>
     </div>
   );
 }

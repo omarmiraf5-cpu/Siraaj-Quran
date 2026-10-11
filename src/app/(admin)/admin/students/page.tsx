@@ -81,6 +81,8 @@ export default function AdminStudentsPage() {
   const [draftPin, setDraftPin] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
   const [pinNote, setPinNote] = useState<string | null>(null);
+  // The open student's PIN as it stands, so the office can read it out or change it.
+  const [currentPin, setCurrentPin] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
@@ -289,6 +291,15 @@ export default function AdminStudentsPage() {
     setDraftPin("");
     setPinNote(null);
     setEditError(null);
+    setCurrentPin(null);
+    if (!isDemo && s.id !== editingId) {
+      supabase
+        .from("students")
+        .select("pin")
+        .eq("id", s.id)
+        .maybeSingle()
+        .then(({ data }) => setCurrentPin((data?.pin as string | null) ?? null));
+    }
   };
 
   const savePin = async (s: DemoStudent) => {
@@ -302,7 +313,9 @@ export default function AdminStudentsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || "Failed to set PIN");
-      setPinNote(`PIN set. ${s.name.split(" ")[0]} can sign in with ${draftPin}.`);
+      setPinNote(`PIN ${currentPin ? "changed" : "set"}. ${s.name.split(" ")[0]} now signs in with ${draftPin}.`);
+      setCurrentPin(draftPin);
+      setDraftPin("");
     } catch (err) {
       setPinNote(err instanceof Error ? err.message : "Failed to set PIN");
     } finally {
@@ -512,14 +525,19 @@ export default function AdminStudentsPage() {
                 whoever forgets it. */}
             {!isDemo && (
               <div>
-                <label className="block text-xs font-semibold text-ink mb-1.5">Sign-in PIN</label>
+                <label className="block text-xs font-semibold text-ink mb-1.5">
+                  Sign-in PIN
+                  <span className="font-normal text-ink-muted">
+                    {" "}· {currentPin ? <>now <span className="font-semibold text-ink tracking-[0.2em]">{currentPin}</span></> : "none yet"}
+                  </span>
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     inputMode="numeric"
                     maxLength={4}
                     value={draftPin}
                     onChange={(e) => setDraftPin(e.target.value.replace(/\D/g, ""))}
-                    placeholder="4 digits"
+                    placeholder={currentPin ? "New 4-digit PIN" : "4 digits"}
                     className="flex-1 bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink tracking-[0.4em] focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                   />
                   <button
@@ -528,7 +546,7 @@ export default function AdminStudentsPage() {
                     disabled={draftPin.length !== 4 || pinSaving}
                     className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 disabled:opacity-40 transition-colors"
                   >
-                    {pinSaving ? "Saving…" : "Set PIN"}
+                    {pinSaving ? "Saving…" : currentPin ? "Change PIN" : "Set PIN"}
                   </button>
                 </div>
                 {pinNote && <p className="text-[11px] text-ink-muted mt-1">{pinNote}</p>}

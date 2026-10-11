@@ -1,6 +1,7 @@
 "use client";
 
 import { SidebarNav } from "@/components/SidebarNav";
+import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useRequirePasswordChange } from "@/hooks/useRequirePasswordChange";
 
 const NAV = [
@@ -56,11 +57,12 @@ const NAV = [
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
   useRequirePasswordChange();
+  const { blocked } = useSignInGuard();
 
   return (
     <div className="flex min-h-screen bg-surface-bg">
       <SidebarNav items={NAV} roleKey="role.parent" />
-      <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-20 md:pb-6 overflow-auto">{children}</main>
+      <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-20 md:pb-6 overflow-auto">{blocked ? null : children}</main>
     </div>
   );
 }

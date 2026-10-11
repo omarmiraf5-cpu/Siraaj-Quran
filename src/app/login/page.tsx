@@ -12,6 +12,7 @@ import { DEMO_ACCOUNTS } from "@/lib/demo";
 import { SHOW_DEMO_LOGINS } from "@/lib/demoMode";
 import type { Role } from "@/lib/types";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
+import { homeOf, mayOpen } from "@/lib/portalAccess";
 import { safeNextPath } from "@/lib/safeNextPath";
 
 const ROLES: { key: Role; labelKey: string; portalKey: string }[] = [
@@ -128,9 +129,12 @@ export default function LoginPage() {
 
   // Where to go once signed in: the page a link asked to come back to (the
   // platform page sends its owner here with ?next=/platform), or else the
-  // person's own portal.
-  const destination = (ownRole: string) =>
-    safeNextPath(new URLSearchParams(window.location.search).get("next")) ?? `/${ownRole}`;
+  // person's own portal. Never another role's portal: a student's login
+  // asked back to a teacher's page goes to the student's own.
+  const destination = (ownRole: string) => {
+    const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
+    return next && mayOpen(next, ownRole) ? next : homeOf(ownRole);
+  };
 
   // Already signed in — the app reopening, or a return visit — goes straight
   // on instead of asking for the password again.

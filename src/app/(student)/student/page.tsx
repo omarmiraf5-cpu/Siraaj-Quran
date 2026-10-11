@@ -33,6 +33,7 @@ import { MyQaidahLesson } from "@/components/QaidahLessonCard";
 import { SectionCard, AttendanceStrip, TeacherNote } from "@/components/portal-ui";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
+import { StudentAccountButtons } from "@/components/StudentAccountButtons";
 import {
   Avatar,
   StreakPill,
@@ -137,6 +138,8 @@ export default function StudentDashboard() {
             message={levelMessage(level)}
           />
         </div>
+
+        <StudentAccountButtons />
       </header>
 
       {/* Dua — the calm beat between the scoreboard and the work. Coloured
