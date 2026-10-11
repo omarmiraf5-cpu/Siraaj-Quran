@@ -13,6 +13,7 @@ import {
   PAY_METHOD_LABELS,
   monthEnd,
   monthOf,
+  financeProblem,
   parseAmount,
   shiftMonth,
   shortDate,
@@ -54,7 +55,8 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   const [month, setMonth] = useState(thisMonth);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [ready, setReady] = useState(false);
-  const [notReady, setNotReady] = useState(false);
+  // Why the tab can't load, if it can't.
+  const [notReady, setNotReady] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,7 +75,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
       .lte("spent_on", monthEnd(m))
       .order("spent_on", { ascending: false });
     if (loadError) {
-      setNotReady(true);
+      setNotReady(financeProblem(loadError, "Expenses"));
       return;
     }
     setExpenses(
@@ -169,7 +171,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   if (notReady) {
     return (
       <SectionCard title="Expenses">
-        <EmptyNote>Expenses need the salaries and expenses update run in Supabase first (mydiiwaan-update-11.sql).</EmptyNote>
+        <EmptyNote>{notReady}</EmptyNote>
       </SectionCard>
     );
   }

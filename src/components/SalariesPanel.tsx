@@ -20,6 +20,7 @@ import {
   PAY_METHOD_LABELS,
   SALARY_METHODS,
   monthOf,
+  financeProblem,
   parseAmount,
   shiftMonth,
   shortDate,
@@ -68,7 +69,8 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   const [rates, setRates] = useState<Record<string, number>>({});
   const [payments, setPayments] = useState<SalaryPayment[]>([]);
   const [ready, setReady] = useState(false);
-  const [notReady, setNotReady] = useState(false);
+  // Why the tab can't load, if it can't.
+  const [notReady, setNotReady] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(blankDraft());
   const [rateDraft, setRateDraft] = useState("");
@@ -93,7 +95,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
         loadSchoolTeachers(supabase, { everyAdmin: true }),
         supabase.from("staff_pay_rates").select("staff_id, monthly_amount"),
       ]);
-      if (ratesError) setNotReady(true);
+      if (ratesError) setNotReady(financeProblem(ratesError, "Salaries"));
       setStaff(people.filter((p) => p.active !== false));
       setRates(Object.fromEntries((rateRows ?? []).map((r) => [r.staff_id as string, Number(r.monthly_amount)])));
     };
@@ -113,7 +115,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
       .eq("pay_month", m)
       .order("paid_on");
     if (loadError) {
-      setNotReady(true);
+      setNotReady(financeProblem(loadError, "Salaries"));
       return;
     }
     setPayments(
@@ -301,7 +303,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   if (notReady) {
     return (
       <SectionCard title="Salaries">
-        <EmptyNote>Salaries need the salaries and expenses update run in Supabase first (mydiiwaan-update-11.sql).</EmptyNote>
+        <EmptyNote>{notReady}</EmptyNote>
       </SectionCard>
     );
   }

@@ -2288,6 +2288,21 @@ create policy "Admins manage their expenses" on expenses
   for all using (school_id = my_school_id() and my_role() = 'admin')
   with check (school_id = my_school_id() and my_role() = 'admin');
 
+-- The app reaches these through Supabase's API: given explicitly, since a
+-- database whose default privileges weren't set from the start doesn't
+-- pass them on to new tables. What each person sees is still only what the
+-- policies above allow.
+do $$
+declare t text;
+begin
+  foreach t in array array['staff_pay_rates', 'salary_payments', 'expenses', 'school_memberships', 'campuses', 'weekly_report_sends', 'qaidah_recordings'] loop
+    if to_regclass('public.' || t) is not null then
+      execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+      execute format('grant all on public.%I to service_role', t);
+    end if;
+  end loop;
+end $$;
+
 -- ══════════════════════════════════════
 -- Switched-off accounts
 -- ══════════════════════════════════════
@@ -2311,3 +2326,6 @@ begin
       and (u.banned_until is null or u.banned_until < now());
   end if;
 end $$;
+
+-- Supabase's API reads the tables afresh, new ones included.
+notify pgrst, 'reload schema';

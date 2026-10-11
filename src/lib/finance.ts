@@ -93,3 +93,15 @@ export function parseAmount(text: string): number | null {
   if (!Number.isFinite(n) || n <= 0 || n > 10_000_000) return null;
   return Math.round(n * 100) / 100;
 }
+
+/** Why the Salaries or Expenses tab can't load, from the database's answer. */
+export function financeProblem(error: { code?: string; message?: string }, what: "Salaries" | "Expenses"): string {
+  const message = error.message ?? "";
+  if (["PGRST205", "42P01"].includes(error.code ?? "") || /does not exist|schema cache/i.test(message)) {
+    return `${what} need the salaries and expenses update run in Supabase first (mydiiwaan-update-11.sql).`;
+  }
+  if (error.code === "42501" || /permission denied/i.test(message)) {
+    return `${what} can't be read yet: the database hasn't given MyDiiwaan access to its new tables (${message}). Run the access fix in Supabase.`;
+  }
+  return `Couldn't load ${what.toLowerCase()}: ${message || "please try again"}.`;
+}
