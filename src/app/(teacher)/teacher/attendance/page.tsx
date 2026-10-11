@@ -23,7 +23,7 @@ import { LoadingNote } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { demoAttendanceFetch } from "@/lib/demoAttendance";
 import { PlanAlertBanner } from "@/components/yearly-plan-ui";
-import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
+import { myHalaqas, narrowToMine, type MyHalaqa } from "@/lib/teacherScope";
 
 /** A child whose absences just reached a run long enough to tell home about. */
 interface LongAbsence {
@@ -76,6 +76,10 @@ export default function TeacherAttendancePage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [longAbsences, setLongAbsences] = useState<LongAbsence[]>([]);
+  // Each halaqa has its own register: one at a time on screen, its own
+  // tally, "mark all present" and save. Null in the sample school.
+  const [halaqas, setHalaqas] = useState<MyHalaqa[] | null>(null);
+  const [halaqaId, setHalaqaId] = useState<string | null>(null);
 
   // Merged with whatever the admin portal has added, so a newly enrolled
   // student shows up on today's register without a page reload elsewhere.
@@ -99,15 +103,24 @@ export default function TeacherAttendancePage() {
       const todayStr = todayIso();
       setToday(todayStr);
 
-      const [{ data: studentRows }, { data: attendanceRows }, mine] = await Promise.all([
+      const [{ data: studentRows }, { data: attendanceRows }, groups] = await Promise.all([
         supabase.from("students").select("id, full_name, grade, active").eq("active", true).order("full_name"),
         // What this teacher recorded, and any marks for the children of a
         // halaqa they teach, whoever took them: the attendance policy
         // decides, so teachers sharing a halaqa see one register.
         supabase.from("attendance").select("student_id, class_date, status"),
-        // Just the children of their own halaqas.
-        myHalaqaStudents(supabase),
+        // Their own halaqas, each with its children.
+        myHalaqas(supabase),
       ]);
+      const mine = groups && new Map(groups.flatMap((h) => h.studentIds.map((id) => [id, h.label] as const)));
+      const present = new Set((studentRows ?? []).map((s) => s.id as string));
+      const shown = groups?.filter((h) => h.studentIds.some((id) => present.has(id))) ?? null;
+      setHalaqas(shown);
+      let remembered: string | null = null;
+      try {
+        remembered = localStorage.getItem("attendance_halaqa");
+      } catch {}
+      setHalaqaId(shown?.find((h) => h.id === remembered)?.id ?? shown?.[0]?.id ?? null);
 
       setStudents(
         narrowToMine(
@@ -147,15 +160,37 @@ export default function TeacherAttendancePage() {
     });
   };
 
+  // The halaqa on screen, and its children, labelled with it.
+  const halaqa = halaqas?.find((h) => h.id === halaqaId) ?? null;
+  const roster = halaqa
+    ? students.filter((s) => halaqa.studentIds.includes(s.id)).map((s) => ({ ...s, halaqa: halaqa.label }))
+    : students;
+  const inRoster = new Set(roster.map((s) => s.id));
+  // Today's marks for just this halaqa, and the ones as saved.
+  const here = Object.fromEntries(Object.entries(records).filter(([id]) => inRoster.has(id)));
+  const savedHere = Object.fromEntries(Object.entries(savedMarks).filter(([id]) => inRoster.has(id)));
+  const unsaved = (id: string) => records[id] !== savedMarks[id];
+
+  const pickHalaqa = (id: string) => {
+    setHalaqaId(id);
+    setSaved(false);
+    setError(null);
+    setLongAbsences([]);
+    try {
+      localStorage.setItem("attendance_halaqa", id);
+    } catch {}
+  };
+
   const markAllPresent = () => {
     setSaved(false);
-    setRecords(Object.fromEntries(students.map((s) => [s.id, "present" as const])));
+    setRecords((r) => ({ ...r, ...Object.fromEntries(roster.map((s) => [s.id, "present" as const])) }));
   };
 
   const count = (s: AttendanceStatus) =>
-    Object.values(records).filter((v) => v === s).length;
-  const marked = Object.keys(records).length;
-  const remaining = students.length - marked;
+    Object.values(here).filter((v) => v === s).length;
+  const marked = Object.keys(here).length;
+  const remaining = roster.length - marked;
+  const changed = roster.some((s) => unsaved(s.id));
 
   const saveAttendance = async () => {
     setSaving(true);
@@ -173,8 +208,9 @@ export default function TeacherAttendancePage() {
         // sharing the halaqa may have marked other children meanwhile.
         body: JSON.stringify({
           date: today,
-          records: Object.fromEntries(Object.entries(records).filter(([id, status]) => savedMarks[id] !== status)),
-          cleared: Object.keys(savedMarks).filter((id) => !(id in records)),
+          // Just this halaqa's register: another halaqa's marks wait for its own save.
+          records: Object.fromEntries(Object.entries(here).filter(([id, status]) => savedHere[id] !== status)),
+          cleared: Object.keys(savedHere).filter((id) => !(id in here)),
         }),
       });
       const body = await res.json();
@@ -184,16 +220,19 @@ export default function TeacherAttendancePage() {
 
       setHistory((h) => {
         const next = { ...h };
-        for (const student_id of Object.keys(savedMarks)) {
-          if (!(student_id in records)) next[student_id] = (next[student_id] ?? []).filter((d) => d.date !== today);
+        for (const student_id of Object.keys(savedHere)) {
+          if (!(student_id in here)) next[student_id] = (next[student_id] ?? []).filter((d) => d.date !== today);
         }
-        for (const [student_id, status] of Object.entries(records)) {
+        for (const [student_id, status] of Object.entries(here)) {
           const withoutToday = (next[student_id] ?? []).filter((d) => d.date !== today);
           next[student_id] = [{ date: today, status }, ...withoutToday];
         }
         return next;
       });
-      setSavedMarks(records);
+      setSavedMarks((m) => {
+        const next = Object.fromEntries(Object.entries(m).filter(([id]) => !inRoster.has(id)));
+        return { ...next, ...here };
+      });
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("teacher.attendance.saveFailed"));
@@ -217,10 +256,42 @@ export default function TeacherAttendancePage() {
         title={t("nav.attendance")}
         meta={[
           formatDay(today, language),
-          `${students.length} ${t("common.students")}`,
+          ...(halaqa ? [halaqa.label] : []),
+          `${roster.length} ${t("common.students")}`,
           remaining > 0 ? `${remaining} ${t("teacher.attendance.stillToMark")}` : t("teacher.attendance.everyoneMarked"),
         ]}
       />
+
+      {/* One register per halaqa */}
+      {halaqas && halaqas.length > 1 && (
+        <div role="tablist" aria-label={t("teacher.attendance.whichHalaqa")} className="flex gap-2 overflow-x-auto pb-1">
+          {halaqas.map((h) => {
+            const on = h.id === halaqaId;
+            const kids = h.studentIds.filter((id) => students.some((s) => s.id === id));
+            const done = kids.filter((id) => id in records).length;
+            const pending = kids.some((id) => unsaved(id));
+            return (
+              <button
+                key={h.id}
+                role="tab"
+                aria-selected={on}
+                onClick={() => pickHalaqa(h.id)}
+                className={`flex-shrink-0 rounded-2xl border px-3 py-2 text-start transition-colors ${
+                  on ? "border-emerald-700 bg-emerald-700 text-white" : "border-surface-border bg-surface-card text-ink hover:border-emerald-700"
+                }`}
+              >
+                <span className="block text-sm font-semibold whitespace-nowrap">
+                  {h.label}
+                  {pending && <span className={`ms-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle ${on ? "bg-white" : "bg-amber-500"}`} />}
+                </span>
+                <span className={`block text-[11px] tabular-nums ${on ? "text-white/80" : "text-ink-muted"}`}>
+                  {done}/{kids.length} {t("teacher.attendance.marked")}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Today's tally */}
       <div className="grid grid-cols-4 gap-2">
@@ -249,13 +320,13 @@ export default function TeacherAttendancePage() {
         </button>
       </div>
 
-      {students.length === 0 && (
+      {roster.length === 0 && (
         <div className="card-quiet p-5 text-[13px] text-ink-muted">{t("teacher.attendance.noHalaqa")}</div>
       )}
 
       {/* Roster */}
       <div className="card-quiet divide-y divide-surface-border overflow-hidden">
-        {students.map((s) => {
+        {roster.map((s) => {
           const summary = summariseAttendance(history[s.id] ?? []);
           return (
             <div key={s.id} className="flex items-center gap-3 px-3 py-3">
@@ -322,7 +393,7 @@ export default function TeacherAttendancePage() {
       <div className="fixed bottom-20 md:bottom-0 start-0 end-0 md:start-56 p-3 bg-surface-card border-t border-surface-border z-30">
         <button
           onClick={saveAttendance}
-          disabled={marked === 0 || saving}
+          disabled={(marked === 0 && !changed) || saving}
           className="w-full max-w-4xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
         >
           {saved && <IconCheck size={16} />}
@@ -330,9 +401,9 @@ export default function TeacherAttendancePage() {
             ? t("common.saving")
             : saved
               ? t("teacher.attendance.saved")
-              : marked === 0
+              : marked === 0 && !changed
                 ? t("teacher.attendance.markToSave")
-                : `${t("teacher.attendance.saveButton")} · ${count("present")} ${t("common.present").toLowerCase()}`}
+                : `${t("teacher.attendance.saveButton")}${halaqa && halaqas && halaqas.length > 1 ? ` · ${halaqa.label}` : ""} · ${count("present")} ${t("common.present").toLowerCase()}`}
         </button>
       </div>
     </div>

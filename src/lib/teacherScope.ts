@@ -13,6 +13,25 @@ type Db = ReturnType<typeof createClient>;
  * Empty for a teacher with no halaqa yet; null only when nobody is signed in.
  */
 export async function myHalaqaStudents(supabase: Db): Promise<Map<string, string> | null> {
+  const halaqas = await myHalaqas(supabase);
+  if (!halaqas) return null;
+  const mine = new Map<string, string>();
+  for (const h of halaqas) for (const id of h.studentIds) if (!mine.has(id)) mine.set(id, h.label);
+  return mine;
+}
+
+export interface MyHalaqa {
+  id: string;
+  label: string;
+  studentIds: string[];
+}
+
+/**
+ * The halaqas a teacher teaches at the school they're in, each with its
+ * label and its children — so a register can be taken one halaqa at a
+ * time. Empty for a teacher with no halaqa yet; null when nobody is signed in.
+ */
+export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -29,8 +48,7 @@ export async function myHalaqaStudents(supabase: Db): Promise<Map<string, string
     supabase.from("class_teachers").select("class_id").eq("teacher_id", user.id),
   ]);
   const ids = [...new Set([...(leads ?? []).map((c) => c.id as string), ...(shares ?? []).map((c) => c.class_id as string)])];
-  const mine = new Map<string, string>();
-  if (ids.length === 0) return mine;
+  if (ids.length === 0) return [];
 
   const [{ data: halaqas }, { data: enrolments }, campuses] = await Promise.all([
     graded
@@ -49,11 +67,13 @@ export async function myHalaqaStudents(supabase: Db): Promise<Map<string, string
           : h.name,
       ])
   );
+  const groups = new Map<string, MyHalaqa>();
+  for (const [id, label] of where) groups.set(id, { id, label, studentIds: [] });
   for (const e of enrolments ?? []) {
-    const label = where.get(e.class_id as string);
-    if (label && !mine.has(e.student_id as string)) mine.set(e.student_id as string, label);
+    const g = groups.get(e.class_id as string);
+    if (g && !g.studentIds.includes(e.student_id as string)) g.studentIds.push(e.student_id as string);
   }
-  return mine;
+  return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
 }
 
 /** Just the children in `mine`, labelled with their halaqa; all of them, as they were, when it's null. */
