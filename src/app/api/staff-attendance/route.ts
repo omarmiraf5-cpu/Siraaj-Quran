@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { schoolTeacherProfiles, teachesAtSchool } from "@/lib/schoolMemberships";
 import { NextRequest, NextResponse } from "next/server";
 import { addDays } from "@/lib/planDates";
 import {
@@ -72,7 +73,8 @@ export async function GET(req: NextRequest) {
 
       const [{ data: teachers, error: tError }, { data: rows, error: rError }, { data: reports, error: pError }] =
         await Promise.all([
-          supabase.from("profiles").select("id, full_name, active").eq("school_id", me.school_id).eq("role", "teacher").order("full_name"),
+          // Its teachers switched into another of their schools too.
+          schoolTeacherProfiles(createAdminClient(), me.school_id as string).then((data) => ({ data, error: null })),
           supabase.from("staff_attendance").select(STAFF_COLUMNS).eq("school_id", me.school_id).gte("work_date", from).lte("work_date", to),
           supabase.from("staff_absence_reports").select(REPORT_COLUMNS).eq("school_id", me.school_id).gte("to_date", from).order("from_date"),
         ]);
@@ -271,7 +273,7 @@ export async function PATCH(req: NextRequest) {
       .select("id, school_id, role")
       .eq("id", teacher_id)
       .maybeSingle();
-    if (!teacher || teacher.school_id !== me.school_id || teacher.role !== "teacher") {
+    if (!teacher || !(await teachesAtSchool(createAdminClient(), teacher_id, me.school_id as string))) {
       return NextResponse.json({ error: "No such teacher at your school" }, { status: 404 });
     }
 

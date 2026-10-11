@@ -11,12 +11,15 @@ export function DeleteAccount({
   name,
   consequences,
   onDelete,
+  action = "Delete permanently",
 }: {
   name: string;
   /** What deleting this account does, in a sentence or two. */
   consequences: string;
   /** Deletes it; throws with a message to show if it didn't. */
   onDelete: () => Promise<void>;
+  /** What the button says, for a teacher who only leaves this school. */
+  action?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -46,7 +49,7 @@ export function DeleteAccount({
         }}
         className="text-[12px] font-semibold text-red-700 dark:text-red-300 hover:underline"
       >
-        Delete permanently…
+        {action}…
       </button>
     );
   }
@@ -69,7 +72,7 @@ export function DeleteAccount({
           disabled={busy || !matches}
           className="bg-red-700 text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-xl disabled:opacity-40"
         >
-          {busy ? "Deleting…" : "Delete permanently"}
+          {busy ? "Working…" : action}
         </button>
         <button
           type="button"

@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { createProvisionedUser } from "@/lib/accountProvisioning";
-import { sendAccountWelcomes, sendPasswordResetLink } from "@/lib/accountWelcome";
+import { sendAccountWelcomes, sendPasswordResetLink, sendSchoolJoined } from "@/lib/accountWelcome";
+import { addSchool } from "@/lib/schoolMemberships";
 import { ACCOUNT_ROLES, requireAdmin, schoolAccount, type AccountRole } from "@/lib/adminAccounts";
 
 // Accounts are made with a temporary password the admin can hand over, so
@@ -88,6 +89,64 @@ export async function POST(req: NextRequest) {
     // createProvisionedUser gives the new login its profile, so the account
     // lands in the right school with the right role the moment it exists.
     const admin = createAdminClient();
+
+    // Already a teacher at another school: this school becomes one of
+    // theirs, on the login they have, rather than a second login to keep
+    // apart. They switch between their schools from the menu.
+    if (role === "teacher") {
+      const { data: holder } = await admin
+        .from("profiles")
+        .select("id, role, school_id, full_name, active")
+        .eq("email", email.trim().toLowerCase())
+        .maybeSingle();
+      if (holder && holder.role === "teacher" && holder.school_id && holder.school_id !== caller.school_id) {
+        const name = holder.full_name || email.trim();
+        let outcome: Awaited<ReturnType<typeof addSchool>>;
+        try {
+          outcome = await addSchool(admin, holder, caller.school_id as string);
+        } catch (joinError) {
+          console.error("Accounts: couldn't add a school to a teacher", joinError);
+          return NextResponse.json(
+            {
+              error: /school_memberships/.test(String((joinError as { message?: string })?.message))
+                ? "Teachers at more than one school need the update run in Supabase first (mydiiwaan-update-10.sql)."
+                : "Couldn't add them to your school. Please try again.",
+            },
+            { status: 500 }
+          );
+        }
+        if (!outcome.added) {
+          return NextResponse.json(
+            {
+              error:
+                outcome.reason === "already"
+                  ? `${name} is already one of your teachers.`
+                  : `${name} is one of your teachers, switched off. Open them below and tick Active.`,
+            },
+            { status: 409 }
+          );
+        }
+        if (outcome.movedIn) await admin.auth.admin.updateUserById(holder.id, { ban_duration: "none" });
+        const { data: schools } = await admin.from("schools").select("id, name").in("id", [caller.school_id, holder.school_id]);
+        const nameOf = (id: string | null) => (schools ?? []).find((x: { id: string }) => x.id === id)?.name ?? "";
+        const told = await sendSchoolJoined(
+          { name, email: email.trim().toLowerCase() },
+          { name: nameOf(caller.school_id) || "Your school", otherSchool: outcome.movedIn ? "" : nameOf(holder.school_id), replyTo: user.email }
+        );
+        return NextResponse.json(
+          {
+            id: holder.id,
+            email: email.trim().toLowerCase(),
+            full_name: holder.full_name,
+            joined: true,
+            other_school: nameOf(holder.school_id),
+            welcome_email: told.ok ? "sent" : told.reason,
+          },
+          { status: 201 }
+        );
+      }
+    }
+
     const inTheWay = await loginInTheWay(admin, email.trim(), role as AllowedRole, caller, user.id);
     if (inTheWay) return NextResponse.json({ error: inTheWay }, { status: 409 });
     const tempPassword = generateTempPassword();

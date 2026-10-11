@@ -437,15 +437,64 @@ as $$
   where s.profile_id = auth.uid()
 $$;
 
+-- ══════════════════════════════════════
+-- Teachers at more than one school
+-- ══════════════════════════════════════
+-- One login, one email, can teach at several schools. Its profile is in
+-- one school at a time — the one it's switched into, so my_school_id(),
+-- my_role() and every rule here work as they always have — and this lists
+-- every school it teaches at, the current one included. Only kept for a
+-- teacher at two schools or more; anyone else is just their profile.
+-- Written by the server alone (/api/admin/accounts adds and removes a
+-- school, /api/me/school switches): each office can see its own rows.
+create table if not exists school_memberships (
+  user_id     uuid not null references profiles(id) on delete cascade,
+  school_id   uuid not null references schools(id) on delete cascade,
+  role        text not null default 'teacher' check (role in ('teacher')),
+  -- Switched off by this school's office, whatever the others do.
+  active      boolean not null default true,
+  created_at  timestamptz not null default now(),
+  primary key (user_id, school_id)
+);
+alter table school_memberships enable row level security;
+create index if not exists idx_school_memberships_school on school_memberships(school_id);
+
+drop policy if exists "People read their own schools" on school_memberships;
+create policy "People read their own schools" on school_memberships
+  for select using (user_id = auth.uid());
+drop policy if exists "Admins read their school's members" on school_memberships;
+create policy "Admins read their school's members" on school_memberships
+  for select using (school_id = my_school_id() and my_role() = 'admin');
+
+-- Whether someone teaches at a school: their login is a teacher's there
+-- now, or the school is one of theirs.
+create or replace function teaches_at(uid uuid, sid uuid)
+returns boolean
+language sql security definer stable set search_path = public
+as $$
+  select exists (select 1 from profiles where id = uid and school_id = sid and role = 'teacher')
+      or exists (select 1 from school_memberships where user_id = uid and school_id = sid and role = 'teacher')
+$$;
+
+-- The office sees its teachers while they're switched into another school.
+drop policy if exists "Admins read their school's teachers at other schools" on profiles;
+create policy "Admins read their school's teachers at other schools" on profiles
+  for select using (
+    my_role() = 'admin'
+    and exists (select 1 from school_memberships m where m.user_id = profiles.id and m.school_id = my_school_id())
+  );
+
 -- The halaqas the caller teaches, as its first teacher or one of the
--- others (class_teachers). None for a switched-off account.
+-- others (class_teachers), at the school they're in now. None for a
+-- switched-off account.
 create or replace function my_taught_class_ids()
 returns setof uuid
 language sql security definer stable set search_path = public
 as $$
-  select id from classes where teacher_id = auth.uid() and am_active()
+  select id from classes where teacher_id = auth.uid() and school_id = my_school_id() and am_active()
   union
-  select class_id from class_teachers where teacher_id = auth.uid() and am_active()
+  select ct.class_id from class_teachers ct join classes c on c.id = ct.class_id
+  where ct.teacher_id = auth.uid() and c.school_id = my_school_id() and am_active()
 $$;
 
 -- The children in those halaqas. Their teachers share what's recorded
@@ -471,7 +520,7 @@ create policy "Admins manage halaqa teachers" on class_teachers
     class_school_id(class_id) = my_school_id() and my_role() = 'admin'
   ) with check (
     class_school_id(class_id) = my_school_id() and my_role() = 'admin'
-    and exists (select 1 from profiles p where p.id = teacher_id and p.role = 'teacher' and p.school_id = my_school_id())
+    and teaches_at(teacher_id, my_school_id())
   );
 drop policy if exists "Teachers see their halaqas' teachers" on class_teachers;
 create policy "Teachers see their halaqas' teachers" on class_teachers
@@ -2134,6 +2183,30 @@ create index if not exists idx_weekly_report_sends_week on weekly_report_sends(s
 drop policy if exists "Admins read their school's weekly report sends" on weekly_report_sends;
 create policy "Admins read their school's weekly report sends" on weekly_report_sends
   for select using (school_id = my_school_id() and my_role() = 'admin');
+
+-- ══════════════════════════════════════
+-- Teachers at more than one school: one school at a time
+-- ══════════════════════════════════════
+-- A teacher's own halaqas and records (the lessons, register, recitations
+-- and stars they recorded, their sign-ins) reach them only at the school
+-- they're switched into: at another of their schools, those stay that
+-- school's. Restrictive, so it only ever narrows what the other rules allow.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'classes', 'lessons', 'assignments', 'quranic_assignments', 'surah_test_confirmations', 'attendance',
+    'subject_grades', 'recitation_log', 'student_stars', 'student_badges', 'staff_attendance', 'staff_absence_reports'
+  ] loop
+    execute format('drop policy if exists "A teacher works in the school they''re in" on %I', t);
+    execute format(
+      'create policy "A teacher works in the school they''re in" on %I as restrictive for all '
+      'using (my_role() is distinct from ''teacher'' or school_id = my_school_id()) '
+      'with check (my_role() is distinct from ''teacher'' or school_id = my_school_id())',
+      t
+    );
+  end loop;
+end $$;
 
 -- ══════════════════════════════════════
 -- Switched-off accounts

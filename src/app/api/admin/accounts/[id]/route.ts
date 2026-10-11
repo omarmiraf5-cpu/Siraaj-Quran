@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin, schoolAccount } from "@/lib/adminAccounts";
+import { removeSchool, setActiveAt } from "@/lib/schoolMemberships";
 
 // One teacher's or parent's account, from the office's Teachers and Parents
 // pages: renaming it, switching it off or back on, and deleting it.
@@ -47,6 +48,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const found = await schoolAccount(admin, auth.caller, id);
     if (found.error) return found.error;
     const { target } = found;
+
+    // A teacher at other schools too: their name is theirs everywhere, but
+    // switched on or off is this school's own say. Their login is locked
+    // out only once no school has them on.
+    if (found.member) {
+      if (patch.full_name !== undefined) {
+        const { error } = await admin.from("profiles").update({ full_name: patch.full_name }).eq("id", id);
+        if (error) throw error;
+      }
+      if (patch.active !== undefined && patch.active !== target.active) {
+        const outcome = await setActiveAt(admin, id, auth.caller.school_id as string, patch.active);
+        if (outcome?.lockedOut || outcome?.unlocked) {
+          const { error: banError } = await admin.auth.admin.updateUserById(id, {
+            ban_duration: outcome.unlocked ? "none" : SWITCHED_OFF,
+          });
+          if (banError) console.error("Accounts: Supabase didn't take the switch", banError);
+        }
+      }
+      return NextResponse.json({
+        id,
+        full_name: patch.full_name ?? target.full_name,
+        active: patch.active ?? target.active,
+      });
+    }
 
     // The profile first: switched off there, the database's rules lock the
     // account out at once.
@@ -97,7 +122,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const admin = createAdminClient();
     const found = await schoolAccount(admin, auth.caller, id);
     if (found.error) return found.error;
-
+    // A teacher at other schools too leaves this one only: their login,
+    // and everything at their other schools, stay.
+    if (found.member) {
+      const left = await removeSchool(admin, id, auth.caller.school_id as string);
+      if (left?.lockedOut) {
+        await admin.auth.admin.updateUserById(id, { ban_duration: SWITCHED_OFF });
+      }
+      return NextResponse.json({ deleted: true, name: found.target.full_name, keptElsewhere: true });
+    }
     const { error } = await admin.auth.admin.deleteUser(id);
     if (error) throw error;
     return NextResponse.json({ deleted: true, name: found.target.full_name });

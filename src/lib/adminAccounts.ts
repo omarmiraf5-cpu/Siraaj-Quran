@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import type { createClient } from "@/lib/supabase/server";
 import type { createAdminClient } from "@/lib/supabase/admin";
+import { membershipAt } from "@/lib/schoolMemberships";
 
 type SessionDb = Awaited<ReturnType<typeof createClient>>;
 type ServiceDb = ReturnType<typeof createAdminClient>;
@@ -75,11 +76,17 @@ export async function schoolAccount(admin: ServiceDb, caller: { school_id: strin
   if (!target) {
     return { error: NextResponse.json({ error: "No such account" }, { status: 404 }) };
   }
+  // A teacher at this school and others: this school's own say on them,
+  // switched into whichever school they are now.
+  const member = await membershipAt(admin, id, caller.school_id ?? "");
+  if (member) {
+    return { target: { ...target, role: "teacher", active: member.active }, member: true, elsewhere: target.school_id !== caller.school_id };
+  }
   if (target.school_id !== caller.school_id) {
     return { error: NextResponse.json({ error: "That account belongs to a different school" }, { status: 403 }) };
   }
   if (!ACCOUNT_ROLES.includes(target.role as AccountRole)) {
     return { error: NextResponse.json({ error: `A ${target.role} account can't be changed here` }, { status: 400 }) };
   }
-  return { target };
+  return { target, member: false, elsewhere: false };
 }

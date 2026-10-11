@@ -72,6 +72,8 @@ export interface DemoTeacher {
   active?: boolean;
   /** Runs the school, and teaches with that same login. */
   admin?: boolean;
+  /** Teaches at another school too, with this same login. */
+  otherSchools?: boolean;
 }
 
 // Every existing assignment and message uses teacher_id "t1", so that one

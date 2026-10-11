@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { SchoolSwitcher } from "@/components/SchoolSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
@@ -118,6 +119,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           <span className="text-white/30 text-xs font-medium flex-shrink-0">· {role}</span>
         </div>
         <div className="flex items-center gap-1.5">
+          <SchoolSwitcher variant="topbar" enabled={!demoUser} />
           <LanguageToggle variant="icon" className="bg-white/10 text-white/70 hover:bg-white/20" />
           <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
           <button
@@ -228,6 +230,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           <p className="text-xs text-white/40 uppercase tracking-wider mb-1">{role}</p>
           <p className="text-sm font-semibold text-white/90 truncate">{displayName}</p>
         </div>
+        <SchoolSwitcher variant="sidebar" enabled={!demoUser} />
 
         {/* Dark mode + language toggles — top of nav */}
         <div className="border-t border-white/10 pt-3 pb-1 space-y-0.5">

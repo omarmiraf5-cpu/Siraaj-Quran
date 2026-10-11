@@ -10,12 +10,16 @@ type Db = ReturnType<typeof createClient>;
  * unless `everyAdmin`: choosing a halaqa's teachers offers them all.
  */
 export async function loadSchoolTeachers(supabase: Db, { everyAdmin = false } = {}): Promise<DemoTeacher[]> {
-  const [{ data: people }, { data: leads }, { data: others }] = await Promise.all([
+  const [{ data: people }, { data: leads }, { data: others }, { data: memberships }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, active, role").in("role", ["teacher", "admin"]).order("full_name"),
     supabase.from("classes").select("teacher_id"),
     // A database without class_teachers yet answers with an error here.
     supabase.from("class_teachers").select("teacher_id"),
+    // Teachers at other schools too: on or off as this school has them.
+    // Only this school's are readable; none before the update that adds them.
+    supabase.from("school_memberships").select("user_id, active"),
   ]);
+  const here = new Map(((memberships ?? []) as Array<{ user_id: string; active: boolean }>).map((m) => [m.user_id, m.active]));
   const teaching = new Set([...(leads ?? []), ...(others ?? [])].map((r) => r.teacher_id as string | null));
   return (people ?? [])
     .filter((p) => p.role === "teacher" || everyAdmin || teaching.has(p.id))
@@ -23,8 +27,9 @@ export async function loadSchoolTeachers(supabase: Db, { everyAdmin = false } = 
       id: p.id,
       name: p.full_name,
       email: p.email ?? "",
-      active: p.active,
+      active: here.has(p.id) ? here.get(p.id) : p.active,
       ...(p.role === "admin" ? { admin: true } : {}),
+      ...(here.has(p.id) ? { otherSchools: true } : {}),
     }));
 }
 

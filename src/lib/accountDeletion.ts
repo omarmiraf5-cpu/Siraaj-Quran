@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Db } from "@/lib/attendanceServer";
+import { rehomeBeforeSchoolGoes } from "@/lib/schoolMemberships";
 
 export type SchoolDeletion =
   | { ok: true; deleted: string; accountsRemoved: number; accountErrors: string[] }
@@ -38,7 +39,13 @@ export async function deleteSchoolAndAccounts(
   if (profilesError) return { ok: false, status: 500, error: profilesError.message };
   const people = (everyone ?? []) as Array<{ id: string; is_platform_admin: boolean | null }>;
   const kept = keepPlatformOwners ? people.filter((p) => p.is_platform_admin).map((p) => p.id) : [];
-  const peopleProfiles = people.filter((p) => !kept.includes(p.id));
+  // Teachers at other schools too go to one of those, keeping their login.
+  const rehomed = await rehomeBeforeSchoolGoes(
+    admin as unknown as Parameters<typeof rehomeBeforeSchoolGoes>[0],
+    schoolId,
+    people.filter((p) => !kept.includes(p.id)).map((p) => p.id)
+  );
+  const peopleProfiles = people.filter((p) => !kept.includes(p.id) && !rehomed.includes(p.id));
 
   // Taken out of the school first: deleting it deletes its people's
   // profiles too. Back to how a login with no school stands.

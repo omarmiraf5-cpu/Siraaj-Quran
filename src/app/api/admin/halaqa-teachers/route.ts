@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { schoolMembers } from "@/lib/schoolMemberships";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAccounts";
 
@@ -55,7 +56,10 @@ export async function PUT(req: NextRequest) {
         .eq("school_id", caller.school_id)
         .in("role", ["teacher", "admin"]);
       if (staffError) throw staffError;
-      if ((staff ?? []).length !== ids.length) {
+      // Or one of its teachers switched into another of their schools.
+      const members = await schoolMembers(admin, caller.school_id as string);
+      const allowed = new Set([...(staff ?? []).map((p: { id: string }) => p.id), ...ids.filter((id) => members.has(id))]);
+      if (ids.some((id) => !allowed.has(id))) {
         return NextResponse.json({ error: "Only your school's teachers and admins can teach its halaqas" }, { status: 400 });
       }
     }

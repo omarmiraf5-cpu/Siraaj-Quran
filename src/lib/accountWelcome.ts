@@ -222,3 +222,77 @@ export function sendPasswordResetLink(
     },
   ]);
 }
+
+/**
+ * A teacher who already has a MyDiiwaan login, added by a second school:
+ * nothing new to set up, just how to move between their schools.
+ */
+export function schoolJoinedEmail(args: { name: string; email: string; schoolName: string; otherSchool: string; repliesToSchool: boolean }) {
+  const school = args.schoolName.replace(/\s+/g, " ").trim();
+  const other = args.otherSchool.replace(/\s+/g, " ").trim();
+  const firstName = greetingName(args.name);
+  const greeting = firstName ? `${SALAM}, ${firstName},` : `${SALAM},`;
+  const added = `${school} has added you as a teacher on MyDiiwaan.`;
+  const how = `You already have a login, so there's nothing new to set up. Sign in as usual with ${args.email}, then tap "Switch school" in the menu to move between ${other || "your schools"} and ${school}.`;
+  const questions = args.repliesToSchool
+    ? `Questions? Reply to this email and it goes to ${school}.`
+    : "Questions? Just reply to this email.";
+  const link = `${SITE_URL}/login`;
+  const text = [
+    greeting,
+    "",
+    added,
+    "",
+    how,
+    "",
+    `Sign in: ${link}`,
+    "",
+    questions,
+    "",
+    "May Allah put barakah in your teaching.",
+    "",
+    "Wassalamu alaikum wa rahmatullahi wa barakatuh,",
+    "The MyDiiwaan team",
+  ].join("\n");
+
+  const para = "margin:6px 0 0;font-size:15px;line-height:1.55;color:#1f2430;";
+  const html = emailLayout({
+    eyebrow: "A new school",
+    content: `<tr><td style="padding:26px 28px 4px;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:#0e2347;">You're teaching at ${escapeHtml(school)}</div>
+    <p style="margin:16px 0 0;font-size:15px;line-height:1.55;">${escapeHtml(greeting)}</p>
+    <p style="${para}">${escapeHtml(added)}</p>
+    <p style="${para}">${escapeHtml(how)}</p>
+    <div style="margin-top:18px;">${emailButton(link, "Sign in")}</div>
+  </td></tr>
+  <tr><td style="padding:22px 28px 28px;">
+    <p style="${para}">${escapeHtml(questions)}</p>
+    <p style="${para}margin-top:14px;">May Allah put barakah in your teaching.</p>
+    <p style="${para}margin-top:14px;">Wassalamu alaikum wa rahmatullahi wa barakatuh,<br>The MyDiiwaan team</p>
+  </td></tr>`,
+    footer: `MyDiiwaan · <a href="${SITE_URL}" style="color:#8a8d96;">mydiiwaan.com</a> · <a href="${SITE_URL}/privacy" style="color:#8a8d96;">Privacy</a>`,
+  });
+
+  return { subject: `You've been added to ${school} on MyDiiwaan`, html, text };
+}
+
+/** Emails a teacher that a second school has added them. Never throws. */
+export function sendSchoolJoined(
+  teacher: { name: string; email: string },
+  school: { name: string; otherSchool: string; replyTo?: string | null }
+): Promise<EmailResult> {
+  return sendEmailBatch(`New-school email for "${teacher.email}" at "${school.name}"`, () => [
+    {
+      from: EMAIL_FROM,
+      to: teacher.email,
+      replyTo: school.replyTo || SUPPORT_EMAIL,
+      ...schoolJoinedEmail({
+        name: teacher.name,
+        email: teacher.email,
+        schoolName: school.name,
+        otherSchool: school.otherSchool,
+        repliesToSchool: Boolean(school.replyTo),
+      }),
+    },
+  ]);
+}

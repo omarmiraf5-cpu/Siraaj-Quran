@@ -248,7 +248,13 @@ export default function AdminTeachersPage() {
       setNewEmail("");
       setShowForm(false);
       setInviteNote(
-        `Account created for ${data.email}. ${welcomeNote(data.welcome_email)}Temporary password: ${data.temp_password} — share it with them if the email doesn't reach them. They'll be asked to set their own password the first time they use it.`
+        data.joined
+          ? `${data.full_name || data.email} already teaches at ${data.other_school || "another school"} with this email, so they've been added to your school too — the same login and password. ${
+              data.welcome_email === "sent"
+                ? "We've emailed them that they can switch between their schools from the menu."
+                : `The email telling them didn't send (${data.welcome_email}), so let them know: they switch schools from the menu.`
+            }`
+          : `Account created for ${data.email}. ${welcomeNote(data.welcome_email)}Temporary password: ${data.temp_password} — share it with them if the email doesn't reach them. They'll be asked to set their own password the first time they use it.`
       );
     } catch (err) {
       setInviteNote(err instanceof Error ? err.message : "Failed to create teacher");
@@ -580,8 +586,9 @@ export default function AdminTeachersPage() {
                         Active
                       </label>
                       <p className="text-[11px] text-ink-muted -mt-1 leading-relaxed">
-                        Untick to switch {t.name} off: they can&apos;t sign in or see anything
-                        until you switch them back on.
+                        {t.otherSchools
+                          ? `Untick to switch ${t.name} off at your school: they can't see anything here until you switch them back on. Their other school isn't affected.`
+                          : `Untick to switch ${t.name} off: they can't sign in or see anything until you switch them back on.`}
                       </p>
                       {saveError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{saveError}</p>}
                       <div className="flex items-center gap-2">
@@ -628,9 +635,20 @@ export default function AdminTeachersPage() {
 
                       {!isDemo && (
                         <div className="pt-3 border-t border-surface-border">
+                          {t.otherSchools && (
+                            <p className="text-[11.5px] text-ink-muted leading-relaxed mb-2">
+                              {t.name} also teaches at another school with this same login. Switching them off or removing
+                              them here only affects your school.
+                            </p>
+                          )}
                           <DeleteAccount
                             name={t.name}
-                            consequences={`This deletes ${t.name}'s sign-in for good. The register, lessons and messages they recorded stay with the school without their name, and a halaqa they teach alone will need another teacher. To keep them but stop them signing in, untick Active instead.`}
+                            action={t.otherSchools ? "Remove from this school" : undefined}
+                            consequences={
+                              t.otherSchools
+                                ? `${t.name} leaves your school only: their login stays, for their other school. What they recorded here stays with you, and a halaqa they teach alone here will need another teacher.`
+                                : `This deletes ${t.name}'s sign-in for good. The register, lessons and messages they recorded stay with the school without their name, and a halaqa they teach alone will need another teacher. To keep them but stop them signing in, untick Active instead.`
+                            }
                             onDelete={async () => {
                               await deleteAccount(t.id);
                               setEditingId(null);

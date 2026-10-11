@@ -42,6 +42,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "common.language": "Language",
     "common.loading": "Loading…",
     "common.switchPortal": "Switch portal",
+    "common.switchSchool": "Switch school",
+    "common.yourSchools": "Your schools",
+    "common.switchingSchool": "Switching…",
+    "common.switchFailed": "That didn't switch. Please try again.",
     "common.cancel": "Cancel",
 
     "nav.dashboard": "Dashboard",
@@ -541,6 +545,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "common.language": "Luqadda",
     "common.loading": "Waa la soo rarayaa…",
     "common.switchPortal": "U beddel bogga kale",
+    "common.switchSchool": "Beddel iskuulka",
+    "common.yourSchools": "Iskuulladaada",
+    "common.switchingSchool": "Waa la beddelayaa…",
+    "common.switchFailed": "Lama beddelin. Fadlan isku day mar kale.",
     "common.cancel": "Jooji",
 
     "nav.dashboard": "Bogga Hore",
@@ -1040,6 +1048,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "common.language": "اللغة",
     "common.loading": "جارٍ التحميل…",
     "common.switchPortal": "تبديل البوابة",
+    "common.switchSchool": "تبديل المدرسة",
+    "common.yourSchools": "مدارسك",
+    "common.switchingSchool": "جارٍ التبديل…",
+    "common.switchFailed": "لم يتم التبديل. يرجى المحاولة مرة أخرى.",
     "common.cancel": "إلغاء",
 
     "nav.dashboard": "لوحة التحكم",

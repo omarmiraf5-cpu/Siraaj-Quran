@@ -89,9 +89,16 @@ export async function GET() {
   const when = (x: string | null) => (x ? Date.parse(x) : 0);
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
+  // Teachers at more than one school count at each of them.
+  const { data: membershipRows, error: membershipsError } = await admin.from("school_memberships").select("user_id, school_id");
+  const memberships = (membershipsError ? [] : membershipRows ?? []) as Array<{ user_id: string; school_id: string }>;
+
   const enriched = await Promise.all(
     schools.map(async (school) => {
-      const members = ((people ?? []) as Array<Record<string, any>>).filter((p) => p.school_id === school.id);
+      const memberIds = new Set(memberships.filter((m) => m.school_id === school.id).map((m) => m.user_id));
+      const members = ((people ?? []) as Array<Record<string, any>>).filter(
+        (p) => p.school_id === school.id || memberIds.has(p.id)
+      );
       const staff = members
         .filter((p) => p.role === "admin" || p.role === "teacher")
         .map((p) => ({
@@ -107,13 +114,9 @@ export async function GET() {
       const lastActive = activity.reduce<string | null>((max, a) => latest(max, a.at), null);
       const thisWeek = activity.filter((a) => a.at && Date.parse(a.at) >= weekAgo);
 
-      const [{ count: studentCount }, { count: teacherCount }, { data: admins }] = await Promise.all([
+      const teacherCount = members.filter((p) => p.role === "teacher").length;
+      const [{ count: studentCount }, { data: admins }] = await Promise.all([
         admin.from("students").select("id", { count: "exact", head: true }).eq("school_id", school.id),
-        admin
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("school_id", school.id)
-          .eq("role", "teacher"),
         admin
           .from("profiles")
           .select("full_name, email")
