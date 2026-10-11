@@ -12,6 +12,7 @@ import { useDemoUser } from "@/hooks/useDemoUser";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
+import { useSignInGuard } from "@/hooks/useSignInGuard";
 
 interface NavItem {
   href: string;
@@ -89,6 +90,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const { t } = useLanguage();
   useRecordVisit();
   useSwitchedOffGuard();
+  useSignInGuard();
   const role = t(roleKey);
   const displayName = demoUser?.name ?? userName ?? role;
   const [moreOpen, setMoreOpen] = useState(false);
