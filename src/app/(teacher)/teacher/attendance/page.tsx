@@ -116,9 +116,10 @@ export default function TeacherAttendancePage() {
       const present = new Set((studentRows ?? []).map((s) => s.id as string));
       const shown = groups?.filter((h) => h.studentIds.some((id) => present.has(id))) ?? null;
       setHalaqas(shown);
-      let remembered: string | null = null;
+      // Opened from a halaqa on the dashboard, that one; otherwise the last one used here.
+      let remembered: string | null = new URLSearchParams(window.location.search).get("halaqa");
       try {
-        remembered = localStorage.getItem("attendance_halaqa");
+        remembered ??= localStorage.getItem("attendance_halaqa");
       } catch {}
       setHalaqaId(shown?.find((h) => h.id === remembered)?.id ?? shown?.[0]?.id ?? null);
 

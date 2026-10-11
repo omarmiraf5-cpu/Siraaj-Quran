@@ -32,7 +32,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
-import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
+import { myHalaqas, narrowToMine } from "@/lib/teacherScope";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
@@ -81,6 +81,8 @@ export default function TeacherDashboard() {
   const [assignments, setAssignments] = useState<QuranicAssignment[]>([]);
   const [attendanceHistory, setAttendanceHistory] = useState<Record<string, AttendanceDay[]>>({});
   const [todayStatus, setTodayStatus] = useState<Record<string, AttendanceStatus> | null>(null);
+  // The halaqas they teach, each with its children (just the ones on the roster).
+  const [groups, setGroups] = useState<Array<{ id: string; label: string; studentIds: string[] }>>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -93,13 +95,20 @@ export default function TeacherDashboard() {
         setStudents(DEMO_STUDENTS);
         setAssignments(DEMO_ASSIGNMENTS);
         setAttendanceHistory(DEMO_ATTENDANCE);
+        setGroups(
+          [...new Set(DEMO_STUDENTS.map((s) => s.halaqa))].map((h) => ({
+            id: h,
+            label: h,
+            studentIds: DEMO_STUDENTS.filter((s) => s.halaqa === h).map((s) => s.id),
+          }))
+        );
         return;
       }
 
       const todayStr = todayIso();
       setToday(todayStr);
 
-      const [{ data: profile }, { data: studentRows }, { data: assignmentRows }, { data: attendanceRows }, mine] =
+      const [{ data: profile }, { data: studentRows }, { data: assignmentRows }, { data: attendanceRows }, halaqaRows] =
         await Promise.all([
           supabase.from("profiles").select("full_name").eq("id", user.id).single(),
           supabase.from("students").select("id, full_name, grade").eq("active", true).order("full_name"),
@@ -107,9 +116,10 @@ export default function TeacherDashboard() {
           // (with others, too): the policies on both tables decide.
           supabase.from("quranic_assignments").select("*"),
           supabase.from("attendance").select("student_id, class_date, status"),
-          // Just the children of their own halaqas.
-          myHalaqaStudents(supabase),
+          // Their own halaqas, each with its children.
+          myHalaqas(supabase),
         ]);
+      const mine = halaqaRows && new Map(halaqaRows.flatMap((h) => h.studentIds.map((id) => [id, h.label] as const)));
 
       setTeacherName(profile?.full_name ?? null);
       const roster = narrowToMine(
@@ -118,6 +128,7 @@ export default function TeacherDashboard() {
       );
       const theirs = new Set(roster.map((s) => s.id));
       setStudents(roster);
+      setGroups((halaqaRows ?? []).map((h) => ({ ...h, studentIds: h.studentIds.filter((id) => theirs.has(id)) })));
       setAssignments(((assignmentRows ?? []) as QuranicAssignment[]).filter((a) => !mine || theirs.has(a.student_id)));
 
       const history: Record<string, AttendanceDay[]> = {};
@@ -254,6 +265,70 @@ export default function TeacherDashboard() {
           onClick={isDemo ? () => setDrilldown("attendance") : undefined}
         />
       </div>
+
+      {/* Their halaqas, each with its children and how today's register
+          stands, and a way straight into that halaqa's register. */}
+      {groups.length > 0 && (
+        <SectionCard
+          title={t("teacher.dashboard.myHalaqas")}
+          note={`${groups.length} ${groups.length === 1 ? t("teacher.dashboard.halaqa") : t("teacher.dashboard.halaqas")}`}
+        >
+          <div className="grid md:grid-cols-2 gap-3">
+            {groups.map((h) => {
+              const kids = h.studentIds
+                .map((id) => students.find((s) => s.id === id))
+                .filter((s): s is RosterStudent => Boolean(s));
+              const status = (id: string) =>
+                isDemo ? DEMO_ATTENDANCE[id]?.[0]?.status : todayStatus?.[id];
+              const marked = kids.filter((k) => status(k.id)).length;
+              return (
+                <div key={h.id} className="rounded-2xl border border-surface-border p-4" data-halaqa={h.label}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[14px] text-ink truncate">{h.label}</p>
+                      <p className="text-[11px] text-ink-muted">
+                        {kids.length} {t("common.students")} · {marked}/{kids.length} {t("teacher.attendance.marked")}{" "}
+                        {t("teacher.dashboard.today")}
+                      </p>
+                    </div>
+                    <Link
+                      href={isDemo ? "/teacher/attendance" : `/teacher/attendance?halaqa=${encodeURIComponent(h.id)}`}
+                      className="flex-shrink-0 text-[12px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+                    >
+                      {t("teacher.dashboard.takeRegister")}
+                    </Link>
+                  </div>
+                  {kids.length === 0 ? (
+                    <p className="mt-3 text-[12px] text-ink-muted">{t("teacher.dashboard.noChildrenYet")}</p>
+                  ) : (
+                    <ul className="mt-3 flex flex-wrap gap-1.5">
+                      {kids.map((k) => {
+                        const st = status(k.id);
+                        return (
+                          <li
+                            key={k.id}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-surface-bg-warm border border-surface-border px-2.5 py-1 text-[12px] text-ink"
+                          >
+                            {st && (
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  st === "present" ? "bg-green-700" : st === "late" ? "bg-amber-600" : st === "absent" ? "bg-red-700" : "bg-slate-500"
+                                }`}
+                                title={t(`common.${st}`)}
+                              />
+                            )}
+                            {k.name}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
 
       <AnnouncementsFeed audience="teachers" />
 
