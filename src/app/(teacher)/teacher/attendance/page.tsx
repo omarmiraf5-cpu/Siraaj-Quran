@@ -105,7 +105,7 @@ export default function TeacherAttendancePage() {
         // halaqa they teach, whoever took them: the attendance policy
         // decides, so teachers sharing a halaqa see one register.
         supabase.from("attendance").select("student_id, class_date, status"),
-        // In an academic school, just the children of their own halaqas.
+        // Just the children of their own halaqas.
         myHalaqaStudents(supabase),
       ]);
 
@@ -248,6 +248,10 @@ export default function TeacherAttendancePage() {
           {t("teacher.attendance.markAllPresent")}
         </button>
       </div>
+
+      {students.length === 0 && (
+        <div className="card-quiet p-5 text-[13px] text-ink-muted">{t("teacher.attendance.noHalaqa")}</div>
+      )}
 
       {/* Roster */}
       <div className="card-quiet divide-y divide-surface-border overflow-hidden">

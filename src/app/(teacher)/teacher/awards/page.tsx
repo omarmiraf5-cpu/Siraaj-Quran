@@ -118,7 +118,7 @@ export default function TeacherAwardsPage() {
 
       const [{ data: studentRows }, mine] = await Promise.all([
         supabase.from("students").select("id, full_name, active").order("full_name"),
-        // In an academic school, just the children of their own halaqas.
+        // Just the children of their own halaqas.
         myHalaqaStudents(supabase),
       ]);
       setStudents(

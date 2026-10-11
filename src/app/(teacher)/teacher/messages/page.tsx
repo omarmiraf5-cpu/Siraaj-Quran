@@ -65,7 +65,7 @@ export default function TeacherMessagesPage() {
       const [{ data: profile }, { data: studentRows }, mine] = await Promise.all([
         supabase.from("profiles").select("school_id, full_name").eq("id", user.id).single(),
         supabase.from("students").select("id, full_name, grade").eq("active", true).order("full_name"),
-        // In an academic school, just the children of their own halaqas.
+        // Just the children of their own halaqas.
         myHalaqaStudents(supabase),
       ]);
 

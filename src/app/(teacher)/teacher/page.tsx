@@ -107,7 +107,7 @@ export default function TeacherDashboard() {
           // (with others, too): the policies on both tables decide.
           supabase.from("quranic_assignments").select("*"),
           supabase.from("attendance").select("student_id, class_date, status"),
-          // In an academic school, just the children of their own halaqas.
+          // Just the children of their own halaqas.
           myHalaqaStudents(supabase),
         ]);
 

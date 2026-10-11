@@ -430,8 +430,10 @@ export default function AdminHalaqasPage() {
 
   // How many children are in a halaqa: by its id where names repeat across
   // grades and campuses; by name in the sample school, which has no ids.
-  const countOf = (h: DemoHalaqa) =>
-    isDemo ? studentsInHalaqa(h.name, students).length : students.filter((s) => s.halaqaId === h.id).length;
+  // A halaqa's students, by name.
+  const studentsOf = (h: DemoHalaqa) =>
+    (isDemo ? studentsInHalaqa(h.name, students) : students.filter((s) => s.halaqaId === h.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const countOf = (h: DemoHalaqa) => studentsOf(h).length;
   const placed = isDemo ? students.length : students.filter((s) => s.halaqaId).length;
 
   // An academic school's halaqas: by campus (when it has them), then grade.
@@ -510,9 +512,27 @@ export default function AdminHalaqasPage() {
               </p>
               <TeacherPicker teachers={teachers} selected={draftTeacherIds} onChange={setDraftTeacherIds} meId={meId} />
             </div>
-            <p className="text-xs text-ink-muted">
-              {count} student{count === 1 ? "" : "s"} currently in this halaqa.
-            </p>
+            <div>
+              <p className="text-xs font-semibold text-ink mb-1.5">
+                {count} student{count === 1 ? "" : "s"} in this halaqa
+              </p>
+              {count === 0 ? (
+                <p className="text-[11.5px] text-ink-muted">None yet. Put students in a halaqa from the Students page.</p>
+              ) : (
+                <ul className="flex flex-wrap gap-1.5">
+                  {studentsOf(h).map((s) => (
+                    <li
+                      key={s.id}
+                      className={`text-[12px] rounded-full border border-surface-border bg-surface-card px-2.5 py-1 ${
+                        s.active === false ? "text-ink-muted line-through" : "text-ink"
+                      }`}
+                    >
+                      {s.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             {editError && <p className="text-xs text-red-600 dark:text-red-400">{editError}</p>}
             <div className="flex items-center gap-2">
               <button

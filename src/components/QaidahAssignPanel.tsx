@@ -61,7 +61,7 @@ export function useQaidahClassroom() {
         // Only the halaqas this teacher teaches come back, and only their children.
         supabase.from("classes").select("id, name"),
         supabase.from("class_enrollments").select("class_id, student_id"),
-        // In an academic school, just the children of their own halaqas.
+        // Just the children of their own halaqas.
         myHalaqaStudents(supabase),
       ]);
       const className = new Map((classRows ?? []).map((c) => [c.id as string, c.name as string]));

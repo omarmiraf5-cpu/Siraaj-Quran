@@ -5,11 +5,12 @@ import { loadCampuses } from "@/lib/schoolStructure";
 type Db = ReturnType<typeof createClient>;
 
 /**
- * The children a teacher's pages show in an academic school: those in the
- * halaqas they teach, each with where that is — "Grade 3 · North · Halaqa
- * A". A school of hundreds can't put every child on every teacher's
- * register. Null anywhere else: a Qur'an school's teachers see the school's
- * children, as they always have.
+ * The children a teacher's pages show: those in the halaqas they teach,
+ * each with where that is — "Halaqa A", or "Grade 3 · North · Halaqa A" in
+ * an academic school. The register, lessons and messages are for a
+ * teacher's own children, never the whole school's: an admin who teaches
+ * could otherwise see every child, since the office's own rules let them.
+ * Empty for a teacher with no halaqa yet; null only when nobody is signed in.
  */
 export async function myHalaqaStudents(supabase: Db): Promise<Map<string, string> | null> {
   const {
@@ -18,12 +19,13 @@ export async function myHalaqaStudents(supabase: Db): Promise<Map<string, string
   if (!user) return null;
   const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
   if (!me?.school_id) return null;
-  // Before the grades update, there's nothing to ask: every school is a Qur'an school.
+  // Before the grades update there's no such column: a Qur'an school.
   const { data: school, error } = await supabase.from("schools").select("organised_by_grade").eq("id", me.school_id).maybeSingle();
-  if (error || school?.organised_by_grade !== true) return null;
+  const graded = !error && school?.organised_by_grade === true;
 
+  // Their halaqas at the school they're in now.
   const [{ data: leads }, { data: shares }] = await Promise.all([
-    supabase.from("classes").select("id").eq("teacher_id", user.id),
+    supabase.from("classes").select("id").eq("teacher_id", user.id).eq("school_id", me.school_id),
     supabase.from("class_teachers").select("class_id").eq("teacher_id", user.id),
   ]);
   const ids = [...new Set([...(leads ?? []).map((c) => c.id as string), ...(shares ?? []).map((c) => c.class_id as string)])];
@@ -31,15 +33,21 @@ export async function myHalaqaStudents(supabase: Db): Promise<Map<string, string
   if (ids.length === 0) return mine;
 
   const [{ data: halaqas }, { data: enrolments }, campuses] = await Promise.all([
-    supabase.from("classes").select("id, name, grade, campus_id").in("id", ids),
+    graded
+      ? supabase.from("classes").select("id, name, grade, campus_id, school_id").in("id", ids)
+      : supabase.from("classes").select("id, name, school_id").in("id", ids),
     supabase.from("class_enrollments").select("class_id, student_id").in("class_id", ids),
-    loadCampuses(supabase),
+    graded ? loadCampuses(supabase) : Promise.resolve([]),
   ]);
   const where = new Map(
-    (halaqas ?? []).map((h) => [
-      h.id as string,
-      [gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name as string].filter(Boolean).join(" · "),
-    ])
+    ((halaqas ?? []) as Array<{ id: string; name: string; grade?: number; campus_id?: string | null; school_id: string }>)
+      .filter((h) => h.school_id === me.school_id)
+      .map((h) => [
+        h.id,
+        graded
+          ? [gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
+          : h.name,
+      ])
   );
   for (const e of enrolments ?? []) {
     const label = where.get(e.class_id as string);
