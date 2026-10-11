@@ -18,6 +18,7 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import StudentImport from "@/components/StudentImport";
 import WeeklyReportsCard from "@/components/WeeklyReportsCard";
+import StudentPins from "@/components/StudentPins";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { GRADES, gradeLabel } from "@/lib/grades";
@@ -676,6 +677,19 @@ export default function AdminStudentsPage() {
       )}
 
       {!isDemo && schoolId && <WeeklyReportsCard schoolId={schoolId} graded={graded} />}
+
+      {!isDemo && schoolId && ready && (
+        <StudentPins
+          schoolName={schoolName}
+          refreshKey={students.length}
+          placeOf={(id) => {
+            const s = students.find((x) => x.id === id);
+            const h = s ? studentHalaqa(s) : undefined;
+            return [graded && s?.grade !== undefined ? gradeLabel(s.grade) : null, h ? halaqaInGrade(h) : null].filter(Boolean).join(" · ");
+          }}
+          onDone={() => loadRealStudents()}
+        />
+      )}
 
       {showImport && (
         <StudentImport

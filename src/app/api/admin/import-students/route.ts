@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse, after } from "next/server";
 import { randomBytes } from "crypto";
 import { createProvisionedUser } from "@/lib/accountProvisioning";
-import { sendAccountWelcomes, type NewAccount } from "@/lib/accountWelcome";
+import { sendAccountWelcomes } from "@/lib/accountWelcome";
+import { parentLoginsFor } from "@/lib/parentLogins";
 import { requireAdmin } from "@/lib/adminAccounts";
 import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 import { gradeLabel, isGrade } from "@/lib/grades";
@@ -138,45 +139,9 @@ export async function POST(req: NextRequest) {
     };
 
     // A parent once per batch, however many of their children are in it.
-    type ParentOutcome = { id: string | null; status: "created" | "linked" | "failed"; reason?: string; password?: string };
-    const parentsSeen = new Map<string, ParentOutcome>();
-    const welcomes: NewAccount[] = [];
-    const parentFor = async (row: ImportRow, childName: string) => {
-      const email = key(row.parentEmail);
-      const seen = parentsSeen.get(email);
-      if (seen) return { email, ...seen };
-      const { data: holder } = await admin.from("profiles").select("id, role, school_id, full_name").eq("email", email).maybeSingle();
-      let result: ParentOutcome;
-      if (holder) {
-        result =
-          holder.school_id === schoolId && holder.role === "parent"
-            ? { id: holder.id, status: "linked" }
-            : {
-                id: null,
-                status: "failed",
-                reason:
-                  holder.school_id === schoolId
-                    ? `${email} is ${holder.full_name || "someone"}'s ${holder.role} login here, so it can't also be a parent's`
-                    : `${email} already has a MyDiiwaan login at another school`,
-              };
-      } else {
-        const name = String(row.parentName ?? "").trim() || `${childName}'s parent`;
-        const password = randomBytes(9).toString("base64url");
-        const { data, error } = await createProvisionedUser(admin, {
-          email,
-          password,
-          user_metadata: { role: "parent", full_name: name, school_id: schoolId, must_change_password: true },
-        });
-        if (error || !data.user) {
-          result = { id: null, status: "failed", reason: error?.message ?? "Couldn't make their login" };
-        } else {
-          result = { id: data.user.id, status: "created", password };
-          welcomes.push({ userId: data.user.id, name, email, role: "parent", children: [] });
-        }
-      }
-      parentsSeen.set(email, result);
-      return { email, ...result };
-    };
+    const parents = parentLoginsFor(admin, schoolId);
+    const welcomes = parents.welcomes;
+    const parentFor = (row: ImportRow, childName: string) => parents.forEmail(row.parentEmail, row.parentName, childName);
 
     const results: RowResult[] = [];
     for (const row of rows) {

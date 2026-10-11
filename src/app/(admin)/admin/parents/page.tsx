@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { welcomeNote } from "@/lib/welcomeNote";
 import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
 import { IconArrow } from "@/components/icons";
+import ParentImport from "@/components/ParentImport";
 
 interface ParentRow {
   id: string;
@@ -42,6 +43,7 @@ export default function AdminParentsPage() {
   const [created, setCreated] = useState<ParentRow[]>([]);
 
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newChildIds, setNewChildIds] = useState<string[]>([]);
@@ -266,15 +268,29 @@ export default function AdminParentsPage() {
           unlinked ? `${unlinked} with no child linked` : "all linked to a child",
         ]}
         actions={
-          <button
-            type="button"
-            onClick={() => setShowForm((v) => !v)}
-            className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
-          >
-            {showForm ? "Cancel" : "+ Add parent"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {!isDemo && (
+              <button
+                type="button"
+                onClick={() => setShowImport((v) => !v)}
+                aria-expanded={showImport}
+                className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
+              >
+                Import from a spreadsheet
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowForm((v) => !v)}
+              className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
+            >
+              {showForm ? "Cancel" : "+ Add parent"}
+            </button>
+          </div>
         }
       />
+
+      {showImport && <ParentImport students={students} onDone={() => loadReal()} onClose={() => setShowImport(false)} />}
 
       {showForm && (
         <form onSubmit={addParent} className="card-quiet p-5 space-y-4">

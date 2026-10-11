@@ -37,7 +37,8 @@ interface ParsedStudent {
   campus: string;
 }
 
-const NAME_PATTERNS = [/^(full[ _-]?name|student[ _-]?name|name)$/i];
+// "Child's name" too: a parents sheet is laid out from the child's side.
+const NAME_PATTERNS = [/^(full[ _-]?name|student[ _-]?name|name|student|child(?:['’]?s)?(?:[ _-]?name)?)$/i];
 const AGE_PATTERNS = [/^age$/i];
 const GRADE_PATTERNS = [/^grade$/i];
 const HALAQA_PATTERNS = [/^(halaqa|class|group|section)$/i];
