@@ -4,6 +4,7 @@ import { emailButton, emailLayout, escapeHtml } from "@/lib/email";
 import { SALAM } from "@/lib/schoolWelcome";
 import { SITE_URL } from "@/lib/site";
 import { weekLabel, type StudentWeek, type WeekRange } from "@/lib/weeklyReport";
+import { greetingName } from "@/lib/names";
 
 // The two weekly emails: a parent's, about the week their children had,
 // and the office's, about the school's. Plain words, what was recorded and
@@ -67,7 +68,7 @@ export function parentWeeklyEmail(args: { parentName: string; children: StudentW
   const school = args.schoolName.replace(/\s+/g, " ").trim();
   const names = list(args.children.map((c) => firstName(c.name)));
   const week = weekLabel(args.range);
-  const greeting = firstName(args.parentName) ? `${SALAM}, ${firstName(args.parentName)},` : `${SALAM},`;
+  const greeting = greetingName(args.parentName) ? `${SALAM}, ${greetingName(args.parentName)},` : `${SALAM},`;
   const intro = `Here's what ${names}'s teachers at ${school} recorded this week, ${week}.`;
   const why = `You get this each Friday when there's learning to report. Replies go to ${school}, and they can switch these emails off.`;
 
@@ -132,7 +133,7 @@ export function officeWeeklyEmail(args: { adminName: string; schoolName: string;
   const absent = args.students
     .filter((s) => s.attendance.absent >= 2)
     .map((s) => `${s.name}${s.place ? ` (${s.place})` : ""} — absent ${s.attendance.absent} days`);
-  const greeting = firstName(args.adminName) ? `${SALAM}, ${firstName(args.adminName)},` : `${SALAM},`;
+  const greeting = greetingName(args.adminName) ? `${SALAM}, ${greetingName(args.adminName)},` : `${SALAM},`;
 
   const counts = [
     `${plural(reported.length, "student")} had learning recorded, and ${plural(args.parentsEmailed, "parent")} ${args.parentsEmailed === 1 ? "was" : "were"} sent their report.`,

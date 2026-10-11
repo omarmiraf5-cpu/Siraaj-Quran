@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { createProvisionedUser } from "@/lib/accountProvisioning";
-import { sendAccountWelcomes } from "@/lib/accountWelcome";
+import { sendAccountWelcomes, sendPasswordResetLink } from "@/lib/accountWelcome";
 import { ACCOUNT_ROLES, requireAdmin, schoolAccount, type AccountRole } from "@/lib/adminAccounts";
 
 // Accounts are made with a temporary password the admin can hand over, so
@@ -184,19 +184,42 @@ export async function PATCH(req: NextRequest) {
   const supabase = await createClient();
 
   try {
-    const { user_id } = await req.json();
+    const { user_id, by } = await req.json();
     if (!user_id) {
       return NextResponse.json({ error: "user_id is required" }, { status: 400 });
     }
 
     const auth = await requireAdmin(supabase);
     if (auth.error) return auth.error;
-    const { caller } = auth;
+    const { caller, user } = auth;
 
     const admin = createAdminClient();
     const found = await schoolAccount(admin, caller, user_id);
     if (found.error) return found.error;
     const { target } = found;
+
+    // Or the office emails them a link to choose a new one themselves,
+    // leaving their current password as it is until they do.
+    if (by === "email") {
+      if (target.active === false) {
+        return NextResponse.json(
+          { error: `${target.full_name || "This account"} is switched off. Switch them back on first.` },
+          { status: 400 }
+        );
+      }
+      if (!target.email) {
+        return NextResponse.json({ error: "This account has no email to send to." }, { status: 400 });
+      }
+      const { data: school } = await admin.from("schools").select("name").eq("id", caller.school_id).maybeSingle();
+      const sent = await sendPasswordResetLink(
+        { userId: target.id, name: target.full_name ?? "", email: target.email },
+        { name: school?.name ?? "Your school", replyTo: user.email }
+      );
+      if (!sent.ok) {
+        return NextResponse.json({ error: `The email didn't send: ${sent.reason}` }, { status: 502 });
+      }
+      return NextResponse.json({ id: target.id, full_name: target.full_name, email: target.email, emailed: true });
+    }
 
     // Merged rather than replaced: updateUserById overwrites user_metadata
     // wholesale, and dropping role/school_id from it would orphan the

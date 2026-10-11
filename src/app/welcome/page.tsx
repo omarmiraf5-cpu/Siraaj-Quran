@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { greetingName } from "@/lib/names";
 
 interface Welcome {
   name: string;
@@ -28,6 +29,8 @@ export default function WelcomePage() {
   const { t } = useLanguage();
 
   const [token, setToken] = useState("");
+  // Sent by the school as a reset rather than a welcome: worded for a new password.
+  const [reset, setReset] = useState(false);
   const [account, setAccount] = useState<Welcome | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [password, setPassword] = useState("");
@@ -37,8 +40,10 @@ export default function WelcomePage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const found = new URLSearchParams(window.location.search).get("token") ?? "";
+    const params = new URLSearchParams(window.location.search);
+    const found = params.get("token") ?? "";
     setToken(found);
+    setReset(params.get("reset") === "1");
     if (!found) {
       setProblem("link");
       return;
@@ -96,7 +101,7 @@ export default function WelcomePage() {
     }
   };
 
-  const firstName = account?.name.trim().split(/\s+/)[0] ?? "";
+  const firstName = account ? greetingName(account.name) : "";
   const field =
     "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
 
@@ -104,7 +109,7 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-surface-bg flex items-center justify-center px-4 py-12">
       <div className="card-quiet w-full max-w-sm p-8 space-y-5">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-bold text-ink">{t("welcome.title")}</h1>
+          <h1 className="text-xl font-bold text-ink">{t(reset ? "welcome.resetTitle" : "welcome.title")}</h1>
           <LanguageToggle
             variant="pill"
             className="flex-shrink-0 bg-surface-card border border-surface-border text-ink-muted hover:text-ink"
@@ -144,13 +149,15 @@ export default function WelcomePage() {
                 {t("welcome.salam")}
                 {firstName ? ` ${firstName}` : ""}
               </p>
-              <p className="text-ink-muted">
-                {t("welcome.addedTo")}{" "}
-                <strong className="text-ink">
-                  <bdi>{account.school}</bdi>
-                </strong>
-                .
-              </p>
+              {!reset && (
+                <p className="text-ink-muted">
+                  {t("welcome.addedTo")}{" "}
+                  <strong className="text-ink">
+                    <bdi>{account.school}</bdi>
+                  </strong>
+                  .
+                </p>
+              )}
               <p className="text-ink-muted">
                 {t("welcome.passwordFor")}
                 <span className="block font-semibold text-ink [overflow-wrap:anywhere]">

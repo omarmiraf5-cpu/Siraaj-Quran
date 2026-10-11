@@ -4,6 +4,7 @@ import { emailButton, emailLayout, escapeHtml, sendEmailBatch, type EmailResult 
 import { HADITH, quoteHtml, quoteText, SALAM } from "@/lib/schoolWelcome";
 import { EMAIL_FROM, SITE_URL, SUPPORT_EMAIL } from "@/lib/site";
 import { makeWelcomeToken, welcomeLink, WELCOME_LINK_DAYS } from "@/lib/welcomeLink";
+import { greetingName } from "@/lib/names";
 
 /** A teacher's or parent's login, just made by their school. */
 export interface NewAccount {
@@ -44,7 +45,7 @@ export function accountWelcomeEmail(args: {
   repliesToSchool: boolean;
 }) {
   const school = args.schoolName.replace(/\s+/g, " ").trim();
-  const firstName = firstNameOf(args.name);
+  const firstName = greetingName(args.name);
   const greeting = firstName ? `${SALAM}, ${firstName},` : `${SALAM},`;
   const children = args.children ?? [];
   const added = `${school} has added you to MyDiiwaan as a ${args.role}.`;
@@ -138,4 +139,86 @@ export function sendAccountWelcomes(
       }),
     }))
   );
+}
+
+/**
+ * A link to choose a new password, sent by the school's office for one of
+ * its teachers or parents — instead of reading them a temporary one. Their
+ * current password keeps working until they use it.
+ */
+export function passwordResetEmail(args: {
+  name: string;
+  email: string;
+  schoolName: string;
+  link: string;
+  repliesToSchool: boolean;
+}) {
+  const school = args.schoolName.replace(/\s+/g, " ").trim();
+  const firstName = greetingName(args.name);
+  const greeting = firstName ? `${SALAM}, ${firstName},` : `${SALAM},`;
+  const sent = `${school} has sent you a link to choose a new password for MyDiiwaan.`;
+  const signIn = `You'll sign in with ${args.email}. The link works once, for ${WELCOME_LINK_DAYS} days, and until you use it your current password still works.`;
+  const notYou = "If you didn't ask for this, you can ignore this email.";
+  const questions = args.repliesToSchool
+    ? "Questions? Reply to this email and it goes to your school."
+    : "Questions? Just reply to this email.";
+  const text = [
+    greeting,
+    "",
+    sent,
+    "",
+    "Choose your new password here:",
+    args.link,
+    "",
+    signIn,
+    "",
+    notYou,
+    "",
+    questions,
+    "",
+    "Wassalamu alaikum wa rahmatullahi wa barakatuh,",
+    "The MyDiiwaan team",
+  ].join("\n");
+
+  const para = "margin:6px 0 0;font-size:15px;line-height:1.55;color:#1f2430;";
+  const small = "margin:6px 0 0;font-size:13px;line-height:1.5;color:#6b6f7a;";
+  const html = emailLayout({
+    eyebrow: "Your password",
+    content: `<tr><td style="padding:26px 28px 4px;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:#0e2347;">Choose a new password</div>
+    <p style="margin:16px 0 0;font-size:15px;line-height:1.55;">${escapeHtml(greeting)}</p>
+    <p style="${para}">${escapeHtml(sent)}</p>
+    <div style="margin-top:18px;">${emailButton(args.link, "Choose a new password")}</div>
+    <p style="${small}margin-top:14px;">${escapeHtml(signIn)}</p>
+    <p style="${small}">${escapeHtml(notYou)}</p>
+  </td></tr>
+  <tr><td style="padding:22px 28px 28px;">
+    <p style="${para}">${questions}</p>
+    <p style="${para}margin-top:14px;">Wassalamu alaikum wa rahmatullahi wa barakatuh,<br>The MyDiiwaan team</p>
+  </td></tr>`,
+    footer: `MyDiiwaan · <a href="${SITE_URL}" style="color:#8a8d96;">mydiiwaan.com</a> · <a href="${SITE_URL}/privacy" style="color:#8a8d96;">Privacy</a>`,
+  });
+
+  return { subject: "Choose a new MyDiiwaan password", html, text };
+}
+
+/** Emails one teacher or parent a link to choose a new password. Never throws. */
+export function sendPasswordResetLink(
+  account: { userId: string; name: string; email: string },
+  school: { name: string; replyTo?: string | null }
+): Promise<EmailResult> {
+  return sendEmailBatch(`Password link for "${account.email}" at "${school.name}"`, () => [
+    {
+      from: EMAIL_FROM,
+      to: account.email,
+      replyTo: school.replyTo || SUPPORT_EMAIL,
+      ...passwordResetEmail({
+        name: account.name,
+        email: account.email,
+        schoolName: school.name,
+        link: welcomeLink(makeWelcomeToken(account.userId), { reset: true }),
+        repliesToSchool: Boolean(school.replyTo),
+      }),
+    },
+  ]);
 }

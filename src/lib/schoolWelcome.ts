@@ -2,6 +2,7 @@ import "server-only";
 
 import { emailButton, emailLayout, escapeHtml, sendEmail, type EmailResult } from "@/lib/email";
 import { EMAIL_FROM, SITE_URL, SUPPORT_EMAIL } from "@/lib/site";
+import { greetingName } from "@/lib/names";
 
 /** The school a new admin has just finished setting up. */
 export interface WelcomedSchool {
@@ -79,7 +80,7 @@ export const quoteText = (q: Quote) => [`  ${q.arabic}`, `  “${q.english}”`,
  */
 export function schoolWelcomeEmail(school: WelcomedSchool) {
   const name = school.name.replace(/\s+/g, " ").trim();
-  const firstName = school.adminName.trim().split(/\s+/)[0];
+  const firstName = greetingName(school.adminName);
   const greeting = firstName ? `${SALAM}, ${firstName},` : `${SALAM},`;
   const loginUrl = `${SITE_URL}/login`;
   const studentUrl = `${SITE_URL}/login?school=${encodeURIComponent(school.slug)}`;

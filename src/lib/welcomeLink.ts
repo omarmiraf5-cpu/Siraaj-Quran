@@ -68,5 +68,9 @@ export function welcomeSpent(appMetadata: Record<string, unknown> | undefined, i
   return Number.isFinite(used) && used >= issuedAt;
 }
 
-/** Where the email's button goes: the page that takes the new password. */
-export const welcomeLink = (token: string) => `${SITE_URL}/welcome?token=${encodeURIComponent(token)}`;
+/**
+ * Where the email's button goes: the page that takes the new password —
+ * worded for choosing a new one when the school sent it as a reset.
+ */
+export const welcomeLink = (token: string, opts: { reset?: boolean } = {}) =>
+  `${SITE_URL}/welcome?token=${encodeURIComponent(token)}${opts.reset ? "&reset=1" : ""}`;

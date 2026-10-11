@@ -2,6 +2,7 @@ import "server-only";
 
 import { emailButton, emailLayout, escapeHtml, sendEmail, type EmailResult } from "@/lib/email";
 import { EMAIL_FROM, SITE_URL, SUPPORT_EMAIL } from "@/lib/site";
+import { greetingName } from "@/lib/names";
 
 /**
  * The "reset your password" email: one button to the page where a new
@@ -9,7 +10,7 @@ import { EMAIL_FROM, SITE_URL, SUPPORT_EMAIL } from "@/lib/site";
  * spent only when the new password is actually submitted.
  */
 export function passwordResetEmail({ name, email, link }: { name: string; email: string; link: string }) {
-  const firstName = name.trim().split(/\s+/)[0];
+  const firstName = greetingName(name);
   const greeting = firstName ? `Assalamu alaikum ${firstName},` : "Assalamu alaikum,";
   const expiry =
     "For your security, the link works only once and expires after a while. If it has expired, ask for a new one from the sign-in page.";

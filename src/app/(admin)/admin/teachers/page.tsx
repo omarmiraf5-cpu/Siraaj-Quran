@@ -309,6 +309,33 @@ export default function AdminTeachersPage() {
     }
   };
 
+  // Or a link by email, so they choose a new password themselves and
+  // nobody has to pass one on.
+  const emailResetLink = async (t: DemoTeacher) => {
+    if (isDemo) {
+      setResetNote("Sample data — there's no real account to email.");
+      return;
+    }
+    setResetting(true);
+    setResetNote(null);
+    try {
+      const res = await fetch("/api/admin/accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: t.id, by: "email" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't send the email");
+      setResetNote(
+        `Emailed ${data.email} a link to choose a new password. It works once, for 14 days, and their current password keeps working until they use it.`
+      );
+    } catch (err) {
+      setResetNote(err instanceof Error ? err.message : "Couldn't send the email");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const saveEdit = async (t: DemoTeacher) => {
     if (isDemo) {
       const patch: TeacherOverride = {
@@ -576,14 +603,24 @@ export default function AdminTeachersPage() {
                       </div>
 
                       <div className="pt-3 border-t border-surface-border">
-                        <button
-                          type="button"
-                          onClick={() => resetPassword(t)}
-                          disabled={resetting}
-                          className="text-[13px] font-semibold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
-                        >
-                          {resetting ? "Resetting…" : "Reset password"}
-                        </button>
+                        <div className="flex flex-wrap gap-x-5 gap-y-2">
+                          <button
+                            type="button"
+                            onClick={() => emailResetLink(t)}
+                            disabled={resetting}
+                            className="text-[13px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline transition-colors disabled:opacity-50"
+                          >
+                            Email a reset link
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => resetPassword(t)}
+                            disabled={resetting}
+                            className="text-[13px] font-semibold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
+                          >
+                            {resetting ? "Working…" : "Get a temporary password"}
+                          </button>
+                        </div>
                         {resetNote && (
                           <p className="text-[11px] text-ink mt-2 leading-relaxed break-words">{resetNote}</p>
                         )}

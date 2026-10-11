@@ -108,6 +108,33 @@ export default function AdminParentsPage() {
     }
   };
 
+  // Or a link by email, so they choose a new password themselves and
+  // nobody has to pass one on.
+  const emailResetLink = async (p: ParentRow) => {
+    if (isDemo) {
+      setNote("Sample data — there's no real account to email.");
+      return;
+    }
+    setResettingId(p.id);
+    setNote(null);
+    try {
+      const res = await fetch("/api/admin/accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: p.id, by: "email" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't send the email");
+      setNote(
+        `Emailed ${data.email} a link to choose a new password. It works once, for 14 days, and their current password keeps working until they use it.`
+      );
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "Couldn't send the email");
+    } finally {
+      setResettingId(null);
+    }
+  };
+
   const loadReal = async () => {
     const { data: profileRows } = await supabase
       .from("profiles")
@@ -398,14 +425,24 @@ export default function AdminParentsPage() {
                       </div>
 
                       <div className="pt-3 border-t border-surface-border">
-                        <button
-                          type="button"
-                          onClick={() => resetPassword(p)}
-                          disabled={resettingId === p.id}
-                          className="text-[13px] font-semibold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
-                        >
-                          {resettingId === p.id ? "Resetting…" : "Reset password"}
-                        </button>
+                        <div className="flex flex-wrap gap-x-5 gap-y-2">
+                          <button
+                            type="button"
+                            onClick={() => emailResetLink(p)}
+                            disabled={resettingId === p.id}
+                            className="text-[13px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline transition-colors disabled:opacity-50"
+                          >
+                            Email a reset link
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => resetPassword(p)}
+                            disabled={resettingId === p.id}
+                            className="text-[13px] font-semibold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
+                          >
+                            {resettingId === p.id ? "Working…" : "Get a temporary password"}
+                          </button>
+                        </div>
                       </div>
 
                       {!isDemo && (
