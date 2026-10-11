@@ -23,6 +23,8 @@ import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { GRADES, gradeLabel } from "@/lib/grades";
 import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
+import { loadRoster } from "@/lib/rosterExport";
+import { download, fileNameFor } from "@/lib/sheetTools";
 
 const bigField =
   "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
@@ -59,6 +61,7 @@ export default function AdminStudentsPage() {
   const [campusFilter, setCampusFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [newName, setNewName] = useState("");
   // A halaqa by its id; in the sample school, by its name.
   const [newHalaqa, setNewHalaqa] = useState("");
@@ -193,6 +196,30 @@ export default function AdminStudentsPage() {
       : halaqas;
   const studentHalaqa = (s: DemoStudent) =>
     isDemo ? halaqas.find((h) => h.name === s.halaqa) : s.halaqaId ? halaqaById(s.halaqaId) : undefined;
+
+  // Every student as a spreadsheet: where they are, their PIN, their parents.
+  const downloadList = async () => {
+    setExporting(true);
+    try {
+      const roster = await loadRoster(supabase);
+      const where = (h: { name: string; campusId: string | null }) => [campusName(h.campusId), h.name].filter(Boolean).join(" · ");
+      const name = schoolName || ((await supabase.from("schools").select("name").maybeSingle()).data?.name as string | undefined) || "";
+      download(fileNameFor(name, "students"), [
+        ["Name", ...(graded ? ["Grade"] : []), "Halaqa", "Active", "PIN", "Parents", "Parent emails"],
+        ...roster.map((s) => [
+          s.name,
+          ...(graded ? [s.grade == null ? "" : gradeLabel(s.grade)] : []),
+          s.halaqas.map(where).join(", "),
+          s.active ? "Yes" : "No",
+          s.pin ?? "",
+          s.parents.map((p) => p.name).join(", "),
+          s.parents.map((p) => p.email).join(", "),
+        ]),
+      ]);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const addStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -631,6 +658,16 @@ export default function AdminStudentsPage() {
             className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-sm font-semibold px-4 py-2.5 rounded-2xl hover:border-brand-navy/40 transition"
           >
             Import from a spreadsheet
+          </button>
+        )}
+        {!isDemo && (
+          <button
+            type="button"
+            onClick={downloadList}
+            disabled={exporting}
+            className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-sm font-semibold px-4 py-2.5 rounded-2xl hover:border-brand-navy/40 transition disabled:opacity-50"
+          >
+            {exporting ? "Getting them…" : "Download the list"}
           </button>
         )}
         <button

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { download, fileNameFor, printPinSheet } from "@/lib/sheetTools";
+import { loadRoster } from "@/lib/rosterExport";
 
 // Parents for the students a school already has, from a spreadsheet: each
 // row a child's name and their parent's name and email. Read, matched to
@@ -65,6 +66,27 @@ export default function ParentImport({
       .then(({ data }) => setSchoolName((data?.name as string | undefined) ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The school's own students, ready for their parents to be typed in:
+  // those with parents already show them, and can be left as they are.
+  const [fetching, setFetching] = useState(false);
+  const downloadStudents = async () => {
+    setFetching(true);
+    try {
+      const roster = (await loadRoster(supabase)).filter((s) => s.active);
+      roster.sort((a, b) => (a.halaqas[0]?.name ?? "").localeCompare(b.halaqas[0]?.name ?? "") || a.name.localeCompare(b.name));
+      const name = schoolName || ((await supabase.from("schools").select("name").maybeSingle()).data?.name as string | undefined) || "";
+      download(fileNameFor(name, "students for parents"), [
+        TEMPLATE[0],
+        ...roster.flatMap((s) => {
+          const halaqa = s.halaqas.map((h) => h.name).join(", ");
+          return s.parents.length > 0 ? s.parents.map((p) => [s.name, halaqa, p.name, p.email]) : [[s.name, halaqa, "", ""]];
+        }),
+      ]);
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const read = async (file: File) => {
     setReading(true);
@@ -177,7 +199,8 @@ export default function ParentImport({
           <p className="text-[12.5px] text-ink-muted mt-1 leading-relaxed">
             For students already here. One row per child: <strong>Child&apos;s name</strong>, <strong>Parent Name</strong>,{" "}
             <strong>Parent Email</strong>, and their <strong>Halaqa</strong> if two children share a name. A parent of several children
-            gets one login, and each new parent is emailed a link to choose their password.
+            gets one login, and each new parent is emailed a link to choose their password. Easiest: download your students, fill in
+            each parent&apos;s name and email, and choose that file.
           </p>
         </div>
         <button type="button" onClick={onClose} className="text-[13px] font-semibold text-ink-muted hover:text-ink flex-shrink-0">
@@ -201,6 +224,9 @@ export default function ParentImport({
               }}
             />
           </label>
+          <button type="button" onClick={downloadStudents} disabled={fetching} className={ghost}>
+            {fetching ? "Getting them…" : "Download your students to fill in"}
+          </button>
           <button type="button" onClick={() => download("parents template.csv", TEMPLATE)} className={ghost}>
             Download a template
           </button>
