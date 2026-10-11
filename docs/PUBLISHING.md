@@ -1,9 +1,13 @@
 # Publishing MyDiiwaan on the App Store and Google Play
 
-The apps are the live portal in a native shell: they open mydiiwaan.com, so
-**every change to the website reaches the apps immediately**, with no store
-review. You only publish a new app version when something native changes
-(the icon, permissions, a new plugin).
+The apps are the live portal in a native shell: they open
+https://www.mydiiwaan.com, so **every change to the website reaches the apps
+immediately**, with no store review. You only publish a new app version when
+something native changes (the icon, permissions, a new plugin).
+
+The steps only you can do — accounts, signing, screenshots, privacy forms —
+are written out in plain language in `docs/app-store-release.md`. This file
+is the GitHub build path that goes with them.
 
 Builds run on GitHub — no Mac needed. You do everything below from a browser.
 
@@ -18,9 +22,10 @@ Builds run on GitHub — no Mac needed. You do everything below from a browser.
    `omar.miraf5@gmail.com` (set in `src/lib/site.ts` — change it there, or
    ask Claude, and the site and apps follow at once; the store listings'
    contact email is typed into each store's form and changed there).
-3. **Check the web address.** Open `mydiiwaan.com` in Safari. If the address
-   bar changes to `www.mydiiwaan.com`, tell Claude — the app should then load
-   the www address directly.
+3. **Web address.** The app loads `https://www.mydiiwaan.com` directly. The
+   bare `mydiiwaan.com` name is a Cloudflare CNAME to Vercel and 308-redirects
+   to www. In Supabase → Authentication → URL Configuration, set Site URL to
+   `https://www.mydiiwaan.com` and allow `https://www.mydiiwaan.com/**`.
 4. **A review school.** Apple and Google test the app by signing in. On your
    `/platform` page, set up a school called e.g. *MyDiiwaan Review School*
    with a few students, one teacher, one parent (linked to a child) and
@@ -91,8 +96,8 @@ App Store Connect → your app → **1.0 Prepare for Submission**.
   `App-Store-iPhone-6.9` into the 6.9" iPhone slot, `App-Store-iPad-13` into
   the 13" iPad slot. (Apple scales them for the other sizes.)
 - **Promotional text, Description, Keywords, Subtitle**: see section C.
-- **Support URL**: `https://mydiiwaan.com/support`
-- **Marketing URL**: `https://mydiiwaan.com`
+- **Support URL**: `https://www.mydiiwaan.com/support`
+- **Marketing URL**: `https://www.mydiiwaan.com`
 - **Build**: choose the one from TestFlight.
 - **App Review Information** → Sign-in required: yes → give the **teacher**
   login from step 0.4, and paste into Notes:
@@ -117,7 +122,7 @@ App Store Connect → your app → **1.0 Prepare for Submission**.
   the rating from your answers.
 
 **App Privacy** (left menu) → Privacy Policy URL:
-`https://mydiiwaan.com/privacy`, then **Get Started** → *Yes, we collect data*:
+`https://www.mydiiwaan.com/privacy`, then **Get Started** → *Yes, we collect data*:
 
 | Data type | Used for | Linked to the person | Tracking |
 |---|---|---|---|
@@ -179,7 +184,7 @@ uploads) → release notes: `First release` → Save → Review → Start rollou
 Add testers by email list, and share the opt-in link with them.
 
 ### B6. App content (left menu → Policy → App content)
-- **Privacy policy**: `https://mydiiwaan.com/privacy`
+- **Privacy policy**: `https://www.mydiiwaan.com/privacy`
 - **App access**: all functionality needs a login → add the demo logins and
   the same notes as A7.
 - **Ads**: No ads.
@@ -193,7 +198,7 @@ Add testers by email list, and share the opt-in link with them.
 - **Data safety**:
   - Collects data: Yes. Encrypted in transit: Yes. Users can request
     deletion: Yes — in the app (Account → Delete account) and at
-    `https://mydiiwaan.com/account`.
+    `https://www.mydiiwaan.com/account`.
   - Personal info: Name, Email address, Phone number — App functionality,
     required.
   - Location: Precise location — App functionality, *processed ephemerally*
@@ -212,7 +217,7 @@ Add testers by email list, and share the opt-in link with them.
 - Phone screenshots: the `Google-Play/googleplay-phone-*.png` files.
 - Tablet screenshots (optional): the iPad images work for 10" tablets.
 - Category: **Education**. Contact email: `omar.miraf5@gmail.com`.
-  Website: `https://mydiiwaan.com`.
+  Website: `https://www.mydiiwaan.com`.
 
 ### B8. Production
 After the closed test has run (12 testers, 14 days, for a personal account),
