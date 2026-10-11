@@ -809,7 +809,7 @@ export function allFees(created: DemoFee[], overrides: Record<string, FeeOverrid
 }
 
 export function money(amount: number): string {
-  return `$${amount.toFixed(2)}`;
+  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ── Announcements ────────────────────────────────────────────────────────

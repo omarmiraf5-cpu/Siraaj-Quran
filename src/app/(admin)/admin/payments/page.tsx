@@ -25,12 +25,41 @@ import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/port
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { SalariesPanel } from "@/components/SalariesPanel";
+import { ExpensesPanel } from "@/components/ExpensesPanel";
+
+type Tab = "fees" | "salaries" | "expenses";
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "fees", label: "Fees" },
+  { id: "salaries", label: "Salaries" },
+  { id: "expenses", label: "Expenses" },
+];
+const TAB_KEY = "payments_tab";
 
 export default function AdminPaymentsPage() {
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  // The tab the office was last on, on this device.
+  const [tab, setTab] = useState<Tab>("fees");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(TAB_KEY);
+      if (saved === "salaries" || saved === "expenses") setTab(saved);
+    } catch {
+      /* private mode */
+    }
+  }, []);
+  const chooseTab = (next: Tab) => {
+    setTab(next);
+    try {
+      localStorage.setItem(TAB_KEY, next);
+    } catch {
+      /* private mode */
+    }
+  };
 
   const [fees, setFees] = useState<DemoFee[]>([]);
   const [students, setStudents] = useState<DemoStudent[]>([]);
@@ -96,6 +125,7 @@ export default function AdminPaymentsPage() {
         return;
       }
 
+      setUserId(user.id);
       const { data: profile } = await supabase
         .from("profiles")
         .select("school_id")
@@ -207,180 +237,210 @@ export default function AdminPaymentsPage() {
       <PortalHero
         eyebrow="Finance"
         title="Payments"
-        meta={[`${money(collected)} collected`, `${money(outstanding)} outstanding`]}
+        meta={
+          tab === "fees"
+            ? [`${money(collected)} collected`, `${money(outstanding)} outstanding`]
+            : [tab === "salaries" ? "What the school pays its staff" : "What the school spends"]
+        }
         actions={
-          <button
-            type="button"
-            onClick={() => setShowForm((v) => !v)}
-            className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
-          >
-            {showForm ? "Cancel" : "+ Record fee"}
-          </button>
+          tab === "fees" ? (
+            <button
+              type="button"
+              onClick={() => setShowForm((v) => !v)}
+              className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
+            >
+              {showForm ? "Cancel" : "+ Record fee"}
+            </button>
+          ) : undefined
         }
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile value={money(billed)} label="Billed" sub={`${fees.length} charges`} />
-        <StatTile value={money(collected)} label="Collected" sub="received to date" />
-        <StatTile value={money(outstanding)} label="Outstanding" sub="still owed" />
-        <StatTile value={unpaidCount} label="Unpaid" sub={unpaidCount === 1 ? "charge" : "charges"} />
+      <div role="tablist" aria-label="Payments" className="flex gap-1 p-1 rounded-2xl bg-surface-card border border-surface-border">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => chooseTab(t.id)}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
+              tab === t.id ? "bg-brand-navy text-white" : "text-ink-muted hover:text-ink hover:bg-surface-bg-warm"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {showForm && (
-        <form onSubmit={addFee} className="card-quiet p-5 space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Student *</label>
-            <select
-              value={newStudent}
-              onChange={(e) => setNewStudent(e.target.value)}
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-            >
-              <option value="">Choose a student…</option>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Description *</label>
-            <input
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              placeholder="e.g. Term 1 tuition"
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-semibold text-ink mb-2">Amount *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={newAmount}
-                onChange={(e) => setNewAmount(e.target.value)}
-                placeholder="300"
-                className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-ink mb-2">Due date *</label>
-              <input
-                type="date"
-                value={newDueDate}
-                onChange={(e) => setNewDueDate(e.target.value)}
-                className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-              />
-            </div>
-          </div>
-          {formError && <p className="text-sm text-status-error-text">{formError}</p>}
-          <button
-            type="submit"
-            disabled={!newStudent || !newAmount || !newDueDate || saving}
-            className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
-          >
-            {saving ? "Saving…" : "Record fee"}
-          </button>
-        </form>
-      )}
+      {tab === "salaries" && ready && <SalariesPanel isDemo={isDemo} schoolId={schoolId} userId={userId} />}
+      {tab === "expenses" && ready && <ExpensesPanel isDemo={isDemo} schoolId={schoolId} userId={userId} />}
 
-      <SectionCard title="All charges" note={`${fees.length} total`}>
-        {!ready ? (
-          <LoadingNote />
-        ) : sorted.length === 0 ? (
-          <EmptyNote>No fees recorded yet.</EmptyNote>
-        ) : (
-          <ul className="divide-y divide-surface-border -my-1">
-            {sorted.map((f) => {
-              const status = feeStatus(f);
-              const isOpen = openId === f.id;
-              const remaining = f.amountDue - f.amountPaid;
-              return (
-                <li key={f.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpenId(isOpen ? null : f.id);
-                      setPayAmount("");
-                    }}
-                    aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
-                  >
-                    <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
-                      {initials(studentName(f.studentId))}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">{studentName(f.studentId)}</p>
-                      <p className="text-[11px] text-ink-muted truncate">
-                        {f.description} · due {f.dueDate}
-                      </p>
-                    </div>
-                    <div className="text-end flex-shrink-0">
-                      <p className="text-[13px] font-semibold text-ink">
-                        {money(f.amountPaid)} <span className="text-ink-muted font-normal">/ {money(f.amountDue)}</span>
-                      </p>
-                      <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5 ${FEE_STATUS_STYLES[status]}`}>
-                        {FEE_STATUS_LABELS[status]}
-                      </span>
-                    </div>
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
-                    </span>
-                  </button>
+      {tab === "fees" && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatTile value={money(billed)} label="Billed" sub={`${fees.length} charges`} />
+            <StatTile value={money(collected)} label="Collected" sub="received to date" />
+            <StatTile value={money(outstanding)} label="Outstanding" sub="still owed" />
+            <StatTile value={unpaidCount} label="Unpaid" sub={unpaidCount === 1 ? "charge" : "charges"} />
+          </div>
 
-                  {isOpen && (
-                    <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
-                      {status === "paid" ? (
-                        <p className="text-[13px] text-ink-muted">
-                          Paid in full on {f.dueDate}. Nothing outstanding.
-                        </p>
-                      ) : (
-                        <>
-                          <p className="text-[13px] text-ink-muted">
-                            {money(remaining)} still outstanding.
+          {showForm && (
+            <form onSubmit={addFee} className="card-quiet p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-ink mb-2">Student *</label>
+                <select
+                  value={newStudent}
+                  onChange={(e) => setNewStudent(e.target.value)}
+                  className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                >
+                  <option value="">Choose a student…</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink mb-2">Description *</label>
+                <input
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="e.g. Term 1 tuition"
+                  className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-ink mb-2">Amount *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newAmount}
+                    onChange={(e) => setNewAmount(e.target.value)}
+                    placeholder="300"
+                    className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-ink mb-2">Due date *</label>
+                  <input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  />
+                </div>
+              </div>
+              {formError && <p className="text-sm text-status-error-text">{formError}</p>}
+              <button
+                type="submit"
+                disabled={!newStudent || !newAmount || !newDueDate || saving}
+                className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
+              >
+                {saving ? "Saving…" : "Record fee"}
+              </button>
+            </form>
+          )}
+
+          <SectionCard title="All charges" note={`${fees.length} total`}>
+            {!ready ? (
+              <LoadingNote />
+            ) : sorted.length === 0 ? (
+              <EmptyNote>No fees recorded yet.</EmptyNote>
+            ) : (
+              <ul className="divide-y divide-surface-border -my-1">
+                {sorted.map((f) => {
+                  const status = feeStatus(f);
+                  const isOpen = openId === f.id;
+                  const remaining = f.amountDue - f.amountPaid;
+                  return (
+                    <li key={f.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenId(isOpen ? null : f.id);
+                          setPayAmount("");
+                        }}
+                        aria-expanded={isOpen}
+                        className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                      >
+                        <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
+                          {initials(studentName(f.studentId))}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-ink truncate">{studentName(f.studentId)}</p>
+                          <p className="text-[11px] text-ink-muted truncate">
+                            {f.description} · due {f.dueDate}
                           </p>
-                          <div>
-                            <label className="block text-xs font-semibold text-ink mb-1.5">Payment received</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              max={remaining}
-                              value={payAmount}
-                              onChange={(e) => setPayAmount(e.target.value)}
-                              placeholder={String(remaining)}
-                              className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => recordPayment(f)}
-                              disabled={!Number(payAmount)}
-                              className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
-                            >
-                              Record payment
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPayAmount(String(remaining))}
-                              className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
-                            >
-                              Paid in full
-                            </button>
-                          </div>
-                        </>
+                        </div>
+                        <div className="text-end flex-shrink-0">
+                          <p className="text-[13px] font-semibold text-ink">
+                            {money(f.amountPaid)} <span className="text-ink-muted font-normal">/ {money(f.amountDue)}</span>
+                          </p>
+                          <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5 ${FEE_STATUS_STYLES[status]}`}>
+                            {FEE_STATUS_LABELS[status]}
+                          </span>
+                        </div>
+                        <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
+                          <IconArrow size={14} />
+                        </span>
+                      </button>
+
+                      {isOpen && (
+                        <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                          {status === "paid" ? (
+                            <p className="text-[13px] text-ink-muted">
+                              Paid in full on {f.dueDate}. Nothing outstanding.
+                            </p>
+                          ) : (
+                            <>
+                              <p className="text-[13px] text-ink-muted">
+                                {money(remaining)} still outstanding.
+                              </p>
+                              <div>
+                                <label className="block text-xs font-semibold text-ink mb-1.5">Payment received</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  max={remaining}
+                                  value={payAmount}
+                                  onChange={(e) => setPayAmount(e.target.value)}
+                                  placeholder={String(remaining)}
+                                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => recordPayment(f)}
+                                  disabled={!Number(payAmount)}
+                                  className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
+                                >
+                                  Record payment
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPayAmount(String(remaining))}
+                                  className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
+                                >
+                                  Paid in full
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </SectionCard>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </SectionCard>
+        </>
+      )}
     </div>
   );
 }

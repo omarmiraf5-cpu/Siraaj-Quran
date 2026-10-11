@@ -2209,6 +2209,86 @@ begin
 end $$;
 
 -- ══════════════════════════════════════
+-- Salaries and expenses
+-- ══════════════════════════════════════
+-- The office's side of the money, beside the fees: what it pays its staff
+-- each month and what it spends. Only the school's admins see any of it.
+
+-- Whether someone is one of a school's staff: an admin or teacher there,
+-- or a teacher there who's switched into another of their schools.
+create or replace function is_school_staff(uid uuid, sid uuid)
+returns boolean
+language plpgsql security definer stable set search_path = public
+as $$
+begin
+  if exists (select 1 from profiles where id = uid and school_id = sid and role in ('admin', 'teacher')) then
+    return true;
+  end if;
+  return exists (select 1 from school_memberships where user_id = uid and school_id = sid);
+end;
+$$;
+
+-- Each staff member's usual monthly salary, to fill in when they're paid.
+create table if not exists staff_pay_rates (
+  school_id       uuid not null references schools(id) on delete cascade,
+  staff_id        uuid not null references profiles(id) on delete cascade,
+  monthly_amount  numeric(10,2) not null check (monthly_amount >= 0),
+  updated_at      timestamptz not null default now(),
+  primary key (school_id, staff_id)
+);
+alter table staff_pay_rates enable row level security;
+drop policy if exists "Admins manage their staff's pay" on staff_pay_rates;
+create policy "Admins manage their staff's pay" on staff_pay_rates
+  for all using (school_id = my_school_id() and my_role() = 'admin')
+  with check (school_id = my_school_id() and my_role() = 'admin' and is_school_staff(staff_id, school_id));
+
+-- Each salary paid: to one of the staff, or to someone without a login
+-- (staff_id empty). The name is kept as it was, whatever happens to the login.
+create table if not exists salary_payments (
+  id          uuid primary key default gen_random_uuid(),
+  school_id   uuid not null references schools(id) on delete cascade,
+  staff_id    uuid references profiles(id) on delete set null,
+  payee_name  text not null check (char_length(trim(payee_name)) between 1 and 120),
+  -- The month it's for, as its first day.
+  pay_month   date not null check (extract(day from pay_month) = 1),
+  amount      numeric(10,2) not null check (amount > 0),
+  paid_on     date not null,
+  method      text not null default 'cash' check (method in ('cash', 'bank', 'e_transfer', 'cheque', 'other')),
+  note        text check (note is null or char_length(note) <= 300),
+  created_by  uuid references profiles(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+alter table salary_payments enable row level security;
+create index if not exists idx_salary_payments_month on salary_payments(school_id, pay_month desc);
+drop policy if exists "Admins manage their salary payments" on salary_payments;
+create policy "Admins manage their salary payments" on salary_payments
+  for all using (school_id = my_school_id() and my_role() = 'admin')
+  with check (
+    school_id = my_school_id() and my_role() = 'admin'
+    and (staff_id is null or is_school_staff(staff_id, school_id))
+  );
+
+-- Everything else the school spends.
+create table if not exists expenses (
+  id           uuid primary key default gen_random_uuid(),
+  school_id    uuid not null references schools(id) on delete cascade,
+  spent_on     date not null,
+  category     text not null check (category in ('rent', 'utilities', 'supplies', 'food', 'transport', 'maintenance', 'events', 'other')),
+  description  text not null check (char_length(trim(description)) between 1 and 200),
+  amount       numeric(10,2) not null check (amount > 0),
+  paid_to      text check (paid_to is null or char_length(paid_to) <= 120),
+  method       text not null default 'cash' check (method in ('cash', 'bank', 'e_transfer', 'cheque', 'card', 'other')),
+  created_by   uuid references profiles(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+alter table expenses enable row level security;
+create index if not exists idx_expenses_month on expenses(school_id, spent_on desc);
+drop policy if exists "Admins manage their expenses" on expenses;
+create policy "Admins manage their expenses" on expenses
+  for all using (school_id = my_school_id() and my_role() = 'admin')
+  with check (school_id = my_school_id() and my_role() = 'admin');
+
+-- ══════════════════════════════════════
 -- Switched-off accounts
 -- ══════════════════════════════════════
 -- Switching a teacher or parent off (the office's Teachers and Parents
