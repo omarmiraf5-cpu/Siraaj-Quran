@@ -254,32 +254,25 @@ school to install it again.
 users' phones actually trust. You hold a separate **upload key**, which only
 proves that an update came from you. You still must not lose the upload key.
 
-Create it on your own computer, not in this repository. In Android Studio:
-**Build → Generate Signed App Bundle / APK → Android App Bundle → Create new…**
+The upload key for this app is already created. It is not in the repository.
 
-- Key store path: somewhere private, for example a folder outside this project,
-  named `mydiiwaan-upload.jks`
-- Passwords: long, and different if you like. Save them in a password manager.
-- Alias: `mydiiwaan`
-- Validity: 25 years or more
-- Certificate name: your name or MyDiiwaan
-
-Or, if you have the Java tools installed, in a terminal **outside** the project
-folder:
-
-```
-keytool -genkeypair -v -keystore mydiiwaan-upload.jks -alias mydiiwaan -keyalg RSA -keysize 2048 -validity 10000
-```
+- File: `mydiiwaan-upload.jks`
+- Alias: `mydiiwaan-upload`
+- Certificate name: `CN=MyDiiwaan, O=MyDiiwaan`
+- The store password and the key password are the same. They are written only
+  in the private note that came with the key file.
 
 **Backups**
 
-- Password manager: both passwords and the alias.
+- Password manager: the password and the alias.
 - A second copy of the `.jks` file on an encrypted drive or USB that you keep
   offline.
 - Do not email the file to yourself without a password on it.
-- Do not commit it. The Android project ignores `*.jks` and `*.keystore`.
+- Do not commit it. The Android project ignores `*.jks`, `*.keystore`, and
+  `keystore.properties`.
 
-There is no keystore in this repository, and none was created here.
+Do not generate a second keystore. Play will reject an update signed with a
+different upload key.
 
 ---
 
@@ -303,7 +296,42 @@ apps as of 31 August 2026.
 
 The GitHub workflow in `docs/PUBLISHING.md` can build this same `.aab` if you
 would rather not install Android Studio. The keystore then lives in GitHub
-secrets, not in the repository. Keep your own backup either way.
+secrets, not in the repository. Keep your own backup either way. Use the same
+upload key either way (`mydiiwaan-upload`).
+
+### Rebuild a signed release from the command line
+
+You need Node, Java 21, and the Android SDK. The upload key stays on your
+computer.
+
+1. Copy `android/keystore.properties.example` to `android/keystore.properties`.
+2. Put `mydiiwaan-upload.jks` in the `android` folder (that name is ignored
+   by git), or set `storeFile` to the full path of your copy of the file.
+3. Set `storePassword` and `keyPassword` to the upload-key password. Leave
+   `keyAlias` as `mydiiwaan-upload`.
+4. From the project folder, run:
+
+```
+npm ci
+npx cap sync android
+cd android
+./gradlew bundleRelease
+```
+
+The signed file is `android/app/build/outputs/bundle/release/app-release.aab`.
+
+This first release is version name `1.0.0` and version code `1`. Google Play
+requires every later upload to use a higher version code. When you want the
+store to show a new number, raise the version name as well:
+
+```
+cd android
+VERSION_CODE=2 VERSION_NAME=1.0.1 ./gradlew bundleRelease
+```
+
+`keystore.properties` and the `.jks` file are not committed. The GitHub
+Action reads the same key from repository secrets instead of that properties
+file.
 
 ---
 
