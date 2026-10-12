@@ -28,8 +28,7 @@ const PLATFORM_DEFAULT: SchoolBranding = {
 
 // Every school on the platform shares one deployment, so the crest and
 // wordmark in the chrome have to come from whichever school the signed-in
-// user belongs to rather than being baked into the markup. RLS already
-// scopes `schools` to the caller's own row, so no filter is needed here.
+// user belongs to rather than being baked into the markup.
 export function useSchoolBranding(): SchoolBranding {
   const [branding, setBranding] = useState<SchoolBranding>(PLATFORM_DEFAULT);
 
@@ -42,10 +41,16 @@ export function useSchoolBranding(): SchoolBranding {
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Their school by its id: someone who can see more than one school
+      // (an admin, with a teacher who works at another too) otherwise got
+      // no answer here, and the chrome kept the platform's name.
+      const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
+      if (!me?.school_id) return;
       const { data } = await supabase
         .from("schools")
         .select("name, name_arabic, logo_url")
-        .single();
+        .eq("id", me.school_id)
+        .maybeSingle();
       if (!data?.name) return;
 
       setBranding({

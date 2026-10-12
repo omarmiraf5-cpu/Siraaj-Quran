@@ -29,7 +29,7 @@ import {
 import { DEMO_SCHOOL } from "@/lib/demo";
 import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
@@ -46,11 +46,10 @@ export default function AdminDashboard() {
   const { mode: noticeMode, api: noticeApi } = useAttendanceApi("admin");
   const [ready, setReady] = useState(false);
 
-  const [school, setSchool] = useState({
-    name: DEMO_SCHOOL.name,
-    city: DEMO_SCHOOL.city,
-    province: DEMO_SCHOOL.province,
-  });
+  // Unknown until it's loaded: starting from the sample school's name put
+  // "Siraaj Academy" on a real school's dashboard for the moment that took.
+  const [school, setSchool] = useState<{ name: string; city: string | null; province: string | null } | null>(null);
+  const [today, setToday] = useState(DEMO_TODAY);
   const [studentCount, setStudentCount] = useState(0);
   const [activeStudentCount, setActiveStudentCount] = useState(0);
   const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
@@ -129,6 +128,7 @@ export default function AdminDashboard() {
       } = await supabase.auth.getUser();
 
       if (!user) {
+        setSchool({ name: DEMO_SCHOOL.name, city: DEMO_SCHOOL.city, province: DEMO_SCHOOL.province });
         const students = allStudents(
           readDemoStore(DEMO_CREATED_STUDENTS_KEY, []),
           readDemoStore<Record<string, StudentOverride>>(DEMO_STUDENT_OVERRIDES_KEY, {})
@@ -170,11 +170,15 @@ export default function AdminDashboard() {
         return;
       }
 
-      const { data: schoolRow } = await supabase
-        .from("schools")
-        .select("name, city, province")
-        .single();
-      if (schoolRow) setSchool(schoolRow);
+      setToday(new Date().toLocaleDateString("en-CA"));
+      // The school they're signed in to, by its id: an admin can see more
+      // than one school (a teacher's other school), so "the one school I
+      // can see" isn't a question with one answer.
+      const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
+      const { data: schoolRow } = me?.school_id
+        ? await supabase.from("schools").select("name, city, province").eq("id", me.school_id).maybeSingle()
+        : { data: null };
+      setSchool(schoolRow ?? { name: "", city: null, province: null });
 
       const { data: studentRows } = await supabase.from("students").select("active");
       setStudentCount(studentRows?.length ?? 0);
@@ -200,14 +204,22 @@ export default function AdminDashboard() {
   const activeTeachers = teachers.filter((t) => t.active !== false);
   const unassignedHalaqas = halaqas.filter((h) => !h.teacherId);
 
+  if (!school) {
+    return (
+      <div className="max-w-7xl mx-auto pt-10">
+        <LoadingNote>{t("common.loadingDashboard")}</LoadingNote>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-4 pt-2">
       <PortalHero
         eyebrow={t("common.schoolOverview")}
-        title={school.name}
+        title={school.name || t("common.schoolOverview")}
         meta={[
           [school.city, school.province].filter(Boolean).join(", "),
-          formatDay(DEMO_TODAY, language),
+          formatDay(today, language),
           `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
         ]}
       />

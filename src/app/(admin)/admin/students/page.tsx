@@ -20,6 +20,7 @@ import StudentImport from "@/components/StudentImport";
 import WeeklyReportsCard from "@/components/WeeklyReportsCard";
 import StudentPins from "@/components/StudentPins";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
+import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
 import { GRADES, gradeLabel } from "@/lib/grades";
 import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
@@ -205,7 +206,7 @@ export default function AdminStudentsPage() {
     try {
       const roster = await loadRoster(supabase);
       const where = (h: { name: string; campusId: string | null }) => [campusName(h.campusId), h.name].filter(Boolean).join(" · ");
-      const name = schoolName || ((await supabase.from("schools").select("name").maybeSingle()).data?.name as string | undefined) || "";
+      const name = schoolName || (await mySchool<{ name: string }>(supabase, "name"))?.name || "";
       download(fileNameFor(name, "students"), [
         ["Name", ...(graded ? ["Grade"] : []), "Halaqa", "Active", "PIN", "Parents", "Parent emails"],
         ...roster.map((s) => [

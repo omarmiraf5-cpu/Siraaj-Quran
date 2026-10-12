@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
 import { download, fileNameFor, printPinSheet } from "@/lib/sheetTools";
 import { loadRoster } from "@/lib/rosterExport";
@@ -59,11 +60,7 @@ export default function ParentImport({
   const [results, setResults] = useState<RowResult[]>([]);
 
   useEffect(() => {
-    supabase
-      .from("schools")
-      .select("name")
-      .maybeSingle()
-      .then(({ data }) => setSchoolName((data?.name as string | undefined) ?? ""));
+    mySchool<{ name: string }>(supabase, "name").then((data) => setSchoolName(data?.name ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -75,7 +72,7 @@ export default function ParentImport({
     try {
       const roster = (await loadRoster(supabase)).filter((s) => s.active);
       roster.sort((a, b) => (a.halaqas[0]?.name ?? "").localeCompare(b.halaqas[0]?.name ?? "") || a.name.localeCompare(b.name));
-      const name = schoolName || ((await supabase.from("schools").select("name").maybeSingle()).data?.name as string | undefined) || "";
+      const name = schoolName || (await mySchool<{ name: string }>(supabase, "name"))?.name || "";
       download(fileNameFor(name, "students for parents"), [
         TEMPLATE[0],
         ...roster.flatMap((s) => {

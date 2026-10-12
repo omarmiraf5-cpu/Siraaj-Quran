@@ -15,6 +15,7 @@ import {
 } from "@/lib/attendanceRules";
 import { formatDay } from "@/data/demo";
 import { useLanguage } from "@/components/LanguageProvider";
+import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
 import type { MapPoint } from "@/components/LocationMap";
 
@@ -500,7 +501,7 @@ function SettingsCard({
     (school.current ??= (async () => {
       // The sample school is in Edmonton, and already on the map.
       if (settings.demo) return { city: null, country: "CA" };
-      const { data } = await createClient().from("schools").select("city, country").single();
+      const data = await mySchool<{ city: string | null; country: string | null }>(createClient(), "city, country");
       return { city: data?.city ?? null, country: data?.country ?? null };
     })().catch(() => ({ city: null, country: null })));
   const whereIsTown = () =>
