@@ -506,7 +506,7 @@ export default function AdminStudentsPage() {
       const h = halaqaById(classId);
       const where = target ? target.label : h ? halaqaInGrade(h) : "the halaqa";
       setAssignNote(
-        `${ids.length} student${ids.length === 1 ? "" : "s"} ${classId === "__none" ? "taken out of their halaqa" : `put in ${where}`}.`
+        `${ids.length} student${ids.length === 1 ? "" : "s"} ${classId === "__none" ? "taken away from their teacher" : `put with ${where}`}.`
       );
       setPicked(new Set());
     } catch (err) {
@@ -563,7 +563,7 @@ export default function AdminStudentsPage() {
               {s.name}
             </p>
             <p className="text-[11px] text-ink-muted truncate">
-              {graded ? (halaqa ? halaqaInGrade(halaqa) : "No halaqa yet") : s.halaqa}
+              {graded ? (halaqa ? halaqaInGrade(halaqa) : "No teacher yet") : s.halaqa}
               {s.parentNames && s.parentNames.length > 0 && <> · Parent{s.parentNames.length === 1 ? "" : "s"}: {s.parentNames.join(", ")}</>}
             </p>
           </div>
@@ -610,9 +610,9 @@ export default function AdminStudentsPage() {
                 </label>
               )}
               <label className="block">
-                <span className="block text-xs font-semibold text-ink mb-1.5">Halaqa</span>
+                <span className="block text-xs font-semibold text-ink mb-1.5">{graded ? "Teacher" : "Halaqa"}</span>
                 <select value={draftHalaqa} onChange={(e) => setDraftHalaqa(e.target.value)} className={smallField}>
-                  {(graded || !draftHalaqa) && <option value="">{graded ? "No halaqa yet" : "Select a halaqa"}</option>}
+                  {(graded || !draftHalaqa) && <option value="">{graded ? "No teacher yet" : "Select a halaqa"}</option>}
                   {halaqaOptions(draftGrade)}
                 </select>
               </label>
@@ -848,7 +848,7 @@ export default function AdminStudentsPage() {
                   {c.name}
                 </option>
               ))}
-              <option value="none">No halaqa yet</option>
+              <option value="none">No teacher yet</option>
             </select>
           )}
         </div>
@@ -919,7 +919,7 @@ export default function AdminStudentsPage() {
               </label>
             )}
             <label className="block">
-              <span className="block text-sm font-semibold text-ink mb-2">Halaqa {graded ? "" : "*"}</span>
+              <span className="block text-sm font-semibold text-ink mb-2">{graded ? "Teacher" : "Halaqa *"}</span>
               <select
                 value={newHalaqa}
                 onChange={(e) => setNewHalaqa(e.target.value)}
@@ -945,7 +945,7 @@ export default function AdminStudentsPage() {
       {graded && ready && gradeSummary.length > 0 && (
         <SectionCard
           title="Grades"
-          note={`${gradeSummary.reduce((n, g) => n + g.unplaced, 0)} without a halaqa`}
+          note={`${gradeSummary.reduce((n, g) => n + g.unplaced, 0)} without a teacher`}
         >
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" data-section="grades">
             {gradeSummary.map((g) => {
@@ -962,11 +962,11 @@ export default function AdminStudentsPage() {
                 >
                   <span className="block text-[13.5px] font-semibold">{gradeLabel(g.grade)}</span>
                   <span className={`block text-[11px] ${on ? "text-white/80" : "text-ink-muted"}`}>
-                    {g.students} student{g.students === 1 ? "" : "s"} · {g.halaqas} halaqa{g.halaqas === 1 ? "" : "s"}
+                    {g.students} student{g.students === 1 ? "" : "s"} · {g.halaqas} teacher{g.halaqas === 1 ? "" : "s"}
                   </span>
                   {g.unplaced > 0 && (
                     <span className={`block text-[11px] font-semibold ${on ? "text-amber-200" : "text-amber-700 dark:text-amber-300"}`}>
-                      {g.unplaced} without a halaqa
+                      {g.unplaced} without a teacher
                     </span>
                   )}
                 </button>
@@ -1002,7 +1002,7 @@ export default function AdminStudentsPage() {
                     {" · "}
                     {halaqasFor(String(grade)).length === 0 && teachers.length === 0 ? (
                       <Link href="/admin/halaqas" className="underline underline-offset-2 hover:text-ink">
-                        Add halaqas for this grade
+                        Add teachers for this grade
                       </Link>
                     ) : (
                       <button
@@ -1051,9 +1051,9 @@ export default function AdminStudentsPage() {
                           ))}
                         </optgroup>
                       )}
-                      {halaqasFor(String(grade)).length > 0 && (
-                        <optgroup label={`${gradeLabel(grade)}'s halaqas`}>
-                          {halaqasFor(String(grade)).map((h) => (
+                      {halaqasFor(String(grade)).some((h) => !h.teacherId) && (
+                        <optgroup label={`${gradeLabel(grade)}: halaqas without a teacher`}>
+                          {halaqasFor(String(grade)).filter((h) => !h.teacherId).map((h) => (
                             <option key={h.id} value={h.id}>
                               {halaqaInGrade(h)}
                               {teacherName(h.teacherId) && teacherName(h.teacherId) !== h.name ? ` (${teacherName(h.teacherId)})` : ""}
@@ -1061,7 +1061,7 @@ export default function AdminStudentsPage() {
                           ))}
                         </optgroup>
                       )}
-                      <option value="__none">No halaqa (take them out)</option>
+                      <option value="__none">No teacher (take them out)</option>
                     </select>
                     {assignTo.startsWith("t:") && campuses.length > 1 && (
                       <select
@@ -1088,7 +1088,7 @@ export default function AdminStudentsPage() {
                   </div>
                   <div className="flex flex-wrap gap-3 text-[12px] font-semibold text-ink-muted">
                     <button type="button" onClick={() => setPicked(new Set(inGrade.filter((s) => !studentHalaqa(s)).map((s) => s.id)))} className="hover:text-ink underline">
-                      Select those without a halaqa
+                      Select those without a teacher
                     </button>
                     <button type="button" onClick={() => setPicked(new Set(inGrade.map((s) => s.id)))} className="hover:text-ink underline">
                       Select all
@@ -1100,8 +1100,8 @@ export default function AdminStudentsPage() {
                     )}
                   </div>
                   <p className="text-[11.5px] text-ink-muted">
-                    Tap students to select them, then choose their teacher. A teacher without a halaqa in {gradeLabel(grade)} gets one
-                    in their name.
+                    Tap students to select them, then choose their teacher. In this school the teacher is the halaqa: a teacher
+                    new to {gradeLabel(grade)} gets one in their name.
                   </p>
                   {assignNote && <p className="text-[12.5px] text-ink">{assignNote}</p>}
                 </div>
@@ -1121,7 +1121,7 @@ export default function AdminStudentsPage() {
                           <span className="flex-1 min-w-0">
                             <span className={`block text-[13px] font-semibold truncate ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
                             <span className={`block text-[11px] ${h ? "text-ink-muted" : "text-amber-700 dark:text-amber-300 font-semibold"}`}>
-                              {h ? halaqaInGrade(h) : "No halaqa yet"}
+                              {h ? halaqaInGrade(h) : "No teacher yet"}
                               {s.parentNames && s.parentNames.length > 0 && <span className="font-normal text-ink-muted"> · {s.parentNames.join(", ")}</span>}
                             </span>
                           </span>

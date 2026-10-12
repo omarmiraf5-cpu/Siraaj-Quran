@@ -9,3 +9,11 @@ export function greetingName(name: string): string {
   if (words.length > 1 && TITLE.test(words[0])) return `${words[0]} ${words[1]}`;
   return words[0] ?? "";
 }
+
+/** A name without a title in front and with spaces and capitals evened out:
+ *  "Ustadh Omar  Abdullahi" and "omar abdullahi" are the same person. */
+export function nameKey(name: string): string {
+  const words = name.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  while (words.length > 1 && TITLE.test(words[0])) words.shift();
+  return words.join(" ");
+}

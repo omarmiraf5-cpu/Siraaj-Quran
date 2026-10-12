@@ -9,6 +9,8 @@ import { requireAdmin } from "@/lib/adminAccounts";
 import { studentLoginEmail } from "@/lib/studentAuth";
 import { randomStudentPassword } from "@/lib/studentAuthServer";
 import { gradeLabel, isGrade } from "@/lib/grades";
+import { nameKey } from "@/lib/names";
+import { schoolTeacherProfiles } from "@/lib/schoolMemberships";
 
 // A school's roster from a spreadsheet, a batch of rows at a time (Admin →
 // Students → Import): each child made a student with a sign-in PIN, put in
@@ -115,19 +117,27 @@ export async function POST(req: NextRequest) {
       return data;
     };
 
+    // A halaqa named after one of the school's teachers is that teacher's:
+    // in an academic school the teacher is the halaqa.
+    const staff = byGrade ? await schoolTeacherProfiles(admin as never, schoolId).catch(() => []) : [];
+    const teacherCalled = (name: string) => staff.find((t) => t.active !== false && nameKey(t.full_name ?? "") === nameKey(name));
     const halaqaFor = async (name: string, grade: number, campusId: string | null) => {
       const found = halaqas.find(
-        (h) => key(h.name) === key(name) && (!byGrade || h.grade === grade) && (campuses.length === 0 || h.campus_id === campusId)
+        (h) =>
+          (byGrade ? nameKey(h.name) === nameKey(name) : key(h.name) === key(name)) &&
+          (!byGrade || h.grade === grade) &&
+          (campuses.length === 0 || h.campus_id === campusId)
       );
       if (found) return found;
+      const teacher = teacherCalled(name);
       const { data, error } = await admin
         .from("classes")
         .insert({
-          name: name.trim(),
+          name: teacher?.full_name ?? name.trim(),
           subject: "Qur'an & Hifz",
           grade: byGrade ? grade : 0,
           schedule: "",
-          teacher_id: null,
+          teacher_id: teacher?.id ?? null,
           school_id: schoolId,
           ...(campusId ? { campus_id: campusId } : {}),
         })

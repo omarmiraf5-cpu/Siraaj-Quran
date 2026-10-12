@@ -42,6 +42,9 @@ const NAME_PATTERNS = [/^(full[ _-]?name|student[ _-]?name|name|student|child(?:
 const AGE_PATTERNS = [/^age$/i];
 const GRADE_PATTERNS = [/^(grade|grade[ _-]?level|grade[ _-]?\/[ _-]?class|gr|year|year[ _-]?level|level)$/i];
 const HALAQA_PATTERNS = [/^(halaqa|class|group|section)$/i];
+// In an academic school the teacher is the halaqa: a "Teacher" column, when
+// there's no Halaqa one, says the same thing.
+const TEACHER_PATTERNS = [/^((homeroom|class|halaqa|quran|qur'an)[ _-]?)?teacher([ _-]?name)?$/i];
 const CAMPUS_PATTERNS = [/^(campus|site|branch|location)$/i];
 // Ordered: the more specific header wins, so a sheet with both "Parent
 // Email" and a bare "Email" column doesn't mistake the student's own
@@ -63,7 +66,10 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
   const nameCol = matchColumn(headers, NAME_PATTERNS);
   const ageCol = matchColumn(headers, AGE_PATTERNS);
   const gradeCol = matchColumn(headers, GRADE_PATTERNS);
-  const halaqaCol = matchColumn(headers, HALAQA_PATTERNS);
+  const halaqaCol = (() => {
+    const h = matchColumn(headers, HALAQA_PATTERNS);
+    return h !== -1 ? h : matchColumn(headers, TEACHER_PATTERNS);
+  })();
   const parentNameCol = matchColumn(headers, PARENT_NAME_PATTERNS);
   const parentEmailCol = matchColumn(headers, PARENT_EMAIL_PATTERNS);
   const campusCol = matchColumn(headers, CAMPUS_PATTERNS);
@@ -130,7 +136,7 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
     warnings.push("No \"Age\" or \"Grade\" column found — set each student's age by hand.");
   }
   if (halaqaCol === -1) {
-    warnings.push("No \"Halaqa\" column found — assign each student to a halaqa by hand.");
+    warnings.push("No \"Halaqa\" or \"Teacher\" column found — put students with their teacher on the Students page.");
   }
   if (parentEmailCol === -1) {
     warnings.push(

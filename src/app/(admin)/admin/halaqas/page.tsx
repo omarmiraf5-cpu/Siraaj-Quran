@@ -280,15 +280,19 @@ export default function AdminHalaqasPage() {
   const placeMissing = (grade: string, campusId: string) =>
     (graded && grade === "") || (campuses.length > 0 && !campusId);
 
+  // In an academic school the teacher is the halaqa: it's called by its
+  // (first) teacher's name, and changes name when its teacher changes.
+  const teacherNameOf = (id: string | null | undefined) => teachers.find((t) => t.id === id)?.name ?? "";
   const addHalaqa = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId)) return;
-
     const { lead, others } = splitTeachers(newTeacherIds, null);
+    const name = graded ? teacherNameOf(lead) : newName.trim();
+    if (!name || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId)) return;
+
     if (isDemo) {
       const halaqa: DemoHalaqa = {
         id: `local-halaqa-${Date.now()}`,
-        name: newName.trim(),
+        name,
         schedule: newSchedule.trim(),
         teacherId: lead,
         coTeacherIds: others,
@@ -314,7 +318,7 @@ export default function AdminHalaqasPage() {
       const { data: cls, error } = await supabase
         .from("classes")
         .insert({
-          name: newName.trim(),
+          name,
           subject: "Qur'an & Hifz",
           grade: 0,
           schedule: newSchedule.trim(),
@@ -352,9 +356,11 @@ export default function AdminHalaqasPage() {
 
   const saveEdit = async (h: DemoHalaqa) => {
     const { lead, others } = splitTeachers(draftTeacherIds, h.teacherId);
+    // A graded school's halaqa follows its teacher's name.
+    const editedName = graded ? teacherNameOf(lead) || h.name : draftName.trim() || h.name;
     if (isDemo) {
       const patch: HalaqaOverride = {
-        name: draftName.trim() || h.name,
+        name: editedName,
         schedule: draftSchedule.trim() || h.schedule,
         teacherId: lead,
         coTeacherIds: others,
@@ -377,7 +383,7 @@ export default function AdminHalaqasPage() {
       const { error } = await supabase
         .from("classes")
         .update({
-          name: draftName.trim() || h.name,
+          name: editedName,
           schedule: draftSchedule.trim() || h.schedule,
           teacher_id: lead,
           ...placeOf(draftGrade, draftCampusId),
@@ -488,10 +494,12 @@ export default function AdminHalaqasPage() {
 
         {isOpen && (
           <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-ink mb-1.5">Name</label>
-              <input value={draftName} onChange={(e) => setDraftName(e.target.value)} className={smallField} />
-            </div>
+            {!graded && (
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1.5">Name</label>
+                <input value={draftName} onChange={(e) => setDraftName(e.target.value)} className={smallField} />
+              </div>
+            )}
             <PlaceFields
               graded={graded}
               campuses={campuses}
@@ -509,6 +517,7 @@ export default function AdminHalaqasPage() {
               <label className="block text-xs font-semibold text-ink mb-1">Teachers</label>
               <p className="text-[11px] text-ink-muted mb-2">
                 Tap to add or take off. Everyone ticked sees and teaches this halaqa&apos;s children.
+                {graded && " The halaqa is called by the first teacher's name."}
               </p>
               <TeacherPicker teachers={teachers} selected={draftTeacherIds} onChange={setDraftTeacherIds} meId={meId} />
             </div>
@@ -631,15 +640,20 @@ export default function AdminHalaqasPage() {
 
       {showForm && (
         <form onSubmit={addHalaqa} className="card-quiet p-5 space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Name *</label>
-            <input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder={graded ? "e.g. Halaqa A, or Boys 1" : "e.g. Halaqa C"}
-              className={bigField}
-            />
-          </div>
+          {graded ? (
+            <div>
+              <label className="block text-sm font-semibold text-ink mb-1">Teacher *</label>
+              <p className="text-xs text-ink-muted mb-2">
+                The teacher is the halaqa: it&apos;s called by their name. Tap more than one if they teach it together.
+              </p>
+              <TeacherPicker teachers={teachers} selected={newTeacherIds} onChange={setNewTeacherIds} meId={meId} />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-semibold text-ink mb-2">Name *</label>
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Halaqa C" className={bigField} />
+            </div>
+          )}
           <PlaceFields
             graded={graded}
             campuses={campuses}
@@ -659,15 +673,17 @@ export default function AdminHalaqasPage() {
               className={bigField}
             />
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-ink mb-1">Teachers (optional)</label>
-            <p className="text-xs text-ink-muted mb-2">Tap everyone who teaches it. More than one can.</p>
-            <TeacherPicker teachers={teachers} selected={newTeacherIds} onChange={setNewTeacherIds} meId={meId} />
-          </div>
+          {!graded && (
+            <div>
+              <label className="block text-sm font-semibold text-ink mb-1">Teachers (optional)</label>
+              <p className="text-xs text-ink-muted mb-2">Tap everyone who teaches it. More than one can.</p>
+              <TeacherPicker teachers={teachers} selected={newTeacherIds} onChange={setNewTeacherIds} meId={meId} />
+            </div>
+          )}
           {formError && <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>}
           <button
             type="submit"
-            disabled={!newName.trim() || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId) || saving}
+            disabled={(graded ? newTeacherIds.length === 0 : !newName.trim()) || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId) || saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
             {saving ? "Adding…" : "Add halaqa"}
@@ -683,7 +699,7 @@ export default function AdminHalaqasPage() {
         <SectionCard title="All halaqas" note="0 total">
           <EmptyNote>
             {graded
-              ? "No halaqas yet. Add them here, or import your students from a spreadsheet under Students — its halaqas are made for you."
+              ? "No halaqas yet. Add one for each teacher here (by grade and campus), or put students with a teacher on the Students page — their halaqa is made for you."
               : "No halaqas yet."}
           </EmptyNote>
         </SectionCard>
