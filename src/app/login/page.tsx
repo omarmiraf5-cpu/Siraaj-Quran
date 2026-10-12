@@ -101,6 +101,9 @@ export default function LoginPage() {
   const [schoolName,      setSchoolName]      = useState<string | null>(null);
   const [studentId,       setStudentId]       = useState<string | null>(null);
 
+  // The school whose names are showing. Remembered on this device only
+  // once a student has signed in from it (see the PIN pad below).
+  const [rosterSlug,      setRosterSlug]      = useState<string | null>(null);
   const [schoolCode,      setSchoolCode]      = useState("");
   const [schoolLookup,    setSchoolLookup]    = useState<"idle" | "loading" | "notFound">("idle");
 
@@ -110,7 +113,7 @@ export default function LoginPage() {
     const data = await r.json();
     setRoster(data.students ?? []);
     setSchoolName(data.school?.name ?? null);
-    try { localStorage.setItem(SCHOOL_KEY, slug); } catch { /* private mode */ }
+    setRosterSlug(slug);
     return true;
   }, []);
 
@@ -149,6 +152,7 @@ export default function LoginPage() {
         if (!cancelled) setError(t("welcome.accountOff"));
         return;
       }
+      if (profile?.role && profile.role !== "student") forgetRememberedSchool();
       if (user.user_metadata?.must_change_password) { router.replace("/change-password"); return; }
       if (!cancelled && profile?.role) router.replace(destination(profile.role));
     }).catch(() => {});
@@ -175,14 +179,16 @@ export default function LoginPage() {
     setSchoolCode("");
   };
 
-  /** Keep this device's school, so a child using the same phone or tablet
-   *  later sees their classmates' names without a link. */
-  const rememberSchool = async (schoolId: string | null | undefined) => {
-    if (!schoolId) return;
-    const { data } = await supabase.from("schools").select("slug").eq("id", schoolId).single();
-    if (data?.slug) {
-      try { localStorage.setItem(SCHOOL_KEY, data.slug); } catch { /* private mode */ }
-    }
+  // A device remembers a school's names only once a student has signed in
+  // on it — a classroom tablet. A teacher's or parent's own phone never
+  // shows children's names to whoever picks it up: signing in with an
+  // email forgets any school it had remembered.
+  const rememberSchool = () => {
+    if (!rosterSlug) return;
+    try { localStorage.setItem(SCHOOL_KEY, rosterSlug); } catch { /* private mode */ }
+  };
+  const forgetRememberedSchool = () => {
+    try { localStorage.removeItem(SCHOOL_KEY); } catch { /* private mode */ }
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -223,6 +229,7 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
+    forgetRememberedSchool();
     // Their own portal (or the page the link asked for), whichever tab
     // happened to be selected.
     const { data: profile } = await supabase
@@ -240,7 +247,6 @@ export default function LoginPage() {
       router.push("/change-password");
       return;
     }
-    rememberSchool(profile?.school_id).catch(() => {});
     router.push(destination(profile?.role ?? role));
   };
 
@@ -289,6 +295,7 @@ export default function LoginPage() {
           setPin("");
           return;
         }
+        rememberSchool();
         router.push("/student");
       })();
       return;
