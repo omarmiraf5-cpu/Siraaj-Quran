@@ -486,8 +486,8 @@ export default function AdminStudentsPage() {
   const teacherName = (id: string | null | undefined) => teachers.find((t) => t.id === id)?.name;
   // Choosing a teacher: their halaqa in this grade (at the chosen campus),
   // or a new one in their name when they don't have one yet.
-  const halaqaForTeacher = async (teacherId: string, grade: number): Promise<{ id: string; label: string }> => {
-    const campusId = campuses.length > 0 ? assignCampus || campuses[0].id : null;
+  const halaqaForTeacher = async (teacherId: string, grade: number, atCampus?: string | null): Promise<{ id: string; label: string }> => {
+    const campusId = campuses.length > 0 ? atCampus || assignCampus || campuses[0].id : null;
     const theirs = halaqasFor(String(grade)).find(
       (h) => h.teacherId === teacherId && (campuses.length === 0 || (h.campusId ?? null) === campusId)
     );
@@ -511,32 +511,38 @@ export default function AdminStudentsPage() {
     return { id: data.id as string, label: [campusName(campusId), name].filter(Boolean).join(" · ") };
   };
 
-  const assignPicked = async () => {
-    const ids = [...picked];
-    if (ids.length === 0 || !assignTo || assignGrade === null) return;
+  // Students into a halaqa, a teacher's ("t:<id>", made if need be at
+  // `atCampus`), or out of any ("__none"). What it says it did, for the note.
+  const placeStudents = async (ids: string[], to: string, grade: number, atCampus?: string | null): Promise<string> => {
+    const target = to.startsWith("t:") ? await halaqaForTeacher(to.slice(2), grade, atCampus) : null;
+    const classId = target ? target.id : to;
+    const { error: outError } = await supabase.from("class_enrollments").delete().in("student_id", ids);
+    if (outError) throw outError;
+    if (classId !== "__none") {
+      const { error: inError } = await supabase
+        .from("class_enrollments")
+        .insert(ids.map((student_id) => ({ class_id: classId, student_id })));
+      if (inError) throw inError;
+    }
+    // They attend their teacher's campus.
+    const placedAt =
+      classId !== "__none"
+        ? halaqas.find((h) => h.id === classId)?.campusId ?? (target && campuses.length > 0 ? atCampus || assignCampus || campuses[0].id : null)
+        : null;
+    if (studentCampusReady && placedAt) await setCampusFor(ids, placedAt);
+    const h = halaqaById(classId);
+    const where = target ? target.label : h ? halaqaInGrade(h) : "the halaqa";
+    return `${ids.length} student${ids.length === 1 ? "" : "s"} ${classId === "__none" ? "taken away from their teacher" : `put with ${where}`}.`;
+  };
+
+  // One student's teacher, chosen on their own row.
+  const placeOne = async (s: DemoStudent, to: string, grade: number) => {
     setAssignBusy(true);
     setAssignNote(null);
     try {
-      const target = assignTo.startsWith("t:") ? await halaqaForTeacher(assignTo.slice(2), assignGrade) : null;
-      const classId = target ? target.id : assignTo;
-      const { error: outError } = await supabase.from("class_enrollments").delete().in("student_id", ids);
-      if (outError) throw outError;
-      if (classId !== "__none") {
-        const { error: inError } = await supabase
-          .from("class_enrollments")
-          .insert(ids.map((student_id) => ({ class_id: classId, student_id })));
-        if (inError) throw inError;
-      }
-      // They attend their teacher's campus.
-      const placedAt = classId !== "__none" ? (halaqas.find((h) => h.id === classId)?.campusId ?? (target && campuses.length > 0 ? assignCampus || campuses[0].id : null)) : null;
-      if (studentCampusReady && placedAt) await setCampusFor(ids, placedAt);
+      const said = await placeStudents([s.id], to || "__none", grade, campusOfStudent(s));
       await loadRealStudents();
-      const h = halaqaById(classId);
-      const where = target ? target.label : h ? halaqaInGrade(h) : "the halaqa";
-      setAssignNote(
-        `${ids.length} student${ids.length === 1 ? "" : "s"} ${classId === "__none" ? "taken away from their teacher" : `put with ${where}`}.`
-      );
-      setPicked(new Set());
+      setAssignNote(`${s.name}: ${said.replace(/^1 student /, "")}`);
     } catch (err) {
       setAssignNote(err instanceof Error ? err.message : "That didn't save. Please try again.");
     } finally {
@@ -544,6 +550,22 @@ export default function AdminStudentsPage() {
     }
   };
 
+  const assignPicked = async () => {
+    const ids = [...picked];
+    if (ids.length === 0 || !assignTo || assignGrade === null) return;
+    setAssignBusy(true);
+    setAssignNote(null);
+    try {
+      const said = await placeStudents(ids, assignTo, assignGrade, assignCampus);
+      await loadRealStudents();
+      setAssignNote(said);
+      setPicked(new Set());
+    } catch (err) {
+      setAssignNote(err instanceof Error ? err.message : "That didn't save. Please try again.");
+    } finally {
+      setAssignBusy(false);
+    }
+  };
   // Each grade at a glance: its students, how many still need a halaqa,
   // and its halaqas. Grades with neither are left out.
   const gradeSummary = graded
@@ -1233,8 +1255,8 @@ export default function AdminStudentsPage() {
                     </div>
                   )}
                   <p className="text-[11.5px] text-ink-muted">
-                    Tap students to select them, then choose their teacher. In this school the teacher is the halaqa: a teacher
-                    new to {gradeLabel(grade)} gets one in their name.
+                    Choose each student&apos;s teacher on their row — or tap several to select them and give them one teacher
+                    together. In this school the teacher is the halaqa: a teacher new to {gradeLabel(grade)} gets one in their name.
                   </p>
                   {assignNote && <p className="text-[12.5px] text-ink">{assignNote}</p>}
                 </div>
@@ -1242,8 +1264,8 @@ export default function AdminStudentsPage() {
                   {inGrade.map((s) => {
                     const h = studentHalaqa(s);
                     return (
-                      <li key={s.id}>
-                        <label className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-xl cursor-pointer transition-colors ${picked.has(s.id) ? "bg-emerald-50 dark:bg-emerald-950/30" : "hover:bg-surface-bg-warm"}`}>
+                      <li key={s.id} className={`flex items-center gap-2 px-2 -mx-2 rounded-xl transition-colors ${picked.has(s.id) ? "bg-emerald-50 dark:bg-emerald-950/30" : "hover:bg-surface-bg-warm"}`}>
+                        <label className="flex flex-1 min-w-0 items-center gap-3 py-2.5 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={picked.has(s.id)}
@@ -1259,6 +1281,28 @@ export default function AdminStudentsPage() {
                             </span>
                           </span>
                         </label>
+                        {/* This one student's teacher, straight from their row. */}
+                        <select
+                          value={h ? (h.teacherId ? `t:${h.teacherId}` : h.id) : ""}
+                          onChange={(e) => placeOne(s, e.target.value, grade)}
+                          disabled={assignBusy}
+                          aria-label={`Teacher for ${s.name}`}
+                          className="flex-shrink-0 w-40 sm:w-52 bg-surface-card border border-surface-border rounded-lg px-2 py-1.5 text-[12px] text-ink disabled:opacity-50"
+                        >
+                          <option value="">No teacher yet</option>
+                          {teachers.map((t) => (
+                            <option key={t.id} value={`t:${t.id}`}>
+                              {t.name}
+                            </option>
+                          ))}
+                          {halaqasFor(String(grade))
+                            .filter((x) => !x.teacherId)
+                            .map((x) => (
+                              <option key={x.id} value={x.id}>
+                                {halaqaInGrade(x)}
+                              </option>
+                            ))}
+                        </select>
                       </li>
                     );
                   })}
