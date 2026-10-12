@@ -25,6 +25,8 @@ export interface DemoStudent {
   weeklyReport?: boolean;
   /** In a real school: the names of the parents linked to them. */
   parentNames?: string[];
+  /** In a school with campuses: the campus they attend, whatever halaqa they're in. */
+  campusId?: string | null;
 }
 
 export const DEMO_STUDENTS: DemoStudent[] = [

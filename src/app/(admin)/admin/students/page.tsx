@@ -99,6 +99,12 @@ export default function AdminStudentsPage() {
   // and the campus of the halaqa made for them if they have none yet.
   const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
   const [assignCampus, setAssignCampus] = useState("");
+  // Whether students have a campus of their own (update 14), and a campus
+  // for a new or edited student.
+  const [studentCampusReady, setStudentCampusReady] = useState(false);
+  const [newCampus, setNewCampus] = useState("");
+  const [draftCampus, setDraftCampus] = useState("");
+  const [campusBusy, setCampusBusy] = useState(false);
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
     const first = await supabase.from("classes").select("id, name, teacher_id, schedule, grade, campus_id").order("name");
@@ -121,7 +127,12 @@ export default function AdminStudentsPage() {
   // it back down to one halaqa per student, by id as well as name, since a
   // name can repeat across an academic school's grades and campuses.
   const loadRealStudents = async () => {
-    const first = await supabase.from("students").select("id, full_name, active, grade, weekly_report").order("full_name");
+    // Each newer column asked for only once the database has it.
+    const withCampus = await supabase.from("students").select("id, full_name, active, grade, weekly_report, campus_id").order("full_name");
+    setStudentCampusReady(!withCampus.error);
+    const first = withCampus.error
+      ? await supabase.from("students").select("id, full_name, active, grade, weekly_report").order("full_name")
+      : withCampus;
     setReportsReady(!first.error);
     const { data: studentRows } = first.error
       ? await supabase.from("students").select("id, full_name, active, grade").order("full_name")
@@ -149,7 +160,7 @@ export default function AdminStudentsPage() {
       if (className) halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
     }
     setStudents(
-      ((studentRows ?? []) as Array<{ id: string; full_name: string; active: boolean; grade: number; weekly_report?: boolean }>).map((s) => ({
+      ((studentRows ?? []) as Array<{ id: string; full_name: string; active: boolean; grade: number; weekly_report?: boolean; campus_id?: string | null }>).map((s) => ({
         id: s.id,
         name: s.full_name,
         halaqa: halaqaByStudent.get(s.id)?.name ?? "",
@@ -158,6 +169,7 @@ export default function AdminStudentsPage() {
         active: s.active,
         weeklyReport: s.weekly_report !== false,
         parentNames: parentsOf.get(s.id) ?? [],
+        campusId: s.campus_id ?? null,
       }))
     );
   };
@@ -231,6 +243,15 @@ export default function AdminStudentsPage() {
       : halaqas;
   const studentHalaqa = (s: DemoStudent) =>
     isDemo ? halaqas.find((h) => h.name === s.halaqa) : s.halaqaId ? halaqaById(s.halaqaId) : undefined;
+  // The campus a student attends: their own, or else their halaqa's.
+  const campusOfStudent = (s: DemoStudent) => s.campusId ?? studentHalaqa(s)?.campusId ?? null;
+  // Students' campus set in one go (a whole school's list, or those ticked).
+  const setCampusFor = async (ids: string[], campusId: string) => {
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await supabase.from("students").update({ campus_id: campusId }).in("id", ids.slice(i, i + 200));
+      if (error) throw error;
+    }
+  };
 
   // Every student as a spreadsheet: where they are, their PIN, their parents.
   const downloadList = async () => {
@@ -291,6 +312,7 @@ export default function AdminStudentsPage() {
           grade: graded ? Number(newGrade) : 0,
           avatar_initials: initials(name),
           school_id: schoolId,
+          ...(studentCampusReady && campuses.length > 0 ? { campus_id: halaqaById(newHalaqa)?.campusId ?? (newCampus || null) } : {}),
         })
         .select("id")
         .single();
@@ -319,6 +341,7 @@ export default function AdminStudentsPage() {
     setDraftName(s.name);
     setDraftHalaqa(studentHalaqa(s)?.id ?? "");
     setDraftGrade(String(s.grade ?? 0));
+    setDraftCampus(campusOfStudent(s) ?? "");
     setDraftActive(s.active !== false);
     setDraftReport(s.weeklyReport !== false);
     setDraftPin("");
@@ -380,6 +403,8 @@ export default function AdminStudentsPage() {
           active: draftActive,
           ...(graded ? { grade: Number(draftGrade) } : {}),
           ...(reportsReady ? { weekly_report: draftReport } : {}),
+          // A halaqa's campus is its students'; without one, the campus chosen.
+          ...(studentCampusReady && campuses.length > 0 ? { campus_id: halaqaById(draftHalaqa)?.campusId ?? (draftCampus || null) } : {}),
         })
         .eq("id", s.id);
       if (error) throw error;
@@ -422,7 +447,7 @@ export default function AdminStudentsPage() {
     (s) =>
       [s.name, ...(s.parentNames ?? [])].some((n) => n.toLowerCase().includes(search.trim().toLowerCase())) &&
       (!graded || gradeFilter === "" || (s.grade ?? 0) === Number(gradeFilter)) &&
-      (campusFilter === "" || (campusFilter === "none" ? !studentHalaqa(s)?.campusId : studentHalaqa(s)?.campusId === campusFilter))
+      (campusFilter === "" || (campusFilter === "none" ? !campusOfStudent(s) : campusOfStudent(s) === campusFilter))
   );
   const activeCount = students.filter((s) => s.active !== false).length;
   // An academic school's students, by grade.
@@ -445,7 +470,7 @@ export default function AdminStudentsPage() {
     setAssignGrade(grade);
     setPicked(new Set());
     setAssignTo("");
-    setAssignCampus(campuses[0]?.id ?? "");
+    setAssignCampus(campuses.some((c) => c.id === campusFilter) ? campusFilter : campuses[0]?.id ?? "");
     setAssignNote(null);
     setEditingId(null);
   };
@@ -502,6 +527,9 @@ export default function AdminStudentsPage() {
           .insert(ids.map((student_id) => ({ class_id: classId, student_id })));
         if (inError) throw inError;
       }
+      // They attend their teacher's campus.
+      const placedAt = classId !== "__none" ? (halaqas.find((h) => h.id === classId)?.campusId ?? (target && campuses.length > 0 ? assignCampus || campuses[0].id : null)) : null;
+      if (studentCampusReady && placedAt) await setCampusFor(ids, placedAt);
       await loadRealStudents();
       const h = halaqaById(classId);
       const where = target ? target.label : h ? halaqaInGrade(h) : "the halaqa";
@@ -520,12 +548,17 @@ export default function AdminStudentsPage() {
   // and its halaqas. Grades with neither are left out.
   const gradeSummary = graded
     ? GRADES.map((g) => {
-        const inGrade = students.filter((s) => (s.grade ?? 0) === g && s.active !== false);
+        const inGrade = students.filter(
+          (s) =>
+            (s.grade ?? 0) === g &&
+            s.active !== false &&
+            (campusFilter === "" || (campusFilter === "none" ? !campusOfStudent(s) : campusOfStudent(s) === campusFilter))
+        );
         return {
           grade: g,
           students: inGrade.length,
           unplaced: inGrade.filter((s) => !studentHalaqa(s)).length,
-          halaqas: halaqasFor(String(g)).length,
+          halaqas: halaqasFor(String(g)).filter((h) => campusFilter === "" || campusFilter === "none" || h.campusId === campusFilter).length,
         };
       }).filter((x) => x.students > 0 || x.halaqas > 0)
     : [];
@@ -563,7 +596,7 @@ export default function AdminStudentsPage() {
               {s.name}
             </p>
             <p className="text-[11px] text-ink-muted truncate">
-              {graded ? (halaqa ? halaqaInGrade(halaqa) : "No teacher yet") : s.halaqa}
+              {graded ? (halaqa ? halaqaInGrade(halaqa) : [campusName(s.campusId), "No teacher yet"].filter(Boolean).join(" · ")) : s.halaqa}
               {s.parentNames && s.parentNames.length > 0 && <> · Parent{s.parentNames.length === 1 ? "" : "s"}: {s.parentNames.join(", ")}</>}
             </p>
           </div>
@@ -604,6 +637,27 @@ export default function AdminStudentsPage() {
                     {GRADES.map((g) => (
                       <option key={g} value={g}>
                         {gradeLabel(g)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {studentCampusReady && campuses.length > 1 && (
+                <label className="block">
+                  <span className="block text-xs font-semibold text-ink mb-1.5">Campus</span>
+                  <select
+                    value={halaqaById(draftHalaqa)?.campusId ?? draftCampus}
+                    onChange={(e) => {
+                      setDraftCampus(e.target.value);
+                      // Their teacher is at one campus: a new campus starts from none.
+                      if (halaqaById(draftHalaqa)?.campusId && halaqaById(draftHalaqa)?.campusId !== e.target.value) setDraftHalaqa("");
+                    }}
+                    className={smallField}
+                  >
+                    <option value="">Not set</option>
+                    {campuses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
                       </option>
                     ))}
                   </select>
@@ -848,7 +902,7 @@ export default function AdminStudentsPage() {
                   {c.name}
                 </option>
               ))}
-              <option value="none">No teacher yet</option>
+              <option value="none">{studentCampusReady ? "No campus yet" : "No teacher yet"}</option>
             </select>
           )}
         </div>
@@ -918,6 +972,19 @@ export default function AdminStudentsPage() {
                 </select>
               </label>
             )}
+            {studentCampusReady && campuses.length > 1 && (
+              <label className="block">
+                <span className="block text-sm font-semibold text-ink mb-2">Campus</span>
+                <select value={newCampus} onChange={(e) => setNewCampus(e.target.value)} className={bigField}>
+                  <option value="">Not set</option>
+                  {campuses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="block">
               <span className="block text-sm font-semibold text-ink mb-2">{graded ? "Teacher" : "Halaqa *"}</span>
               <select
@@ -941,6 +1008,43 @@ export default function AdminStudentsPage() {
           </button>
         </form>
       )}
+
+      {!isDemo && ready && studentCampusReady && campuses.length > 1 && (() => {
+        const noCampus = students.filter((s) => s.active !== false && !campusOfStudent(s));
+        if (noCampus.length === 0) return null;
+        return (
+          <section className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/25 dark:border-amber-800/40 p-4 flex flex-wrap items-center gap-3" data-section="no-campus">
+            <p className="text-[13px] text-ink flex-1 min-w-[14rem]">
+              <strong>{noCampus.length}</strong> student{noCampus.length === 1 ? " has" : "s have"} no campus yet. If they&apos;re all at one
+              campus, put them there in one go — or set each one&apos;s campus with <em>Assign to a teacher</em>.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {campuses.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  disabled={campusBusy}
+                  onClick={async () => {
+                    if (!window.confirm(`Put all ${noCampus.length} students with no campus at ${c.name}?`)) return;
+                    setCampusBusy(true);
+                    try {
+                      await setCampusFor(noCampus.map((s) => s.id), c.id);
+                      await loadRealStudents();
+                    } catch (err) {
+                      window.alert(err instanceof Error ? err.message : "That didn't save. Please try again.");
+                    } finally {
+                      setCampusBusy(false);
+                    }
+                  }}
+                  className="text-[13px] font-semibold px-3.5 py-2 rounded-xl bg-brand-navy text-white disabled:opacity-40"
+                >
+                  {campusBusy ? "Saving…" : `All at ${c.name}`}
+                </button>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {graded && ready && gradeSummary.length > 0 && (
         <SectionCard
@@ -1099,6 +1203,35 @@ export default function AdminStudentsPage() {
                       </button>
                     )}
                   </div>
+                  {studentCampusReady && campuses.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                      <span className="text-ink-muted">Or set their campus:</span>
+                      {campuses.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          disabled={picked.size === 0 || assignBusy}
+                          onClick={async () => {
+                            setAssignBusy(true);
+                            setAssignNote(null);
+                            try {
+                              await setCampusFor([...picked], c.id);
+                              await loadRealStudents();
+                              setAssignNote(`${picked.size} student${picked.size === 1 ? "" : "s"} set to ${c.name}.`);
+                              setPicked(new Set());
+                            } catch (err) {
+                              setAssignNote(err instanceof Error ? err.message : "That didn't save. Please try again.");
+                            } finally {
+                              setAssignBusy(false);
+                            }
+                          }}
+                          className="font-semibold px-2.5 py-1 rounded-lg border border-surface-border bg-surface-card hover:border-brand-navy disabled:opacity-40"
+                        >
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-[11.5px] text-ink-muted">
                     Tap students to select them, then choose their teacher. In this school the teacher is the halaqa: a teacher
                     new to {gradeLabel(grade)} gets one in their name.
@@ -1121,7 +1254,7 @@ export default function AdminStudentsPage() {
                           <span className="flex-1 min-w-0">
                             <span className={`block text-[13px] font-semibold truncate ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
                             <span className={`block text-[11px] ${h ? "text-ink-muted" : "text-amber-700 dark:text-amber-300 font-semibold"}`}>
-                              {h ? halaqaInGrade(h) : "No teacher yet"}
+                              {h ? halaqaInGrade(h) : [campusName(s.campusId), "No teacher yet"].filter(Boolean).join(" · ")}
                               {s.parentNames && s.parentNames.length > 0 && <span className="font-normal text-ink-muted"> · {s.parentNames.join(", ")}</span>}
                             </span>
                           </span>

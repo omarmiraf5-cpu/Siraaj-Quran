@@ -287,16 +287,15 @@ export default function StudentImport({
             <p>{plan.parents} parent email{plan.parents === 1 ? "" : "s"}</p>
           </div>
 
-          {/* Only a halaqa needs a campus: students without one come in either way. */}
-          {plan.campusNames.length > 1 && rows.some((r) => r.halaqa.trim() && !r.campus.trim()) && (
+          {plan.campusNames.length > 1 && rows.some((r) => !r.campus.trim()) && (
             <label className="block">
-              <span className="block text-sm font-semibold text-ink mb-1.5">Campus for the halaqas in rows that don&apos;t say</span>
+              <span className="block text-sm font-semibold text-ink mb-1.5">Campus for rows that don&apos;t say</span>
               <select
                 value={defaultCampus}
                 onChange={(e) => setDefaultCampus(e.target.value)}
                 className="w-full sm:w-72 bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink"
               >
-                <option value="">None — leave those rows out</option>
+                <option value="">None yet — set it later (rows with a halaqa are left out)</option>
                 {plan.campusNames.map((n) => (
                   <option key={n} value={n}>
                     {n}

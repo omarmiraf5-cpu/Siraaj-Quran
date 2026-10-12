@@ -2154,6 +2154,24 @@ create trigger check_class_campus
   for each row execute function check_class_campus();
 
 -- ══════════════════════════════════════
+-- A student's own campus
+-- ══════════════════════════════════════
+-- Which campus a student attends, before (and whatever) halaqa they're in:
+-- a school's list can be seen campus by campus from the day it's imported.
+-- Students already in a halaqa start at its campus.
+alter table students add column if not exists campus_id uuid references campuses(id) on delete set null;
+create index if not exists idx_students_campus on students(campus_id);
+drop trigger if exists check_student_campus on students;
+create trigger check_student_campus
+  before insert or update of campus_id, school_id on students
+  for each row execute function check_class_campus();
+update students s
+set campus_id = c.campus_id
+from class_enrollments e
+join classes c on c.id = e.class_id
+where e.student_id = s.id and s.campus_id is null and c.campus_id is not null;
+
+-- ══════════════════════════════════════
 -- Weekly progress reports
 -- ══════════════════════════════════════
 -- Every Friday afternoon each parent is emailed about their children's

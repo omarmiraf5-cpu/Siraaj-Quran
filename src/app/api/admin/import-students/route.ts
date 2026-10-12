@@ -188,18 +188,24 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        const { data: student, error: studentError } = await admin
+        const studentRow = {
+          full_name: name,
+          grade: byGrade ? grade : 0,
+          avatar_initials: initials(name),
+          avatar_color: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
+          school_id: schoolId,
+        };
+        // The campus they attend, kept on the student too (update 14); a
+        // database without the column yet takes them without it.
+        let { data: student, error: studentError } = await admin
           .from("students")
-          .insert({
-            full_name: name,
-            grade: byGrade ? grade : 0,
-            avatar_initials: initials(name),
-            avatar_color: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
-            school_id: schoolId,
-          })
+          .insert({ ...studentRow, ...(campus ? { campus_id: halaqa?.campus_id ?? campus.id } : {}) })
           .select("id")
           .single();
-        if (studentError) throw studentError;
+        if (studentError && campus && /campus_id/.test(studentError.message ?? "")) {
+          ({ data: student, error: studentError } = await admin.from("students").insert(studentRow).select("id").single());
+        }
+        if (studentError || !student) throw studentError ?? new Error("Couldn't add them");
 
         // Their sign-in: four digits on the school's login screen.
         const pin = randomPin();
