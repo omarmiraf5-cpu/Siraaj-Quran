@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   DEMO_CREATED_STUDENTS_KEY,
@@ -86,6 +87,13 @@ export default function AdminStudentsPage() {
   // The open student's PIN as it stands, so the office can read it out or change it.
   const [currentPin, setCurrentPin] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  // Putting a grade's students into its halaqas, several at once: which
+  // grade is open for it, who's ticked, and the halaqa they're going to.
+  const [assignGrade, setAssignGrade] = useState<number | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [assignTo, setAssignTo] = useState("");
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [assignNote, setAssignNote] = useState<string | null>(null);
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
     const first = await supabase.from("classes").select("id, name, teacher_id, schedule, grade, campus_id").order("name");
@@ -409,6 +417,63 @@ export default function AdminStudentsPage() {
     await loadRealStudents();
     setGradeBusy(null);
   };
+
+  const startAssigning = (grade: number | null) => {
+    setAssignGrade(grade);
+    setPicked(new Set());
+    setAssignTo("");
+    setAssignNote(null);
+    setEditingId(null);
+  };
+  const togglePicked = (id: string) =>
+    setPicked((now) => {
+      const next = new Set(now);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  // The ticked students into the chosen halaqa (or out of any): a student
+  // is in one halaqa, so whatever they were in before is left.
+  const assignPicked = async () => {
+    const ids = [...picked];
+    if (ids.length === 0 || !assignTo) return;
+    setAssignBusy(true);
+    setAssignNote(null);
+    try {
+      const { error: outError } = await supabase.from("class_enrollments").delete().in("student_id", ids);
+      if (outError) throw outError;
+      if (assignTo !== "__none") {
+        const { error: inError } = await supabase
+          .from("class_enrollments")
+          .insert(ids.map((student_id) => ({ class_id: assignTo, student_id })));
+        if (inError) throw inError;
+      }
+      await loadRealStudents();
+      const h = halaqaById(assignTo);
+      setAssignNote(
+        `${ids.length} student${ids.length === 1 ? "" : "s"} ${assignTo === "__none" ? "taken out of their halaqa" : `put in ${h ? halaqaInGrade(h) : "the halaqa"}`}.`
+      );
+      setPicked(new Set());
+    } catch (err) {
+      setAssignNote(err instanceof Error ? err.message : "That didn't save. Please try again.");
+    } finally {
+      setAssignBusy(false);
+    }
+  };
+
+  // Each grade at a glance: its students, how many still need a halaqa,
+  // and its halaqas. Grades with neither are left out.
+  const gradeSummary = graded
+    ? GRADES.map((g) => {
+        const inGrade = students.filter((s) => (s.grade ?? 0) === g && s.active !== false);
+        return {
+          grade: g,
+          students: inGrade.length,
+          unplaced: inGrade.filter((s) => !studentHalaqa(s)).length,
+          halaqas: halaqasFor(String(g)).length,
+        };
+      }).filter((x) => x.students > 0 || x.halaqas > 0)
+    : [];
 
   const halaqaOptions = (grade: string) =>
     halaqasFor(grade).map((h) => (
@@ -821,6 +886,45 @@ export default function AdminStudentsPage() {
         </form>
       )}
 
+      {graded && ready && gradeSummary.length > 0 && (
+        <SectionCard
+          title="Grades"
+          note={`${gradeSummary.reduce((n, g) => n + g.unplaced, 0)} without a halaqa`}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" data-section="grades">
+            {gradeSummary.map((g) => {
+              const on = gradeFilter === String(g.grade);
+              return (
+                <button
+                  key={g.grade}
+                  type="button"
+                  onClick={() => setGradeFilter(on ? "" : String(g.grade))}
+                  aria-pressed={on}
+                  className={`text-start rounded-2xl border px-3 py-2.5 transition-colors ${
+                    on ? "border-brand-navy bg-brand-navy text-white" : "border-surface-border bg-surface-card hover:border-brand-navy"
+                  }`}
+                >
+                  <span className="block text-[13.5px] font-semibold">{gradeLabel(g.grade)}</span>
+                  <span className={`block text-[11px] ${on ? "text-white/80" : "text-ink-muted"}`}>
+                    {g.students} student{g.students === 1 ? "" : "s"} · {g.halaqas} halaqa{g.halaqas === 1 ? "" : "s"}
+                  </span>
+                  {g.unplaced > 0 && (
+                    <span className={`block text-[11px] font-semibold ${on ? "text-amber-200" : "text-amber-700 dark:text-amber-300"}`}>
+                      {g.unplaced} without a halaqa
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {gradeFilter !== "" && (
+            <button type="button" onClick={() => setGradeFilter("")} className="mt-3 text-[12px] font-semibold text-ink-muted hover:text-ink underline">
+              Show every grade
+            </button>
+          )}
+        </SectionCard>
+      )}
+
       {!ready ? (
         <SectionCard title="All students">
           <LoadingNote />
@@ -837,6 +941,24 @@ export default function AdminStudentsPage() {
             note={
               <>
                 {inGrade.length} student{inGrade.length === 1 ? "" : "s"}
+                {!isDemo && (
+                  <>
+                    {" · "}
+                    {halaqasFor(String(grade)).length === 0 ? (
+                      <Link href="/admin/halaqas" className="underline underline-offset-2 hover:text-ink">
+                        Add halaqas for this grade
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startAssigning(assignGrade === grade ? null : grade)}
+                        className="underline underline-offset-2 hover:text-ink font-semibold"
+                      >
+                        {assignGrade === grade ? "Done" : "Assign to halaqas"}
+                      </button>
+                    )}
+                  </>
+                )}
                 {reportsReady && (
                   <>
                     {" · "}
@@ -853,7 +975,72 @@ export default function AdminStudentsPage() {
               </>
             }
           >
-            <ul className="divide-y divide-surface-border -my-1">{inGrade.map(renderStudent)}</ul>
+            {assignGrade === grade ? (
+              <div className="space-y-3" data-section="assign">
+                <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-3 space-y-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={assignTo}
+                      onChange={(e) => setAssignTo(e.target.value)}
+                      aria-label="Halaqa to put them in"
+                      className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink"
+                    >
+                      <option value="">Choose a halaqa…</option>
+                      {halaqaOptions(String(grade))}
+                      <option value="__none">No halaqa (take them out)</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={assignPicked}
+                      disabled={picked.size === 0 || !assignTo || assignBusy}
+                      className="gradient-emerald text-white text-[13px] font-semibold px-4 py-2 rounded-xl disabled:opacity-40"
+                    >
+                      {assignBusy ? "Saving…" : `Assign ${picked.size || ""}`.trim()}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-[12px] font-semibold text-ink-muted">
+                    <button type="button" onClick={() => setPicked(new Set(inGrade.filter((s) => !studentHalaqa(s)).map((s) => s.id)))} className="hover:text-ink underline">
+                      Select those without a halaqa
+                    </button>
+                    <button type="button" onClick={() => setPicked(new Set(inGrade.map((s) => s.id)))} className="hover:text-ink underline">
+                      Select all
+                    </button>
+                    {picked.size > 0 && (
+                      <button type="button" onClick={() => setPicked(new Set())} className="hover:text-ink underline">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {assignNote && <p className="text-[12.5px] text-ink">{assignNote}</p>}
+                </div>
+                <ul className="divide-y divide-surface-border -my-1">
+                  {inGrade.map((s) => {
+                    const h = studentHalaqa(s);
+                    return (
+                      <li key={s.id}>
+                        <label className="flex items-center gap-3 py-2.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={picked.has(s.id)}
+                            onChange={() => togglePicked(s.id)}
+                            aria-label={s.name}
+                            className="w-4 h-4 accent-emerald-700 flex-shrink-0"
+                          />
+                          <span className="flex-1 min-w-0">
+                            <span className={`block text-[13px] font-semibold truncate ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
+                            <span className={`block text-[11px] ${h ? "text-ink-muted" : "text-amber-700 dark:text-amber-300 font-semibold"}`}>
+                              {h ? halaqaInGrade(h) : "No halaqa yet"}
+                            </span>
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : (
+              <ul className="divide-y divide-surface-border -my-1">{inGrade.map(renderStudent)}</ul>
+            )}
           </SectionCard>
         ))
       ) : (
