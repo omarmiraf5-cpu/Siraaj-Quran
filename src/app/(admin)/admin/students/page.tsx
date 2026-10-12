@@ -13,7 +13,8 @@ import {
   type StudentOverride,
   type HalaqaOverride,
 } from "@/data/demo";
-import type { DemoStudent, DemoHalaqa } from "@/data/demo";
+import type { DemoStudent, DemoHalaqa, DemoTeacher } from "@/data/demo";
+import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
@@ -94,6 +95,10 @@ export default function AdminStudentsPage() {
   const [assignTo, setAssignTo] = useState("");
   const [assignBusy, setAssignBusy] = useState(false);
   const [assignNote, setAssignNote] = useState<string | null>(null);
+  // The school's teachers: students can be put with one straight from here,
+  // and the campus of the halaqa made for them if they have none yet.
+  const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
+  const [assignCampus, setAssignCampus] = useState("");
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
     const first = await supabase.from("classes").select("id, name, teacher_id, schedule, grade, campus_id").order("name");
@@ -203,6 +208,9 @@ export default function AdminStudentsPage() {
         }),
         loadRealStudents(),
         loadRealHalaqas().then(setHalaqas),
+        loadSchoolTeachers(supabase, { everyAdmin: true })
+          .then((t) => setTeachers(t.filter((x) => x.active !== false)))
+          .catch(() => {}),
       ]);
     };
     load().finally(() => setReady(true));
@@ -437,6 +445,7 @@ export default function AdminStudentsPage() {
     setAssignGrade(grade);
     setPicked(new Set());
     setAssignTo("");
+    setAssignCampus(campuses[0]?.id ?? "");
     setAssignNote(null);
     setEditingId(null);
   };
@@ -449,24 +458,55 @@ export default function AdminStudentsPage() {
     });
   // The ticked students into the chosen halaqa (or out of any): a student
   // is in one halaqa, so whatever they were in before is left.
+  const teacherName = (id: string | null | undefined) => teachers.find((t) => t.id === id)?.name;
+  // Choosing a teacher: their halaqa in this grade (at the chosen campus),
+  // or a new one in their name when they don't have one yet.
+  const halaqaForTeacher = async (teacherId: string, grade: number): Promise<{ id: string; label: string }> => {
+    const campusId = campuses.length > 0 ? assignCampus || campuses[0].id : null;
+    const theirs = halaqasFor(String(grade)).find(
+      (h) => h.teacherId === teacherId && (campuses.length === 0 || (h.campusId ?? null) === campusId)
+    );
+    if (theirs) return { id: theirs.id, label: halaqaInGrade(theirs) };
+    const name = teacherName(teacherId) ?? "New halaqa";
+    const { data, error } = await supabase
+      .from("classes")
+      .insert({
+        name,
+        subject: "Qur'an & Hifz",
+        grade,
+        schedule: "",
+        teacher_id: teacherId,
+        school_id: schoolId,
+        ...(campusId ? { campus_id: campusId } : {}),
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    setHalaqas(await loadRealHalaqas());
+    return { id: data.id as string, label: [campusName(campusId), name].filter(Boolean).join(" · ") };
+  };
+
   const assignPicked = async () => {
     const ids = [...picked];
-    if (ids.length === 0 || !assignTo) return;
+    if (ids.length === 0 || !assignTo || assignGrade === null) return;
     setAssignBusy(true);
     setAssignNote(null);
     try {
+      const target = assignTo.startsWith("t:") ? await halaqaForTeacher(assignTo.slice(2), assignGrade) : null;
+      const classId = target ? target.id : assignTo;
       const { error: outError } = await supabase.from("class_enrollments").delete().in("student_id", ids);
       if (outError) throw outError;
-      if (assignTo !== "__none") {
+      if (classId !== "__none") {
         const { error: inError } = await supabase
           .from("class_enrollments")
-          .insert(ids.map((student_id) => ({ class_id: assignTo, student_id })));
+          .insert(ids.map((student_id) => ({ class_id: classId, student_id })));
         if (inError) throw inError;
       }
       await loadRealStudents();
-      const h = halaqaById(assignTo);
+      const h = halaqaById(classId);
+      const where = target ? target.label : h ? halaqaInGrade(h) : "the halaqa";
       setAssignNote(
-        `${ids.length} student${ids.length === 1 ? "" : "s"} ${assignTo === "__none" ? "taken out of their halaqa" : `put in ${h ? halaqaInGrade(h) : "the halaqa"}`}.`
+        `${ids.length} student${ids.length === 1 ? "" : "s"} ${classId === "__none" ? "taken out of their halaqa" : `put in ${where}`}.`
       );
       setPicked(new Set());
     } catch (err) {
@@ -960,7 +1000,7 @@ export default function AdminStudentsPage() {
                 {!isDemo && (
                   <>
                     {" · "}
-                    {halaqasFor(String(grade)).length === 0 ? (
+                    {halaqasFor(String(grade)).length === 0 && teachers.length === 0 ? (
                       <Link href="/admin/halaqas" className="underline underline-offset-2 hover:text-ink">
                         Add halaqas for this grade
                       </Link>
@@ -970,7 +1010,7 @@ export default function AdminStudentsPage() {
                         onClick={() => startAssigning(assignGrade === grade ? null : grade)}
                         className="underline underline-offset-2 hover:text-ink font-semibold"
                       >
-                        {assignGrade === grade ? "Done" : "Assign to halaqas"}
+                        {assignGrade === grade ? "Done" : "Assign to a teacher"}
                       </button>
                     )}
                   </>
@@ -998,13 +1038,45 @@ export default function AdminStudentsPage() {
                     <select
                       value={assignTo}
                       onChange={(e) => setAssignTo(e.target.value)}
-                      aria-label="Halaqa to put them in"
-                      className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink"
+                      aria-label="Teacher or halaqa to put them with"
+                      className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink max-w-full"
                     >
-                      <option value="">Choose a halaqa…</option>
-                      {halaqaOptions(String(grade))}
+                      <option value="">Choose a teacher or halaqa…</option>
+                      {teachers.length > 0 && (
+                        <optgroup label="Teachers">
+                          {teachers.map((t) => (
+                            <option key={t.id} value={`t:${t.id}`}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {halaqasFor(String(grade)).length > 0 && (
+                        <optgroup label={`${gradeLabel(grade)}'s halaqas`}>
+                          {halaqasFor(String(grade)).map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {halaqaInGrade(h)}
+                              {teacherName(h.teacherId) && teacherName(h.teacherId) !== h.name ? ` (${teacherName(h.teacherId)})` : ""}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                       <option value="__none">No halaqa (take them out)</option>
                     </select>
+                    {assignTo.startsWith("t:") && campuses.length > 1 && (
+                      <select
+                        value={assignCampus}
+                        onChange={(e) => setAssignCampus(e.target.value)}
+                        aria-label="Campus"
+                        className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink"
+                      >
+                        {campuses.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <button
                       type="button"
                       onClick={assignPicked}
@@ -1027,6 +1099,10 @@ export default function AdminStudentsPage() {
                       </button>
                     )}
                   </div>
+                  <p className="text-[11.5px] text-ink-muted">
+                    Tap students to select them, then choose their teacher. A teacher without a halaqa in {gradeLabel(grade)} gets one
+                    in their name.
+                  </p>
                   {assignNote && <p className="text-[12.5px] text-ink">{assignNote}</p>}
                 </div>
                 <ul className="divide-y divide-surface-border -my-1">
@@ -1034,7 +1110,7 @@ export default function AdminStudentsPage() {
                     const h = studentHalaqa(s);
                     return (
                       <li key={s.id}>
-                        <label className="flex items-center gap-3 py-2.5 cursor-pointer">
+                        <label className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-xl cursor-pointer transition-colors ${picked.has(s.id) ? "bg-emerald-50 dark:bg-emerald-950/30" : "hover:bg-surface-bg-warm"}`}>
                           <input
                             type="checkbox"
                             checked={picked.has(s.id)}
