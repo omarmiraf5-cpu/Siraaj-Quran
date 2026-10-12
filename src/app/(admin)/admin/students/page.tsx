@@ -124,6 +124,20 @@ export default function AdminStudentsPage() {
     const { data: enrollments } = await supabase
       .from("class_enrollments")
       .select("student_id, class_id, classes(name)");
+    // Each student's parents, by name.
+    const { data: links } = await supabase.from("parent_students").select("parent_id, student_id");
+    const parentIds = [...new Set((links ?? []).map((l) => l.parent_id as string))];
+    const parentRows: Array<{ id: string; full_name: string }> = [];
+    for (let i = 0; i < parentIds.length; i += 200) {
+      const { data } = await supabase.from("profiles").select("id, full_name").in("id", parentIds.slice(i, i + 200));
+      parentRows.push(...((data ?? []) as Array<{ id: string; full_name: string }>));
+    }
+    const parentName = new Map(parentRows.map((p) => [p.id, p.full_name]));
+    const parentsOf = new Map<string, string[]>();
+    for (const l of links ?? []) {
+      const n = parentName.get(l.parent_id as string);
+      if (n) parentsOf.set(l.student_id as string, [...(parentsOf.get(l.student_id as string) ?? []), n]);
+    }
     const halaqaByStudent = new Map<string, { id: string; name: string }>();
     for (const e of enrollments ?? []) {
       const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
@@ -138,6 +152,7 @@ export default function AdminStudentsPage() {
         grade: s.grade,
         active: s.active,
         weeklyReport: s.weekly_report !== false,
+        parentNames: parentsOf.get(s.id) ?? [],
       }))
     );
   };
@@ -397,7 +412,7 @@ export default function AdminStudentsPage() {
 
   const filtered = students.filter(
     (s) =>
-      s.name.toLowerCase().includes(search.trim().toLowerCase()) &&
+      [s.name, ...(s.parentNames ?? [])].some((n) => n.toLowerCase().includes(search.trim().toLowerCase())) &&
       (!graded || gradeFilter === "" || (s.grade ?? 0) === Number(gradeFilter)) &&
       (campusFilter === "" || (campusFilter === "none" ? !studentHalaqa(s)?.campusId : studentHalaqa(s)?.campusId === campusFilter))
   );
@@ -509,6 +524,7 @@ export default function AdminStudentsPage() {
             </p>
             <p className="text-[11px] text-ink-muted truncate">
               {graded ? (halaqa ? halaqaInGrade(halaqa) : "No halaqa yet") : s.halaqa}
+              {s.parentNames && s.parentNames.length > 0 && <> · Parent{s.parentNames.length === 1 ? "" : "s"}: {s.parentNames.join(", ")}</>}
             </p>
           </div>
           {!isDemo && reportsReady && s.weeklyReport === false && !inactive && (
@@ -732,7 +748,7 @@ export default function AdminStudentsPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search students…"
+          placeholder="Search students or parents…"
           className="flex-1 min-w-[180px] bg-surface-card border border-surface-border rounded-2xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
         />
         {!isDemo && (
@@ -1030,6 +1046,7 @@ export default function AdminStudentsPage() {
                             <span className={`block text-[13px] font-semibold truncate ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
                             <span className={`block text-[11px] ${h ? "text-ink-muted" : "text-amber-700 dark:text-amber-300 font-semibold"}`}>
                               {h ? halaqaInGrade(h) : "No halaqa yet"}
+                              {s.parentNames && s.parentNames.length > 0 && <span className="font-normal text-ink-muted"> · {s.parentNames.join(", ")}</span>}
                             </span>
                           </span>
                         </label>

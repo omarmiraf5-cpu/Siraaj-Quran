@@ -352,7 +352,16 @@ export default function StudentImport({
                     {graded && <td className="py-1.5 px-1">{r.grade !== null ? gradeLabel(r.grade) : <span className="text-amber-700">{r.gradeText || "—"}</span>}</td>}
                     {plan.campusNames.length > 0 && <td className="py-1.5 px-1">{plan.campusOf(r) || "—"}</td>}
                     <td className="py-1.5 px-1">{r.halaqa || "—"}</td>
-                    <td className="py-1.5 px-1 text-ink-muted">{r.parentEmail || "—"}</td>
+                    <td className="py-1.5 px-1 text-ink-muted">
+                      {r.parentEmail ? (
+                        <>
+                          <span className="block text-ink">{r.parentName || "—"}</span>
+                          <span className="block text-[11px]">{r.parentEmail}</span>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

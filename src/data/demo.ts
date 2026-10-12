@@ -23,6 +23,8 @@ export interface DemoStudent {
   grade?: number;
   /** Whether their parents get the Friday report; false when the office has switched it off. */
   weeklyReport?: boolean;
+  /** In a real school: the names of the parents linked to them. */
+  parentNames?: string[];
 }
 
 export const DEMO_STUDENTS: DemoStudent[] = [
