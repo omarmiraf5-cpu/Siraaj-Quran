@@ -2335,6 +2335,73 @@ begin
 end $$;
 
 -- ══════════════════════════════════════
+-- Terms, parents' consent, unsubscribing, keeping records, student sign-in
+-- ══════════════════════════════════════
+-- When a school's admin accepted MyDiiwaan's terms and school data
+-- agreement (and which version), and when they confirmed the school has
+-- parents' agreement to their children's records being kept here. Written
+-- by the app's server, which records who did it.
+alter table schools add column if not exists terms_accepted_at timestamptz;
+alter table schools add column if not exists terms_version text;
+alter table schools add column if not exists terms_accepted_by uuid references profiles(id) on delete set null;
+alter table schools add column if not exists parent_consent_confirmed_at timestamptz;
+alter table schools add column if not exists parent_consent_confirmed_by uuid references profiles(id) on delete set null;
+
+-- A parent who unsubscribed from the Friday progress emails.
+alter table profiles add column if not exists weekly_reports_off_at timestamptz;
+
+-- Since when a student has been inactive, so records of children who left
+-- long ago can be found and removed. Kept by the trigger below; students
+-- already inactive count from today.
+alter table students add column if not exists inactive_since timestamptz;
+update students set inactive_since = now() where active = false and inactive_since is null;
+create or replace function track_inactive_since()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.active = false and (tg_op = 'INSERT' or old.active is distinct from false) then
+    new.inactive_since := coalesce(new.inactive_since, now());
+  elsif new.active is distinct from false then
+    new.inactive_since := null;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists track_inactive_since on students;
+create trigger track_inactive_since
+  before insert or update of active on students
+  for each row execute function track_inactive_since();
+
+-- Wrong PINs, per student: after five in a row the PIN pad stops taking
+-- guesses for that child for a while. The server alone reads and writes it.
+create table if not exists student_signin_guard (
+  student_id    uuid primary key references students(id) on delete cascade,
+  failed        int not null default 0,
+  locked_until  timestamptz,
+  updated_at    timestamptz not null default now()
+);
+alter table student_signin_guard enable row level security;
+grant all on public.student_signin_guard to service_role;
+
+-- Students' logins used to have a password made from their PIN and id,
+-- which anyone who knew how could try against the sign-in service directly,
+-- round the count above. Each now gets a random one nobody knows; the PIN
+-- pad doesn't need it (api/student-signin sets a fresh one each time).
+-- Skipped on a plain Postgres with no Supabase auth schema.
+do $$
+begin
+  if to_regclass('auth.users') is not null and to_regprocedure('extensions.crypt(text,text)') is not null then
+    execute $q$
+      update auth.users
+      set encrypted_password = extensions.crypt(gen_random_uuid()::text || gen_random_uuid()::text, extensions.gen_salt('bf'))
+      where email like 'student-%@students.mydiiwaan.app'
+    $q$;
+  end if;
+end $$;
+
+-- ══════════════════════════════════════
 -- Switched-off accounts
 -- ══════════════════════════════════════
 -- Switching a teacher or parent off (the office's Teachers and Parents

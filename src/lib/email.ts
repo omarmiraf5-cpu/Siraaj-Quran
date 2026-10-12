@@ -40,6 +40,8 @@ export interface OutgoingEmail {
   subject: string;
   html: string;
   text: string;
+  /** Extra headers, e.g. List-Unsubscribe. */
+  headers?: Record<string, string>;
 }
 
 export type EmailResult = { ok: true } | { ok: false; reason: string };
@@ -52,6 +54,7 @@ const forResend = (email: OutgoingEmail) => ({
   subject: email.subject,
   html: email.html,
   text: email.text,
+  ...(email.headers ? { headers: email.headers } : {}),
 });
 
 /** What Resend said, from the body of a refusal. */

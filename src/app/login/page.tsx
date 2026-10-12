@@ -11,7 +11,6 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { DEMO_ACCOUNTS } from "@/lib/demo";
 import { SHOW_DEMO_LOGINS } from "@/lib/demoMode";
 import type { Role } from "@/lib/types";
-import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
 import { homeOf, mayOpen } from "@/lib/portalAccess";
 import { safeNextPath } from "@/lib/safeNextPath";
 
@@ -249,6 +248,7 @@ export default function LoginPage() {
   // child hammering the keypad can land two taps inside one render, and
   // reading `pin` directly would drop the second one.
   const handlePin = (digit: string) => {
+    setError(null);
     setPin((current) => (current.length >= 4 ? current : current + digit));
   };
 
@@ -261,20 +261,36 @@ export default function LoginPage() {
     // the demo, where a single PIN opens the sample student.
     if (roster && studentId) {
       setLoading(true);
-      supabase.auth
-        .signInWithPassword({
-          email: studentLoginEmail(studentId),
-          password: studentLoginPassword(studentId, pin),
-        })
-        .then(({ error }) => {
+      // The PIN is checked by the server, which counts wrong ones; a right
+      // one comes back with what this device signs in with.
+      (async () => {
+        const res = await fetch("/api/student-signin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ student_id: studentId, pin }),
+        }).catch(() => null);
+        const body = res ? await res.json().catch(() => ({})) : {};
+        if (!res || !res.ok) {
           setLoading(false);
-          if (error) {
-            setError(t("login.pinDidntWork"));
-            setPin("");
-            return;
-          }
-          router.push("/student");
-        });
+          setError(
+            res?.status === 429
+              ? t("login.pinResting").replace("{minutes}", String(body.locked_minutes ?? 15))
+              : typeof body.tries_left === "number" && body.tries_left <= 2
+                ? t("login.pinTriesLeft").replace("{n}", String(body.tries_left))
+                : t("login.pinDidntWork")
+          );
+          setPin("");
+          return;
+        }
+        const { error } = await supabase.auth.signInWithPassword({ email: body.email, password: body.password });
+        setLoading(false);
+        if (error) {
+          setError(t("login.pinDidntWork"));
+          setPin("");
+          return;
+        }
+        router.push("/student");
+      })();
       return;
     }
 
@@ -519,6 +535,14 @@ export default function LoginPage() {
                       />
                     ))}
                   </div>
+                  {/* A wrong PIN, or the pad resting after too many: said
+                      here, by the dots — the email form's message box is
+                      not on this screen. */}
+                  {error && (
+                    <p role="alert" className="text-center text-[13px] font-semibold text-red-200 -mt-1">
+                      {error}
+                    </p>
+                  )}
                   <div className="grid grid-cols-3 gap-3">
                     {[1,2,3,4,5,6,7,8,9].map((d) => (
                       <button
@@ -621,6 +645,8 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-[11.5px] text-white/40">
             <Link href="/privacy" className="hover:text-white/70">{t("common.privacy")}</Link>
+            <span className="mx-2">·</span>
+            <Link href="/terms" className="hover:text-white/70">{t("common.terms")}</Link>
             <span className="mx-2">·</span>
             <Link href="/support" className="hover:text-white/70">{t("login.help")}</Link>
           </p>

@@ -13,7 +13,8 @@ export const metadata: Metadata = {
  * code before changing a claim. In particular: staff sign-in stores the
  * distance from school, never coordinates (api/staff-attendance); there are
  * no analytics or advertising SDKs; recitation audio and Mushaf fonts are
- * fetched by the device from the third-party hosts named below.
+ * fetched by the device from the third-party hosts named below; uploaded
+ * spreadsheets are read in memory (api/onboard/parse-roster) and not kept.
  */
 export default function PrivacyPage() {
   const email = <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>;
@@ -41,10 +42,36 @@ export default function PrivacyPage() {
           stored by our sign-in provider in a form no one at MyDiiwaan can read.
         </li>
         <li>
-          <strong>Student records, entered by the school</strong> — a student&apos;s name, halaqa (class) and
-          year; attendance; Qur&apos;an lessons and revision, the teacher&apos;s ratings and notes, memorisation
-          progress and yearly plans; stars and badges; school fees owed and paid (amounts and dates only — no card
-          or bank details); and messages between parents and teachers about the child.
+          <strong>Student records, entered by the school</strong> — a student&apos;s name, halaqa (class), grade and
+          campus; attendance; Qur&apos;an and Qa&apos;idah lessons and revision, the teacher&apos;s ratings and notes,
+          memorisation progress and yearly plans; Islamic Studies and Arabic work and marks; stars and badges; school
+          fees owed and paid (amounts and dates only — no card or bank details); and messages between parents and
+          teachers about the child.
+        </li>
+        <li>
+          <strong>Student sign-in</strong> — the 4-digit PIN the school sets, which the office can read back to a
+          child who forgets it, and a count of wrong PINs: after five in a row, that child&apos;s PIN is refused for
+          15 minutes.
+        </li>
+        <li>
+          <strong>The school&apos;s own finances</strong>, if it uses them — what it pays its staff each month and
+          what it spends. Only the school&apos;s admins can see these.
+        </li>
+        <li>
+          <strong>Lesson recordings</strong> — audio a teacher records of Qa&apos;idah lessons, for the school&apos;s
+          students to listen to. Stored for the school and played only to its signed-in members.
+        </li>
+        <li>
+          <strong>Spreadsheets</strong> the office uploads to add students or parents are read to take out the names
+          and details, and are not kept.
+        </li>
+        <li>
+          <strong>Teachers at more than one school</strong> — a teacher can belong to several schools with one login.
+          Each school sees the teacher&apos;s name and email, and only its own records.
+        </li>
+        <li>
+          <strong>Agreements</strong> — when a school&apos;s admin accepted our <Link href="/terms">terms</Link> and
+          confirmed the school has parents&apos; agreement, and who did.
         </li>
         <li>
           <strong>Staff sign-in</strong> — when a teacher signs in or out, the phone&apos;s location is checked
@@ -56,8 +83,10 @@ export default function PrivacyPage() {
           <strong>The school&apos;s location</strong>, set by the school&apos;s admin for that check.
         </li>
         <li>
-          <strong>Notices</strong> the portal sends — for example to parents and the office when a child has
-          missed five school days in a row.
+          <strong>Notices and emails</strong> the portal sends — for example to parents and the office when a child
+          has missed five school days in a row; a welcome or password-reset email; and, if the school uses them, a
+          Friday email to parents about their child&apos;s week. Every Friday email has a link to unsubscribe, and
+          parents can also turn them off on their Account page.
         </li>
         <li>
           <strong>On your device</strong> — a sign-in cookie that keeps you signed in, and settings such as your
@@ -84,7 +113,14 @@ export default function PrivacyPage() {
         <li>Parents see their own children&apos;s records and messages. Students see their own work.</li>
         <li>No other school can see your school&apos;s information.</li>
         <li>
-          Our service providers, only to run MyDiiwaan for us: Supabase (database and sign-in) and Vercel (hosting).
+          Our service providers, only to run MyDiiwaan for us: Supabase (database, file storage and sign-in), Vercel
+          (hosting), Resend (sending emails — it receives the recipient&apos;s address and the email&apos;s
+          contents) and Cloudflare (which runs the mydiiwaan.com domain name).
+        </li>
+        <li>
+          When an admin sets the school&apos;s location, the map is drawn from OpenStreetMap and the address typed is
+          looked up with OpenStreetMap&apos;s search service. They see the address searched for and your
+          device&apos;s internet address, nothing about your account.
         </li>
         <li>
           When you play a recitation or open the Mushaf, your device fetches the audio from cdn.islamic.network or
@@ -106,6 +142,10 @@ export default function PrivacyPage() {
       <ul>
         <li>Information is kept while your school uses MyDiiwaan.</li>
         <li>
+          When a student has been inactive for over two years, the school is offered to delete their records for
+          good from its Students page.
+        </li>
+        <li>
           You can delete your account at any time from the <Link href="/account">Account</Link> page in the portal
           or the app. That removes your login and your details. Records you made about students — attendance
           taken, lessons set, messages in a child&apos;s thread — belong to the school and stay, without your name.
@@ -121,8 +161,10 @@ export default function PrivacyPage() {
       <h2>Security</h2>
       <p>
         Everything is sent over encrypted connections. Each school&apos;s records are separated from every other
-        school&apos;s, and each person can only reach what their role allows. Yearly plans are additionally
-        encrypted before they are stored.
+        school&apos;s, and each person can only reach what their role allows — a student&apos;s login can&apos;t
+        open a teacher&apos;s or a parent&apos;s pages, and only staff can change the school&apos;s records. Yearly
+        plans are additionally encrypted before they are stored. If a breach ever affected a school&apos;s records,
+        we would tell the school without undue delay and help it tell the people affected.
       </p>
 
       <h2>Your choices</h2>
@@ -139,7 +181,7 @@ export default function PrivacyPage() {
       </p>
 
       <p className="text-ink-muted">
-        Contact: {email} · <Link href="/support">Help and support</Link>
+        Contact: {email} · <Link href="/terms">Terms of Service</Link> · <Link href="/support">Help and support</Link>
       </p>
     </InfoPage>
   );

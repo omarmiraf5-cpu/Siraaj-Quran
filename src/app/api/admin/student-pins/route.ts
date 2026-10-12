@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/adminAccounts";
 import { createProvisionedUser } from "@/lib/accountProvisioning";
-import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
+import { studentLoginEmail } from "@/lib/studentAuth";
+import { randomStudentPassword } from "@/lib/studentAuthServer";
 
 // PINs for every student who can't sign in yet, a batch at a time: the
 // office presses one button and the Students page keeps asking until none
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
       let profileId = s.profile_id;
       if (profileId) {
         const { error: passwordError } = await admin.auth.admin.updateUserById(profileId, {
-          password: studentLoginPassword(s.id, pin),
+          password: randomStudentPassword(),
         });
         if (passwordError) throw passwordError;
         // And their sign-in put right, if it isn't a student's of this school.
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
       } else {
         const { data: login, error: loginError } = await createProvisionedUser(admin, {
           email: studentLoginEmail(s.id),
-          password: studentLoginPassword(s.id, pin),
+          password: randomStudentPassword(),
           user_metadata: { role: "student", full_name: s.full_name, school_id: schoolId },
         });
         if (loginError || !login.user) throw new Error(loginError?.message ?? "Couldn't make their sign-in");
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
       }
       const { error: saveError } = await admin.from("students").update({ pin, profile_id: profileId }).eq("id", s.id);
       if (saveError) throw saveError;
+      await admin.from("student_signin_guard").delete().eq("student_id", s.id);
       results.push({ id: s.id, name: s.full_name, pin });
     } catch (e) {
       console.error(`Student PINs: "${s.full_name}" failed`, e);

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SUPPORT_EMAIL } from "@/lib/site";
 import { StudentPinForm } from "@/components/StudentPinForm";
+import { WeeklyEmailsSwitch } from "@/components/WeeklyEmailsSwitch";
 
 /**
  * Your account, for every role: who you are, your password, the privacy
@@ -141,10 +142,12 @@ export default function AccountPage() {
           </section>
 
           {role === "student" && <StudentPinForm demo={!info} />}
+          {info?.role === "parent" && <WeeklyEmailsSwitch />}
 
           <section className="card-quiet divide-y divide-surface-border">
             {role !== "student" && <Row href="/change-password" label="Change password" />}
             <Row href="/privacy" label="Privacy policy" />
+            <Row href="/terms" label="Terms of Service" />
             <Row href="/support" label="Help and support" />
             <button type="button" onClick={signOut} className="w-full text-start px-5 py-3.5 text-[14px] font-semibold text-ink hover:bg-surface-bg-warm transition">
               Sign out

@@ -5,6 +5,7 @@ import { sendEmailBatch, type OutgoingEmail } from "@/lib/email";
 import { EMAIL_FROM, SUPPORT_EMAIL } from "@/lib/site";
 import { loadSchoolWeek, reportWeek } from "@/lib/weeklyReport";
 import { officeWeeklyEmail, parentWeeklyEmail } from "@/lib/weeklyReportEmail";
+import { unsubscribeApiUrl, unsubscribePageUrl } from "@/lib/unsubscribe";
 
 export interface SchoolSendResult {
   school: string;
@@ -84,7 +85,8 @@ async function sendSchoolWeek(admin: Db, schoolId: string, now: Date): Promise<S
         from: EMAIL_FROM,
         to: p.email,
         replyTo,
-        ...parentWeeklyEmail({ parentName: p.name, children: p.children, schoolName: week.school.name, range: week.range }),
+        ...parentWeeklyEmail({ parentName: p.name, children: p.children, schoolName: week.school.name, range: week.range, unsubscribeUrl: unsubscribePageUrl(p.id) }),
+        headers: { "List-Unsubscribe": `<${unsubscribeApiUrl(p.id)}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
       }))
     );
     if (!sent.ok) {

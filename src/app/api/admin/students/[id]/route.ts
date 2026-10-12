@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireMember, isError } from "@/lib/attendanceServer";
+import { removeStudent } from "@/lib/studentRemoval";
 
 /**
  * Permanently deletes a student: their record, everything recorded about
@@ -26,15 +27,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
-  // The login first: if the record went first, nothing would point at the
-  // login any more and it would be left behind.
-  if (student.profile_id) {
-    const { error } = await admin.auth.admin.deleteUser(student.profile_id as string);
-    if (error && !/not found/i.test(error.message)) {
-      return NextResponse.json({ error: "The student's sign-in couldn't be removed. Try again." }, { status: 500 });
-    }
-  }
-  const { error } = await admin.from("students").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const problem = await removeStudent(admin, { id: student.id as string, profile_id: (student.profile_id as string | null) ?? null });
+  if (problem) return NextResponse.json({ error: problem }, { status: 500 });
   return NextResponse.json({ deleted: student.full_name });
 }

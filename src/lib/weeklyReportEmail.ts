@@ -64,13 +64,14 @@ const small = "margin:6px 0 0;font-size:13px;line-height:1.5;color:#6b6f7a;";
 const footer = `MyDiiwaan · <a href="${SITE_URL}" style="color:#8a8d96;">mydiiwaan.com</a> · <a href="${SITE_URL}/privacy" style="color:#8a8d96;">Privacy</a>`;
 
 /** A parent's Friday email: each of their children's week, one after another. */
-export function parentWeeklyEmail(args: { parentName: string; children: StudentWeek[]; schoolName: string; range: WeekRange }) {
+export function parentWeeklyEmail(args: { parentName: string; children: StudentWeek[]; schoolName: string; range: WeekRange; unsubscribeUrl?: string }) {
   const school = args.schoolName.replace(/\s+/g, " ").trim();
   const names = list(args.children.map((c) => firstName(c.name)));
   const week = weekLabel(args.range);
   const greeting = greetingName(args.parentName) ? `${SALAM}, ${greetingName(args.parentName)},` : `${SALAM},`;
   const intro = `Here's what ${names}'s teachers at ${school} recorded this week, ${week}.`;
-  const why = `You get this each Friday when there's learning to report. Replies go to ${school}, and they can switch these emails off.`;
+  const why = `You get this each Friday when there's learning to report. Replies go to ${school}.`;
+  const stop = args.unsubscribeUrl ? `Don't want these emails? Unsubscribe: ${args.unsubscribeUrl}` : `${school} can switch these emails off.`;
 
   const text = [
     greeting,
@@ -85,6 +86,7 @@ export function parentWeeklyEmail(args: { parentName: string; children: StudentW
     `See more in MyDiiwaan: ${SITE_URL}/login`,
     "",
     why,
+    stop,
     "",
     "Wassalamu alaikum wa rahmatullahi wa barakatuh,",
     "The MyDiiwaan team",
@@ -113,7 +115,11 @@ export function parentWeeklyEmail(args: { parentName: string; children: StudentW
   ${args.children.map(childHtml).join("")}
   <tr><td style="padding:22px 28px 28px;">
     <div>${emailButton(`${SITE_URL}/login`, "See more in MyDiiwaan")}</div>
-    <p style="${small}margin-top:16px;">${escapeHtml(why)}</p>
+    <p style="${small}margin-top:16px;">${escapeHtml(why)} ${
+      args.unsubscribeUrl
+        ? `Don't want these emails? <a href="${escapeHtml(args.unsubscribeUrl)}" style="color:#6b6f7a;">Unsubscribe</a>.`
+        : escapeHtml(stop)
+    }</p>
     <p style="${para}margin-top:14px;">Wassalamu alaikum wa rahmatullahi wa barakatuh,<br>The MyDiiwaan team</p>
   </td></tr>`,
     footer,

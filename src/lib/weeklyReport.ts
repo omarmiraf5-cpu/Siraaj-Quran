@@ -298,8 +298,15 @@ export async function loadSchoolWeek(admin: Db, schoolId: string, rangeFor: (tim
   const parentRows = parentIds.length
     ? await inChunks(parentIds, (chunk) => admin.from("profiles").select("id, full_name, email, active, role, school_id").in("id", chunk))
     : [];
+  // Parents who unsubscribed from these emails. Asked on its own, so a
+  // database without the column yet (before update 12) still sends.
+  const unsubscribed = new Set<string>();
+  if (parentIds.length) {
+    const off = await admin.from("profiles").select("id").in("id", parentIds).not("weekly_reports_off_at", "is", null);
+    if (!off.error) for (const p of off.data ?? []) unsubscribed.add(String(p.id));
+  }
   const parents: ParentReport[] = parentRows
-    .filter((p) => p.role === "parent" && p.active !== false && p.school_id === schoolId && str(p.email).includes("@"))
+    .filter((p) => p.role === "parent" && p.active !== false && p.school_id === schoolId && str(p.email).includes("@") && !unsubscribed.has(String(p.id)))
     .map((p) => ({
       id: String(p.id),
       name: str(p.full_name),

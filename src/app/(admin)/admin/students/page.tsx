@@ -19,6 +19,7 @@ import { IconArrow } from "@/components/icons";
 import StudentImport from "@/components/StudentImport";
 import WeeklyReportsCard from "@/components/WeeklyReportsCard";
 import StudentPins from "@/components/StudentPins";
+import { LongInactiveCard } from "@/components/LongInactiveCard";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
@@ -733,6 +734,8 @@ export default function AdminStudentsPage() {
       )}
 
       {!isDemo && schoolId && <WeeklyReportsCard schoolId={schoolId} graded={graded} />}
+
+      {!isDemo && schoolId && ready && <LongInactiveCard onRemoved={() => loadRealStudents()} />}
 
       {!isDemo && schoolId && ready && (
         <StudentPins

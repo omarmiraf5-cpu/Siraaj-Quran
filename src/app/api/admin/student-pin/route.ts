@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { studentLoginEmail, studentLoginPassword, isValidPin } from "@/lib/studentAuth";
+import { studentLoginEmail, isValidPin } from "@/lib/studentAuth";
+import { randomStudentPassword } from "@/lib/studentAuthServer";
 import { NextRequest, NextResponse } from "next/server";
 import { createProvisionedUser } from "@/lib/accountProvisioning";
 
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
     const email = studentLoginEmail(student.id);
-    const password = studentLoginPassword(student.id, String(pin));
+    const password = randomStudentPassword();
 
     let profileId = student.profile_id as string | null;
 
@@ -87,6 +88,8 @@ export async function POST(req: NextRequest) {
       .update({ pin: String(pin), profile_id: profileId })
       .eq("id", student.id);
     if (updateError) throw updateError;
+    // A new PIN starts with a clean slate of tries.
+    await admin.from("student_signin_guard").delete().eq("student_id", student.id);
 
     return NextResponse.json({ student_id: student.id, pin: String(pin) }, { status: 200 });
   } catch (error) {

@@ -36,6 +36,7 @@ import { createClient } from "@/lib/supabase/client";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { useLanguage } from "@/components/LanguageProvider";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
+import { AgreementsBanner } from "@/components/AgreementsBanner";
 
 type ReviewItem = { id: string; halaqaName: string };
 type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: string | null };
@@ -50,6 +51,7 @@ export default function AdminDashboard() {
   // "Siraaj Academy" on a real school's dashboard for the moment that took.
   const [school, setSchool] = useState<{ name: string; city: string | null; province: string | null } | null>(null);
   const [today, setToday] = useState(DEMO_TODAY);
+  const [isDemoSchool, setIsDemoSchool] = useState(true);
   const [studentCount, setStudentCount] = useState(0);
   const [activeStudentCount, setActiveStudentCount] = useState(0);
   const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
@@ -171,6 +173,7 @@ export default function AdminDashboard() {
       }
 
       setToday(new Date().toLocaleDateString("en-CA"));
+      setIsDemoSchool(false);
       // The school they're signed in to, by its id: an admin can see more
       // than one school (a teacher's other school), so "the one school I
       // can see" isn't a question with one answer.
@@ -223,6 +226,8 @@ export default function AdminDashboard() {
           `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
         ]}
       />
+
+      <AgreementsBanner enabled={!isDemoSchool} />
 
       {/* Notices the portal raised on its own — a child absent five school
           days running, a teacher reporting an absence. */}

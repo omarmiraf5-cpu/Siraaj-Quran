@@ -6,7 +6,8 @@ import { createProvisionedUser } from "@/lib/accountProvisioning";
 import { sendAccountWelcomes } from "@/lib/accountWelcome";
 import { parentLoginsFor } from "@/lib/parentLogins";
 import { requireAdmin } from "@/lib/adminAccounts";
-import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
+import { studentLoginEmail } from "@/lib/studentAuth";
+import { randomStudentPassword } from "@/lib/studentAuthServer";
 import { gradeLabel, isGrade } from "@/lib/grades";
 
 // A school's roster from a spreadsheet, a batch of rows at a time (Admin →
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
         const pin = randomPin();
         const { data: login, error: loginError } = await createProvisionedUser(admin, {
           email: studentLoginEmail(student.id),
-          password: studentLoginPassword(student.id, pin),
+          password: randomStudentPassword(),
           user_metadata: { role: "student", full_name: name, school_id: schoolId },
         });
         if (loginError || !login.user) {

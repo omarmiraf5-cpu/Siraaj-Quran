@@ -12,7 +12,16 @@ export const SUPPORT_EMAIL = "omar.miraf5@gmail.com";
  * in this repo. See docs/app-store-release.md.
  */
 export const SITE_URL = "https://www.mydiiwaan.com";
-export const PRIVACY_UPDATED = "24 September 2026";
+export const PRIVACY_UPDATED = "12 October 2026";
+
+/**
+ * The Terms of Service and School Data Agreement (/terms). A school's admin
+ * accepts a version; changing the terms in a way schools must agree to again
+ * means a new version here, and admins are asked to accept it on their
+ * dashboard.
+ */
+export const TERMS_VERSION = "2026-10-12";
+export const TERMS_UPDATED = "12 October 2026";
 
 /**
  * Where the "a new school just signed up" email goes. Never shown on the

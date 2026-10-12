@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAgreements } from "@/hooks/useAgreements";
 import type { DemoHalaqa } from "@/data/demo";
 import type { Campus } from "@/lib/schoolStructure";
 import { gradeLabel } from "@/lib/grades";
@@ -58,6 +59,9 @@ export default function StudentImport({
   onDone: () => void;
   onClose: () => void;
 }) {
+  const { agreements, accept, error: consentError } = useAgreements(true);
+  const needsConsent = !!agreements?.available && !agreements.consentConfirmed;
+  const [consentTick, setConsentTick] = useState(false);
   const [phase, setPhase] = useState<"pick" | "preview" | "importing" | "done">("pick");
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<SheetRow[]>([]);
@@ -122,6 +126,9 @@ export default function StudentImport({
   }, [rows, campuses, halaqas, graded, defaultCampus]);
 
   const run = async () => {
+    // Children's records come in here: the school confirms it has their
+    // parents' agreement first, once.
+    if (needsConsent && !(await accept("consent"))) return;
     setPhase("importing");
     setProgress(0);
     // What the preview said can't be added isn't sent: it's reported as it was shown.
@@ -352,8 +359,19 @@ export default function StudentImport({
             {rows.length > 8 && <p className="text-[11.5px] text-ink-muted mt-1.5 px-1">…and {rows.length - 8} more.</p>}
           </div>
 
+          {needsConsent && (
+            <label className="flex items-start gap-2.5 text-[13px] text-ink rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/25 dark:border-amber-800/40 p-3" data-section="consent">
+              <input type="checkbox" checked={consentTick} onChange={(e) => setConsentTick(e.target.checked)} className="mt-0.5 w-4 h-4 accent-emerald-700 flex-shrink-0" />
+              <span>
+                I confirm the school has these children&apos;s parents&apos; agreement (for example on its enrolment form) to
+                their records being kept in MyDiiwaan. Asked once for the school.
+              </span>
+            </label>
+          )}
+          {consentError && <p className="text-[12.5px] text-red-700 dark:text-red-300">{consentError}</p>}
+
           <div className="flex flex-wrap gap-2.5">
-            <button type="button" onClick={run} disabled={rows.length === plan.noGrade.length + plan.noCampus.length} className={button}>
+            <button type="button" onClick={run} disabled={rows.length === plan.noGrade.length + plan.noCampus.length || (needsConsent && !consentTick)} className={button}>
               Import {rows.length - new Set([...plan.noGrade, ...plan.noCampus]).size} students
             </button>
             <button type="button" onClick={() => setPhase("pick")} className={ghost}>

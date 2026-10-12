@@ -140,6 +140,9 @@ export default function OnboardPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("welcome");
   const [loading, setLoading] = useState(false);
+  // The last step's two ticks: the terms, and parents' agreement.
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [agreedConsent, setAgreedConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     slug: string;
@@ -448,6 +451,7 @@ export default function OnboardPage() {
           // names: the server inserts students in that order and links each
           // parent to the ids it gets back, so two children with the same
           // name can't be confused for one another.
+          agreements: { terms: agreedTerms, parentConsent: agreedConsent },
           parents: (academic ? [] : parents).map((p) => ({
             name: p.name,
             email: p.email,
@@ -1093,12 +1097,30 @@ export default function OnboardPage() {
                 </>
               )}
             </div>
+            <div className="space-y-2.5 border-t border-surface-border pt-4" data-section="agreements">
+              <label className="flex items-start gap-2.5 text-sm text-ink">
+                <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} className="mt-0.5 w-4 h-4 accent-emerald-700 flex-shrink-0" />
+                <span>
+                  I accept MyDiiwaan&apos;s{" "}
+                  <a href="/terms" target="_blank" rel="noreferrer" className="underline font-semibold">Terms of Service and School Data Agreement</a>{" "}
+                  on behalf of the school.
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 text-sm text-ink">
+                <input type="checkbox" checked={agreedConsent} onChange={(e) => setAgreedConsent(e.target.checked)} className="mt-0.5 w-4 h-4 accent-emerald-700 flex-shrink-0" />
+                <span>
+                  The school has (or will get, before adding them) parents&apos; agreement to their children&apos;s records
+                  being kept in MyDiiwaan, as described in the{" "}
+                  <a href="/privacy" target="_blank" rel="noreferrer" className="underline font-semibold">privacy policy</a>.
+                </span>
+              </label>
+            </div>
             {error && (
               <p className="text-status-error-text bg-status-error-bg rounded-card px-4 py-2.5 text-sm">{error}</p>
             )}
             <div className="flex justify-between pt-2">
               <button onClick={goBack} className={ghostBtn} disabled={loading}>← Back</button>
-              <button onClick={submit} disabled={loading} className={primaryBtn}>
+              <button onClick={submit} disabled={loading || !agreedTerms || !agreedConsent} className={primaryBtn}>
                 {loading ? "Setting up…" : "Confirm & create school"}
               </button>
             </div>

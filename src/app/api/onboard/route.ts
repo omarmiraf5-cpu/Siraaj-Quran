@@ -1,9 +1,11 @@
 import { createAdminClient, passwordUser } from "@/lib/supabase/admin";
+import { TERMS_VERSION } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { sendNewSchoolAlert } from "@/lib/newSchoolAlert";
 import { sendSchoolWelcome } from "@/lib/schoolWelcome";
 import { sendAccountWelcomes, type NewAccount } from "@/lib/accountWelcome";
-import { studentLoginEmail, studentLoginPassword } from "@/lib/studentAuth";
+import { studentLoginEmail } from "@/lib/studentAuth";
+import { randomStudentPassword } from "@/lib/studentAuthServer";
 import { isTimeZone } from "@/lib/places";
 import { after, NextRequest, NextResponse } from "next/server";
 import { createProvisionedUser } from "@/lib/accountProvisioning";
@@ -36,6 +38,9 @@ interface OnboardingData {
   // matching on name afterwards breaks on the two Muhammads every roster
   // has. Positions are unambiguous and survive identical names.
   parents?: Array<{ name: string; email: string; studentIndexes: number[] }>;
+  // The admin accepted the terms and school data agreement, and confirmed
+  // the school has parents' agreement, on the form's last step.
+  agreements?: { terms?: boolean; parentConsent?: boolean };
 }
 
 const AVATAR_COLORS = ["bg-subject-blue", "bg-subject-teal", "bg-subject-purple", "bg-subject-orange", "bg-subject-pink"];
@@ -154,6 +159,12 @@ export async function POST(request: NextRequest) {
     const teacherList = data.teachers ?? [];
     const studentList = data.students ?? [];
     const parentList = data.parents ?? [];
+    if (data.agreements?.terms !== true || data.agreements?.parentConsent !== true) {
+      return NextResponse.json(
+        { error: "Please accept the terms and confirm parents' agreement on the last step." },
+        { status: 400 }
+      );
+    }
 
     // The admin may teach as well: listed as a teacher under their own
     // email, they teach that halaqa with the admin's login rather than a
@@ -294,6 +305,23 @@ export async function POST(request: NextRequest) {
       adminId = adminAuth.user.id;
     }
 
+    // What the admin agreed to, with their name and the date. A database
+    // without the columns yet (before update 12) creates the school anyway.
+    {
+      const now = new Date().toISOString();
+      const { error: agreedError } = await admin
+        .from("schools")
+        .update({
+          terms_accepted_at: now,
+          terms_version: TERMS_VERSION,
+          terms_accepted_by: adminId,
+          parent_consent_confirmed_at: now,
+          parent_consent_confirmed_by: adminId,
+        })
+        .eq("id", schoolId);
+      if (agreedError) console.warn("Onboarding: couldn't record the agreements", agreedError.message);
+    }
+
     // Each teacher's temporary password goes back to the caller with them.
     // It used to be generated here and discarded, which left every teacher a
     // school added during signup holding an account nobody — not even the
@@ -391,7 +419,7 @@ export async function POST(request: NextRequest) {
       const pin = randomPin();
       const { data: studentAuth, error: studentAuthError } = await createProvisionedUser(admin, {
         email: studentLoginEmail(studentRow.id),
-        password: studentLoginPassword(studentRow.id, pin),
+        password: randomStudentPassword(),
         user_metadata: { role: "student", full_name: student.name.trim(), school_id: schoolId },
       });
       if (studentAuthError) throw new Error(`Student login for "${student.name}" failed: ${studentAuthError.message}`);
