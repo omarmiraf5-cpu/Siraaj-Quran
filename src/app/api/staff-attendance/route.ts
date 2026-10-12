@@ -52,6 +52,36 @@ function settingsPayload(s: Awaited<ReturnType<typeof loadSchoolSettings>>, isAd
 
 // GET                → the caller's own day and the last four weeks
 // GET ?scope=school  → every teacher, for the office (&from=&to=)
+/**
+ * The first day each teacher can have been expected at this school: not
+ * before the school joined MyDiiwaan, nor before they did (or joined this
+ * school, for a teacher at more than one). Days before it aren't counted as
+ * absences. And while the school has no location set, nobody can sign in,
+ * so no day counts yet.
+ */
+async function firstDays(schoolId: string, ids: string[], timeZone: string, hasPlace: boolean, today: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (ids.length === 0) return out;
+  if (!hasPlace) {
+    for (const id of ids) out.set(id, addDays(today, 1));
+    return out;
+  }
+  const admin = createAdminClient();
+  const [{ data: school }, { data: people }, { data: joined }] = await Promise.all([
+    admin.from("schools").select("created_at").eq("id", schoolId).maybeSingle(),
+    admin.from("profiles").select("id, created_at").in("id", ids),
+    admin.from("school_memberships").select("user_id, created_at").eq("school_id", schoolId).in("user_id", ids),
+  ]);
+  const day = (ts: unknown) => (typeof ts === "string" && ts ? localClock(ts, timeZone).date : "");
+  const schoolDay = day(school?.created_at);
+  const joinedHere = new Map(((joined ?? []) as Array<{ user_id: string; created_at: string }>).map((m) => [m.user_id, m.created_at]));
+  for (const p of (people ?? []) as Array<{ id: string; created_at: string | null }>) {
+    const theirs = day(joinedHere.get(p.id) ?? p.created_at);
+    out.set(p.id, [schoolDay, theirs].filter(Boolean).sort().pop() ?? "");
+  }
+  return out;
+}
+
 export async function GET(req: NextRequest) {
   const supabase = (await createClient()) as unknown as Db;
   const me = await requireMember(supabase, ["teacher", "admin"]);
@@ -83,11 +113,14 @@ export async function GET(req: NextRequest) {
       if (pError) throw pError;
 
       const days = daysBetweenInclusive(from, to);
-      const list = (teachers ?? []).filter((t) => t.active !== false).map((t) => {
+      const active = (teachers ?? []).filter((t) => t.active !== false);
+      const starts = await firstDays(me.school_id as string, active.map((t) => t.id), policy.timeZone, settings.places.length > 0, today);
+      const list = active.map((t) => {
         const mine = ((rows ?? []) as Array<StaffSignIn & { teacher_id: string }>).filter((r) => r.teacher_id === t.id);
         const theirReports = ((reports ?? []) as Array<AbsenceReport & { teacher_id: string }>).filter((r) => r.teacher_id === t.id);
         const byDate = new Map(mine.map((r) => [r.work_date, r]));
-        const history = days.map((d) => staffDay(d, byDate.get(d), theirReports, policy));
+        const start = starts.get(t.id) ?? "";
+        const history = days.filter((d) => d >= start).map((d) => staffDay(d, byDate.get(d), theirReports, policy));
         return {
           id: t.id,
           name: t.full_name,
@@ -119,7 +152,10 @@ export async function GET(req: NextRequest) {
     if (pError) throw pError;
     const byDate = new Map(((rows ?? []) as StaffSignIn[]).map((r) => [r.work_date, r]));
     const mineReports = (reports ?? []) as AbsenceReport[];
-    const history = daysBetweenInclusive(from, today).map((d) => staffDay(d, byDate.get(d), mineReports, policy));
+    const start = (await firstDays(me.school_id as string, [me.id], policy.timeZone, settings.places.length > 0, today)).get(me.id) ?? "";
+    const history = daysBetweenInclusive(from, today)
+      .filter((d) => d >= start)
+      .map((d) => staffDay(d, byDate.get(d), mineReports, policy));
     const todayRow = byDate.get(today) ?? null;
 
     return NextResponse.json({
