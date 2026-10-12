@@ -1001,14 +1001,14 @@ export default function AdminStudentsPage() {
                   <>
                     {" · "}
                     {halaqasFor(String(grade)).length === 0 && teachers.length === 0 ? (
-                      <Link href="/admin/halaqas" className="underline underline-offset-2 hover:text-ink">
+                      <Link href="/admin/halaqas" className="underline underline-offset-2 hover:text-ink font-bold italic">
                         Add teachers for this grade
                       </Link>
                     ) : (
                       <button
                         type="button"
                         onClick={() => startAssigning(assignGrade === grade ? null : grade)}
-                        className="underline underline-offset-2 hover:text-ink font-semibold"
+                        className="underline underline-offset-2 hover:text-ink font-bold italic"
                       >
                         {assignGrade === grade ? "Done" : "Assign to a teacher"}
                       </button>
@@ -1022,7 +1022,7 @@ export default function AdminStudentsPage() {
                       type="button"
                       onClick={() => setGradeReports(grade, !gradeAllOn(grade))}
                       disabled={gradeBusy !== null}
-                      className="underline underline-offset-2 hover:text-ink disabled:opacity-50"
+                      className="underline underline-offset-2 hover:text-ink font-bold italic disabled:opacity-50"
                     >
                       {gradeBusy === grade ? "Saving…" : gradeAllOn(grade) ? "Weekly reports off for this grade" : "Weekly reports on for this grade"}
                     </button>
