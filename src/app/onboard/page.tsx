@@ -609,7 +609,7 @@ export default function OnboardPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {([
                   ["quran", "A Qur'an school", "Students in halaqas."],
-                  ["academic", "An academic school", "Students in grades, Kindergarten to Grade 12, with halaqas inside each grade."],
+                  ["academic", "An academic school", "Students in grades, Pre-K to Grade 12, with halaqas inside each grade."],
                 ] as const).map(([kind, title, note]) => (
                   <label
                     key={kind}
@@ -1073,7 +1073,7 @@ export default function OnboardPage() {
                 <>
                   <p>
                     <span className="text-ink-muted">Kind:</span>{" "}
-                    <span className="font-semibold text-ink">Academic school — Kindergarten to Grade 12, halaqas inside each grade</span>
+                    <span className="font-semibold text-ink">Academic school — Pre-K to Grade 12, halaqas inside each grade</span>
                   </p>
                   <p>
                     <span className="text-ink-muted">Campuses:</span>{" "}
@@ -1148,7 +1148,7 @@ export default function OnboardPage() {
                   <p className="text-[13px] text-ink-muted leading-relaxed">
                     Sign in, open <span className="font-semibold text-ink">Students</span> and tap{" "}
                     <span className="font-semibold text-ink">Import from a spreadsheet</span>. One row per student, with
-                    their Name, Grade (K, or 1 to 12), Campus, Halaqa, and Parent Name and Parent Email. Each grade&apos;s
+                    their Name, Grade (Pre-K, K, or 1 to 12), Campus, Halaqa, and Parent Name and Parent Email. Each grade&apos;s
                     halaqas are made from it, every student gets a PIN, and every parent a login. Then put your teachers
                     on their halaqas under <span className="font-semibold text-ink">Halaqas</span>, and set each
                     campus&apos;s pin under <span className="font-semibold text-ink">Staff attendance</span>.

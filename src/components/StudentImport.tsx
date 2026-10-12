@@ -133,7 +133,7 @@ export default function StudentImport({
     setProgress(0);
     // What the preview said can't be added isn't sent: it's reported as it was shown.
     const held = new Map<SheetRow, string>([
-      ...plan.noGrade.map((r) => [r, "No grade — give Kindergarten (K) or a grade from 1 to 12"] as [SheetRow, string]),
+      ...plan.noGrade.map((r) => [r, "No grade — give Pre-K, Kindergarten (K) or a grade from 1 to 12"] as [SheetRow, string]),
       ...plan.noCampus.map((r) => [r, "Which campus? Fill in the Campus column"] as [SheetRow, string]),
     ]);
     const out: RowResult[] = [...held].map(([r, reason]) => ({ status: "failed" as const, name: r.name, reason }));
@@ -216,7 +216,7 @@ export default function StudentImport({
             One row per student. Columns: <strong>Name</strong>
             {graded ? (
               <>
-                , <strong>Grade</strong> (K, or 1 to 12)
+                , <strong>Grade</strong> (Pre-K, K, or 1 to 12)
               </>
             ) : null}
             , <strong>Halaqa</strong>
@@ -287,15 +287,16 @@ export default function StudentImport({
             <p>{plan.parents} parent email{plan.parents === 1 ? "" : "s"}</p>
           </div>
 
-          {plan.campusNames.length > 1 && rows.some((r) => !r.campus.trim()) && (
+          {/* Only a halaqa needs a campus: students without one come in either way. */}
+          {plan.campusNames.length > 1 && rows.some((r) => r.halaqa.trim() && !r.campus.trim()) && (
             <label className="block">
-              <span className="block text-sm font-semibold text-ink mb-1.5">Campus for rows that don&apos;t say</span>
+              <span className="block text-sm font-semibold text-ink mb-1.5">Campus for the halaqas in rows that don&apos;t say</span>
               <select
                 value={defaultCampus}
                 onChange={(e) => setDefaultCampus(e.target.value)}
                 className="w-full sm:w-72 bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink"
               >
-                <option value="">None — leave them out</option>
+                <option value="">None — leave those rows out</option>
                 {plan.campusNames.map((n) => (
                   <option key={n} value={n}>
                     {n}

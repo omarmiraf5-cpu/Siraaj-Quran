@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { matchColumn, parseCsv, parseXlsx } from "@/lib/parseDelimited";
-import { parseGrade } from "@/lib/grades";
+import { gradeInName, gradeLabel, parseGrade } from "@/lib/grades";
 
 // Reads a school's existing roster out of a spreadsheet or Word document so
 // an admin isn't stuck typing every student in by hand during onboarding.
@@ -40,7 +40,7 @@ interface ParsedStudent {
 // "Child's name" too: a parents sheet is laid out from the child's side.
 const NAME_PATTERNS = [/^(full[ _-]?name|student[ _-]?name|name|student|child(?:['’]?s)?(?:[ _-]?name)?)$/i];
 const AGE_PATTERNS = [/^age$/i];
-const GRADE_PATTERNS = [/^grade$/i];
+const GRADE_PATTERNS = [/^(grade|grade[ _-]?level|grade[ _-]?\/[ _-]?class|gr|year|year[ _-]?level|level)$/i];
 const HALAQA_PATTERNS = [/^(halaqa|class|group|section)$/i];
 const CAMPUS_PATTERNS = [/^(campus|site|branch|location)$/i];
 // Ordered: the more specific header wins, so a sheet with both "Parent
@@ -77,9 +77,12 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
   }
 
   const students: ParsedStudent[] = [];
+  // Names that carried their grade ("… GR6"), where the Grade column said otherwise.
+  const fromName: string[] = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const name = String(row[nameCol] ?? "").trim();
+    // "Ayah  Abdelhamid": spaces doubled in a sheet aren't part of a name.
+    let name = String(row[nameCol] ?? "").replace(/\s+/g, " ").trim();
     if (!name) continue;
 
     let age: number | null = null;
@@ -87,8 +90,17 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
       const raw = Number(row[ageCol]);
       if (Number.isFinite(raw) && raw > 0) age = Math.round(raw);
     }
-    const gradeText = gradeCol !== -1 ? String(row[gradeCol] ?? "").trim() : "";
-    const grade = parseGrade(gradeText);
+    let gradeText = gradeCol !== -1 ? String(row[gradeCol] ?? "").trim() : "";
+    let grade = parseGrade(gradeText);
+    // "Ayyub Abasha GR6": the grade in the name is the one meant, and
+    // isn't part of the name.
+    const named = gradeInName(name);
+    if (named) {
+      if (grade !== null && grade !== named.grade) fromName.push(`${named.name} (${gradeLabel(named.grade)}, not ${gradeLabel(grade)})`);
+      name = named.name;
+      grade = named.grade;
+      gradeText = gradeLabel(named.grade);
+    }
     if (age === null && grade !== null) age = grade + 6;
 
     const halaqa = halaqaCol !== -1 ? String(row[halaqaCol] ?? "").trim() : "";
@@ -99,7 +111,7 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
     // child's — "Yusuf Ali's parent" reads better in a list than a blank.
     const parentEmail =
       parentEmailCol !== -1 ? String(row[parentEmailCol] ?? "").trim().toLowerCase() : "";
-    const rawParentName = parentNameCol !== -1 ? String(row[parentNameCol] ?? "").trim() : "";
+    const rawParentName = parentNameCol !== -1 ? String(row[parentNameCol] ?? "").replace(/\s+/g, " ").trim() : "";
     const parentName = parentEmail
       ? rawParentName || `${name}'s parent`
       : "";
@@ -109,6 +121,11 @@ function rowsToStudents(rows: string[][]): { students: ParsedStudent[]; warnings
     students.push({ name, age, halaqa, parentName, parentEmail: parentEmail || "", grade, gradeText, campus });
   }
 
+  if (fromName.length > 0) {
+    warnings.push(
+      `${fromName.length} name${fromName.length === 1 ? " ends" : "s end"} with a grade that the Grade column disagrees with, so the grade in the name was used — please check: ${fromName.slice(0, 8).join(", ")}${fromName.length > 8 ? "…" : ""}`
+    );
+  }
   if (ageCol === -1 && gradeCol === -1) {
     warnings.push("No \"Age\" or \"Grade\" column found — set each student's age by hand.");
   }

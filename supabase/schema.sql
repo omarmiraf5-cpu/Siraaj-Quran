@@ -271,7 +271,7 @@ where p.id = u.id
 create table if not exists students (
   id              uuid primary key default gen_random_uuid(),
   full_name       text not null,
-  grade           int not null check (grade between 0 and 12),
+  grade           int not null check (grade between -1 and 12),
   date_of_birth   date,
   gender          text check (gender in ('male', 'female')),
   avatar_initials text not null,
@@ -372,7 +372,7 @@ create table if not exists classes (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   subject     text not null,
-  grade       int not null check (grade between 0 and 12),
+  grade       int not null check (grade between -1 and 12),
   section     text,
   schedule    text,
   teacher_id  uuid references profiles(id),
@@ -2101,8 +2101,8 @@ begin
     execute format('alter table %s drop constraint %I', c.tbl, c.conname);
   end loop;
 end $$;
-alter table students add constraint students_grade_check check (grade between 0 and 12);
-alter table classes add constraint classes_grade_check check (grade between 0 and 12);
+alter table students add constraint students_grade_check check (grade between -1 and 12);
+alter table classes add constraint classes_grade_check check (grade between -1 and 12);
 
 -- A school's sites, when it has more than one, each with the same grades:
 -- every halaqa can say which it meets at, and each has its own pin and

@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
       try {
         const grade = byGrade ? row.grade : 0;
         if (byGrade && !isGrade(grade)) {
-          results.push({ status: "failed", name, reason: "No grade — give Kindergarten (K) or a grade from 1 to 12" });
+          results.push({ status: "failed", name, reason: "No grade — give Pre-K, Kindergarten (K) or a grade from 1 to 12" });
           continue;
         }
         const halaqaName = String(row.halaqa ?? "").trim();
@@ -233,7 +233,14 @@ export async function POST(req: NextRequest) {
         results.push(result);
       } catch (error) {
         console.error(`Import: "${name}" failed`, error);
-        results.push({ status: "failed", name, reason: error instanceof Error ? error.message : "Couldn't add them" });
+        const message = error instanceof Error ? error.message : (error as { message?: string } | null)?.message ?? "";
+        results.push({
+          status: "failed",
+          name,
+          reason: /grade_check/.test(message)
+            ? "Pre-K needs the latest database update (mydiiwaan-update-13.sql) run in Supabase first"
+            : message || "Couldn't add them",
+        });
       }
     }
 
