@@ -16,7 +16,7 @@ export interface RosterStudent {
   parents: Array<{ name: string; email: string }>;
 }
 
-async function allRows<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown }>): Promise<T[]> {
+export async function allRows<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown }>): Promise<T[]> {
   const out: T[] = [];
   for (let i = 0; ; i += 1000) {
     const { data } = await page(i, i + 999);
