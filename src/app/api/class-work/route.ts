@@ -15,13 +15,20 @@ import { addLinks, namesOf, staffRoster, teacherFilesPrefix, toAssignment, toSub
  *   parent           — each of their children's.
  * Row-level security decides whose rows come back; this only shapes them.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const me = await requireMember(supabase);
   if (isError(me)) return me.error;
 
   try {
-    if (me.role === "teacher" || me.role === "admin") {
+    // A teacher or admin in parent mode (?as=parent): their own children's
+    // work, as a parent sees it — only those linked to them as their parent.
+    let childIds: string[] | null = null;
+    if ((me.role === "teacher" || me.role === "admin") && req.nextUrl.searchParams.get("as") === "parent") {
+      const { data: links } = await supabase.from("parent_students").select("student_id").eq("parent_id", me.id);
+      childIds = (links ?? []).map((l: any) => l.student_id as string);
+    }
+    if ((me.role === "teacher" || me.role === "admin") && !childIds) {
       const { data: rows, error } = await supabase
         .from("subject_assignments")
         .select("*")
@@ -48,10 +55,9 @@ export async function GET() {
     }
 
     // A child's own copies, or a parent's children's — whichever RLS gives.
-    const { data: subRows, error } = await supabase
-      .from("subject_submissions")
-      .select("*")
-      .order("updated_at", { ascending: false });
+    let subQuery = supabase.from("subject_submissions").select("*").order("updated_at", { ascending: false });
+    if (childIds) subQuery = subQuery.in("student_id", childIds);
+    const { data: subRows, error } = await subQuery;
     if (error) throw error;
     const ids = [...new Set((subRows ?? []).map((s: any) => s.assignment_id))];
     const { data: rows } = ids.length
@@ -70,10 +76,12 @@ export async function GET() {
     // (or their children's) to see, as row-level security just decided.
     await addLinks(admin, items.flatMap((i) => [...i.assignment.attachments, ...answerFiles(i.submission.answers)]));
 
-    if (me.role === "parent") {
-      const { data: children } = await supabase.from("students").select("id, full_name").order("full_name");
+    if (me.role === "parent" || childIds) {
+      let childQuery = supabase.from("students").select("id, full_name").order("full_name");
+      if (childIds) childQuery = childQuery.in("id", childIds);
+      const { data: children } = await childQuery;
       return NextResponse.json({
-        role: me.role,
+        role: "parent",
         children: (children ?? []).map((c: any) => ({ id: c.id, name: c.full_name })),
         items,
       });

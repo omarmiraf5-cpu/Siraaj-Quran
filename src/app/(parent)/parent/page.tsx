@@ -42,7 +42,7 @@ export default function ParentDashboard() {
 
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
-  const { mode, students: children } = usePortalRoster();
+  const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
   const [childId, setChildId] = useState<string | null>(null);
   const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
 
@@ -73,7 +73,10 @@ export default function ParentDashboard() {
     .filter((d): d is string => Boolean(d))
     .sort()[0];
 
-  const todayStatus = attendance[0]?.status;
+  // Today on this device for a real school; the sample school keeps its own day.
+  const today = mode === "demo" ? DEMO_TODAY : new Date().toLocaleDateString("en-CA");
+  // Only a mark for today is today's — not the last one taken.
+  const todayStatus = attendance[0]?.date === today ? attendance[0]?.status : undefined;
 
   // Everything below reads from one child, so there is nothing to draw until
   // the roster has arrived — and a parent whose children haven't been linked
@@ -99,7 +102,7 @@ export default function ParentDashboard() {
         eyebrow={t("common.asalaamuAlaykum")}
         title={demoUser?.name ?? t("role.parent")}
         meta={[
-          formatDay(DEMO_TODAY, language),
+          formatDay(today, language),
           `${child.name.split(" ")[0]} ${t("common.was")} ${
             todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
           } ${t("common.today")}`,

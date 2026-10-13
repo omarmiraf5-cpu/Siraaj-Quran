@@ -25,6 +25,8 @@ interface ParentRow {
   email: string;
   childIds: string[];
   active?: boolean;
+  /** A teacher's or the office's own login, linked as a parent too. */
+  staffRole?: "teacher" | "admin";
 }
 
 const DEMO_PARENTS: ParentRow[] = [
@@ -138,13 +140,14 @@ export default function AdminParentsPage() {
   };
 
   const loadReal = async () => {
+    const { data: links } = await supabase.from("parent_students").select("parent_id, student_id");
+    // The school's parents, and its teachers and office who are parents too.
+    const linkedIds = [...new Set((links ?? []).map((l) => l.parent_id as string))];
     const { data: profileRows } = await supabase
       .from("profiles")
-      .select("id, full_name, email, active")
-      .eq("role", "parent")
+      .select("id, full_name, email, active, role")
+      .or(`role.eq.parent${linkedIds.length ? `,id.in.(${linkedIds.join(",")})` : ""}`)
       .order("full_name");
-
-    const { data: links } = await supabase.from("parent_students").select("parent_id, student_id");
     const childrenByParent = new Map<string, string[]>();
     for (const l of links ?? []) {
       childrenByParent.set(l.parent_id, [...(childrenByParent.get(l.parent_id) ?? []), l.student_id]);
@@ -153,7 +156,8 @@ export default function AdminParentsPage() {
     setParents(
       (profileRows ?? []).map((p) => ({
         id: p.id,
-        name: p.full_name,
+        name: p.role && p.role !== "parent" ? `${p.full_name} (${p.role === "admin" ? "office" : "teacher"})` : p.full_name,
+        staffRole: p.role === "teacher" || p.role === "admin" ? p.role : undefined,
         email: p.email ?? "",
         childIds: childrenByParent.get(p.id) ?? [],
         active: p.active,
@@ -233,6 +237,12 @@ export default function AdminParentsPage() {
       if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || "Failed to create parent account");
       await loadReal();
       resetForm();
+      if (data.staff_parent) {
+        setNote(
+          `${data.full_name || data.email} is one of your ${data.staff_parent === "admin" ? "admins" : "teachers"}, so no new login was made: ${data.linked} child${data.linked === 1 ? " is" : "ren are"} linked to the login they have, and they'll find them under Parent mode in their menu.`
+        );
+        return;
+      }
       setNote(
         [
           data.warning,
@@ -406,7 +416,30 @@ export default function AdminParentsPage() {
                     </span>
                   </button>
 
-                  {isOpen && (
+                  {isOpen && p.staffRole && (
+                    // A teacher's (or the office's) own login: managed on the
+                    // Teachers page. Here, only their link to their children.
+                    <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                      <p className="text-[13px] text-ink leading-relaxed">
+                        This is {p.name.replace(/ \((teacher|office)\)$/, "")}&apos;s own {p.staffRole === "admin" ? "office" : "teacher"} login — they see
+                        their children under <strong>Parent mode</strong> in their menu. Their login is looked after on the Teachers page.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm(`Take ${p.childIds.length} child${p.childIds.length === 1 ? "" : "ren"} off ${p.name}? Parent mode goes too.`)) return;
+                          const { error } = await supabase.from("parent_students").delete().eq("parent_id", p.id);
+                          if (error) setNote(error.message);
+                          setOpenId(null);
+                          await loadReal();
+                        }}
+                        className="text-[13px] font-semibold text-red-700 dark:text-red-300 hover:underline"
+                      >
+                        Unlink their children
+                      </button>
+                    </div>
+                  )}
+                  {isOpen && !p.staffRole && (
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                       <label className="flex items-center gap-2 text-sm text-ink">
                         <input

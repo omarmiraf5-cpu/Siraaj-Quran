@@ -33,8 +33,11 @@ export function parentLoginsFor(admin: Db, schoolId: string) {
     const { data: holder } = await admin.from("profiles").select("id, role, school_id, full_name").eq("email", email).maybeSingle();
     let result: ParentOutcome;
     if (holder) {
+      // A parent here, or one of the school's teachers or its office who is
+      // also a parent: their children are linked to the login they have, and
+      // they see them in parent mode.
       result =
-        holder.school_id === schoolId && holder.role === "parent"
+        holder.school_id === schoolId && ["parent", "teacher", "admin"].includes(holder.role)
           ? { id: holder.id, status: "linked" }
           : {
               id: null,

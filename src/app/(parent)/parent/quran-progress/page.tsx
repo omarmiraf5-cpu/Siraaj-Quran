@@ -43,7 +43,7 @@ export default function ParentQuranProgressPage() {
   const { t, language } = useLanguage();
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
-  const { mode, students: children } = usePortalRoster();
+  const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
   const [childId, setChildId] = useState<string | null>(null);
   const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
   const [expanded, setExpanded] = useState<string | null>(null);

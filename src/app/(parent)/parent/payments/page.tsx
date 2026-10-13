@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
 import { balanceFor, balancesByStudent } from "@/lib/balances";
 import { monthOf, todayIso } from "@/lib/finance";
+import { myChildIds } from "@/hooks/useMyChildren";
 
 export default function ParentPaymentsPage() {
   const supabase = createClient();
@@ -46,15 +47,20 @@ export default function ParentPaymentsPage() {
 
       // RLS already limits both tables to this parent's own children, so
       // neither query needs a filter of its own.
+      // Their own children — for a teacher or admin in parent mode, not the
+      // school's.
+      const ids = await myChildIds(supabase);
       const { data: studentRows } = await supabase
         .from("students")
         .select("id, full_name")
+        .in("id", ids)
         .order("full_name");
       setChildren((studentRows ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: "" })));
 
       const { data } = await supabase
         .from("fees")
         .select("id, student_id, description, amount_due, amount_paid, due_date, term")
+        .in("student_id", ids)
         .order("due_date");
       setFees(
         (data ?? []).map((f) => ({

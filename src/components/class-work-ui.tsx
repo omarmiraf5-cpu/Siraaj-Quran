@@ -1517,7 +1517,7 @@ export function ParentClassWork() {
 
   useEffect(() => {
     if (mode === "loading") return;
-    call<{ children: Array<{ id: string; name: string }>; items: ClassWorkItem[] }>(api, "/api/class-work")
+    call<{ children: Array<{ id: string; name: string }>; items: ClassWorkItem[] }>(api, "/api/class-work?as=parent")
       .then((d) => {
         setData(d);
         setChild((c) => c || d.children[0]?.id || "");

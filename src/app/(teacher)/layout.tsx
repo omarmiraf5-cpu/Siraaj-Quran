@@ -4,6 +4,7 @@ import { SidebarNav } from "@/components/SidebarNav";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useRequirePasswordChange } from "@/hooks/useRequirePasswordChange";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
+import { useMyChildren } from "@/hooks/useMyChildren";
 
 // Ordered so the four things a teacher actually opens every day come
 // first — SidebarNav keeps only that many as mobile tabs and folds
@@ -86,12 +87,21 @@ const SCHOOL_OFFICE = {
   icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M10 21v-5h4v5"/></svg>,
 };
 
+// For a teacher who is also a parent of a child here: their children, as a parent.
+const PARENT_MODE = {
+  href: "/parent",
+  labelKey: "nav.parentMode",
+  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="9.5" r="2.4"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M14.5 20a4.5 4.5 0 0 1 7 0"/></svg>,
+};
+
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   useRequirePasswordChange();
   const { admin } = useStaffRoles();
   const { blocked } = useSignInGuard();
   // Just before their own account, at the end.
-  const items = admin ? [...NAV.slice(0, -1), SCHOOL_OFFICE, NAV[NAV.length - 1]] : NAV;
+  const { hasChildren } = useMyChildren();
+  const extras = [...(admin ? [SCHOOL_OFFICE] : []), ...(hasChildren ? [PARENT_MODE] : [])];
+  const items = [...NAV.slice(0, -1), ...extras, NAV[NAV.length - 1]];
 
   return (
     <div className="flex min-h-screen bg-surface-bg">

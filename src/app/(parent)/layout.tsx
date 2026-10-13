@@ -3,6 +3,7 @@
 import { SidebarNav } from "@/components/SidebarNav";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useRequirePasswordChange } from "@/hooks/useRequirePasswordChange";
+import { useMyChildren } from "@/hooks/useMyChildren";
 
 const NAV = [
   {
@@ -55,13 +56,30 @@ const NAV = [
   },
 ];
 
+// A teacher or admin in parent mode: the way back to their own pages.
+const BACK = {
+  teacher: {
+    href: "/teacher",
+    labelKey: "nav.teacherMode",
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z"/><path d="M12 6.5v13.2"/></svg>,
+  },
+  admin: {
+    href: "/admin",
+    labelKey: "nav.office",
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M10 21v-5h4v5"/></svg>,
+  },
+} as const;
+
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
   useRequirePasswordChange();
   const { blocked } = useSignInGuard();
+  const { role } = useMyChildren();
+  const back = role === "teacher" || role === "admin" ? BACK[role] : null;
+  const items = back ? [...NAV.slice(0, -1), back, NAV[NAV.length - 1]] : NAV;
 
   return (
     <div className="flex min-h-screen bg-surface-bg">
-      <SidebarNav items={NAV} roleKey="role.parent" />
+      <SidebarNav items={items} roleKey={back ? "nav.parentMode" : "role.parent"} />
       <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-20 md:pb-6 overflow-auto">{blocked ? null : children}</main>
     </div>
   );

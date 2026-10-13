@@ -22,11 +22,18 @@ export function portalOf(path: string): Portal | null {
   return (PORTALS as readonly string[]).includes(first) ? (first as Portal) : null;
 }
 
-/** Whether an account with this role may open this path. Shared pages (account, help…) are open to all. */
-export function mayOpen(path: string, role: string | null | undefined): boolean {
+/**
+ * Whether an account with this role may open this path. Shared pages
+ * (account, help…) are open to all. A teacher or admin who is also a parent
+ * of a child at the school (`parentOf`) may open the parent pages too —
+ * their "parent mode" — and only then.
+ */
+export function mayOpen(path: string, role: string | null | undefined, { parentOf = false } = {}): boolean {
   const portal = portalOf(path);
   if (!portal) return true;
-  return !!role && (ALLOWED[portal] as string[]).includes(role);
+  if (!role) return false;
+  if (portal === "parent" && parentOf && (role === "teacher" || role === "admin")) return true;
+  return (ALLOWED[portal] as string[]).includes(role);
 }
 
 /** An account's own home page. */

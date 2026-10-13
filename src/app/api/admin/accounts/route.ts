@@ -147,6 +147,38 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // One of the school's own teachers, or its office, who is also a parent
+    // here: their children are linked to the login they already have, and
+    // they see them in parent mode — no second login.
+    if (role === "parent") {
+      const { data: staff } = await admin
+        .from("profiles")
+        .select("id, role, school_id, full_name")
+        .eq("email", email.trim().toLowerCase())
+        .maybeSingle();
+      if (staff && staff.school_id === caller.school_id && (staff.role === "teacher" || staff.role === "admin")) {
+        const ids = Array.isArray(student_ids) ? (student_ids as unknown[]).filter((x): x is string => typeof x === "string") : [];
+        if (ids.length === 0) {
+          return NextResponse.json(
+            { error: `${staff.full_name || email.trim()} is one of your ${staff.role === "admin" ? "admins" : "teachers"} — tick their children so they can see them in parent mode.` },
+            { status: 400 }
+          );
+        }
+        // Only this school's children, as the admin's own session can see them.
+        const { data: ours } = await supabase.from("students").select("id").in("id", ids).eq("school_id", caller.school_id);
+        const valid = (ours ?? []).map((s: { id: string }) => s.id);
+        if (valid.length === 0) return NextResponse.json({ error: "Those children aren't in your school" }, { status: 400 });
+        const { error: linkError } = await supabase
+          .from("parent_students")
+          .upsert(valid.map((student_id) => ({ parent_id: staff.id, student_id })), { onConflict: "parent_id,student_id", ignoreDuplicates: true });
+        if (linkError) throw linkError;
+        return NextResponse.json(
+          { id: staff.id, email: email.trim().toLowerCase(), full_name: staff.full_name, staff_parent: staff.role, linked: valid.length },
+          { status: 201 }
+        );
+      }
+    }
+
     const inTheWay = await loginInTheWay(admin, email.trim(), role as AllowedRole, caller, user.id);
     if (inTheWay) return NextResponse.json({ error: inTheWay }, { status: 409 });
     const tempPassword = generateTempPassword();

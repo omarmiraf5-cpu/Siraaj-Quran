@@ -63,7 +63,7 @@ interface PlanPayload {
 }
 
 export default function ParentYearlyPlanPage() {
-  const { mode, students: children } = usePortalRoster();
+  const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
   // The sample portal answers these requests in the browser from the
   // sample school's plans — see demoPlans.ts.
   const api = useCallback(

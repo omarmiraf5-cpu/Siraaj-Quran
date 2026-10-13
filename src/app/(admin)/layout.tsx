@@ -3,6 +3,7 @@
 import { SidebarNav } from "@/components/SidebarNav";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
+import { useMyChildren } from "@/hooks/useMyChildren";
 
 const NAV = [
   {
@@ -71,11 +72,20 @@ const MY_HALAQA = {
   icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z"/><path d="M12 6.5v13.2"/></svg>,
 };
 
+// For an admin who is also a parent of a child here: their children, as a parent.
+const PARENT_MODE = {
+  href: "/parent",
+  labelKey: "nav.parentMode",
+  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="9.5" r="2.4"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M14.5 20a4.5 4.5 0 0 1 7 0"/></svg>,
+};
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { teaches } = useStaffRoles();
   const { blocked } = useSignInGuard();
   // Straight after the dashboard: teaching is part of their every day.
-  const items = teaches ? [NAV[0], MY_HALAQA, ...NAV.slice(1)] : NAV;
+  const { hasChildren } = useMyChildren();
+  const base = teaches ? [NAV[0], MY_HALAQA, ...NAV.slice(1)] : NAV;
+  const items = hasChildren ? [...base.slice(0, -1), PARENT_MODE, base[base.length - 1]] : base;
   return (
     <div className="flex min-h-screen bg-surface-bg">
       <SidebarNav items={items} roleKey="role.admin" />

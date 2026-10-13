@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SHOW_DEMO_LOGINS } from "@/lib/demoMode";
-import { homeOf, mayOpen } from "@/lib/portalAccess";
+import { homeOf, mayOpen, portalOf } from "@/lib/portalAccess";
 
 /**
  * Nobody signed in on this device: off to the sign-in page, and back here
@@ -52,7 +52,14 @@ export function useSignInGuard(): { blocked: boolean } {
         const id = data.user?.id ?? session.user.id;
         const { data: me, error: meError } = await supabase.from("profiles").select("role").eq("id", id).maybeSingle();
         if (cancelled || meError) return;
-        if (!mayOpen(pathname, me?.role)) {
+        // A teacher or admin on the parent pages: only as a parent of a child here.
+        let parentOf = false;
+        if (portalOf(pathname) === "parent" && (me?.role === "teacher" || me?.role === "admin")) {
+          const { data: link } = await supabase.from("parent_students").select("student_id").eq("parent_id", id).limit(1);
+          if (cancelled) return;
+          parentOf = (link ?? []).length > 0;
+        }
+        if (!mayOpen(pathname, me?.role, { parentOf })) {
           setBlocked(true);
           router.replace(homeOf(me?.role));
         } else setBlocked(false);

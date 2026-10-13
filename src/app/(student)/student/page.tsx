@@ -301,7 +301,7 @@ export default function StudentDashboard() {
             </div>
           </div>
           <p className="text-[11px] text-ink-muted mt-4 pt-3 border-t border-surface-border">
-            {formatDay(DEMO_TODAY, language)}
+            {formatDay(mode === "demo" ? DEMO_TODAY : new Date().toLocaleDateString("en-CA"), language)}
             <span className="mx-1.5">·</span>
             {done.length} {t("common.finished").toLowerCase()}
             <span className="mx-1.5">·</span>
