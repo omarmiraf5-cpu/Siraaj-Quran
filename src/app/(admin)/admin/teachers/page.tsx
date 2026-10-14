@@ -479,10 +479,10 @@ export default function AdminTeachersPage() {
                       {initials(t.name)}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] font-semibold truncate ${inactive ? "text-ink-muted" : "text-ink"}`}>
+                      <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${inactive ? "text-ink-muted" : "text-ink"}`}>
                         {t.name}
                       </p>
-                      <p className="text-[11px] text-ink-muted truncate">
+                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                         {t.email}
                         {theirHalaqas.length > 0 && ` · ${theirHalaqas.map((h) => h.name).join(", ")}`}
                       </p>

@@ -702,15 +702,17 @@ export default function QuranAssignmentsPage() {
               <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
                 {tr("Once {studentLabel} has recited all of {surah_name} to you, confirm it here. The next lesson won't be scheduled until you do.", { studentLabel, surah_name })}
               </p>
+              {/* Under the words rather than beside them, so on a phone the
+                  message keeps the card's full width. */}
+              <button
+                type="button"
+                onClick={() => confirmSurah(studentId, surah)}
+                disabled={confirmingSurah === key}
+                className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 border border-amber-600/40 rounded-full px-3 py-1.5"
+              >
+                {confirmingSurah === key ? tr("Saving…") : tr("Confirm tested")}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => confirmSurah(studentId, surah)}
-              disabled={confirmingSurah === key}
-              className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 flex-shrink-0 mt-0.5 whitespace-nowrap"
-            >
-              {confirmingSurah === key ? tr("Saving…") : tr("Confirm tested")}
-            </button>
           </div>
         );
       })}
@@ -1147,14 +1149,14 @@ export default function QuranAssignmentsPage() {
                   </span>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-ink truncate">
+                    <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                       {name}
                       {" · "}
                       <span className="underline decoration-2 underline-offset-2">
                         {PORTION_LABELS[a.portion]}
                       </span>
                     </p>
-                    <p className="text-[11px] text-ink-muted truncate">
+                    <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                       {rangeLabel}
                       {a.due_date ? tr(" · due {formatDay}", { formatDay: formatDay(a.due_date, language) }) : ""}
                     </p>

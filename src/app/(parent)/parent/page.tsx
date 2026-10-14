@@ -209,7 +209,7 @@ export default function ParentDashboard() {
                         <p className="eyebrow underline decoration-2 underline-offset-2 text-ink">
                           {t(`portion.${a.portion}`)}
                         </p>
-                        <p className="text-[13px] font-semibold text-ink truncate mt-0.5">
+                        <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere] mt-0.5">
                           {surahEnd ? (
                             `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
                           ) : (

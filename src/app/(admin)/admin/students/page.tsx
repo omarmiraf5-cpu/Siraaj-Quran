@@ -619,10 +619,10 @@ export default function AdminStudentsPage() {
             {initials(s.name)}
           </span>
           <div className="flex-1 min-w-0">
-            <p className={`text-[13px] font-semibold truncate ${inactive ? "text-ink-muted" : "text-ink"}`}>
+            <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${inactive ? "text-ink-muted" : "text-ink"}`}>
               {s.name}
             </p>
-            <p className="text-[11px] text-ink-muted truncate">
+            <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
               {graded ? (halaqa ? halaqaInGrade(halaqa) : [campusName(s.campusId), phrase("No teacher yet")].filter(Boolean).join(" · ")) : s.halaqa}
               {s.parentNames && s.parentNames.length > 0 && <>{" "}{tr("· Parent: {names}|· Parents: {names}", { n: s.parentNames.length, names: s.parentNames.join(", ") })}</>}
             </p>
@@ -868,7 +868,7 @@ export default function AdminStudentsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={tr("Search students or parents…")}
-          className="flex-1 min-w-[180px] bg-surface-card border border-surface-border rounded-2xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+          className="basis-full sm:basis-auto flex-1 min-w-[180px] bg-surface-card border border-surface-border rounded-2xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
         />
         {!isDemo && (
           <button
@@ -1326,7 +1326,7 @@ export default function AdminStudentsPage() {
                             className="w-4 h-4 accent-emerald-700 flex-shrink-0"
                           />
                           <span className="flex-1 min-w-0">
-                            <span className={`block text-[13px] font-semibold truncate ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
+                            <span className={`block text-[13px] font-semibold [overflow-wrap:anywhere] ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
                             <span className={`block text-[11px] ${h ? "text-ink-muted" : "text-amber-700 dark:text-amber-300 font-semibold"}`}>
                               {h ? halaqaInGrade(h) : [campusName(s.campusId), phrase("No teacher yet")].filter(Boolean).join(" · ")}
                               {s.parentNames && s.parentNames.length > 0 && <span className="font-normal text-ink-muted"> · {s.parentNames.join(", ")}</span>}

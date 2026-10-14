@@ -389,7 +389,7 @@ export default function ParentYearlyPlanPage() {
                   </svg>
                 </button>
                 <div className="text-center min-w-0">
-                  <p className="page-title text-[15px] truncate">{slice?.label}</p>
+                  <p className="page-title text-[15px] [overflow-wrap:anywhere]">{slice?.label}</p>
                   {slice?.isCurrent && (
                     <p className="eyebrow mt-1 text-brand-gold-dark">{tr("Current")}</p>
                   )}

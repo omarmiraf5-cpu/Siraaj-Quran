@@ -181,7 +181,7 @@ export default function MyAttendancePage() {
                 <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-ink">{when(r)}</p>
-                    <p className="text-[11.5px] text-ink-muted truncate">
+                    <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                       {REASON_LABEL[r.reason]}
                       {r.note ? ` — ${r.note}` : ""}
                     </p>
@@ -217,7 +217,7 @@ export default function MyAttendancePage() {
               <li key={d.date} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-ink">{formatDay(d.date, language)}</p>
-                  <p className="text-[11.5px] text-ink-muted truncate">
+                  <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                     {timesLine(d) ||
                       (d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : d.note ?? tr("No sign-in"))}
                   </p>

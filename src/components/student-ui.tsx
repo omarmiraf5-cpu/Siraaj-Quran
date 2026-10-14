@@ -153,7 +153,7 @@ export function StreakBadge({ days }: { days: number }) {
   const { tr } = useLanguage();
   if (days < 2) return null;
   return (
-    <span className="shine inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-gold-light to-brand-gold px-3 py-1.5 text-[12px] font-bold text-[#20180a]">
+    <span className="shine inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-gold-light to-brand-gold px-3 py-1 text-[12px] leading-[1.9] whitespace-nowrap font-bold text-[#20180a]">
       <IconFlame size={13} />
       {tr("{days} days in a row", { days })}
     </span>
@@ -192,7 +192,7 @@ export function SurahTile({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="page-title text-[17px] truncate">{title}</h3>
+            <h3 className="page-title text-[17px] [overflow-wrap:anywhere]">{title}</h3>
             {status.done && (
               <span className={`${ILLUM_CLASS.verdigris} w-6 h-6 rounded-full flex-shrink-0`}>
                 <IconCheck size={13} />
@@ -354,7 +354,7 @@ export function UpNextCard({
         <span className="block text-[11px] font-bold uppercase tracking-wider text-white/75">
           {eyebrow}
         </span>
-        <span className="block page-title text-white text-[17px] truncate mt-0.5">
+        <span className="block page-title text-white text-[17px] [overflow-wrap:anywhere] mt-0.5">
           {title}
         </span>
         <span className="block text-[12px] text-white/70 mt-0.5">{detail}</span>
@@ -420,7 +420,7 @@ export function SurahGridTile({
       )}
       {arabic && (
         <span
-          className="relative block font-arabic text-[12px] text-white/60 mb-2 leading-tight truncate w-full"
+          className="relative block font-arabic text-[12px] text-white/60 mb-2 leading-tight [overflow-wrap:anywhere] w-full"
           dir="rtl"
           lang="ar"
         >
@@ -455,7 +455,7 @@ export function SurahGridTile({
         </span>
       </span>
 
-      <span className="relative block text-white font-bold text-[13px] mt-2.5 leading-tight truncate w-full">
+      <span className="relative block text-white font-bold text-[13px] mt-2.5 leading-tight [overflow-wrap:anywhere] w-full">
         {name}
       </span>
       <span className="relative block text-white/70 text-[11px] mt-0.5">{detail}</span>

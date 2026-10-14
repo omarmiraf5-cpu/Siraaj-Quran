@@ -173,7 +173,7 @@ function FileChips({ files, onRemove }: { files: FileRef[]; onRemove?: (i: numbe
               </span>
             )}
             <span className="min-w-0 text-start">
-              <span className="block text-[12.5px] font-semibold text-ink truncate max-w-[170px]" dir="auto">
+              <span className="block text-[12.5px] font-semibold text-ink [overflow-wrap:anywhere] max-w-[170px]" dir="auto">
                 {f.name}
               </span>
               <span className="block text-[11px] text-ink-muted">{fileSize(f.size)}</span>
@@ -991,7 +991,7 @@ function AssignmentDetail({ id, api, today, onClose }: { id: string; api: Api; t
                   className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm/60 px-1 rounded-lg transition"
                 >
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13.5px] font-semibold text-ink truncate">{s.student_name}</span>
+                    <span className="block text-[13.5px] font-semibold text-ink [overflow-wrap:anywhere]">{s.student_name}</span>
                     {s.status === "graded" && s.score !== null && (
                       <span className="block text-[12px] text-ink-muted tabular-nums">
                         {scoreLine(s.score, a.max_points)} · {percentOf(s.score, a.max_points)}%
@@ -1075,7 +1075,7 @@ function MarkingView({
       </button>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="page-title text-[18px] truncate">{submission.student_name}</p>
+          <p className="page-title text-[18px] [overflow-wrap:anywhere]">{submission.student_name}</p>
           {submission.submitted_at && (
             <p className="text-[12px] text-ink-muted">
               {t("cw.status.submitted")} {new Date(submission.submitted_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}

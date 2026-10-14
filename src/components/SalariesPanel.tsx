@@ -359,11 +359,11 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                       {initials(s.name)}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">
+                      <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                         {s.name}
                         {s.admin && <span className="ms-1.5 text-[10px] font-semibold text-ink-muted uppercase tracking-wide">{tr("Admin")}</span>}
                       </p>
-                      <p className="text-[11px] text-ink-muted truncate">
+                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                         {rates[s.id] ? tr("{amount} a month", { amount: money(rates[s.id]) }) : tr("No salary set")}
                       </p>
                     </div>

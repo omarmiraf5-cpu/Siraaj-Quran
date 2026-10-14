@@ -514,7 +514,7 @@ export function QaidahLessons({
                 <span className="block page-title text-[16px] leading-snug">{lesson.title}</span>
                 {language !== "ar" && (
                   <span
-                    className="block font-arabic text-[15px] text-ink-muted mt-0.5 truncate"
+                    className="block font-arabic text-[15px] text-ink-muted mt-0.5 [overflow-wrap:anywhere]"
                     dir="rtl"
                     lang="ar"
                   >

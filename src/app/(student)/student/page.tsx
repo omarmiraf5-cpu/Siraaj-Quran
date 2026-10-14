@@ -124,7 +124,7 @@ export default function StudentDashboard() {
           </Link>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] text-white/55">{t("common.asalaamuAlaykum")}</p>
-            <h1 className="page-title text-white text-[26px] leading-tight truncate">
+            <h1 className="page-title text-white text-[26px] leading-tight [overflow-wrap:anywhere]">
               {firstName}
             </h1>
           </div>

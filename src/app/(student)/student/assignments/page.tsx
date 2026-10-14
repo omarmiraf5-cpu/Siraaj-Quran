@@ -194,7 +194,7 @@ export default function StudentAssignmentsPage() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="page-title text-[19px] truncate">
+                          <h3 className="page-title text-[19px] [overflow-wrap:anywhere]">
                             {surahEnd
                               ? `${surah?.englishName ?? `Surah ${a.surah}`} – ${surahEnd.englishName}`
                               : (surah ? surah.englishName : tr("Surah {surah}", { surah: a.surah }))}

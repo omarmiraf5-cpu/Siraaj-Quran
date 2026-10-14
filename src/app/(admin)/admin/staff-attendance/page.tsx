@@ -197,8 +197,8 @@ export default function StaffAttendancePage() {
             {data.teachers.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{t.name}</p>
-                  <p className="text-[11.5px] text-ink-muted truncate">
+                  <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{t.name}</p>
+                  <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                     {timesLine(t.today) ||
                       (t.today.report
                         ? `${REASON_LABEL[t.today.report.reason]}${t.today.report.note ? ` — ${t.today.report.note}` : ""}`
@@ -379,7 +379,7 @@ function TeacherDays({
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold text-ink">{formatDay(d.date, language)}</p>
-                <p className="text-[11.5px] text-ink-muted truncate">
+                <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                   {[timesLine(d), d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : "", d.note ? `Office: ${d.note}` : ""]
                     .filter(Boolean)
                     .join(" · ") || tr("No sign-in")}

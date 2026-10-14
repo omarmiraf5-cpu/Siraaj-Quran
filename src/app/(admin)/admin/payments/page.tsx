@@ -380,8 +380,8 @@ export default function AdminPaymentsPage() {
                           {initials(studentName(f.studentId))}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-ink truncate">{studentName(f.studentId)}</p>
-                          <p className="text-[11px] text-ink-muted truncate">
+                          <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{studentName(f.studentId)}</p>
+                          <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                             {tr("{description} · due {dueDate}", { description: f.description, dueDate: f.dueDate })}
                           </p>
                         </div>

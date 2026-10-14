@@ -352,8 +352,8 @@ export default function StudentAttendancePage() {
                     className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">{g.label}</p>
-                      <p className="text-[11px] text-ink-muted truncate">
+                      <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{g.label}</p>
+                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                         {g.teacher && g.teacher !== g.label.split(" · ").pop() ? `${g.teacher} · ` : ""}
                         {tr("{count} students", { count: g.kids.length })}
                       </p>
@@ -381,7 +381,7 @@ export default function StudentAttendancePage() {
                         const st = markOn.get(`${k.id}|${day}`);
                         return (
                           <li key={k.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
-                            <span className="text-ink truncate">{k.name}</span>
+                            <span className="text-ink [overflow-wrap:anywhere]">{k.name}</span>
                             <span className={`font-semibold flex-shrink-0 ${STATUS_TEXT[st ?? "none"]}`}>{st ? t(`common.${st}`) : tr("Not marked")}</span>
                           </li>
                         );
@@ -439,8 +439,8 @@ export default function StudentAttendancePage() {
                             {initials(s.name)}
                           </span>
                           <span className="min-w-0">
-                            <span className="block font-semibold text-ink truncate">{s.name}</span>
-                            <span className="block text-[11px] text-ink-muted truncate">{placeOf(s)}</span>
+                            <span className="block font-semibold text-ink [overflow-wrap:anywhere]">{s.name}</span>
+                            <span className="block text-[11px] text-ink-muted [overflow-wrap:anywhere]">{placeOf(s)}</span>
                           </span>
                         </span>
                       </td>

@@ -678,7 +678,7 @@ export function MilestoneNavigator({
           <p className="eyebrow">
             {tr("Milestone {n} of {count}", { n: index + 1, count: milestones.length })}
           </p>
-          <p className="page-title text-[15px] truncate mt-0.5">
+          <p className="page-title text-[15px] [overflow-wrap:anywhere] mt-0.5">
             {focused.title?.trim() ? milestoneTitle(focused) : mushafRange(focused) || milestoneTitle(focused)}
           </p>
         </div>

@@ -331,17 +331,19 @@ export default function TeacherAttendancePage() {
         {roster.map((s) => {
           const summary = summariseAttendance(history[s.id] ?? []);
           return (
-            <div key={s.id} className="flex items-center gap-3 px-3 py-3">
+            // On a phone the four marks get their own line under the name, so
+            // a long name and its details show in full.
+            <div key={s.id} className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2.5 px-3 py-3">
               <div className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-xs flex-shrink-0">
                 {initials(s.name)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-ink truncate">{s.name}</p>
-                <p className="text-[11px] text-ink-muted">
+                <p className="font-semibold text-sm text-ink [overflow-wrap:anywhere]">{s.name}</p>
+                <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                   {s.halaqa} · {summary.rate}% {t("common.thisTerm")}
                 </p>
               </div>
-              <div className="flex gap-1.5 flex-shrink-0">
+              <div className="flex gap-2 sm:gap-1.5 w-full sm:w-auto sm:flex-shrink-0">
                 {MARKS.map((m) => {
                   const active = records[s.id] === m.status;
                   return (
@@ -350,7 +352,7 @@ export default function TeacherAttendancePage() {
                       onClick={() => mark(s.id, m.status)}
                       aria-label={`${t(`common.${m.status}`)} — ${s.name}`}
                       aria-pressed={active}
-                      className={`w-9 h-9 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
+                      className={`flex-1 sm:flex-none h-10 sm:h-9 sm:w-9 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
                         active ? m.on : `border-surface-border text-ink-muted ${m.off}`
                       }`}
                     >

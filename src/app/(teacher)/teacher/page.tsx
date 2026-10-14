@@ -291,7 +291,7 @@ export default function TeacherDashboard() {
                 <div key={h.id} className="rounded-2xl border border-surface-border p-4" data-halaqa={h.label}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-semibold text-[14px] text-ink truncate">{h.label}</p>
+                      <p className="font-semibold text-[14px] text-ink [overflow-wrap:anywhere]">{h.label}</p>
                       <p className="text-[11px] text-ink-muted">
                         {countLabel("{count} student|{count} students", kids.length, `${kids.length} ${t("common.students")}`)} · {marked}/{kids.length} {countLabel("{count} marked|{count} marked", marked, t("teacher.attendance.marked"))}{" "}
                         {t("teacher.dashboard.today")}
@@ -364,7 +364,7 @@ export default function TeacherDashboard() {
                         {initials(student.name)}
                       </span>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-[13px] font-semibold text-ink truncate">
+                        <span className="block text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                           {student.name}
                         </span>
                         <span className="block text-[11px] text-ink-muted">{student.halaqa}</span>
@@ -385,7 +385,7 @@ export default function TeacherDashboard() {
                       {initials(student.name)}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="block text-[13px] font-semibold text-ink truncate">
+                      <span className="block text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                         {student.name}
                       </span>
                       <span className="block text-[11px] text-ink-muted">{student.halaqa}</span>
@@ -425,7 +425,7 @@ export default function TeacherDashboard() {
                       {initials(student?.name ?? "?")}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">
+                      <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                         {student?.name ?? t("role.student")}
                       </p>
                       <p className="text-[12px] text-ink-body">
@@ -436,7 +436,7 @@ export default function TeacherDashboard() {
                         </span>
                       </p>
                       {a.teacher_notes && (
-                        <p className="text-[11px] text-ink-muted mt-1 line-clamp-2 leading-snug">
+                        <p className="text-[11px] text-ink-muted mt-1 [overflow-wrap:anywhere] leading-snug">
                           {a.teacher_notes}
                         </p>
                       )}

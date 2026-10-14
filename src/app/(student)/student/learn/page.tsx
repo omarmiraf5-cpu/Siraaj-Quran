@@ -73,7 +73,7 @@ export default function StudentLearnPage() {
               <span className="flex items-baseline justify-between gap-2">
                 <span className="page-title text-[17px]">{tr(item.title)}</span>
                 {language !== "ar" && <span
-                  className="font-arabic text-[15px] text-ink-muted flex-shrink-0 truncate"
+                  className="font-arabic text-[15px] text-ink-muted flex-shrink-0 [overflow-wrap:anywhere]"
                   dir="rtl"
                   lang="ar"
                 >

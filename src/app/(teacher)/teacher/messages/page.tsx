@@ -244,8 +244,8 @@ export default function TeacherMessagesPage() {
                     {initials(s.name)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-ink truncate">{s.name}</p>
-                    <p className="text-[11px] text-ink-muted truncate" dir="auto">
+                    <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{s.name}</p>
+                    <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]" dir="auto">
                       {isAbsence
                         ? `${t("common.absence")} · ${formatDay(last.absence_date!, language)}`
                         : last

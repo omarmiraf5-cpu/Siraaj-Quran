@@ -954,8 +954,8 @@ export default function OnboardPage() {
                           className="w-4 h-4 accent-emerald-600 flex-shrink-0"
                         />
                         <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-ink truncate">{s.name}</span>
-                          <span className="block text-xs text-ink-muted truncate">
+                          <span className="block text-sm font-semibold text-ink [overflow-wrap:anywhere]">{s.name}</span>
+                          <span className="block text-xs text-ink-muted [overflow-wrap:anywhere]">
                             {s.halaqa}
                             {claimedBy ? tr(" · already linked to {name}", { name: claimedBy.name }) : ""}
                           </span>

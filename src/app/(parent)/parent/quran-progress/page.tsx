@@ -202,7 +202,7 @@ export default function ParentQuranProgressPage() {
                             {PORTION_ARABIC[a.portion]}
                           </span>
                         </p>
-                        <p className="text-[14px] font-semibold text-ink truncate mt-0.5">
+                        <p className="text-[14px] font-semibold text-ink [overflow-wrap:anywhere] mt-0.5">
                           {surahEnd ? (
                             rangeLabel
                           ) : (

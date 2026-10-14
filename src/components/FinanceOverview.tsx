@@ -154,7 +154,7 @@ export function FinanceOverview({
                             <span className="w-7 h-7 rounded-lg bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[10px] flex-shrink-0">
                               {initials(name(r.studentId))}
                             </span>
-                            <span className="font-semibold text-ink truncate">{name(r.studentId)}</span>
+                            <span className="font-semibold text-ink [overflow-wrap:anywhere]">{name(r.studentId)}</span>
                           </span>
                         </td>
                         <td className="py-2 px-1 text-end tabular-nums text-ink-body" dir="ltr">{money(r.old)}</td>

@@ -378,7 +378,7 @@ export default function TeacherAwardsPage() {
                     {STAR_REASON_EMOJI[s.reason]}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-ink truncate">
+                    <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                       {student?.name ?? tr("Student")}
                       <span className="font-normal text-ink-muted"> · {STAR_REASON_LABELS[s.reason]}</span>
                     </p>

@@ -110,19 +110,24 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
     <>
       {/* ── MOBILE TOP BAR ── */}
       <header className="md:hidden fixed top-[env(safe-area-inset-top)] start-0 end-0 z-50 gradient-navy flex items-center justify-between px-4 h-14 shadow-dark">
-        <div className="flex items-center gap-2.5 min-w-0">
+        {/* The school's name gets the room: on a phone the buttons are
+            icons only, and the role sits under the name rather than beside
+            it, so a teacher can always see which school they're in. */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <Crest
             branding={branding}
             size={32}
             className="w-8 h-8 rounded-lg overflow-hidden ring-1 ring-brand-gold/60 flex-shrink-0"
           />
-          <Wordmark branding={branding} className="font-display text-sm font-bold tracking-tight truncate" />
-          <span className="text-white/30 text-xs font-medium flex-shrink-0">· {role}</span>
+          <div className="min-w-0 leading-tight">
+            <Wordmark branding={branding} className="block font-display text-sm font-bold tracking-tight truncate" />
+            <span className="block text-white/40 text-[11px] font-medium truncate">{role}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-shrink-0 ms-2">
           <SchoolSwitcher variant="topbar" enabled={!demoUser} />
           <LanguageToggle variant="icon" className="bg-white/10 text-white/70 hover:bg-white/20" />
-          <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
+          <ThemeToggle variant="icon" className="bg-white/10 text-white/70 hover:bg-white/20" />
           <button
             onClick={handleSignOut}
             className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 transition"
@@ -229,7 +234,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         {/* User info */}
         <div className="px-2 mb-1">
           <p className="text-xs text-white/40 uppercase tracking-wider mb-1">{role}</p>
-          <p className="text-sm font-semibold text-white/90 truncate">{displayName}</p>
+          <p className="text-sm font-semibold text-white/90 [overflow-wrap:anywhere]">{displayName}</p>
         </div>
         <SchoolSwitcher variant="sidebar" enabled={!demoUser} />
 

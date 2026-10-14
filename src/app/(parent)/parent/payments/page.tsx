@@ -115,7 +115,7 @@ export default function ParentPaymentsPage() {
           <ul className="divide-y divide-surface-border -my-1" data-section="by-child">
             {perChild.map((b) => (
               <li key={b.studentId} className="py-3 flex items-center justify-between gap-3">
-                <p className="text-[13px] font-semibold text-ink truncate">{childName(b.studentId)}</p>
+                <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{childName(b.studentId)}</p>
                 <p className="text-[12px] text-ink-muted text-end" dir="ltr">
                   {t("parent.payments.oldBalance")} {money(b.old)} · {t("parent.payments.monthlyBalance")} {money(b.monthOwed)} ·{" "}
                   <span className={`font-semibold ${b.outstanding > 0 ? "text-red-800 dark:text-red-300" : "text-ink"}`}>
@@ -140,8 +140,8 @@ export default function ParentPaymentsPage() {
               return (
                 <li key={f.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-ink truncate">{f.description}</p>
-                    <p className="text-[11px] text-ink-muted truncate">
+                    <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{f.description}</p>
+                    <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                       {childName(f.studentId)} · {t("common.due").toLowerCase()} {formatDay(f.dueDate, language)}
                     </p>
                   </div>

@@ -89,7 +89,7 @@ export function AnnouncementsFeed({
                     {t("common.pinned")}
                   </span>
                 )}
-                <p className="text-[13px] font-semibold text-ink truncate">
+                <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                   {a.titleKey ? t(a.titleKey) : a.title}
                 </p>
               </div>

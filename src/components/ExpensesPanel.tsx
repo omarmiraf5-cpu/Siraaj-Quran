@@ -283,8 +283,8 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                   >
                     <span className="w-12 text-center flex-shrink-0 text-[11px] font-semibold text-ink-muted">{shortDate(e.spentOn)}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">{e.description}</p>
-                      <p className="text-[11px] text-ink-muted truncate">
+                      <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{e.description}</p>
+                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                         {EXPENSE_CATEGORY_LABELS[e.category]}
                         {e.paidTo ? ` · ${e.paidTo}` : ""} · {PAY_METHOD_LABELS[e.method]}
                       </p>

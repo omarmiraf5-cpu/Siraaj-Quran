@@ -285,8 +285,8 @@ export default function AdminDashboard() {
             return (
               <li key={teacher.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{teacher.name}</p>
-                  <p className="text-[11px] text-ink-muted truncate">
+                  <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{teacher.name}</p>
+                  <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                     {theirHalaqas.length > 0
                       ? theirHalaqas.map((h) => h.name).join(", ")
                       : t("common.noHalaqaAssigned")}

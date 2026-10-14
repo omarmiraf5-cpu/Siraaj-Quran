@@ -110,7 +110,7 @@ export function Modal({
               </span>
             )}
             <div className="min-w-0">
-              <h2 className="page-title text-white text-lg truncate">{title}</h2>
+              <h2 className="page-title text-white text-lg [overflow-wrap:anywhere]">{title}</h2>
               {subtitle && <p className="text-[12px] text-white/55">{subtitle}</p>}
             </div>
           </div>
@@ -136,9 +136,11 @@ export function SectionCard({
 }) {
   return (
     <section className={`card-quiet p-5 ${className}`}>
-      <div className="flex items-baseline justify-between gap-3">
+      {/* Wraps on a phone: a long note drops under the title instead of
+          running off the edge of the card. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 className="page-title text-lg">{title}</h2>
-        {note && <span className="eyebrow flex-shrink-0">{note}</span>}
+        {note && <span className="eyebrow">{note}</span>}
       </div>
       <div className="gold-rule my-4" />
       {children}
@@ -371,7 +373,7 @@ function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?
             {t(`portion.${entry.portion}`)}
           </span>
         </p>
-        <p className="text-[11px] text-ink-muted truncate">
+        <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
           {surah ? surah.englishName : tr("Surah {surah}", { surah: entry.surah })}{" "}{tr("· ayahs {ayah_start}–{ayah_end}", { ayah_start: entry.ayah_start, ayah_end: entry.ayah_end })}
         </p>
         {entry.notes && (
