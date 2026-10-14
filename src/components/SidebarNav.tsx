@@ -150,7 +150,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors ${
+              className={`flex-1 min-w-0 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] leading-tight text-center font-semibold transition-colors ${
                 active ? "text-brand-gold" : "text-white/45 hover:text-white/80"
               }`}
             >
@@ -164,7 +164,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
-            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors ${
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] leading-tight text-center font-semibold transition-colors ${
               moreActive || moreOpen ? "text-brand-gold" : "text-white/45 hover:text-white/80"
             }`}
           >

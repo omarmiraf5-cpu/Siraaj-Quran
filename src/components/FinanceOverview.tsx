@@ -113,7 +113,7 @@ export function FinanceOverview({
       </SectionCard>
 
       <SectionCard title={tr("Fee balances")} note={tr("as of {month}", { month: monthLabel(month) })}>
-        <div className="grid grid-cols-3 gap-3" data-section="balances">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" data-section="balances">
           <StatTile value={money(school.old)} label={tr("Old balance")} sub={tr("unpaid from before {month}", { month: monthLabel(month) })} />
           <StatTile value={money(school.monthOwed)} label={tr("Monthly balance")} sub={tr("still owed for {month}", { month: monthLabel(month) })} />
           <StatTile value={money(school.outstanding)} label={tr("Outstanding")} sub={tr("old + monthly")} />

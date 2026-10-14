@@ -100,7 +100,7 @@ export default function ParentPaymentsPage() {
         }
       />
 
-      <div className="grid grid-cols-3 gap-3" data-section="balances">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" data-section="balances">
         <StatTile value={money(balance.old)} label={t("parent.payments.oldBalance")} sub={t("parent.payments.fromEarlierMonths")} />
         <StatTile value={money(balance.monthOwed)} label={t("parent.payments.monthlyBalance")} sub={t("parent.payments.owedThisMonth")} />
         <StatTile value={money(balance.outstanding)} label={t("parent.payments.outstandingBalance")} sub={t("parent.payments.oldPlusMonthly")} />

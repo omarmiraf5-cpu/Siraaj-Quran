@@ -440,12 +440,13 @@ export default function TeacherDashboard() {
                           {a.teacher_notes}
                         </p>
                       )}
+                      {/* Under the note rather than beside it: this card is
+                          narrow on a tablet, and a date column squeezed the
+                          note into a sliver. */}
+                      {a.due_date && (
+                        <p className="text-[11px] text-ink-muted mt-1">{formatDay(a.due_date, language)}</p>
+                      )}
                     </div>
-                    {a.due_date && (
-                      <span className="text-[11px] text-ink-muted flex-shrink-0 whitespace-nowrap">
-                        {formatDay(a.due_date, language)}
-                      </span>
-                    )}
                   </>
                 );
                 return (

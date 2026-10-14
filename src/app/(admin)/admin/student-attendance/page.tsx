@@ -419,7 +419,7 @@ export default function StudentAttendancePage() {
               {tr("Over {periodLabel}, most absences first. Attendance % counts present and late out of the days marked (excused days aren't counted).", { periodLabel })}
             </p>
             <div className="overflow-x-auto -mx-1">
-              <table className="w-full text-[13px]" data-section="by-student">
+              <table className="w-full min-w-[30rem] text-[13px]" data-section="by-student">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide text-ink-muted">
                     <th className="text-start font-semibold py-2 px-1">{tr("Student")}</th>
