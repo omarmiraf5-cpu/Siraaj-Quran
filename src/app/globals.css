@@ -692,3 +692,7 @@ body {
   .card-lift,
   .card-lift:hover { transition: none; transform: none; }
 }
+
+/* A row that scrolls sideways without a scrollbar under it. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

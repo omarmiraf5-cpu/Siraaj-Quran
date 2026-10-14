@@ -14,6 +14,7 @@ import {
   type AssignmentOverride,
   type RecitationLogEntry,
 } from "@/data/demo";
+import { useChosenChild } from "@/hooks/useChosenChild";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { PortalHero } from "@/components/PortalHero";
 import {
@@ -45,16 +46,11 @@ export default function ParentQuranProgressPage() {
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
-  const [childId, setChildId] = useState<string | null>(null);
-  const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
+  const { child, choose: setChildId, options: childChoices } = useChosenChild(children);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
   const [demoLog, setDemoLog] = useState<RecitationLogEntry[]>([]);
   const [realLog, setRealLog] = useState<RecitationLogEntry[]>([]);
-
-  useEffect(() => {
-    if (!childId && children.length > 0) setChildId(children[0].id);
-  }, [children, childId]);
 
   const { assignments: baseAssignments, ready } = useStudentRecord(child?.id ?? null, mode);
 
@@ -133,8 +129,8 @@ export default function ParentQuranProgressPage() {
       />
 
       {children.length > 1 && (
-        <div className="flex items-center gap-3">
-          <span className="eyebrow">{t("common.viewing")}</span>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="eyebrow flex-shrink-0">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
             value={child.id}
@@ -142,7 +138,7 @@ export default function ParentQuranProgressPage() {
               setChildId(v);
               setExpanded(null);
             }}
-            options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+            options={childChoices}
           />
         </div>
       )}

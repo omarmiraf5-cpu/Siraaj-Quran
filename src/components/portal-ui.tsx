@@ -6,7 +6,7 @@
 // serif one on another, bars in four different heights — which is what made
 // the product read as three products.
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { pillSpring } from "@/lib/motion-config";
 import {
@@ -311,12 +311,26 @@ export function SegmentedSwitch<T extends string>({
 }) {
   const reduce = useReducedMotion();
   const group = useId();
+  const strip = useRef<HTMLDivElement>(null);
+  // Four or five children don't fit a phone's width: the row scrolls
+  // sideways, and the chosen one is brought into view.
+  useEffect(() => {
+    // Only the strip scrolls — never the page under it.
+    const box = strip.current;
+    const el = box?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!box || !el || box.scrollWidth <= box.clientWidth) return;
+    const a = el.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const by = a.left < b.left ? a.left - b.left - 8 : a.right > b.right ? a.right - b.right + 8 : 0;
+    if (by) box.scrollBy({ left: by, behavior: reduce ? "auto" : "smooth" });
+  }, [value, reduce]);
   if (options.length < 2) return null;
   return (
     <div
+      ref={strip}
       role="tablist"
       aria-label={label}
-      className="inline-flex flex-wrap p-1 gap-1 rounded-full bg-surface-bg-warm border border-surface-border"
+      className="inline-flex max-w-full overflow-x-auto no-scrollbar p-1 gap-1 rounded-full bg-surface-bg-warm border border-surface-border"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -326,7 +340,7 @@ export function SegmentedSwitch<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`relative px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+            className={`relative flex-shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
               active ? "text-white" : "text-ink-muted hover:text-ink"
             }`}
           >

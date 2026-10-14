@@ -57,6 +57,47 @@ function todayIso() {
   return new Date().toLocaleDateString("en-CA");
 }
 
+/*
+ * Marks not yet saved are kept on the device as they're tapped, so a
+ * dropped signal, a reload or a flat battery halfway down the register
+ * doesn't lose them. Kept per signed-in teacher and for one day only:
+ * yesterday's leftovers are never applied to today's register.
+ */
+type Draft = { date: string; marks: Record<string, AttendanceStatus | null> };
+const draftKey = (who: string) => `attendance_draft:${who}`;
+
+function readDraft(who: string, date: string): Draft["marks"] | null {
+  try {
+    const d = JSON.parse(localStorage.getItem(draftKey(who)) ?? "null") as Draft | null;
+    return d?.date === date && d.marks && typeof d.marks === "object" ? d.marks : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(who: string, date: string, marks: Draft["marks"]) {
+  try {
+    if (Object.keys(marks).length === 0) localStorage.removeItem(draftKey(who));
+    else localStorage.setItem(draftKey(who), JSON.stringify({ date, marks }));
+  } catch {}
+}
+
+/** Whether the browser thinks there's a connection. */
+function useOnline() {
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online;
+}
+
 export default function TeacherAttendancePage() {
   const supabase = createClient();
   const { t, language, tr } = useLanguage();
@@ -84,6 +125,10 @@ export default function TeacherAttendancePage() {
   // tally, "mark all present" and save. Null in the sample school.
   const [halaqas, setHalaqas] = useState<MyHalaqa[] | null>(null);
   const [halaqaId, setHalaqaId] = useState<string | null>(null);
+  // Whose register the draft on this device belongs to.
+  const [who, setWho] = useState<string | null>(null);
+  const [restored, setRestored] = useState(0);
+  const online = useOnline();
 
   // Merged with whatever the admin portal has added, so a newly enrolled
   // student shows up on today's register without a page reload elsewhere.
@@ -101,6 +146,7 @@ export default function TeacherAttendancePage() {
         ).filter((s) => s.active !== false);
         setStudents(roster);
         setHistory(DEMO_ATTENDANCE);
+        restoreDraft("demo", DEMO_TODAY, {});
         return;
       }
 
@@ -147,12 +193,50 @@ export default function TeacherAttendancePage() {
         if (row.class_date === todayStr) todayRecords[row.student_id] = day.status;
       }
       setHistory(byStudent);
-      setRecords(todayRecords);
       setSavedMarks(todayRecords);
+      restoreDraft(user.id, todayStr, todayRecords);
+    };
+
+    // Unsaved marks from earlier today go back on the register over what
+    // the database holds; a mark that matches it is no longer a change.
+    const restoreDraft = (owner: string, date: string, base: Record<string, AttendanceStatus>) => {
+      const draft = readDraft(owner, date) ?? {};
+      const next = { ...base };
+      let changes = 0;
+      for (const [id, status] of Object.entries(draft)) {
+        if (status === null) delete next[id];
+        else next[id] = status;
+        if ((base[id] ?? null) !== status) changes++;
+      }
+      setRecords(next);
+      setRestored(changes);
+      setWho(owner);
     };
 
     load().finally(() => setReady(true));
   }, []);
+
+  // Every change not yet saved, as it stands — kept on the device.
+  const pending: Draft["marks"] = {};
+  for (const id of new Set([...Object.keys(records), ...Object.keys(savedMarks)])) {
+    if (records[id] !== savedMarks[id]) pending[id] = records[id] ?? null;
+  }
+  const pendingCount = Object.keys(pending).length;
+  const pendingJson = JSON.stringify(pending);
+  useEffect(() => {
+    if (who) writeDraft(who, today, JSON.parse(pendingJson));
+  }, [who, today, pendingJson]);
+
+  // Closing the tab or reloading with marks unsaved asks first.
+  useEffect(() => {
+    if (pendingCount === 0) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pendingCount]);
 
   const mark = (id: string, status: AttendanceStatus) => {
     setSaved(false);
@@ -218,7 +302,8 @@ export default function TeacherAttendancePage() {
           cleared: Object.keys(savedHere).filter((id) => !(id in here)),
         }),
       });
-      const body = await res.json();
+      // A gateway's error page isn't JSON; it's still a failed save.
+      const body = await res.json().catch(() => ({}));
       if (res.status === 401) throw new Error(t("teacher.attendance.signedOut"));
       if (!res.ok) throw new Error(body.error ?? t("teacher.attendance.saveFailed"));
       setLongAbsences(Array.isArray(body.alerts) ? body.alerts : []);
@@ -239,9 +324,17 @@ export default function TeacherAttendancePage() {
         return { ...next, ...here };
       });
       setSaved(true);
+      setRestored(0);
       toast.success(halaqa && halaqas && halaqas.length > 1 ? `${t("teacher.attendance.saved")} · ${halaqa.label}` : t("teacher.attendance.saved"));
     } catch (err) {
-      const message = err instanceof Error ? tr(err.message) : t("teacher.attendance.saveFailed");
+      // fetch itself failing means no connection, not a refusal: say so in
+      // words, and that nothing tapped has been lost.
+      const message =
+        err instanceof TypeError || !navigator.onLine
+          ? tr("Couldn't reach the school. Your marks are kept on this device — try again when you have signal.")
+          : err instanceof Error
+            ? tr(err.message)
+            : t("teacher.attendance.saveFailed");
       setError(message);
       toast.error(message);
     } finally {
@@ -298,6 +391,26 @@ export default function TeacherAttendancePage() {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {!online && (
+        <div role="status" className="rounded-2xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-950/25 px-4 py-3">
+          <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-200">{tr("You're offline")}</p>
+          <p className="text-[12px] text-amber-800 dark:text-amber-300 mt-0.5">
+            {tr("Keep marking — every mark is kept on this device. Save once you have signal again.")}
+          </p>
+        </div>
+      )}
+
+      {restored > 0 && (
+        <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-surface-border bg-surface-bg-warm px-4 py-3">
+          <p className="text-[13px] text-ink-body">
+            {tr("{count} unsaved mark from earlier was put back. Save to keep it.|{count} unsaved marks from earlier were put back. Save to keep them.", { count: restored })}
+          </p>
+          <button type="button" onClick={() => setRestored(0)} className="text-[12px] font-semibold text-ink-muted hover:text-ink flex-shrink-0">
+            {tr("OK")}
+          </button>
         </div>
       )}
 
@@ -390,6 +503,14 @@ export default function TeacherAttendancePage() {
       {error && (
         <div className="bg-red-50 dark:bg-red-950/25 border border-red-200 dark:border-red-800/40 rounded-2xl p-4">
           <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <button
+            type="button"
+            onClick={saveAttendance}
+            disabled={saving}
+            className="mt-2 text-[13px] font-semibold text-red-800 dark:text-red-200 underline underline-offset-2 disabled:opacity-50"
+          >
+            {tr("Try again")}
+          </button>
         </div>
       )}
 
@@ -404,11 +525,13 @@ export default function TeacherAttendancePage() {
         <PressButton
           onClick={saveAttendance}
           loading={saving}
-          disabled={marked === 0 && !changed}
+          disabled={(marked === 0 && !changed) || !online}
           className="w-full max-w-4xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 transition-opacity"
         >
           {saved && <IconCheck size={16} />}
-          {saving
+          {!online
+            ? tr("Offline — marks kept on this device")
+            : saving
             ? t("common.saving")
             : saved
               ? t("teacher.attendance.saved")

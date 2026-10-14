@@ -86,6 +86,12 @@ export default function AdminPaymentsPage() {
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  // A school of a few hundred has a few hundred charges a term: the list is
+  // searched and narrowed rather than scrolled.
+  const [query, setQuery] = useState("");
+  const [show, setShow] = useState<"all" | "unpaid" | "partial" | "paid">("all");
 
   const loadRealStudents = async (): Promise<DemoStudent[]> => {
     const { data } = await supabase
@@ -205,8 +211,11 @@ export default function AdminPaymentsPage() {
   // from being mistyped as a smaller total than what's already been paid.
   const recordPayment = async (fee: DemoFee) => {
     const amount = Number(payAmount);
-    if (!amount) return;
-    const amountPaid = Math.min(fee.amountDue, fee.amountPaid + amount);
+    // More than is owed is refused, not quietly cut down: the desk has
+    // either mistyped or taken too much, and either way should know.
+    if (!amount || amount < 0 || amount > fee.amountDue - fee.amountPaid || paying) return;
+    const amountPaid = fee.amountPaid + amount;
+    setPayError(null);
 
     if (isDemo) {
       const next = { ...overrides, [fee.id]: { ...overrides[fee.id], amountPaid } };
@@ -215,19 +224,34 @@ export default function AdminPaymentsPage() {
       setFees(allFees(created, next));
       setOpenId(null);
       setPayAmount("");
+      toast.success(tr("Payment of {amount} recorded for {name}.", { amount: money(amount), name: studentName(fee.studentId) }));
       return;
     }
 
-    await supabase
-      .from("fees")
-      .update({
-        amount_paid: amountPaid,
-        status: feeStatus({ amountDue: fee.amountDue, amountPaid }),
-      })
-      .eq("id", fee.id);
-    await loadRealFees();
-    setOpenId(null);
-    setPayAmount("");
+    setPaying(true);
+    try {
+      const { error } = await supabase
+        .from("fees")
+        .update({
+          amount_paid: amountPaid,
+          status: feeStatus({ amountDue: fee.amountDue, amountPaid }),
+        })
+        .eq("id", fee.id);
+      if (error) throw error;
+      await loadRealFees();
+      setOpenId(null);
+      setPayAmount("");
+      toast.success(tr("Payment of {amount} recorded for {name}.", { amount: money(amount), name: studentName(fee.studentId) }));
+    } catch {
+      // The form stays open with the amount still in it, ready to retry.
+      const message = navigator.onLine
+        ? tr("The payment wasn't saved. Please try again.")
+        : tr("You're offline. The payment wasn't saved — try again when you have signal.");
+      setPayError(message);
+      toast.error(message);
+    } finally {
+      setPaying(false);
+    }
   };
 
   const studentName = (id: string) => students.find((s) => s.id === id)?.name ?? phrase("Unknown student");
@@ -237,7 +261,17 @@ export default function AdminPaymentsPage() {
   const outstanding = billed - collected;
   const unpaidCount = fees.filter((f) => feeStatus(f) !== "paid").length;
 
-  const sorted = [...fees].sort((a, b) => {
+  const counts = {
+    all: fees.length,
+    unpaid: fees.filter((f) => feeStatus(f) === "due").length,
+    partial: fees.filter((f) => feeStatus(f) === "partial").length,
+    paid: fees.filter((f) => feeStatus(f) === "paid").length,
+  };
+  const needle = query.trim().toLocaleLowerCase();
+  const sorted = fees
+    .filter((f) => show === "all" || feeStatus(f) === (show === "unpaid" ? "due" : show))
+    .filter((f) => !needle || `${studentName(f.studentId)} ${f.description}`.toLocaleLowerCase().includes(needle))
+    .sort((a, b) => {
     const rank = { due: 0, partial: 1, paid: 2 } as const;
     const byStatus = rank[feeStatus(a)] - rank[feeStatus(b)];
     return byStatus !== 0 ? byStatus : a.dueDate.localeCompare(b.dueDate);
@@ -286,7 +320,7 @@ export default function AdminPaymentsPage() {
             <StatTile value={money(billed)} label={tr("Billed")} sub={tr("{count} charges", { count: fees.length })} />
             <StatTile value={money(collected)} label={tr("Collected")} sub={tr("received to date")} />
             <StatTile value={money(outstanding)} label={tr("Outstanding")} sub={tr("still owed")} />
-            <StatTile value={unpaidCount} label={tr("Unpaid")} sub={unpaidCount === 1 ? "charge" : "charges"} />
+            <StatTile value={unpaidCount} label={tr("Unpaid")} sub={tr("charge|charges", { count: unpaidCount })} />
           </div>
 
           {showForm && (
@@ -349,11 +383,58 @@ export default function AdminPaymentsPage() {
             </form>
           )}
 
-          <SectionCard title={tr("All charges")} note={tr("{count} total", { count: fees.length })}>
+          <SectionCard
+            title={tr("All charges")}
+            note={sorted.length === fees.length ? tr("{count} total", { count: fees.length }) : tr("{shown} of {count}", { shown: sorted.length, count: fees.length })}
+          >
+            {ready && fees.length > 0 && (
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={tr("Search by student or charge")}
+                  aria-label={tr("Search by student or charge")}
+                  className="flex-1 min-w-0 bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                />
+                <div role="group" aria-label={tr("Show")} className="flex flex-wrap gap-1.5">
+                  {(["all", "unpaid", "partial", "paid"] as const).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={show === k}
+                      onClick={() => setShow(k)}
+                      className={`flex-shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                        show === k
+                          ? "border-brand-navy bg-brand-navy text-white"
+                          : "border-surface-border text-ink-muted hover:text-ink"
+                      }`}
+                    >
+                      {k === "all" ? tr("All") : FEE_STATUS_LABELS[k === "unpaid" ? "due" : k]}{" "}
+                      <span className="tabular-nums opacity-75">{counts[k]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {!ready ? (
               <LoadingNote />
-            ) : sorted.length === 0 ? (
+            ) : fees.length === 0 ? (
               <EmptyNote>{tr("No fees recorded yet.")}</EmptyNote>
+            ) : sorted.length === 0 ? (
+              <div className="py-2">
+                <EmptyNote>{tr("No charges match.")}</EmptyNote>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setShow("all");
+                  }}
+                  className="text-[12px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+                >
+                  {tr("Clear search and filters")}
+                </button>
+              </div>
             ) : (
               <ul className="divide-y divide-surface-border -my-1">
                 {sorted.map((f) => {
@@ -367,6 +448,7 @@ export default function AdminPaymentsPage() {
                         onClick={() => {
                           setOpenId(isOpen ? null : f.id);
                           setPayAmount("");
+                          setPayError(null);
                         }}
                         aria-expanded={isOpen}
                         className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
@@ -388,7 +470,7 @@ export default function AdminPaymentsPage() {
                             {FEE_STATUS_LABELS[status]}
                           </span>
                         </div>
-                        <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
+                        <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90 rtl:-rotate-90" : ""}`}>
                           <IconArrow size={14} />
                         </span>
                       </button>
@@ -414,17 +496,24 @@ export default function AdminPaymentsPage() {
                                   value={payAmount}
                                   onChange={(e) => setPayAmount(e.target.value)}
                                   placeholder={String(remaining)}
+                                  aria-invalid={Number(payAmount) > remaining}
                                   className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                                 />
+                                {Number(payAmount) > remaining && (
+                                  <p className="text-[12px] text-status-error-text mt-1.5">
+                                    {tr("That's more than the {amount} still owed.", { amount: money(remaining) })}
+                                  </p>
+                                )}
                               </div>
+                              {payError && <p className="text-[12px] text-status-error-text">{payError}</p>}
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
                                   onClick={() => recordPayment(f)}
-                                  disabled={!Number(payAmount)}
+                                  disabled={!(Number(payAmount) > 0) || Number(payAmount) > remaining || paying}
                                   className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
                                 >
-                                  {tr("Record payment")}
+                                  {paying ? tr("Saving…") : tr("Record payment")}
                                 </button>
                                 <button
                                   type="button"

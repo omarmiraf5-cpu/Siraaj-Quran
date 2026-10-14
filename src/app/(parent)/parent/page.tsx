@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
@@ -13,6 +12,7 @@ import {
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
+import { useChosenChild } from "@/hooks/useChosenChild";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { useQaidahLessons } from "@/hooks/useQaidahLessons";
 import { useQaidahRecordings } from "@/hooks/useQaidahRecordings";
@@ -46,14 +46,7 @@ export default function ParentDashboard() {
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
-  const [childId, setChildId] = useState<string | null>(null);
-  const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
-
-  // Until the roster arrives there is no child to pick, so the first one
-  // becomes the selection as soon as there is one.
-  useEffect(() => {
-    if (!childId && children.length > 0) setChildId(children[0].id);
-  }, [children, childId]);
+  const { child, choose: setChildId, options: childChoices } = useChosenChild(children);
 
   const { attendance, assignments, ready } = useStudentRecord(child?.id ?? null, mode);
   // Each child's Qa'idah lesson, where their teacher has set one.
@@ -133,13 +126,13 @@ export default function ParentDashboard() {
 
       {/* Which child. A parent with one child never sees this. */}
       {children.length > 1 && (
-        <div className="flex items-center gap-3">
-          <span className="eyebrow">{t("common.viewing")}</span>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="eyebrow flex-shrink-0">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
             value={child?.id ?? ""}
             onChange={setChildId}
-            options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+            options={childChoices}
           />
         </div>
       )}

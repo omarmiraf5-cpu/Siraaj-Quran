@@ -10,6 +10,7 @@ import { PlanAlertBanner } from "@/components/yearly-plan-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
 import { translateNotice } from "@/lib/noticeText";
+import { useToast } from "@/components/Toast";
 
 /* ── Which portal is this ──────────────────────────────────────────── */
 
@@ -288,6 +289,8 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
 
 /* ── Notices ───────────────────────────────────────────────────────── */
 
+const NOTICES_SHOWN = 2;
+
 interface Notice {
   id: string;
   kind: "absence_streak" | "staff_absence_report" | "account_deleted" | "deletion_request";
@@ -304,8 +307,11 @@ interface Notice {
  * sit at the top of a dashboard without leaving a gap.
  */
 export function NoticesPanel({ api }: { api: Api }) {
+  const { tr } = useLanguage();
+  const toast = useToast();
   const [items, setItems] = useState<Notice[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     api("/api/notifications")
@@ -317,22 +323,35 @@ export function NoticesPanel({ api }: { api: Api }) {
   const dismiss = async (id: string) => {
     setBusy(id);
     try {
-      await api("/api/notifications", {
+      const res = await api("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
+      if (!res.ok) throw new Error();
       setItems((list) => list.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
+    } catch {
+      // Left on screen: a notice that vanished without being dismissed
+      // would come back on the next visit with no explanation.
+      toast.error(tr("Couldn't dismiss that notice. Check your connection and try again."));
     } finally {
       setBusy(null);
     }
   };
 
-  const unread = items.filter((n) => !n.read_at);
+  // A child missing school comes before anything for information, newest
+  // first within each. Several at once — a family of four after a bout of
+  // flu — would push the dashboard off the screen, so two show and the
+  // rest wait behind a link.
+  const unread = items
+    .filter((n) => !n.read_at)
+    .sort((a, b) => Number(b.kind === "absence_streak") - Number(a.kind === "absence_streak") || b.created_at.localeCompare(a.created_at));
   if (unread.length === 0) return null;
+  const shown = showAll ? unread : unread.slice(0, NOTICES_SHOWN);
+  const hidden = unread.length - shown.length;
   return (
     <div className="space-y-2.5">
-      {unread.map((n) => (
+      {shown.map((n) => (
         <PlanAlertBanner
           key={n.id}
           level={n.kind === "absence_streak" ? "critical" : "info"}
@@ -342,6 +361,16 @@ export function NoticesPanel({ api }: { api: Api }) {
           busy={busy === n.id}
         />
       ))}
+      {unread.length > NOTICES_SHOWN && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className="text-[12px] font-semibold text-ink-muted hover:text-ink underline underline-offset-2"
+        >
+          {showAll ? tr("Show fewer notices") : tr("{count} more notice|{count} more notices", { count: hidden })}
+        </button>
+      )}
     </div>
   );
 }
