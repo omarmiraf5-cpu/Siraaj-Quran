@@ -10,8 +10,8 @@
    into a grey admin panel the moment you signed in, which is what made the
    product feel cheaper after the front door. */
 :root {
-  --c-surface-bg: #f4f2ec;
-  --c-surface-bg-warm: #fbfaf6;
+  --c-surface-bg: #e6edf6;
+  --c-surface-bg-warm: #f4f7fb;
   --c-surface-card: #ffffff;
   --c-surface-border: #e3ddd2;
   --c-ink: #12161d;
@@ -46,9 +46,9 @@
 
 /* ── Dark mode tokens ── */
 .dark {
-  --c-surface-bg: #0c1018;
-  --c-surface-bg-warm: #121826;
-  --c-surface-card: #161d2b;
+  --c-surface-bg: #070b12;
+  --c-surface-bg-warm: #101722;
+  --c-surface-card: #141b28;
   --c-surface-border: #2a3344;
   --c-ink: #f4f1ea;
   --c-ink-body: #d5d0c6;
@@ -85,7 +85,13 @@
     font-variant-numeric: tabular-nums;
   }
   .gradient-navy {
-    background: linear-gradient(165deg, #1c4a82 0%, #14325c 46%, #0e2347 100%);
+    background: linear-gradient(155deg, #1e5aa3 0%, #14386a 42%, #0e2347 78%, #09182f 100%);
+  }
+  /* Repeating eight-point star. Encoded so it can sit behind a hero or the
+     sign-in stage without a second network request. */
+  .geo-fill {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='84' height='84' viewBox='0 0 84 84'><g fill='none' stroke='%23e6cd8a' stroke-width='0.7'><path d='M42 6l7 22 22 7-22 7-7 22-7-22-22-7 22-7z'/><circle cx='42' cy='42' r='9'/><path d='M42 0v84M0 42h84' stroke-opacity='0.45'/></g></svg>");
+    background-size: 84px 84px;
   }
   .gradient-emerald {
     background: linear-gradient(135deg, #26a06c, #1f8a5b);
@@ -450,10 +456,10 @@ body {
   .card-quiet {
     background: var(--c-surface-card);
     border: 1px solid var(--c-surface-border);
-    border-radius: 16px;
+    border-radius: 22px;
     box-shadow:
-      0 1px 2px rgba(14, 35, 71, 0.04),
-      0 10px 28px -18px rgba(14, 35, 71, 0.16);
+      0 1px 2px rgba(14, 35, 71, 0.05),
+      0 18px 40px -22px rgba(14, 35, 71, 0.38);
     transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease;
   }
   .dark .card-quiet {
@@ -649,17 +655,19 @@ body {
     cursor: not-allowed;
   }
   .btn-primary {
-    background: var(--c-navy);
+    background: #0e2347;
     color: #fff;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 8px 18px -12px rgba(14, 35, 71, 0.7);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16) inset, 0 12px 24px -12px rgba(14, 35, 71, 0.85);
   }
-  .btn-primary:hover:not(:disabled) { background: #16325f; }
+  .btn-primary:hover:not(:disabled) { background: #1a3d72; }
   .btn-accent {
-    background: linear-gradient(180deg, #e6cd8a 0%, #c6a15a 100%);
+    background: linear-gradient(180deg, #f3dd9e 0%, #c6a15a 100%);
     color: #1c1408;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 8px 18px -12px rgba(90, 60, 10, 0.55);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 12px 24px -10px rgba(138, 100, 20, 0.75);
   }
-  .btn-accent:hover:not(:disabled) { filter: brightness(1.05); }
+  .btn-accent:hover:not(:disabled) { filter: brightness(1.06); }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
   .btn-secondary {
     background: var(--c-surface-card);
     color: var(--c-ink);
@@ -690,10 +698,99 @@ body {
   }
 
   .hero-frame {
-    border: 1px solid rgba(230, 205, 138, 0.32);
+    border: 1px solid rgba(230, 205, 138, 0.45);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.14),
-      0 18px 40px -24px rgba(8, 16, 36, 0.55);
+      inset 0 1px 0 rgba(243, 221, 158, 0.7),
+      inset 0 -1px 0 rgba(230, 205, 138, 0.4),
+      0 22px 50px -24px rgba(8, 16, 36, 0.65);
+  }
+  .hero-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(230, 205, 138, 0.55);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .hero-stat {
+    border-radius: 16px;
+    background: rgba(8, 18, 40, 0.28);
+    border: 1px solid rgba(230, 205, 138, 0.35);
+    padding: 0.7rem 0.8rem 0.65rem;
+    backdrop-filter: blur(8px);
+  }
+  .role-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 84px;
+    border-radius: 18px;
+    border: 1px solid var(--c-surface-border);
+    background: var(--c-surface-bg);
+    color: var(--c-ink);
+    font-size: 13px;
+    font-weight: 700;
+    transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1), background 140ms ease, box-shadow 140ms ease, color 140ms ease;
+  }
+  .role-tile:hover { transform: translateY(-2px); }
+  .role-tile:active { transform: scale(0.98); }
+  .role-tile-on {
+    background: #0e2347;
+    color: #fff;
+    border-color: #0e2347;
+    box-shadow: 0 14px 28px -14px rgba(14, 35, 71, 0.8);
+  }
+  .role-ico {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(14, 35, 71, 0.08);
+    color: #0e2347;
+  }
+  .role-tile-on .role-ico {
+    background: rgba(230, 205, 138, 0.18);
+    color: #e6cd8a;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 26rem;
+    border-radius: 28px;
+    background: var(--c-surface-card);
+    color: var(--c-ink);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.8) inset,
+      0 30px 70px -28px rgba(0, 0, 0, 0.55);
+    padding: 1.35rem 1.15rem 1.25rem;
+  }
+  .dark .login-card {
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 30px 70px -24px rgba(0, 0, 0, 0.7);
+  }
+  .dock {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 16px 40px -16px rgba(14, 35, 71, 0.45), 0 0 0 1px rgba(14, 35, 71, 0.04);
+    backdrop-filter: blur(18px);
+  }
+  .dark .dock {
+    background: rgba(16, 22, 34, 0.82);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .dock-pill {
+    background: linear-gradient(180deg, #f3dd9e, #c6a15a);
+    color: #1c1408;
+    box-shadow: 0 6px 16px -8px rgba(138, 100, 20, 0.8);
   }
 
   .skeleton {

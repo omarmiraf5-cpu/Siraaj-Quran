@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ILLUM_CLASS } from "@/components/student-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
@@ -42,9 +41,9 @@ function StudentTabBar() {
   const { t } = useLanguage();
 
   return (
-    <nav className="fixed bottom-0 start-0 end-0 z-50 bg-surface-card/92 backdrop-blur-xl border-t border-surface-border shadow-e2 safe-area-bottom">
-      <div className="max-w-5xl mx-auto flex px-1.5 py-1">
-        {TABS.map(({ href, labelKey, Icon, colour }) => {
+    <div className="fixed bottom-3 inset-x-3 z-50 safe-area-bottom pointer-events-none">
+    <nav className="dock pointer-events-auto mx-auto max-w-lg flex rounded-[28px] p-1.5">
+        {TABS.map(({ href, labelKey, Icon }) => {
           const active =
             href === "/student/learn"
               ? LEARN_PATHS.some((p) => pathname.startsWith(p))
@@ -56,20 +55,18 @@ function StudentTabBar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className="flex-1 flex flex-col items-center justify-center gap-1 min-h-14 py-1 rounded-2xl transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95"
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 min-h-12 py-1 rounded-[20px] transition-all active:scale-95 ${active ? "dock-pill" : ""}`}
             >
               <span
-                className={`w-11 h-8 rounded-full flex items-center justify-center transition-all ${
-                  active
-                    ? `${ILLUM_CLASS[colour]} scale-105`
-                    : "text-ink-muted border border-transparent"
+                className={`w-8 h-7 rounded-full flex items-center justify-center transition-all ${
+                  active ? "text-[#1c1408]" : "text-ink-muted"
                 }`}
               >
                 <Icon size={18} />
               </span>
               <span
-                className={`text-[10px] font-bold leading-none transition-colors ${
-                  active ? "text-ink" : "text-ink-muted"
+                className={`text-[11px] font-bold leading-none transition-colors ${
+                  active ? "text-[#1c1408]" : "text-ink-muted"
                 }`}
               >
                 {t(labelKey)}
@@ -77,8 +74,8 @@ function StudentTabBar() {
             </Link>
           );
         })}
-      </div>
     </nav>
+    </div>
   );
 }
 

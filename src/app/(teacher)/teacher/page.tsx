@@ -8,6 +8,7 @@ import {
   DEMO_ASSIGNMENTS,
   DEMO_ATTENDANCE,
   DEMO_TODAY,
+  ATTENDANCE_STYLES,
   summariseAttendance,
   formatDay,
   daysFromToday,
@@ -25,8 +26,9 @@ import {
   AttendanceLegend,
   EmptyNote,
   LoadingNote,
+  avatarTone,
 } from "@/components/portal-ui";
-import { IconBook, IconCalendar, IconClock, IconPen, IconArrow } from "@/components/icons";
+import { IconBook, IconCalendar, IconClock, IconPen, IconArrow, IconUsers, IconCheck } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
@@ -35,13 +37,6 @@ import { countLabel } from "@/lib/i18n/phrases";
 import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
 import { myHalaqas, narrowToMine } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
-
-const STATUS_TEXT: Record<AttendanceStatus, string> = {
-  present: "text-attend-present-ink",
-  late: "text-attend-late-ink",
-  absent: "text-attend-absent-ink",
-  excused: "text-attend-excused-ink",
-};
 
 interface RosterStudent {
   id: string;
@@ -228,6 +223,12 @@ export default function TeacherDashboard() {
             </HeroButtonGhost>
           </>
         }
+        stats={[
+          { value: students.length, label: t("nav.students") },
+          { value: active.length, label: t("common.activeWork") },
+          { value: review.length, label: t("common.toReview") },
+          { value: `${avgAttendance}%`, label: t("common.attendanceStat") },
+        ]}
       />
 
       {/* Signing in on arrival — the first thing a teacher does, so it sits
@@ -241,6 +242,8 @@ export default function TeacherDashboard() {
           the wrong students. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
+          tone={0}
+          icon={<IconUsers size={18} />}
           value={students.length}
           label={t("nav.students")}
           sub={halaqas
@@ -253,18 +256,24 @@ export default function TeacherDashboard() {
           onClick={isDemo ? () => setDrilldown("students") : undefined}
         />
         <StatTile
+          tone={1}
+          icon={<IconPen size={18} />}
           value={active.length}
           label={t("common.activeWork")}
           sub={dueThisWeek > 0 ? countLabel("{count} due this week|{count} due this week", dueThisWeek, `${dueThisWeek} ${t("common.dueThisWeek")}`) : t("common.nothingDueThisWeek")}
           onClick={isDemo ? () => setDrilldown("active") : undefined}
         />
         <StatTile
+          tone={2}
+          icon={<IconBook size={18} />}
           value={review.length}
           label={t("common.toReview")}
           sub={reviewDue ? `${t("common.oldestDue")} ${formatDay(reviewDue, language)}` : t("common.allClear")}
           onClick={isDemo ? () => setDrilldown("review") : undefined}
         />
         <StatTile
+          tone={3}
+          icon={<IconCheck size={18} />}
           value={`${avgAttendance}%`}
           label={t("common.attendanceStat")}
           sub={countLabel("{inToday} of {count} in today", students.length, `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`, { inToday })}
@@ -360,7 +369,7 @@ export default function TeacherDashboard() {
                       onClick={() => setSelectedStudentId(student.id)}
                       className="w-full flex items-center gap-3 text-start rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
                     >
-                      <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
+                      <span className={`w-11 h-11 rounded-full text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${avatarTone(student.name)}`}>
                         {initials(student.name)}
                       </span>
                       <span className="flex-1 min-w-0">
@@ -369,9 +378,7 @@ export default function TeacherDashboard() {
                         </span>
                         <span className="block text-[11px] text-ink-muted">{student.halaqa}</span>
                       </span>
-                      <span
-                        className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}
-                      >
+                      <span className={`badge flex-shrink-0 ${ATTENDANCE_STYLES[status]}`}>
                         {t(`common.${status}`)}
                       </span>
                     </button>
@@ -381,7 +388,7 @@ export default function TeacherDashboard() {
                     key={student.id}
                     className="w-full flex items-center gap-3 rounded-xl px-2 py-1.5 -mx-2"
                   >
-                    <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
+                    <span className={`w-11 h-11 rounded-full text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${avatarTone(student.name)}`}>
                       {initials(student.name)}
                     </span>
                     <span className="flex-1 min-w-0">
@@ -390,7 +397,7 @@ export default function TeacherDashboard() {
                       </span>
                       <span className="block text-[11px] text-ink-muted">{student.halaqa}</span>
                     </span>
-                    <span className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}>
+                    <span className={`badge flex-shrink-0 ${ATTENDANCE_STYLES[status]}`}>
                       {t(`common.${status}`)}
                     </span>
                   </li>
@@ -421,7 +428,7 @@ export default function TeacherDashboard() {
                 const student = students.find((s) => s.id === a.student_id);
                 const content = (
                   <>
-                    <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
+                    <span className={`w-11 h-11 rounded-full text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${avatarTone(student?.name ?? "?")}`}>
                       {initials(student?.name ?? "?")}
                     </span>
                     <div className="flex-1 min-w-0">

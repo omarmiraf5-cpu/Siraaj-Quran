@@ -114,9 +114,10 @@ export default function StudentDashboard() {
       {/* Hero — who you are, what you have earned, and how far to the next
           level, in the order a child reads it. */}
       <header
-        className={`${theme.hero} hero-frame rounded-[22px] px-5 py-5 relative overflow-hidden animate-rise`}
+        className="gradient-navy hero-frame rounded-[24px] px-5 py-5 relative overflow-hidden animate-rise"
       >
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
+        <div className="geo-fill absolute inset-0 opacity-50 pointer-events-none" />
+        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-gold-light to-transparent" />
 
         <div className="relative flex items-center gap-3.5">
           <Link href="/account" aria-label={tr("My account")} className="rounded-full active:scale-95 transition-transform">

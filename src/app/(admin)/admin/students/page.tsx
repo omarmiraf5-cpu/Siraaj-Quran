@@ -16,7 +16,7 @@ import {
 import type { DemoStudent, DemoHalaqa, DemoTeacher } from "@/data/demo";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote, avatarTone } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import StudentImport from "@/components/StudentImport";
 import WeeklyReportsCard from "@/components/WeeklyReportsCard";
@@ -607,13 +607,11 @@ export default function AdminStudentsPage() {
           type="button"
           onClick={() => startEditing(s)}
           aria-expanded={isOpen}
-          className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+          className="w-full flex items-center gap-3 py-3.5 text-start hover:bg-surface-bg-warm rounded-2xl -mx-1 px-2 transition-colors"
         >
           <span
-            className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
-              inactive
-                ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500"
-                : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"
+            className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-[12px] text-white flex-shrink-0 ${
+              inactive ? "bg-slate-400" : avatarTone(s.name)
             }`}
           >
             {initials(s.name)}
@@ -1165,7 +1163,7 @@ export default function AdminStudentsPage() {
                     screen so one teacher can be given to all of them without
                     scrolling back up a long grade. */}
                 {picked.size > 0 && (
-                  <div className="fixed inset-x-0 bottom-16 md:bottom-0 z-40 md:start-56 px-3 pb-3 pointer-events-none" data-section="bulk-bar">
+                  <div className="fixed inset-x-0 bottom-16 md:bottom-0 z-40 md:start-60 px-3 pb-3 pointer-events-none" data-section="bulk-bar">
                     <div className="max-w-3xl mx-auto pointer-events-auto rounded-2xl border border-emerald-500/50 bg-surface-card shadow-2xl p-3 flex flex-wrap items-center gap-2">
                       <span className="text-[12.5px] font-semibold text-ink">
                         {tr("{count} ticked", { count: picked.size })}

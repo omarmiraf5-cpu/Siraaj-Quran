@@ -19,7 +19,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { IconCheck } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
-import { LoadingNote } from "@/components/portal-ui";
+import { LoadingNote, avatarTone } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { demoAttendanceFetch } from "@/lib/demoAttendance";
@@ -331,8 +331,8 @@ export default function TeacherAttendancePage() {
         {roster.map((s) => {
           const summary = summariseAttendance(history[s.id] ?? []);
           return (
-            <div key={s.id} className="flex items-center gap-3 px-3 py-3">
-              <div className="w-11 h-11 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-xs flex-shrink-0">
+            <div key={s.id} className="flex items-center gap-3 px-4 py-3.5">
+              <div className={`w-11 h-11 rounded-full text-white flex items-center justify-center font-bold text-xs flex-shrink-0 ${avatarTone(s.name)}`}>
                 {initials(s.name)}
               </div>
               <div className="flex-1 min-w-0">
@@ -392,7 +392,7 @@ export default function TeacherAttendancePage() {
           tab bar renders after this one in the DOM with a higher z-index,
           it was winning the stacking fight and hiding all but a sliver of
           the button underneath it. */}
-      <div className="fixed bottom-20 md:bottom-0 start-0 end-0 md:start-56 p-3 bg-surface-card border-t border-surface-border z-30">
+      <div className="fixed bottom-20 md:bottom-0 start-0 end-0 md:start-60 p-3 bg-surface-card border-t border-surface-border z-30">
         <button
           onClick={saveAttendance}
           disabled={(marked === 0 && !changed) || saving}

@@ -181,24 +181,80 @@ function useCountUp(value: string | number) {
   return `${shown}${suffix}`;
 }
 
+const TILE_TINT = [
+  "bg-[#0e2347]/10 text-[#0e2347] dark:bg-white/10 dark:text-brand-gold-light",
+  "bg-attend-present-bg text-attend-present-ink",
+  "bg-attend-late-bg text-attend-late-ink",
+  "bg-attend-excused-bg text-attend-excused-ink",
+];
+
+function MiniRing({ value }: { value: number }) {
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, value));
+  return (
+    <svg width="40" height="40" viewBox="0 0 40 40" className="shrink-0 -rotate-90" aria-hidden>
+      <circle cx="20" cy="20" r={r} fill="none" className="stroke-surface-border" strokeWidth="3.5" />
+      <circle
+        cx="20"
+        cy="20"
+        r={r}
+        fill="none"
+        className="stroke-brand-gold"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - pct / 100)}
+      />
+    </svg>
+  );
+}
+
+export const AVATAR_TONES = [
+  "bg-[#0e2347]",
+  "bg-[#0e7a48]",
+  "bg-[#9a6200]",
+  "bg-[#3e5278]",
+  "bg-[#834272]",
+  "bg-[#1a6b8a]",
+];
+
+export function avatarTone(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i) * (i + 1)) % AVATAR_TONES.length;
+  return AVATAR_TONES[h];
+}
+
 export function StatTile({
   value,
   label,
   sub,
+  icon,
+  tone = 0,
   onClick,
 }: {
   value: string | number;
   label: string;
   sub?: string;
+  icon?: React.ReactNode;
+  tone?: number;
   onClick?: () => void;
 }) {
   const display = useCountUp(value);
+  const pct = typeof value === "string" && value.endsWith("%") ? Number(value.replace("%", "")) : null;
   const body = (
-    <>
-      <p className="font-display text-[28px] font-semibold text-ink tabular-nums leading-none tracking-tight"><bdi dir="ltr">{display}</bdi></p>
-      <p className="eyebrow mt-2">{label}</p>
-      {sub && <p className="text-[12px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
-    </>
+    <div className="flex items-start gap-3">
+      <span className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${TILE_TINT[tone % TILE_TINT.length]}`}>
+        {icon ?? <span className="w-2.5 h-2.5 rounded-full bg-current" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-display text-[30px] font-semibold text-ink tabular-nums leading-none tracking-tight"><bdi dir="ltr">{display}</bdi></p>
+        <p className="eyebrow mt-2">{label}</p>
+        {sub && <p className="text-[12px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
+        {pct == null && <div className="mt-3 h-1 w-10 rounded-full bg-brand-gold" />}
+      </div>
+      {pct != null && !Number.isNaN(pct) && <MiniRing value={pct} />}
+    </div>
   );
 
   // min-w-0 matters here: these tiles sit in a CSS grid, where a grid
@@ -208,13 +264,13 @@ export function StatTile({
   // out the grid — and with it the page's horizontal scroll — instead
   // of just wrapping to a second line.
   if (!onClick) {
-    return <div className="card-quiet card-lift px-4 py-4 min-w-0">{body}</div>;
+    return <div className="card-quiet card-lift px-4 py-4 min-w-0 rounded-[22px]">{body}</div>;
   }
   return (
     <button
       type="button"
       onClick={onClick}
-      className="card-quiet card-lift px-4 py-4 min-w-0 min-h-11 text-start cursor-pointer hover:bg-surface-bg-warm active:scale-[.98]"
+      className="card-quiet card-lift px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start cursor-pointer hover:bg-surface-bg-warm active:scale-[.98]"
     >
       {body}
     </button>

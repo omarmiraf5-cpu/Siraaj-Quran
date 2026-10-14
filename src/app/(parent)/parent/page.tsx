@@ -29,7 +29,7 @@ import {
   LoadingNote,
   TeacherNote,
 } from "@/components/portal-ui";
-import { IconBook, IconChart, IconCalendar, IconArrow } from "@/components/icons";
+import { IconBook, IconChart, IconCalendar, IconArrow, IconCheck, IconUsers } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -124,6 +124,12 @@ export default function ParentDashboard() {
             </HeroButtonGhost>
           </>
         }
+        stats={[
+          { value: `${summary.rate}%`, label: t("common.attendanceStat") },
+          { value: `${memorisation}%`, label: t("common.memorised") },
+          { value: active.length, label: t("common.openWork") },
+          { value: done.length, label: t("assignment.completed") },
+        ]}
       />
 
       {/* The school's notices for this family — a child absent five school
@@ -146,6 +152,8 @@ export default function ParentDashboard() {
       {/* At a glance, in the parent's terms rather than the school's. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
+          tone={3}
+          icon={<IconCalendar size={18} />}
           value={`${summary.rate}%`}
           label={t("common.attendanceStat")}
           sub={countLabel(
@@ -156,6 +164,8 @@ export default function ParentDashboard() {
           )}
         />
         <StatTile
+          tone={1}
+          icon={<IconBook size={18} />}
           value={`${memorisation}%`}
           label={t("common.memorised")}
           sub={countLabel(
@@ -165,11 +175,15 @@ export default function ParentDashboard() {
           )}
         />
         <StatTile
+          tone={2}
+          icon={<IconUsers size={18} />}
           value={active.length}
           label={t("common.openWork")}
           sub={nextDue ? `${t("common.nextDue")} ${formatDay(nextDue, language)}` : t("common.nothingDue")}
         />
         <StatTile
+          tone={0}
+          icon={<IconCheck size={18} />}
           value={done.length}
           label={t("assignment.completed")}
           sub={done.length ? t("common.wellDone") : t("common.noneYet")}

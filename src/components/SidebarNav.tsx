@@ -41,16 +41,15 @@ const MAX_PRIMARY_TABS = 4;
 
 // A school's own name replaces the platform wordmark wholesale; only the
 // MyDiiwaan default gets the two-tone "My"/"Diiwaan" split.
-function Wordmark({ branding, className }: { branding: SchoolBranding; className: string }) {
-  const { tr } = useLanguage();
+function Wordmark({ branding, className, onDark = true }: { branding: SchoolBranding; className: string; onDark?: boolean }) {
   return (
     <span className={className}>
       {branding.isCustom ? (
-        <span className="gold-foil">{branding.name}</span>
+        <span className={onDark ? "gold-foil" : "text-brand-gold-dark"}>{branding.name}</span>
       ) : (
         <>
-          <span className="text-white">My</span>
-          <span className="gold-foil">Diiwaan</span>
+          <span className={onDark ? "text-white" : "text-ink"}>My</span>
+          <span className={onDark ? "gold-foil" : "text-brand-gold-dark dark:text-brand-gold-light"}>Diiwaan</span>
         </>
       )}
     </span>
@@ -109,23 +108,23 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   return (
     <>
       {/* ── MOBILE TOP BAR ── */}
-      <header className="md:hidden fixed top-[env(safe-area-inset-top)] start-0 end-0 z-50 gradient-navy flex items-center justify-between px-3 h-14 shadow-dark border-b border-white/10">
+      <header className="md:hidden fixed top-[env(safe-area-inset-top)] start-0 end-0 z-50 bg-white/80 dark:bg-[#101722]/85 backdrop-blur-xl flex items-center justify-between px-3 h-14 border-b border-black/5 dark:border-white/10">
         <div className="flex items-center gap-2.5 min-w-0">
           <Crest
             branding={branding}
             size={32}
-            className="w-8 h-8 rounded-lg overflow-hidden ring-1 ring-brand-gold/60 flex-shrink-0"
+            className="w-8 h-8 rounded-xl overflow-hidden ring-1 ring-brand-gold/50 flex-shrink-0"
           />
-          <Wordmark branding={branding} className="font-display text-sm font-bold tracking-tight truncate" />
-          <span className="text-white/30 text-xs font-medium flex-shrink-0">· {role}</span>
+          <Wordmark branding={branding} onDark={false} className="font-display text-sm font-bold tracking-tight truncate" />
+          <span className="text-ink-muted text-xs font-medium flex-shrink-0">· {role}</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <SchoolSwitcher variant="topbar" enabled={!demoUser} />
-          <LanguageToggle variant="icon" className="min-w-11 min-h-11 bg-white/10 text-white/80 hover:bg-white/20" />
-          <ThemeToggle variant="pill" className="min-h-11 bg-white/10 text-white/85 hover:bg-white/20" />
+          <LanguageToggle variant="icon" className="min-w-11 min-h-11 bg-brand-navy/5 text-ink hover:bg-brand-navy/10" />
+          <ThemeToggle variant="pill" className="min-h-11 bg-brand-navy/5 text-ink hover:bg-brand-navy/10" />
           <button
             onClick={handleSignOut}
-            className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white/80 hover:bg-white/20 transition active:scale-95"
+            className="w-11 h-11 rounded-full bg-brand-navy/5 flex items-center justify-center text-ink hover:bg-brand-navy/10 transition active:scale-95"
             aria-label={t("common.signOut")}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -138,18 +137,19 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       </header>
 
       {/* ── MOBILE BOTTOM TAB BAR ── */}
-      <nav className="md:hidden fixed bottom-0 start-0 end-0 z-50 bg-brand-navy-dark/95 backdrop-blur-xl border-t border-white/10 flex safe-area-bottom">
+      <div className="md:hidden fixed bottom-3 inset-x-3 z-50 safe-area-bottom pointer-events-none">
+      <nav className="dock pointer-events-auto mx-auto flex max-w-lg rounded-[28px] p-1.5">
         {primaryItems.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 flex flex-col items-center justify-center min-h-14 py-1.5 gap-1 text-[11px] font-semibold transition-colors ${
-                active ? "text-brand-gold-light" : "text-white/75 hover:text-white"
+              className={`flex-1 flex flex-col items-center justify-center min-h-12 py-1 gap-0.5 rounded-[20px] text-[11px] font-semibold transition-all ${
+                active ? "dock-pill" : "text-ink-muted hover:text-ink"
               }`}
             >
-              <span className={`flex items-center justify-center w-8 h-6 rounded-full transition-all ${active ? "bg-brand-gold/20 text-brand-gold-light" : ""}`}>{item.icon}</span>
+              <span className="flex items-center justify-center">{item.icon}</span>
               {t(item.labelKey)}
             </Link>
           );
@@ -159,11 +159,11 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
-            className={`flex-1 flex flex-col items-center justify-center min-h-14 py-1.5 gap-1 text-[11px] font-semibold transition-colors ${
-              moreActive || moreOpen ? "text-brand-gold-light" : "text-white/75 hover:text-white"
+            className={`flex-1 flex flex-col items-center justify-center min-h-12 py-1 gap-0.5 rounded-[20px] text-[11px] font-semibold transition-all ${
+              moreActive || moreOpen ? "dock-pill" : "text-ink-muted hover:text-ink"
             }`}
           >
-            <span className={`flex items-center justify-center w-8 h-6 rounded-full ${moreActive || moreOpen ? "bg-brand-gold/20 text-brand-gold-light" : ""}`}>
+            <span className="flex items-center justify-center">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
                 <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
@@ -174,6 +174,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           </button>
         )}
       </nav>
+      </div>
 
       {/* ── MOBILE "MORE" SHEET ── */}
       {showOverflow && moreOpen && (
@@ -183,7 +184,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             onClick={() => setMoreOpen(false)}
             aria-hidden="true"
           />
-          <div className="sheet-in md:hidden fixed bottom-14 start-0 end-0 z-50 bg-brand-navy-dark border-t border-white/10 rounded-t-[22px] shadow-dark p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+          <div className="sheet-in md:hidden fixed bottom-24 start-3 end-3 z-50 bg-white/95 dark:bg-[#141b28]/95 backdrop-blur-xl border border-black/5 dark:border-white/10 rounded-[22px] shadow-e3 p-2">
             {moreItems.map((item) => {
               const active = pathname === item.href;
               return (
@@ -191,8 +192,8 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                   key={item.href}
                   href={item.href}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium transition-colors active:scale-[.99] ${
-                    active ? "bg-white/15 text-brand-gold-light" : "text-white/80 hover:bg-white/8 hover:text-white"
+                  className={`flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-medium transition-colors active:scale-[.99] ${
+                    active ? "dock-pill" : "text-ink hover:bg-brand-navy/5"
                   }`}
                 >
                   <span className="flex-shrink-0 opacity-80">{item.icon}</span>
@@ -205,7 +206,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       )}
 
       {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="hidden md:flex flex-col w-56 min-h-screen sticky top-0 h-screen overflow-y-auto gradient-navy text-white p-4 gap-1 flex-shrink-0 border-e border-white/10">
+      <aside className="hidden md:flex flex-col w-60 min-h-screen sticky top-0 h-screen overflow-y-auto bg-white/75 dark:bg-[#101722]/90 backdrop-blur-xl text-ink p-3 gap-1 flex-shrink-0 border-e border-black/5 dark:border-white/10">
         {/* Logo + branding */}
         <div className="flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
           <Crest
@@ -216,10 +217,11 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           <div className="flex flex-col items-center gap-1">
             <Wordmark
               branding={branding}
+              onDark={false}
               className="font-display text-lg font-bold tracking-tight leading-tight text-center"
             />
             {branding.nameArabic && (
-              <span className="font-calligraphy font-bold text-2xl text-brand-gold-light leading-none" dir="rtl" lang="ar">
+              <span className="font-calligraphy font-bold text-2xl text-brand-gold-dark leading-none" dir="rtl" lang="ar">
                 {branding.nameArabic}
               </span>
             )}
@@ -228,38 +230,38 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
 
         {/* User info */}
         <div className="px-2 mb-1">
-          <p className="text-xs text-white/40 uppercase tracking-wider mb-1">{role}</p>
-          <p className="text-sm font-semibold text-white/90 truncate">{displayName}</p>
+          <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">{role}</p>
+          <p className="text-sm font-semibold text-ink truncate">{displayName}</p>
         </div>
         <SchoolSwitcher variant="sidebar" enabled={!demoUser} />
 
         {/* Dark mode + language toggles — top of nav */}
-        <div className="border-t border-white/10 pt-3 pb-1 space-y-0.5">
+        <div className="border-t border-black/5 dark:border-white/10 pt-3 pb-1 space-y-0.5">
           <ThemeToggle
             variant="labeled"
-            className="text-white/60 hover:text-white hover:bg-white/8"
+            className="text-ink-muted hover:text-ink hover:bg-brand-navy/5"
           />
           <LanguageToggle
             variant="labeled"
-            className="text-white/60 hover:text-white hover:bg-white/8"
+            className="text-ink-muted hover:text-ink hover:bg-brand-navy/5"
           />
         </div>
 
         {/* Nav links */}
-        <nav className="space-y-0.5 border-t border-white/10 pt-3">
+        <nav className="space-y-1 border-t border-black/5 dark:border-white/10 pt-3">
           {items.map((item) => {
             const active = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-semibold transition-all ${
                   active
-                    ? "bg-white/12 text-white border-s-[3px] border-brand-gold-light"
-                    : "text-white/70 hover:text-white hover:bg-white/8"
+                    ? "dock-pill"
+                    : "text-ink-body hover:text-ink hover:bg-brand-navy/5"
                 }`}
               >
-                <span className={`flex-shrink-0 ${active ? "text-brand-gold-light" : "opacity-80"}`}>{item.icon}</span>
+                <span className="flex-shrink-0">{item.icon}</span>
                 {t(item.labelKey)}
               </Link>
             );
@@ -269,7 +271,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         {/* Sign out */}
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/8 transition-all border-t border-white/10 mt-2"
+          className="flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all mt-2"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -280,13 +282,13 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         </button>
 
         {portalLinks && portalLinks.length > 0 && (
-          <div className="flex-1 border-t border-white/10 pt-3 mt-2">
-            <p className="text-xs text-white/30 uppercase tracking-wider px-3 mb-1.5">{t("common.switchPortal")}</p>
+          <div className="flex-1 border-t border-black/5 dark:border-white/10 pt-3 mt-2">
+            <p className="text-xs text-ink-muted uppercase tracking-wider px-3 mb-1.5">{t("common.switchPortal")}</p>
             {portalLinks.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/8 transition-all"
+                className="flex items-center gap-3 px-3 py-2 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all"
               >
                 <span className="flex-shrink-0 opacity-70">{item.icon}</span>
                 {t(item.labelKey)}
