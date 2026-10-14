@@ -18,6 +18,8 @@ import { welcomeNote } from "@/lib/welcomeNote";
 import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
 import { IconArrow } from "@/components/icons";
 import ParentImport from "@/components/ParentImport";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 interface ParentRow {
   id: string;
@@ -36,6 +38,7 @@ const DEMO_PARENTS: ParentRow[] = [
 const DEMO_CREATED_PARENTS_KEY = "demo_created_parents";
 
 export default function AdminParentsPage() {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
@@ -68,7 +71,7 @@ export default function AdminParentsPage() {
   // parent's sign-ins.
   const saveSwitch = async (p: ParentRow) => {
     if (isDemo) {
-      setNote("Sample data — there's no real account to switch off.");
+      setNote(tr("Sample data — there's no real account to switch off."));
       return;
     }
     setSavingSwitch(true);
@@ -78,7 +81,7 @@ export default function AdminParentsPage() {
       await loadReal();
       setOpenId(null);
     } catch (err) {
-      setSwitchError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+      setSwitchError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
       setSavingSwitch(false);
     }
@@ -89,7 +92,7 @@ export default function AdminParentsPage() {
   // has to come back to whoever holds the database.
   const resetPassword = async (p: ParentRow) => {
     if (isDemo) {
-      setNote("Sample data — there's no real account to reset.");
+      setNote(tr("Sample data — there's no real account to reset."));
       return;
     }
     setResettingId(p.id);
@@ -101,12 +104,12 @@ export default function AdminParentsPage() {
         body: JSON.stringify({ user_id: p.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't reset the password");
+      if (!res.ok) throw new Error(data.error || phrase("Couldn't reset the password"));
       setNote(
-        `New temporary password for ${data.full_name || p.name}: ${data.temp_password} — share it with them. They'll set their own the next time they sign in.`
+        tr("New temporary password for {n}: {temp_password} — share it with them. They'll set their own the next time they sign in.", { n: data.full_name || p.name, temp_password: data.temp_password })
       );
     } catch (err) {
-      setNote(err instanceof Error ? err.message : "Couldn't reset the password");
+      setNote(err instanceof Error ? tr(err.message) : tr("Couldn't reset the password"));
     } finally {
       setResettingId(null);
     }
@@ -116,7 +119,7 @@ export default function AdminParentsPage() {
   // nobody has to pass one on.
   const emailResetLink = async (p: ParentRow) => {
     if (isDemo) {
-      setNote("Sample data — there's no real account to email.");
+      setNote(tr("Sample data — there's no real account to email."));
       return;
     }
     setResettingId(p.id);
@@ -128,12 +131,12 @@ export default function AdminParentsPage() {
         body: JSON.stringify({ user_id: p.id, by: "email" }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't send the email");
+      if (!res.ok) throw new Error(data.error || phrase("Couldn't send the email"));
       setNote(
-        `Emailed ${data.email} a link to choose a new password. It works once, for 14 days, and their current password keeps working until they use it.`
+        tr("Emailed {email} a link to choose a new password. It works once, for 14 days, and their current password keeps working until they use it.", { email: data.email })
       );
     } catch (err) {
-      setNote(err instanceof Error ? err.message : "Couldn't send the email");
+      setNote(err instanceof Error ? tr(err.message) : tr("Couldn't send the email"));
     } finally {
       setResettingId(null);
     }
@@ -234,25 +237,32 @@ export default function AdminParentsPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || "Failed to create parent account");
+      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || phrase("Failed to create parent account"));
       await loadReal();
       resetForm();
       if (data.staff_parent) {
         setNote(
-          `${data.full_name || data.email} is one of your ${data.staff_parent === "admin" ? "admins" : "teachers"}, so no new login was made: ${data.linked} child${data.linked === 1 ? " is" : "ren are"} linked to the login they have, and they'll find them under Parent mode in their menu.`
+          tr(
+            data.staff_parent === "admin"
+              ? "{name} is one of your admins, so no new login was made: {children} linked to the login they have, and they'll find them under Parent mode in their menu."
+              : "{name} is one of your teachers, so no new login was made: {children} linked to the login they have, and they'll find them under Parent mode in their menu.",
+            { name: data.full_name || data.email, children: tr("{count} child is|{count} children are", { count: data.linked }) },
+          )
         );
         return;
       }
       setNote(
         [
           data.warning,
-          `${data.warning ? "" : `Account created for ${data.email}. `}${welcomeNote(data.welcome_email)}Temporary password: ${data.temp_password} — share it with them if the email doesn't reach them. They'll be asked to set their own password the first time they use it.`,
+          data.warning ? "" : tr("Account created for {email}.", { email: data.email }),
+          welcomeNote(data.welcome_email),
+          tr("Temporary password: {password} — share it with them if the email doesn't reach them. They'll be asked to set their own password the first time they use it.", { password: data.temp_password }),
         ]
           .filter(Boolean)
           .join(" ")
       );
     } catch (err) {
-      setNote(err instanceof Error ? err.message : "Failed to create parent account");
+      setNote(err instanceof Error ? tr(err.message) : tr("Failed to create parent account"));
     } finally {
       setSaving(false);
     }
@@ -265,17 +275,17 @@ export default function AdminParentsPage() {
     setShowForm(false);
   };
 
-  const childName = (id: string) => students.find((s) => s.id === id)?.name ?? "Unknown";
+  const childName = (id: string) => students.find((s) => s.id === id)?.name ?? phrase("Unknown");
   const unlinked = parents.filter((p) => p.childIds.length === 0).length;
 
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Families"
-        title="Parents"
+        eyebrow={tr("Families")}
+        title={tr("Parents")}
         meta={[
-          `${parents.length} total`,
-          unlinked ? `${unlinked} with no child linked` : "all linked to a child",
+          tr("{count} total", { count: parents.length }),
+          unlinked ? tr("{count} with no child linked", { count: unlinked }) : tr("all linked to a child"),
         ]}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -286,7 +296,7 @@ export default function AdminParentsPage() {
                 aria-expanded={showImport}
                 className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
               >
-                Import from a spreadsheet
+                {tr("Import from a spreadsheet")}
               </button>
             )}
             <button
@@ -294,7 +304,7 @@ export default function AdminParentsPage() {
               onClick={() => setShowForm((v) => !v)}
               className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
             >
-              {showForm ? "Cancel" : "+ Add parent"}
+              {showForm ? tr("Cancel") : tr("+ Add parent")}
             </button>
           </div>
         }
@@ -305,16 +315,16 @@ export default function AdminParentsPage() {
       {showForm && (
         <form onSubmit={addParent} className="card-quiet p-5 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Full name *</label>
+            <label className="block text-sm font-semibold text-ink mb-2">{tr("Full name *")}</label>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Khalid Nur"
+              placeholder={tr("e.g. Khalid Nur")}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Email *</label>
+            <label className="block text-sm font-semibold text-ink mb-2">{tr("Email *")}</label>
             <input
               type="email"
               value={newEmail}
@@ -325,10 +335,10 @@ export default function AdminParentsPage() {
           </div>
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              Their children <span className="font-normal text-ink-muted">(pick any)</span>
+              {tr("Their children")}{" "}<span className="font-normal text-ink-muted">{tr("(pick any)")}</span>
             </label>
             {students.length === 0 ? (
-              <EmptyNote>Add students first, then you can link them here.</EmptyNote>
+              <EmptyNote>{tr("Add students first, then you can link them here.")}</EmptyNote>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {students.map((s) => {
@@ -353,15 +363,15 @@ export default function AdminParentsPage() {
           </div>
           <p className="text-xs text-ink-muted">
             {isDemo
-              ? "In the demo this is stored locally — no real account is created."
-              : "We'll email them a link to choose their own password, and you'll get a temporary password to share in case the email doesn't reach them. They see only the children linked here."}
+              ? tr("In the demo this is stored locally — no real account is created.")
+              : tr("We'll email them a link to choose their own password, and you'll get a temporary password to share in case the email doesn't reach them. They see only the children linked here.")}
           </p>
           <button
             type="submit"
             disabled={!newName.trim() || !newEmail.trim() || saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            {isDemo ? "Add parent" : saving ? "Creating…" : "Create login"}
+            {isDemo ? tr("Add parent") : saving ? tr("Creating…") : tr("Create login")}
           </button>
         </form>
       )}
@@ -370,11 +380,11 @@ export default function AdminParentsPage() {
         <div className="card-quiet p-4 text-sm text-ink border border-emerald-600/30">{note}</div>
       )}
 
-      <SectionCard title="All parents" note={`${parents.length} total`}>
+      <SectionCard title={tr("All parents")} note={tr("{count} total", { count: parents.length })}>
         {!ready ? (
           <LoadingNote />
         ) : parents.length === 0 ? (
-          <EmptyNote>No parent accounts yet.</EmptyNote>
+          <EmptyNote>{tr("No parent accounts yet.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {parents.map((p) => {
@@ -403,12 +413,12 @@ export default function AdminParentsPage() {
                         {p.email}
                         {p.childIds.length > 0
                           ? ` · ${p.childIds.map(childName).join(", ")}`
-                          : " · no child linked"}
+                          : tr(" · no child linked")}
                       </p>
                     </div>
                     {inactive && (
                       <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
-                        Inactive
+                        {tr("Inactive")}
                       </span>
                     )}
                     <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
@@ -421,21 +431,20 @@ export default function AdminParentsPage() {
                     // Teachers page. Here, only their link to their children.
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                       <p className="text-[13px] text-ink leading-relaxed">
-                        This is {p.name.replace(/ \((teacher|office)\)$/, "")}&apos;s own {p.staffRole === "admin" ? "office" : "teacher"} login — they see
-                        their children under <strong>Parent mode</strong> in their menu. Their login is looked after on the Teachers page.
+                        {tr("This is {replace}'s own", { replace: p.name.replace(/ \((teacher|office)\)$/, "") })}{" "}{p.staffRole === "admin" ? "office" : "teacher"}{" "}{tr("login — they see their children under")}{" "}<strong>{tr("Parent mode")}</strong>{" "}{tr("in their menu. Their login is looked after on the Teachers page.")}
                       </p>
                       <button
                         type="button"
                         onClick={async () => {
-                          if (!window.confirm(`Take ${p.childIds.length} child${p.childIds.length === 1 ? "" : "ren"} off ${p.name}? Parent mode goes too.`)) return;
+                          if (!window.confirm(tr("Take {count} child off {name}? Parent mode goes too.|Take {count} children off {name}? Parent mode goes too.", { count: p.childIds.length, name: p.name }))) return;
                           const { error } = await supabase.from("parent_students").delete().eq("parent_id", p.id);
-                          if (error) setNote(error.message);
+                          if (error) setNote(tr(error.message));
                           setOpenId(null);
                           await loadReal();
                         }}
                         className="text-[13px] font-semibold text-red-700 dark:text-red-300 hover:underline"
                       >
-                        Unlink their children
+                        {tr("Unlink their children")}
                       </button>
                     </div>
                   )}
@@ -448,11 +457,10 @@ export default function AdminParentsPage() {
                           onChange={(e) => setDraftActive(e.target.checked)}
                           className="w-4 h-4 rounded"
                         />
-                        Active
+                        {tr("Active")}
                       </label>
                       <p className="text-[11px] text-ink-muted -mt-1 leading-relaxed">
-                        Untick to switch {p.name} off: they can&apos;t sign in or see anything until you switch
-                        them back on.
+                        {tr("Untick to switch {name} off: they can't sign in or see anything until you switch them back on.", { name: p.name })}
                       </p>
                       {switchError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{switchError}</p>}
                       <div className="flex items-center gap-2">
@@ -462,14 +470,14 @@ export default function AdminParentsPage() {
                           disabled={savingSwitch}
                           className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
                         >
-                          {savingSwitch ? "Saving…" : "Save"}
+                          {savingSwitch ? tr("Saving…") : tr("Save")}
                         </button>
                         <button
                           type="button"
                           onClick={() => setOpenId(null)}
                           className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
                         >
-                          Cancel
+                          {tr("Cancel")}
                         </button>
                       </div>
 
@@ -481,7 +489,7 @@ export default function AdminParentsPage() {
                             disabled={resettingId === p.id}
                             className="text-[13px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline transition-colors disabled:opacity-50"
                           >
-                            Email a reset link
+                            {tr("Email a reset link")}
                           </button>
                           <button
                             type="button"
@@ -489,7 +497,7 @@ export default function AdminParentsPage() {
                             disabled={resettingId === p.id}
                             className="text-[13px] font-semibold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
                           >
-                            {resettingId === p.id ? "Working…" : "Get a temporary password"}
+                            {resettingId === p.id ? tr("Working…") : tr("Get a temporary password")}
                           </button>
                         </div>
                       </div>
@@ -498,7 +506,7 @@ export default function AdminParentsPage() {
                         <div className="pt-3 border-t border-surface-border">
                           <DeleteAccount
                             name={p.name}
-                            consequences={`This deletes ${p.name}'s sign-in for good. Their children stay at the school, and messages they sent stay without their name. To keep them but stop them signing in, untick Active instead.`}
+                            consequences={tr("This deletes {name}'s sign-in for good. Their children stay at the school, and messages they sent stay without their name. To keep them but stop them signing in, untick Active instead.", { name: p.name })}
                             onDelete={async () => {
                               await deleteAccount(p.id);
                               setOpenId(null);

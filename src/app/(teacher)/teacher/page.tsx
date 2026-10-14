@@ -33,6 +33,7 @@ import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
 import { myHalaqas, narrowToMine } from "@/lib/teacherScope";
+import { ByLanguage } from "@/components/ByLanguage";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
@@ -61,7 +62,7 @@ function daysFromReal(iso: string, todayStr: string): number {
 
 export default function TeacherDashboard() {
   const supabase = createClient();
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const demoUser = useDemoUser();
   const { mode: staffMode, api: staffApi } = useAttendanceApi("teacher");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -423,7 +424,7 @@ export default function TeacherDashboard() {
                         {student?.name ?? t("role.student")}
                       </p>
                       <p className="text-[12px] text-ink-body">
-                        {surah ? surah.englishName : `Surah ${a.surah}`}
+                        {surah ? surah.englishName : tr("Surah {surah}", { surah: a.surah })}
                         <span className="text-ink-muted">
                           {" "}
                           · {t("common.ayahs")} {a.ayah_start}–{a.ayah_end}
@@ -504,10 +505,16 @@ export default function TeacherDashboard() {
           خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ
         </p>
         <div className="gold-rule w-20 mx-auto my-5" />
-        <p className="font-serif text-[15px] text-ink-body italic" dir="ltr">
-          &ldquo;The best among you are those who learn the Qur&apos;an and teach it.&rdquo;
-        </p>
-        <p className="text-[11px] text-ink-muted mt-2" dir="ltr">Prophet Muhammad &#xFDFA;</p>
+        {/* The English meaning, for readers of the Arabic above who need it. */}
+        <ByLanguage
+          en={
+            <p className="font-serif text-[15px] text-ink-body italic" dir="ltr">
+              “The best among you are those who learn the Qur&apos;an and teach it.”
+            </p>
+          }
+          ar={null}
+        />
+        <p className="text-[11px] text-ink-muted mt-2" dir="ltr">{tr("Prophet Muhammad ﷺ")}</p>
       </section>
 
       {/* A stat opens its list; a name in that list opens the student.

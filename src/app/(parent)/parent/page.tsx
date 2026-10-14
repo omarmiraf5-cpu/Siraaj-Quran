@@ -34,10 +34,11 @@ import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { useLanguage } from "@/components/LanguageProvider";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
+import { ByLanguage } from "@/components/ByLanguage";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const { mode: noticeMode, api: noticeApi } = useAttendanceApi("parent");
 
   // RLS narrows this to the signed-in parent's own children; in demo mode
@@ -199,10 +200,9 @@ export default function ParentDashboard() {
                             `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
                           ) : (
                             <>
-                              {surah ? surah.englishName : `Surah ${a.surah}`}
+                              {surah ? surah.englishName : tr("Surah {surah}", { surah: a.surah })}
                               <span className="font-normal text-ink-muted">
-                                {" "}
-                                · ayahs {a.ayah_start}–{a.ayah_end}
+                                {" "}{tr("· ayahs {ayah_start}–{ayah_end}", { ayah_start: a.ayah_start, ayah_end: a.ayah_end })}
                               </span>
                             </>
                           )}
@@ -341,10 +341,16 @@ export default function ParentDashboard() {
           وَقُل رَّبِّ زِدْنِي عِلْمًا
         </p>
         <div className="gold-rule w-20 mx-auto my-5" />
-        <p className="font-serif text-[15px] text-ink-body italic" dir="ltr">
-          &ldquo;And say: My Lord, increase me in knowledge.&rdquo;
-        </p>
-        <p className="text-[11px] text-ink-muted mt-2" dir="ltr">Surah Ta-Ha, 114</p>
+        {/* The English meaning, for readers of the Arabic above who need it. */}
+        <ByLanguage
+          en={
+            <p className="font-serif text-[15px] text-ink-body italic" dir="ltr">
+              “And say: My Lord, increase me in knowledge.”
+            </p>
+          }
+          ar={null}
+        />
+        <p className="text-[11px] text-ink-muted mt-2" dir="ltr">{tr("Surah Ta-Ha, 114")}</p>
       </section>
     </div>
   );

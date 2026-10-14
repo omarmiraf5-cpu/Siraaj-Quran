@@ -29,6 +29,8 @@ import {
   type PayMethod,
   type SalaryPayment,
 } from "@/lib/finance";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // The month's salaries: every admin and teacher with their usual monthly
 // pay, who's been paid and who hasn't, and anyone else the school pays.
@@ -71,6 +73,7 @@ export function demoSalaryPayments(thisMonth: string): SalaryPayment[] {
 }
 
 export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; schoolId: string | null; userId: string | null }) {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const thisMonth = monthOf(todayIso());
   const [month, setMonth] = useState(thisMonth);
@@ -175,7 +178,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   const saveRate = async (s: DemoTeacher) => {
     const amount = rateDraft.trim() === "" ? 0 : parseAmount(rateDraft);
     if (amount === null) {
-      setError("Enter their monthly salary as an amount, like 1200.");
+      setError(tr("Enter their monthly salary as an amount, like 1200."));
       return;
     }
     setBusy(true);
@@ -188,7 +191,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
       const { error: saveError } = await supabase
         .from("staff_pay_rates")
         .upsert({ school_id: schoolId, staff_id: s.id, monthly_amount: amount, updated_at: new Date().toISOString() }, { onConflict: "school_id,staff_id" });
-      if (saveError) setError(saveError.message);
+      if (saveError) setError(tr(saveError.message));
       else setRates({ ...rates, [s.id]: amount });
     }
     if (!draft.amount && amount) setDraft({ ...draft, amount: String(amount) });
@@ -198,11 +201,11 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   const record = async (payee: { staffId: string | null; name: string }, d: Draft) => {
     const amount = parseAmount(d.amount);
     if (amount === null) {
-      setError("Enter the amount paid, like 1200.");
+      setError(tr("Enter the amount paid, like 1200."));
       return false;
     }
     if (!payee.name.trim()) {
-      setError("Who was paid?");
+      setError(tr("Who was paid?"));
       return false;
     }
     setBusy(true);
@@ -233,7 +236,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
         created_by: userId,
       });
       if (saveError) {
-        setError(saveError.message);
+        setError(tr(saveError.message));
         setBusy(false);
         return false;
       }
@@ -244,7 +247,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   };
 
   const undo = async (p: SalaryPayment) => {
-    if (!window.confirm(`Remove the ${money(p.amount)} paid to ${p.payeeName} on ${shortDate(p.paidOn)}?`)) return;
+    if (!window.confirm(tr("Remove the {amount} paid to {payeeName} on {shortDate}?", { amount: money(p.amount), payeeName: p.payeeName, shortDate: shortDate(p.paidOn) }))) return;
     if (isDemo) {
       const all = readDemoStore<SalaryPayment[]>(DEMO_PAYMENTS_KEY, demoSeed(staff, thisMonth).payments);
       writeDemoStore(
@@ -254,7 +257,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
     } else {
       const { error: deleteError } = await supabase.from("salary_payments").delete().eq("id", p.id);
       if (deleteError) {
-        setError(deleteError.message);
+        setError(tr(deleteError.message));
         return;
       }
     }
@@ -266,11 +269,11 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   const paymentLine = (p: SalaryPayment) => (
     <li key={p.id} className="flex items-start justify-between gap-3 text-[12.5px]">
       <span className="text-ink">
-        <strong>{money(p.amount)}</strong> on {shortDate(p.paidOn)} · {PAY_METHOD_LABELS[p.method]}
+        <strong>{money(p.amount)}</strong>{" "}{tr("on {shortDate} · {PAY_METHOD_LABELS}", { shortDate: shortDate(p.paidOn), PAY_METHOD_LABELS: PAY_METHOD_LABELS[p.method] })}
         {p.note && <span className="text-ink-muted"> · {p.note}</span>}
       </span>
       <button type="button" onClick={() => undo(p)} className="text-[12px] font-semibold text-red-700 dark:text-red-300 hover:underline flex-shrink-0">
-        Undo
+        {tr("Undo")}
       </button>
     </li>
   );
@@ -279,17 +282,17 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={label}>Amount *</label>
+          <label className={label}>{tr("Amount *")}</label>
           <input inputMode="decimal" value={d.amount} onChange={(e) => setD({ ...d, amount: e.target.value })} placeholder="1200" className={field} />
         </div>
         <div>
-          <label className={label}>Paid on</label>
+          <label className={label}>{tr("Paid on")}</label>
           <input type="date" value={d.paidOn} onChange={(e) => setD({ ...d, paidOn: e.target.value })} className={field} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={label}>How</label>
+          <label className={label}>{tr("How")}</label>
           <select value={d.method} onChange={(e) => setD({ ...d, method: e.target.value as PayMethod })} className={field}>
             {SALARY_METHODS.map((m) => (
               <option key={m} value={m}>
@@ -299,19 +302,19 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
           </select>
         </div>
         <div>
-          <label className={label}>Note</label>
-          <input value={d.note} onChange={(e) => setD({ ...d, note: e.target.value })} placeholder="Optional" maxLength={300} className={field} />
+          <label className={label}>{tr("Note")}</label>
+          <input value={d.note} onChange={(e) => setD({ ...d, note: e.target.value })} placeholder={tr("Optional")} maxLength={300} className={field} />
         </div>
       </div>
       <button type="button" onClick={onSave} disabled={busy || !d.amount} className={`${primary} w-full`}>
-        {busy ? "Saving…" : submit}
+        {busy ? tr("Saving…") : submit}
       </button>
     </div>
   );
 
   if (notReady) {
     return (
-      <SectionCard title="Salaries">
+      <SectionCard title={tr("Salaries")}>
         <EmptyNote>{notReady}</EmptyNote>
       </SectionCard>
     );
@@ -324,20 +327,20 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <StatTile value={money(paidTotal)} label="Paid" sub={`${payments.length} payment${payments.length === 1 ? "" : "s"}`} />
+        <StatTile value={money(paidTotal)} label={tr("Paid")} sub={tr("{count} payment|{count} payments", { count: payments.length })} />
         <StatTile
           value={money(stillToPay)}
-          label="Still to pay"
-          sub={noRate > 0 ? `${noRate} with no salary set` : unpaid.length === 0 ? "everyone's paid" : `${unpaid.length} to go`}
+          label={tr("Still to pay")}
+          sub={noRate > 0 ? tr("{noRate} with no salary set", { noRate }) : unpaid.length === 0 ? tr("everyone's paid") : tr("{count} to go", { count: unpaid.length })}
         />
-        <StatTile value={`${staff.length - unpaid.length} of ${staff.length}`} label="Staff paid" sub="this month" />
+        <StatTile value={`${staff.length - unpaid.length} of ${staff.length}`} label={tr("Staff paid")} sub={tr("this month")} />
       </div>
 
-      <SectionCard title="Staff" note={`${staff.length} on staff`}>
+      <SectionCard title={tr("Staff")} note={tr("{count} on staff", { count: staff.length })}>
         {!ready ? (
           <LoadingNote />
         ) : staff.length === 0 ? (
-          <EmptyNote>No teachers yet. Add them under Teachers.</EmptyNote>
+          <EmptyNote>{tr("No teachers yet. Add them under Teachers.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {staff.map((s) => {
@@ -358,10 +361,10 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-ink truncate">
                         {s.name}
-                        {s.admin && <span className="ms-1.5 text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Admin</span>}
+                        {s.admin && <span className="ms-1.5 text-[10px] font-semibold text-ink-muted uppercase tracking-wide">{tr("Admin")}</span>}
                       </p>
                       <p className="text-[11px] text-ink-muted truncate">
-                        {rates[s.id] ? `${money(rates[s.id])} a month` : "No salary set"}
+                        {rates[s.id] ? tr("{amount} a month", { amount: money(rates[s.id]) }) : tr("No salary set")}
                       </p>
                     </div>
                     <div className="text-end flex-shrink-0">
@@ -369,12 +372,12 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                         <>
                           <p className="text-[13px] font-semibold text-ink">{money(paid)}</p>
                           <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5 bg-status-success-bg text-status-success-text">
-                            Paid {shortDate(theirs[theirs.length - 1].paidOn)}
+                            {tr("Paid {shortDate}", { shortDate: shortDate(theirs[theirs.length - 1].paidOn) })}
                           </span>
                         </>
                       ) : (
                         <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning-text">
-                          Not paid yet
+                          {tr("Not paid yet")}
                         </span>
                       )}
                     </div>
@@ -387,14 +390,14 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-4">
                       {theirs.length > 0 && (
                         <div>
-                          <p className="text-xs font-semibold text-ink mb-1.5">Paid this month</p>
+                          <p className="text-xs font-semibold text-ink mb-1.5">{tr("Paid this month")}</p>
                           <ul className="space-y-1.5">
                             {theirs.map((p) => paymentLine(p))}
                           </ul>
                         </div>
                       )}
                       <div>
-                        <p className="text-xs font-semibold text-ink mb-1.5">{theirs.length > 0 ? "Pay more" : "Pay their salary"}</p>
+                        <p className="text-xs font-semibold text-ink mb-1.5">{theirs.length > 0 ? tr("Pay more") : tr("Pay their salary")}</p>
                         {payForm(
                           draft,
                           setDraft,
@@ -404,18 +407,18 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                               setDraft(blankDraft(leftFor(s.id, [...payments, { staffId: s.id, amount } as SalaryPayment])));
                             }
                           },
-                          "Record payment"
+                          phrase("Record payment")
                         )}
                       </div>
                       <div className="pt-3 border-t border-surface-border">
-                        <label className={label}>Usual monthly salary</label>
+                        <label className={label}>{tr("Usual monthly salary")}</label>
                         <div className="flex gap-2">
                           <input inputMode="decimal" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} placeholder="e.g. 1200" className={field} />
                           <button type="button" onClick={() => saveRate(s)} disabled={busy} className={ghost}>
-                            Save
+                            {tr("Save")}
                           </button>
                         </div>
-                        <p className="text-[11px] text-ink-muted mt-1">Filled in each time you pay them; you can still change the amount.</p>
+                        <p className="text-[11px] text-ink-muted mt-1">{tr("Filled in each time you pay them; you can still change the amount.")}</p>
                       </div>
                       {error && <p className="text-[12.5px] text-status-error-text">{error}</p>}
                     </div>
@@ -427,9 +430,9 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
         )}
       </SectionCard>
 
-      <SectionCard title="Others paid" note="without a MyDiiwaan login">
+      <SectionCard title={tr("Others paid")} note={tr("without a MyDiiwaan login")}>
         <div className="space-y-3">
-          {others.length === 0 && !other && <EmptyNote>Nobody else paid this month.</EmptyNote>}
+          {others.length === 0 && !other && <EmptyNote>{tr("Nobody else paid this month.")}</EmptyNote>}
           {others.length > 0 && (
             <ul className="space-y-2">
               {others.map((p) => (
@@ -443,8 +446,8 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
           {other ? (
             <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
               <div>
-                <label className={label}>Who *</label>
-                <input value={other.name} onChange={(e) => setOther({ ...other, name: e.target.value })} placeholder="e.g. Abdi (cleaner)" maxLength={120} className={field} />
+                <label className={label}>{tr("Who *")}</label>
+                <input value={other.name} onChange={(e) => setOther({ ...other, name: e.target.value })} placeholder={tr("e.g. Abdi (cleaner)")} maxLength={120} className={field} />
               </div>
               {payForm(
                 other,
@@ -452,16 +455,16 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                 async () => {
                   if (await record({ staffId: null, name: other.name }, other)) setOther(null);
                 },
-                "Record payment"
+                phrase("Record payment")
               )}
               <button type="button" onClick={() => setOther(null)} className="text-[13px] font-semibold text-ink-muted hover:text-ink">
-                Cancel
+                {tr("Cancel")}
               </button>
               {error && <p className="text-[12.5px] text-status-error-text">{error}</p>}
             </div>
           ) : (
             <button type="button" onClick={() => { setOther({ ...blankDraft(), name: "" }); setError(null); }} className={ghost}>
-              + Pay someone else
+              {tr("+ Pay someone else")}
             </button>
           )}
         </div>

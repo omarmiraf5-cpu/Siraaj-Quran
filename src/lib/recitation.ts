@@ -3,6 +3,7 @@
 // recordings.
 
 import { SURAHS } from "@/data/mushaf-index";
+import { translateFields } from "@/lib/i18n/phrases";
 
 // Two independent hosts serve per-ayah recitation, and they do not carry the
 // same reciters: the Islamic Network CDN indexes by a running ayah number
@@ -66,6 +67,10 @@ export const RECITERS: Reciter[] = [
     ],
   },
 ];
+
+// Their names in the current language (lib/i18n/phrases).
+for (const r of RECITERS) translateFields(r, ["name"]);
+
 
 export function getAbsoluteAyahNumber(surah: number, ayah: number): number {
   let total = 0;

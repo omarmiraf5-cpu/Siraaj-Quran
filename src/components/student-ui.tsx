@@ -14,6 +14,7 @@ import {
   IconPlay,
   IconBookOpen,
 } from "@/components/icons";
+import { useLanguage } from "@/components/LanguageProvider";
 
 /* ── Illumination colours ──────────────────────────────────────────────
    Six, assigned to a surah by its number so the same surah is always the
@@ -95,6 +96,7 @@ export function ProgressRing({
   /** Shown under the number, e.g. "learnt". */
   label?: string;
 }) {
+  const { tr } = useLanguage();
   const pct = Math.max(0, Math.min(100, value));
   const stroke = 6;
   const r = (size - stroke) / 2;
@@ -139,7 +141,7 @@ export function ProgressRing({
           </span>
         )}
       </div>
-      <span className="sr-only">{pct}% complete</span>
+      <span className="sr-only">{tr("{pct}% complete", { pct })}</span>
     </div>
   );
 }
@@ -148,11 +150,12 @@ export function ProgressRing({
    The one purely celebratory thing on the page, so the one thing that
    catches the light. */
 export function StreakBadge({ days }: { days: number }) {
+  const { tr } = useLanguage();
   if (days < 2) return null;
   return (
     <span className="shine inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-gold-light to-brand-gold px-3 py-1.5 text-[12px] font-bold text-[#20180a]">
       <IconFlame size={13} />
-      {days} days in a row
+      {tr("{days} days in a row", { days })}
     </span>
   );
 }
@@ -249,11 +252,12 @@ export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
 /* ── Streak pill ───────────────────────────────────────────────────────
    The compact form, for the corner of a hero. */
 export function StreakPill({ days }: { days: number }) {
+  const { tr } = useLanguage();
   if (days < 1) return null;
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-2xl bg-white/12 border border-white/20 px-3 py-2 text-white flex-shrink-0"
-      title={`${days} days in a row`}
+      title={tr("{days} days in a row", { days })}
     >
       <span className="text-brand-gold-light">
         <IconFlame size={16} />
@@ -278,6 +282,7 @@ export function LevelBar({
   percent: number;
   message: string;
 }) {
+  const { tr } = useLanguage();
   return (
     <div className="rounded-2xl bg-white/10 border border-white/15 px-4 py-3.5 backdrop-blur-sm">
       <div className="flex items-baseline justify-between gap-3">
@@ -285,10 +290,10 @@ export function LevelBar({
           <span className="text-brand-gold-light">
             <IconStar size={15} />
           </span>
-          Level {level}
+          {tr("Level {level}", { level })}
         </span>
         <span className="text-[12px] text-white/60 tabular-nums flex-shrink-0">
-          {into} / {span} XP
+          {tr("{into} / {span} XP", { into, span })}
         </span>
       </div>
 
@@ -298,7 +303,7 @@ export function LevelBar({
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`Level ${level} progress`}
+        aria-label={tr("Level {level} progress", { level })}
       >
         <div
           className="h-full rounded-full bg-gradient-to-r from-brand-gold-light to-brand-gold"

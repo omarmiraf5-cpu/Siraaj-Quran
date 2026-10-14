@@ -53,6 +53,8 @@ import {
   walk,
   type Direction,
 } from "@/lib/mushafPlan";
+import { phrase } from "@/lib/i18n/phrases";
+import { translateAlert } from "@/lib/yearlyPlan";
 
 interface Student {
   id: string;
@@ -104,7 +106,7 @@ const LOG_KEY = "demo_recitation_log_v1";
 
 export default function QuranAssignmentsPage() {
   const supabase = createClient();
-  const { language } = useLanguage();
+  const { language, tr } = useLanguage();
   const surahs = QURAN;
   const [students, setStudents] = useState<Student[]>([]);
   // Full roster (admin-created students merged in), kept for name lookups
@@ -254,8 +256,8 @@ export default function QuranAssignmentsPage() {
         console.error("Error loading data:", err);
         setLoadError(
           err instanceof Error
-            ? `Couldn't load assignments: ${err.message}`
-            : "Couldn't load assignments"
+            ? tr("Couldn't load assignments: {message}", { message: err.message })
+            : tr("Couldn't load assignments")
         );
       }
     };
@@ -283,11 +285,11 @@ export default function QuranAssignmentsPage() {
 
       if (!selectedStudent && students.length === 0) {
         throw new Error(
-          "There are no students to assign to yet — add them in the admin portal first."
+          phrase("There are no students to assign to yet — add them in the admin portal first.")
         );
       }
       if (missing.length > 0) {
-        throw new Error(`Still needed: ${missing.join(", ")}.`);
+        throw new Error(phrase("Still needed: {fields}.", { fields: missing.join(", ") }));
       }
 
       const surahEndValue = parseInt(spansSurah && endSurah ? endSurah : selectedSurah);
@@ -348,7 +350,7 @@ export default function QuranAssignmentsPage() {
 
         if (!res.ok) {
           const data = await res.json();
-          throw new Error(data.error || "Failed to create assignment");
+          throw new Error(data.error || phrase("Failed to create assignment"));
         }
 
         // Re-read so the new assignment appears in the list below straight
@@ -377,7 +379,7 @@ export default function QuranAssignmentsPage() {
 
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(err instanceof Error ? tr(err.message) : tr("Unknown error"));
     } finally {
       setLoading(false);
     }
@@ -415,7 +417,7 @@ export default function QuranAssignmentsPage() {
         }
         if (b?.position) {
           setLastPosition(b.position);
-          setLastSurahName(b.surah_name ?? "");
+          setLastSurahName(getSurahById(b.position.surah)?.englishName ?? b.surah_name ?? "");
         }
       })
       // Losing the suggestion costs the shortcut, not the form — every
@@ -658,30 +660,31 @@ export default function QuranAssignmentsPage() {
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Set work"
-        title="Assignments"
+        eyebrow={tr("Set work")}
+        title={tr("Assignments")}
         meta={[
-          `${students.length} students`,
-          `${allAssignments.length} set this term`,
+          tr("{count} student|{count} students", { count: students.length }),
+          tr("{count} set this term", { count: allAssignments.length }),
         ]}
       />
 
       {Object.entries(planSummaries).flatMap(([studentId, summary]) => {
-        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? "A student";
+        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? tr("A student");
         return summary.alerts.map((a) => (
           <PlanAlertBanner
             key={`${studentId}:${a.code}`}
             level={a.level}
-            title={`${studentLabel}: ${a.title}`}
-            detail={a.detail}
+            title={`${studentLabel}: ${translateAlert(a).title}`}
+            detail={translateAlert(a).detail}
           />
         ));
       })}
 
       {Object.entries(planSummaries).map(([studentId, summary]) => {
         if (!summary.pending_confirmation) return null;
-        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? "A student";
-        const { surah, surah_name } = summary.pending_confirmation;
+        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? tr("A student");
+        const { surah } = summary.pending_confirmation;
+        const surah_name = getSurahById(surah)?.englishName ?? summary.pending_confirmation.surah_name;
         const key = `${studentId}:${surah}`;
         return (
           <div
@@ -694,11 +697,10 @@ export default function QuranAssignmentsPage() {
             <AlertGlyph colour="#b8860b" />
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold tracking-tight text-amber-700">
-                {studentLabel} has reached the end of {surah_name} — test the whole surah
+                {tr("{studentLabel} has reached the end of {surah_name} — test the whole surah", { studentLabel, surah_name })}
               </p>
               <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
-                Once {studentLabel} has recited all of {surah_name} to you, confirm it here. The next
-                lesson won&apos;t be scheduled until you do.
+                {tr("Once {studentLabel} has recited all of {surah_name} to you, confirm it here. The next lesson won't be scheduled until you do.", { studentLabel, surah_name })}
               </p>
             </div>
             <button
@@ -707,7 +709,7 @@ export default function QuranAssignmentsPage() {
               disabled={confirmingSurah === key}
               className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 flex-shrink-0 mt-0.5 whitespace-nowrap"
             >
-              {confirmingSurah === key ? "Saving…" : "Confirm tested"}
+              {confirmingSurah === key ? tr("Saving…") : tr("Confirm tested")}
             </button>
           </div>
         );
@@ -718,14 +720,14 @@ export default function QuranAssignmentsPage() {
         <form onSubmit={handleSubmit} className="card-quiet p-5 space-y-5">
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              Student *
+              {tr("Student *")}
             </label>
             <select
               value={selectedStudent}
               onChange={(e) => setSelectedStudent(e.target.value)}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
-              <option value="">Select a student</option>
+              <option value="">{tr("Select a student")}</option>
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.full_name}
@@ -738,7 +740,7 @@ export default function QuranAssignmentsPage() {
               which is the one most often being set. */}
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              Portion *
+              {tr("Portion *")}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {HIFZ_PORTIONS.map((p) => {
@@ -784,11 +786,11 @@ export default function QuranAssignmentsPage() {
               shared with the yearly plan. */}
           {portion === "new" && !isDemo && selectedStudent && (
             <div className="rounded-2xl border border-brand-navy/25 bg-brand-navy/[.04] dark:bg-white/[.03] p-3.5">
-              <p className="text-sm font-semibold text-ink mb-2">Continue from their last lesson</p>
+              <p className="text-sm font-semibold text-ink mb-2">{tr("Continue from their last lesson")}</p>
 
               <label className="block">
                 <span className="block text-[11px] text-ink-muted mb-1">
-                  Works through the mushaf
+                  {tr("Works through the mushaf")}
                 </span>
                 <select
                   value={direction}
@@ -804,15 +806,14 @@ export default function QuranAssignmentsPage() {
                 </select>
               </label>
               <p className="text-[11px] text-ink-muted mt-1.5">
-                {DIRECTION_HINT[direction]} Saved on the student, so the yearly plan uses the same
-                order.
+                {tr("{DIRECTION_HINT} Saved on the student, so the yearly plan uses the same order.", { DIRECTION_HINT: DIRECTION_HINT[direction] })}
               </p>
 
               {lastPosition ? (
                 <>
                   <div className="flex items-end gap-2 mt-3">
                     <label className="w-28 flex-shrink-0">
-                      <span className="block text-[11px] text-ink-muted mb-1">Ayahs</span>
+                      <span className="block text-[11px] text-ink-muted mb-1">{tr("Ayahs")}</span>
                       <input
                         type="number"
                         min="1"
@@ -828,28 +829,28 @@ export default function QuranAssignmentsPage() {
                       disabled={!resumeAt}
                       className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] disabled:opacity-40 transition-all"
                     >
-                      Apply
+                      {tr("Apply")}
                     </button>
                   </div>
                   <p className="text-[11px] text-ink-muted mt-2">
-                    Last recorded: <span className="font-semibold text-ink">
-                      {lastSurahName} {lastPosition.ayah}
+                    {tr("Last recorded:")}{" "}<span className="font-semibold text-ink">
+                      {getSurahById(lastPosition.surah)?.englishName ?? lastSurahName} {lastPosition.ayah}
                     </span>
                     {resumeAt ? (
                       <>
-                        {" · "}next starts at{" "}
+                        {" "}{tr("· next starts at")}{" "}
                         <span className="font-semibold text-ink">{formatPosition(resumeAt)}</span>
                       </>
                     ) : (
-                      " · nothing follows it in this direction"
+                      tr(" · nothing follows it in this direction")
                     )}
                   </p>
                 </>
               ) : (
                 <p className="text-[11px] text-ink-muted mt-3">
                   {directionKnown
-                    ? "No new-lesson assignments on file yet, so there is nothing to continue from. Set the surah and ayahs below."
-                    : "Checking their recorded lessons…"}
+                    ? tr("No new-lesson assignments on file yet, so there is nothing to continue from. Set the surah and ayahs below.")
+                    : tr("Checking their recorded lessons…")}
                 </p>
               )}
             </div>
@@ -862,10 +863,10 @@ export default function QuranAssignmentsPage() {
               surah and ayah, not by the juz'. */}
           {portion !== "new" && (
             <div className="rounded-2xl border border-brand-gold/35 bg-brand-gold/8 p-3.5">
-              <p className="text-sm font-semibold text-ink mb-2">Or set by juz'</p>
+              <p className="text-sm font-semibold text-ink mb-2">{tr("Or set by juz'")}</p>
               <div className="flex items-end gap-2">
                 <label className="flex-1 min-w-0">
-                  <span className="block text-[11px] text-ink-muted mb-1">Starting juz'</span>
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Starting juz'")}</span>
                   <select
                     value={juzStart}
                     onChange={(e) => setJuzStart(e.target.value)}
@@ -873,13 +874,13 @@ export default function QuranAssignmentsPage() {
                   >
                     {JUZ_STARTS.map((j) => (
                       <option key={j.juz} value={j.juz}>
-                        Juz {j.juz}
+                        {tr("Juz {juz}", { juz: j.juz })}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="w-20 flex-shrink-0">
-                  <span className="block text-[11px] text-ink-muted mb-1">Juz' count</span>
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Juz' count")}</span>
                   <input
                     type="number"
                     min="1"
@@ -894,19 +895,18 @@ export default function QuranAssignmentsPage() {
                   onClick={applyJuzRange}
                   className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] transition-all"
                 >
-                  Apply
+                  {tr("Apply")}
                 </button>
               </div>
               <p className="text-[11px] text-ink-muted mt-2">
-                Fills in the surah and ayahs below — a juz' rarely lines up
-                with a surah's edges, so this often spans more than one.
+                {tr("Fills in the surah and ayahs below — a juz' rarely lines up with a surah's edges, so this often spans more than one.")}
               </p>
             </div>
           )}
 
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              Surah *
+              {tr("Surah *")}
             </label>
             <select
               value={selectedSurah}
@@ -917,10 +917,10 @@ export default function QuranAssignmentsPage() {
               }}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
-              <option value="">Select a Surah</option>
+              <option value="">{tr("Select a Surah")}</option>
               {surahs.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.id}. {s.englishName} ({s.ayahs} Ayahs)
+                  {tr("{id}. {englishName} ({ayahs} Ayahs)", { id: s.id, englishName: s.englishName, ayahs: s.ayahs })}
                 </option>
               ))}
             </select>
@@ -929,7 +929,7 @@ export default function QuranAssignmentsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-ink mb-2">
-                Ayah Start *
+                {tr("Ayah Start *")}
               </label>
               <input
                 type="number"
@@ -945,7 +945,7 @@ export default function QuranAssignmentsPage() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-ink mb-2">
-                Ayah End *
+                {tr("Ayah End *")}
               </label>
               <input
                 type="number"
@@ -962,7 +962,7 @@ export default function QuranAssignmentsPage() {
           </div>
           {maxAyahs > 0 && !spansSurah && (
             <p className="text-xs text-ink-muted">
-              This Surah has {maxAyahs} Ayahs
+              {tr("This Surah has {maxAyahs} Ayahs", { maxAyahs })}
             </p>
           )}
 
@@ -972,7 +972,7 @@ export default function QuranAssignmentsPage() {
             (spansSurah ? (
               <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-ink">Ends in surah</span>
+                  <span className="text-sm font-semibold text-ink">{tr("Ends in surah")}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -981,7 +981,7 @@ export default function QuranAssignmentsPage() {
                     }}
                     className="text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors"
                   >
-                    Remove
+                    {tr("Remove")}
                   </button>
                 </div>
                 <select
@@ -993,12 +993,12 @@ export default function QuranAssignmentsPage() {
                 >
                   {endSurahOptions.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.id}. {s.englishName} ({s.ayahs} Ayahs)
+                      {tr("{id}. {englishName} ({ayahs} Ayahs)", { id: s.id, englishName: s.englishName, ayahs: s.ayahs })}
                     </option>
                   ))}
                 </select>
                 <p className="text-[11px] text-ink-muted">
-                  Ayah End above is now within {endSurahData?.englishName ?? "this surah"}.
+                  {tr("Ayah End above is now within")}{" "}{endSurahData?.englishName ?? tr("this surah")}.
                 </p>
               </div>
             ) : (
@@ -1007,13 +1007,13 @@ export default function QuranAssignmentsPage() {
                 onClick={() => setSpansSurah(true)}
                 className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
               >
-                + End in a different surah
+                {tr("+ End in a different surah")}
               </button>
             ))}
 
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              Due Date (optional)
+              {tr("Due Date (optional)")}
             </label>
             <input
               type="date"
@@ -1025,12 +1025,12 @@ export default function QuranAssignmentsPage() {
 
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              Notes for student (optional)
+              {tr("Notes for student (optional)")}
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any instructions or tips..."
+              placeholder={tr("Add any instructions or tips...")}
               rows={4}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition resize-none"
             />
@@ -1046,8 +1046,8 @@ export default function QuranAssignmentsPage() {
             <div className="bg-green-50 dark:bg-green-950/25 border border-green-200 dark:border-green-800/40 rounded-2xl p-4">
               <p className="text-sm text-green-700 dark:text-green-300">
                 {isDemo
-                  ? "Assignment added below — this preview saves in your browser only."
-                  : "Assignment created."}
+                  ? tr("Assignment added below — this preview saves in your browser only.")
+                  : tr("Assignment created.")}
               </p>
             </div>
           )}
@@ -1057,7 +1057,7 @@ export default function QuranAssignmentsPage() {
             disabled={loading}
             className="w-full gradient-emerald hover:opacity-90 disabled:opacity-50 text-white font-semibold py-3 rounded-2xl transition-all active:scale-95"
           >
-            {loading ? "Creating..." : "Create Assignment"}
+            {loading ? tr("Creating...") : tr("Create Assignment")}
           </button>
         </form>
 
@@ -1072,8 +1072,8 @@ export default function QuranAssignmentsPage() {
             <div className="card-quiet p-5 overflow-hidden">
               <h2 className="page-title text-lg">
                 {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
-                  ? `${selectedSurahData?.englishName ?? "Preview"} – ${endSurahData.englishName}`
-                  : (selectedSurahData?.englishName ?? "Preview")}
+                  ? `${selectedSurahData?.englishName ?? phrase("Preview")} – ${endSurahData.englishName}`
+                  : (selectedSurahData?.englishName ?? tr("Preview"))}
               </h2>
               <div className="gold-rule my-4" />
               <Mushaf
@@ -1099,10 +1099,9 @@ export default function QuranAssignmentsPage() {
               <span className="icon-tile mx-auto mb-4">
                 <IconBook size={19} />
               </span>
-              <h3 className="page-title text-lg mb-2">Mushaf preview</h3>
+              <h3 className="page-title text-lg mb-2">{tr("Mushaf preview")}</h3>
               <p className="text-[13px] text-ink-muted leading-relaxed max-w-xs mx-auto">
-                Pick a surah and an ayah range — the Tajweed-highlighted text
-                your student will study appears here as you go.
+                {tr("Pick a surah and an ayah range — the Tajweed-highlighted text your student will study appears here as you go.")}
               </p>
             </div>
           )}
@@ -1113,14 +1112,14 @@ export default function QuranAssignmentsPage() {
           records; the create form above writes real ones once a teacher is
           properly signed in, and adds a browser-local preview row otherwise. */}
       <SectionCard
-        title="Current assignments"
-        note={`${allAssignments.length} across all students · tap to grade`}
+        title={tr("Current assignments")}
+        note={tr("{count} across all students · tap to grade", { count: allAssignments.length })}
       >
         {loadError && (
           <p className="text-xs font-semibold text-red-700 dark:text-red-400 py-2">{loadError}</p>
         )}
         {!loadError && allAssignments.length === 0 && (
-          <EmptyNote>No assignments yet — set the first one above.</EmptyNote>
+          <EmptyNote>{tr("No assignments yet — set the first one above.")}</EmptyNote>
         )}
         <ul className="divide-y divide-surface-border -my-1">
           {allAssignments.map((a) => {
@@ -1157,7 +1156,7 @@ export default function QuranAssignmentsPage() {
                     </p>
                     <p className="text-[11px] text-ink-muted truncate">
                       {rangeLabel}
-                      {a.due_date ? ` · due ${formatDay(a.due_date, language)}` : ""}
+                      {a.due_date ? tr(" · due {formatDay}", { formatDay: formatDay(a.due_date, language) }) : ""}
                     </p>
                   </div>
 
@@ -1189,7 +1188,7 @@ export default function QuranAssignmentsPage() {
                   <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                     <div>
                       <p className="text-xs font-semibold text-ink mb-2">
-                        Today&apos;s rating
+                        {tr("Today's rating")}
                       </p>
                       <div className="grid grid-cols-4 gap-1.5">
                         {DAILY_RATING_ORDER.map((r) => {
@@ -1215,13 +1214,13 @@ export default function QuranAssignmentsPage() {
 
                     <div>
                       <label className="block text-xs font-semibold text-ink mb-1.5">
-                        Remark for the parent
+                        {tr("Remark for the parent")}
                       </label>
                       <textarea
                         value={draftNotes}
                         onChange={(e) => setDraftNotes(e.target.value)}
                         rows={3}
-                        placeholder="e.g. Held the madd well today, keep it up."
+                        placeholder={tr("e.g. Held the madd well today, keep it up.")}
                         className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition resize-none"
                       />
                     </div>
@@ -1233,20 +1232,20 @@ export default function QuranAssignmentsPage() {
                         disabled={savingEdit}
                         className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50 hover:opacity-90 active:scale-[.98] transition-all"
                       >
-                        {savingEdit ? "Saving…" : "Save"}
+                        {savingEdit ? tr("Saving…") : tr("Save")}
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingId(null)}
                         className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
                       >
-                        Cancel
+                        {tr("Cancel")}
                       </button>
                     </div>
 
                     <div className="pt-1">
                       <p className="text-xs font-semibold text-ink mb-2">
-                        {name.split(" ")[0]}&apos;s history
+                        {tr("{value}'s history", { value: name.split(" ")[0] })}
                       </p>
                       <RecitationHistory entries={recitationLogFor(a.student_id, log)} />
                     </div>

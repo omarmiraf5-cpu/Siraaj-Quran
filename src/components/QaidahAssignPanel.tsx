@@ -125,7 +125,7 @@ export function QaidahAssignPanel({
   /** The book on screen, offered first when setting a new lesson. */
   book: QaidahBookId;
 }) {
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const { mode, students, rows, setRows, ready, missingTable } = room;
   const actions = useMemo(() => qaidahActions(mode === "demo"), [mode]);
   const [query, setQuery] = useState("");
@@ -166,7 +166,7 @@ export function QaidahAssignPanel({
     try {
       setDone(await work());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+      setError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
       setBusy(null);
     }

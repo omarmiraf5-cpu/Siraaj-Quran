@@ -161,7 +161,7 @@ export function StatTile({
 }) {
   const body = (
     <>
-      <p className="text-[26px] font-bold text-ink tabular-nums leading-none">{value}</p>
+      <p className="text-[26px] font-bold text-ink tabular-nums leading-none"><bdi dir="ltr">{value}</bdi></p>
       <p className="eyebrow mt-2">{label}</p>
       {sub && <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
     </>
@@ -355,7 +355,7 @@ export function RatingPill({ rating }: { rating: DailyRating }) {
    What was read, and how it went. Shared between the timeline and the
    selected-day detail below, since both show the same thing. */
 function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?: boolean }) {
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const surah = getSurahById(entry.surah);
   return (
     <div className="flex items-start justify-between gap-3 py-2.5">
@@ -367,7 +367,7 @@ function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?
           </span>
         </p>
         <p className="text-[11px] text-ink-muted truncate">
-          {surah ? surah.englishName : `Surah ${entry.surah}`} · ayahs {entry.ayah_start}–{entry.ayah_end}
+          {surah ? surah.englishName : tr("Surah {surah}", { surah: entry.surah })}{" "}{tr("· ayahs {ayah_start}–{ayah_end}", { ayah_start: entry.ayah_start, ayah_end: entry.ayah_end })}
         </p>
         {entry.notes && (
           <p className="text-[12px] text-ink-body font-serif italic leading-snug mt-1">
@@ -446,7 +446,7 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
           aria-label={t("common.previousMonth")}
           className="w-7 h-7 rounded-full flex items-center justify-center text-ink-muted hover:bg-surface-bg-warm hover:text-ink transition"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rtl:-scale-x-100"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <p className="text-[13px] font-semibold text-ink tabular-nums">
           {MONTHS[cursor.month]} {cursor.year}
@@ -457,7 +457,7 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
           aria-label={t("common.nextMonth")}
           className="w-7 h-7 rounded-full flex items-center justify-center text-ink-muted hover:bg-surface-bg-warm hover:text-ink transition"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rtl:-scale-x-100"><path d="M9 18l6-6-6-6" /></svg>
         </button>
       </div>
 

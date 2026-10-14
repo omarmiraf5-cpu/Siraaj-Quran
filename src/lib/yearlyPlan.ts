@@ -140,6 +140,8 @@ export const PACE = {
    existing `from "@/lib/yearlyPlan"` import keeps working unchanged. */
 export { parseDay, toISODate, daysBetween, addDays, todayISO } from "@/lib/planDates";
 import { parseDay, toISODate, daysBetween, addDays, todayISO } from "@/lib/planDates";
+import { currentLanguage, dateLocale } from "@/lib/i18n/current";
+import { labels, phrase } from "@/lib/i18n/phrases";
 import { countInstructionalDays, type SchoolCalendar } from "@/lib/schoolCalendar";
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -504,7 +506,7 @@ export function slicePlan(
   entries: ProgressEntry[],
   grain: PeriodGrain,
   today: string = todayISO(),
-  locale = "en-CA",
+  locale = dateLocale("en-CA"),
   cal?: SchoolCalendar
 ): PeriodSlice[] {
   if (grain === "year") {
@@ -663,6 +665,61 @@ export function evaluateAlerts(
   return alerts;
 }
 
+/**
+ * An alert as the reader's language says it. Alerts are worded in English
+ * when they're raised (above) and stored that way, so this reads the
+ * numbers back out of each wording and says it again through phrase().
+ * Text it doesn't recognise comes back unchanged.
+ */
+export function translateAlert<A extends { title: string; detail: string }>(a: A): A {
+  if (currentLanguage() === "en") return a;
+  const UNITS: Record<string, PlanUnit> = {
+    ayah: "ayah", ayahs: "ayah", page: "page", pages: "page", line: "line", lines: "line",
+    surah: "surah", surahs: "surah", juz: "juz", lesson: "lesson", lessons: "lesson",
+  };
+  const amount = (n: string, word: string) => {
+    const unit = UNITS[word];
+    return unit ? `${n} ${unitLabel(Number(n), unit)}` : `${n} ${word}`;
+  };
+  const Q = "([\\d.]+) (\\w+)";
+  const titles: Record<string, string> = {
+    "Behind schedule": phrase("Behind schedule"),
+    "Slipping behind": phrase("Slipping behind"),
+    "A milestone has passed its date": phrase("A milestone has passed its date"),
+    "No progress recorded recently": phrase("No progress recorded recently"),
+    "On course to finish short": phrase("On course to finish short"),
+  };
+  let title = titles[a.title] ?? a.title;
+  const many = a.title.match(/^(\d+) milestones have passed their dates$/);
+  if (many) title = phrase("{count} milestones have passed their dates", { count: Number(many[1]) });
+
+  let detail = a.detail;
+  let m: RegExpMatchArray | null;
+  if ((m = a.detail.match(new RegExp(`^Expected ${Q} by today, recorded ${Q} — a shortfall of ${Q}\\. Finishing on time now needs about ([\\d.]+) (\\w+) a week, against ([\\d.]+) so far\\.$`)))) {
+    detail = phrase("Expected {expected} by today, recorded {actual} — a shortfall of {short}. Finishing on time now needs about {needed} a week, against {current} so far.", {
+      expected: amount(m[1], m[2]), actual: amount(m[3], m[4]), short: amount(m[5], m[6]), needed: amount(m[7], m[8]), current: m[9],
+    });
+  } else if ((m = a.detail.match(new RegExp(`^"(.*)" was due (\\S+) \\((\\d+) days? ago\\) at ([\\d.]+) of ${Q}\\.$`)))) {
+    const named = m[1].match(/^Milestone (\d+)$/);
+    detail = phrase("“{title}” was due {date} ({days}) at {done} of {target}.", {
+      title: named ? phrase("Milestone {n}", { n: Number(named[1]) }) : m[1],
+      date: m[2],
+      days: phrase("{count} day ago|{count} days ago", { count: Number(m[3]) }),
+      done: m[4],
+      target: amount(m[5], m[6]),
+    });
+  } else if (a.detail === "Nothing has been recorded against this plan since it was created.") {
+    detail = phrase(a.detail);
+  } else if ((m = a.detail.match(/^The last entry was (\d+) days ago\. /))) {
+    detail = phrase("The last entry was {count} days ago. The pace figures above are only as current as the last time a teacher recorded a session.", { count: Number(m[1]) });
+  } else if ((m = a.detail.match(new RegExp(`^(\\d+) days left\\. At the current pace this plan lands at about ${Q} of ${Q}\\.$`)))) {
+    detail = phrase("{count} days left. At the current pace this plan lands at about {projected} of {total}.", {
+      count: Number(m[1]), projected: amount(m[2], m[3]), total: amount(m[4], m[5]),
+    });
+  }
+  return { ...a, title, detail };
+}
+
 /* ── Presentation helpers ──────────────────────────────────────────── */
 
 /**
@@ -702,18 +759,19 @@ export function formatUnits(n: number, unit: PlanUnit): string {
 }
 
 export function unitLabel(n: number, unit: PlanUnit): string {
-  if (unit === "juz") return "juz";
-  return Math.round(n * 100) / 100 === 1 ? unit : `${unit}s`;
+  const count = Math.round(n * 100) / 100;
+  if (unit === "juz") return phrase("juz|juz", { count });
+  return phrase(`${unit}|${unit}s`, { count });
 }
 
-export const PACE_LABEL: Record<PaceStatus, string> = {
+export const PACE_LABEL: Record<PaceStatus, string> = labels({
   not_started: "Not started",
   ahead: "Ahead of schedule",
   on_track: "On track",
   at_risk: "Slipping",
   behind: "Behind schedule",
   complete: "Complete",
-};
+});
 
 /** Milestone titles are optional — a teacher generating twelve monthly
  *  milestones in one click shouldn't have to name all twelve. */

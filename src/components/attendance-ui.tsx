@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { demoAttendanceFetch, type DemoRole } from "@/lib/demoAttendance";
 import { formatClock, type StaffDay } from "@/lib/attendanceRules";
 import { PlanAlertBanner } from "@/components/yearly-plan-ui";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
+import { translateNotice } from "@/lib/noticeText";
 
 /* ── Which portal is this ──────────────────────────────────────────── */
 
@@ -49,7 +52,7 @@ export async function currentPosition(): Promise<Fix> {
   if (Capacitor.isNativePlatform()) return nativePosition();
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      reject(new Error("This device can't share its location, so it can't be used to sign in. Try your phone."));
+      reject(new Error(phrase("This device can't share its location, so it can't be used to sign in. Try your phone.")));
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -61,7 +64,7 @@ export async function currentPosition(): Promise<Fix> {
               ? "Location access is blocked for this site. Allow it in your browser settings (tap the icon next to the web address), then try again."
               : e.code === 3
                 ? "Finding your location took too long. Try again — near a window helps."
-                : "Your location couldn't be found. Check that location services are turned on, then try again."
+                : phrase("Your location couldn't be found. Check that location services are turned on, then try again.")
           )
         ),
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
@@ -84,12 +87,12 @@ async function nativePosition(): Promise<Fix> {
     const message = e instanceof Error ? e.message.toLowerCase() : "";
     if (message.includes("denied") || message.includes("permission")) throw denied;
     if (message.includes("disabled") || message.includes("services")) {
-      throw new Error("Location services are off on this phone. Turn them on in Settings, then try again.");
+      throw new Error(phrase("Location services are off on this phone. Turn them on in Settings, then try again."));
     }
     if (message.includes("timeout") || message.includes("timed out")) {
       throw new Error("Finding your location took too long. Try again — near a window helps.");
     }
-    throw new Error("Your location couldn't be found. Check that location services are turned on, then try again.");
+    throw new Error(phrase("Your location couldn't be found. Check that location services are turned on, then try again."));
   }
 }
 
@@ -107,13 +110,13 @@ const STATUS_STYLE: Record<StaffDay["status"], string> = {
 
 export function statusLabel(day: StaffDay, isToday = false): string {
   switch (day.status) {
-    case "present": return "On time";
-    case "late": return day.minutesLate > 0 ? `Late · ${day.minutesLate} min` : "Late";
-    case "absent": return isToday ? "Not signed in" : "Absent";
-    case "reported": return "Reported absence";
-    case "excused": return "Excused";
-    case "pending": return "Not in yet";
-    case "off": return "No school";
+    case "present": return phrase("On time");
+    case "late": return day.minutesLate > 0 ? phrase("Late · {n} min", { n: day.minutesLate }) : phrase("Late");
+    case "absent": return isToday ? phrase("Not signed in") : phrase("Absent");
+    case "reported": return phrase("Reported absence");
+    case "excused": return phrase("Excused");
+    case "pending": return phrase("Not in yet");
+    case "off": return phrase("No school");
   }
 }
 
@@ -149,6 +152,7 @@ interface MyDay {
  * server, which makes the actual on-the-premises decision.
  */
 export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void }) {
+  const { tr } = useLanguage();
   const [data, setData] = useState<MyDay | null>(null);
   const [busy, setBusy] = useState<"" | "locating" | "saving">("");
   const [error, setError] = useState<string | null>(null);
@@ -158,11 +162,11 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
     const res = await api("/api/staff-attendance");
     const body = await res.json();
     if (res.ok) setData(body);
-    else setError(body.error ?? "Could not load today's sign-in");
+    else setError(tr(body.error ?? "Could not load today's sign-in"));
   }, [api]);
 
   useEffect(() => {
-    load().catch(() => setError("Could not load today's sign-in"));
+    load().catch(() => setError(tr("Could not load today's sign-in")));
   }, [load]);
 
   const act = async (action: "sign_in" | "sign_out") => {
@@ -181,12 +185,12 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
         body: JSON.stringify({ action, ...fix }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "That didn't go through — please try again");
-      setDone(body.message ?? (action === "sign_in" ? "Signed in — have a good day." : "Signed out — see you next time."));
+      if (!res.ok) throw new Error(body.error ?? phrase("That didn't go through — please try again"));
+      setDone(body.message ?? (action === "sign_in" ? "Signed in — have a good day." : phrase("Signed out — see you next time.")));
       await load();
       onChange?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "That didn't go through — please try again");
+      setError(e instanceof Error ? tr(e.message) : tr("That didn't go through — please try again"));
     } finally {
       setBusy("");
     }
@@ -195,7 +199,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
   if (!data) {
     return (
       <section className="card-quiet p-5">
-        <p className="text-[13px] text-ink-muted">{error ?? "Checking today's sign-in…"}</p>
+        <p className="text-[13px] text-ink-muted">{error ?? tr("Checking today's sign-in…")}</p>
       </section>
     );
   }
@@ -203,19 +207,19 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
   const { day, settings } = data;
   const due = formatClock(settings.start_time);
   const headline = data.signed_out
-    ? `Signed out at ${formatClock(day.signedOut!)}`
+    ? phrase("Signed out at {time}", { time: formatClock(day.signedOut!) })
     : data.signed_in
-      ? `Signed in at ${formatClock(day.signedIn!)}`
+      ? phrase("Signed in at {time}", { time: formatClock(day.signedIn!) })
       : day.status === "reported"
-        ? "You reported an absence for today"
+        ? phrase("You reported an absence for today")
         : day.status === "off"
-          ? "No school today"
-          : "You haven't signed in yet";
+          ? phrase("No school today")
+          : phrase("You haven't signed in yet");
   const sub = data.signed_in
     ? day.status === "late"
-      ? `${day.minutesLate} minutes after the ${due} start.`
-      : `On time for the ${due} start.`
-    : `Staff are due at ${due}. You can only sign in on the school premises.`;
+      ? phrase("{count} minute after the {due} start.|{count} minutes after the {due} start.", { count: day.minutesLate, due })
+      : phrase("On time for the {due} start.", { due })
+    : phrase("Staff are due at {due}. You can only sign in on the school premises.", { due });
 
   const canSignIn = settings.configured && !data.signed_in;
   const canSignOut = settings.configured && data.signed_in && !data.signed_out;
@@ -224,7 +228,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
     <section className="card-quiet p-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
-          <p className="eyebrow">Today · staff sign-in</p>
+          <p className="eyebrow">{tr("Today · staff sign-in")}</p>
           <p className="page-title text-lg mt-1">{headline}</p>
           <p className="text-[12.5px] text-ink-muted mt-1 leading-relaxed">{sub}</p>
           {data.signed_in && (
@@ -241,7 +245,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
               disabled={busy !== ""}
               className="gradient-emerald text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-50 active:scale-[.98] transition-all"
             >
-              {busy === "locating" ? "Checking your location…" : busy === "saving" ? "Signing in…" : "Sign in"}
+              {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Signing in…") : tr("Sign in")}
             </button>
           )}
           {canSignOut && (
@@ -251,7 +255,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
               disabled={busy !== ""}
               className="bg-brand-navy text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-50 active:scale-[.98] transition-all"
             >
-              {busy === "locating" ? "Checking your location…" : busy === "saving" ? "Signing out…" : "Sign out"}
+              {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Signing out…") : tr("Sign out")}
             </button>
           )}
         </div>
@@ -259,19 +263,17 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
 
       {(canSignIn || canSignOut) && (
         <p className="text-[12px] text-ink-muted mt-3 leading-relaxed">
-          This checks your location once, only to confirm you are at the school. The map pin is not kept.
-          Students and parents are never asked.
+          {tr("This checks your location once, only to confirm you are at the school. The map pin is not kept. Students and parents are never asked.")}
         </p>
       )}
       {!settings.configured && (
         <p className="text-[12.5px] text-amber-800 dark:text-amber-300 mt-3">
-          Signing in isn&apos;t switched on yet — the office needs to set the school&apos;s location first.
+          {tr("Signing in isn't switched on yet — the office needs to set the school's location first.")}
         </p>
       )}
       {settings.demo && (
         <p className="text-[11.5px] text-ink-muted mt-3">
-          Sample portal: the location check and times are simulated. On your school&apos;s portal, signing in
-          and out only works on the premises.
+          {tr("Sample portal: the location check and times are simulated. On your school's portal, signing in and out only works on the premises.")}
         </p>
       )}
       {error && (
@@ -334,8 +336,8 @@ export function NoticesPanel({ api }: { api: Api }) {
         <PlanAlertBanner
           key={n.id}
           level={n.kind === "absence_streak" ? "critical" : "info"}
-          title={n.title}
-          detail={n.body}
+          title={translateNotice(n).title}
+          detail={translateNotice(n).body}
           onAcknowledge={() => dismiss(n.id)}
           busy={busy === n.id}
         />

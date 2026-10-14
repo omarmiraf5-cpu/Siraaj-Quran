@@ -1,4 +1,6 @@
 import { addDays } from "@/lib/planDates";
+import { currentLanguage } from "@/lib/i18n/current";
+import { labels } from "@/lib/i18n/phrases";
 import { isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
 
 /**
@@ -119,7 +121,8 @@ export function formatClock(time: string): string {
   const mins = minutesOf(time);
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+  const half = currentLanguage() === "ar" ? (h < 12 ? "ص" : "م") : h < 12 ? "am" : "pm";
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${half}`;
 }
 
 /* ── A teacher's day ───────────────────────────────────────────────── */
@@ -150,12 +153,12 @@ export interface AbsenceReport {
   cancelled_at: string | null;
 }
 
-export const REASON_LABEL: Record<AbsenceReport["reason"], string> = {
+export const REASON_LABEL: Record<AbsenceReport["reason"], string> = labels({
   sick: "Sick",
   family: "Family matter",
   travel: "Travelling",
   other: "Other",
-};
+});
 
 export interface StaffPolicy {
   timeZone: string;

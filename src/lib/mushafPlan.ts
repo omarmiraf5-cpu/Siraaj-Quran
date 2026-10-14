@@ -2,6 +2,7 @@ import { JUZ_START_PAGES, PAGE_STARTS, SURAHS, TOTAL_PAGES, getSurahById } from 
 import { addDays } from "@/lib/planDates";
 import { countInstructionalDays, isInstructionalDay, type SchoolCalendar } from "@/lib/schoolCalendar";
 import { startOfWeek, type PlanUnit } from "@/lib/yearlyPlan";
+import { labels, phrase } from "@/lib/i18n/phrases";
 
 /**
  * Turning "five juz this year" into "Al-Mulk 1–30, then Al-Qalam 1–52, …"
@@ -47,16 +48,16 @@ export const AVERAGE_PAGES_PER_JUZ = TOTAL_PAGES / 30;
 /** Named the way a teacher says it out loud, not the way a developer
  *  would: "An-Nas and up" is what gets said in a staff room, and
  *  "hifz order" is a term half of them would read two ways. */
-export const DIRECTION_LABEL: Record<Direction, string> = {
+export const DIRECTION_LABEL: Record<Direction, string> = labels({
   hifz: "An-Nas and up — 114 toward Al-Baqarah",
   forward: "Al-Baqarah and down — 2 toward An-Nas",
-};
+});
 
 /** One line for a form's help text. */
-export const DIRECTION_HINT: Record<Direction, string> = {
+export const DIRECTION_HINT: Record<Direction, string> = labels({
   hifz: "The usual hifz order: start at the short surahs and work up the mushaf.",
   forward: "Straight through the mushaf from the beginning.",
-};
+});
 
 /**
  * Where a plan begins for a student with nothing on file yet — the first
@@ -526,7 +527,7 @@ export function pageLabel(from: Position, to: Position): string {
     }
   }
   if (pages.length === 0) pages.push(pageOfPosition(from));
-  if (pages.length === 1) return `Page ${pages[0]}`;
+  if (pages.length === 1) return phrase("Page {page}", { page: pages[0] });
 
   const runs: [number, number][] = [];
   for (const p of pages) {
@@ -534,7 +535,7 @@ export function pageLabel(from: Position, to: Position): string {
     if (run && p === run[1] + 1) run[1] = p;
     else runs.push([p, p]);
   }
-  return `Pages ${runs.map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`)).join(", ")}`;
+  return phrase("Pages {pages}", { pages: runs.map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`)).join(", ") });
 }
 
 /* ── Daily rate ────────────────────────────────────────────────────────

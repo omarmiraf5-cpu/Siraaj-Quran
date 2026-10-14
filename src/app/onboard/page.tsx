@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { countriesByName, countryOfTimeZone, countryTimeZones, placeLabel, timeZoneLabel } from "@/lib/places";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
+import { labels, phrase } from "@/lib/i18n/phrases";
 
 type Step =
   | "welcome"
@@ -20,7 +22,7 @@ type Step =
 // there's a child to attach them to — the step lists the students just
 // entered and asks which ones belong to whom.
 const STEPS: Step[] = ["welcome", "school", "admin", "teachers", "students", "parents", "halaqas", "review"];
-const STEP_LABELS: Record<Step, string> = {
+const STEP_LABELS: Record<Step, string> = labels({
   welcome: "Welcome",
   school: "School",
   admin: "Admin",
@@ -30,7 +32,7 @@ const STEP_LABELS: Record<Step, string> = {
   halaqas: "Halaqas",
   review: "Review",
   complete: "Done",
-};
+});
 
 interface SchoolForm {
   name: string;
@@ -137,6 +139,7 @@ const ghostBtn =
   "px-6 py-3 rounded-2xl border border-surface-border text-ink hover:bg-surface-bg-warm transition";
 
 export default function OnboardPage() {
+  const { tr } = useLanguage();
   const router = useRouter();
   const [step, setStep] = useState<Step>("welcome");
   const [loading, setLoading] = useState(false);
@@ -280,7 +283,7 @@ export default function OnboardPage() {
     // of being bounced off the last screen.
     const clash = emailTaken(email);
     if (clash) {
-      setParentError(`${email} is already used by ${clash}. Each account needs its own email.`);
+      setParentError(tr("{email} is already used by {clash}. Each account needs its own email.", { email, clash }));
       return;
     }
 
@@ -301,7 +304,7 @@ export default function OnboardPage() {
       body.append("file", file);
       const response = await fetch("/api/onboard/parse-roster", { method: "POST", body });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Couldn't read that file.");
+      if (!response.ok) throw new Error(payload.error || phrase("Couldn't read that file."));
 
       type ParsedRow = {
         name: string;
@@ -368,21 +371,22 @@ export default function OnboardPage() {
       const notices: string[] = [];
       if (added > 0) {
         notices.push(
-          `Also read ${added} parent${added === 1 ? "" : "s"} covering ${linked} child${
-            linked === 1 ? "" : "ren"
-          } — check them on the Parents step.`
+          tr("Also read {parents} covering {children} — check them on the Parents step.", {
+            parents: tr("{count} parent|{count} parents", { count: added }),
+            children: tr("{count} child|{count} children", { count: linked }),
+          })
         );
       }
       if (skipped.length > 0) {
         notices.push(
-          `Skipped ${skipped.join(", ")} as a parent — already used by the admin or a teacher.`
+          tr("Skipped {emails} as a parent — already used by the admin or a teacher.", { emails: skipped.join(", ") })
         );
       }
       setImportNotice(notices.length > 0 ? notices.join(" ") : null);
 
       setImportWarnings(payload.warnings ?? []);
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : "Couldn't read that file.");
+      setImportError(err instanceof Error ? tr(err.message) : tr("Couldn't read that file."));
     } finally {
       setImporting(false);
     }
@@ -462,11 +466,11 @@ export default function OnboardPage() {
         }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Onboarding failed");
+      if (!response.ok) throw new Error(payload.error || phrase("Onboarding failed"));
       setResult(payload);
       setStep("complete");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? tr(err.message) : tr("Something went wrong"));
     } finally {
       setLoading(false);
     }
@@ -478,9 +482,9 @@ export default function OnboardPage() {
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
         <div className="max-w-4xl mx-auto relative">
           <h1 className="font-display text-3xl font-bold text-white">
-            Set up your school on <span className="gold-foil">MyDiiwaan</span>
+            {tr("Set up your school on")}{" "}<span className="gold-foil">MyDiiwaan</span>
           </h1>
-          <p className="text-white/60 mt-2 text-[15px]">A few minutes to add your teachers, students, parents, and halaqas.</p>
+          <p className="text-white/60 mt-2 text-[15px]">{tr("A few minutes to add your teachers, students, parents, and halaqas.")}</p>
         </div>
       </header>
 
@@ -511,36 +515,35 @@ export default function OnboardPage() {
         {step === "welcome" && (
           <div className="card-quiet p-8 text-center space-y-5">
             <div className="text-5xl">🕌</div>
-            <h2 className="text-xl font-bold text-ink">Let&apos;s get your school set up</h2>
+            <h2 className="text-xl font-bold text-ink">{tr("Let's get your school set up")}</h2>
             <p className="text-ink-muted text-[15px]">
-              You&apos;ll add your school&apos;s name, create your admin login, then add your teachers,
-              students, parents, and halaqas. Have your roster ready — this takes about 5 minutes.
+              {tr("You'll add your school's name, create your admin login, then add your teachers, students, parents, and halaqas. Have your roster ready — this takes about 5 minutes.")}
             </p>
             <div className="bg-status-info-bg rounded-2xl p-4 text-start">
               <p className="text-sm text-status-info-text">
-                💡 Each student gets a 4-digit PIN generated automatically — you&apos;ll get a printable list at the end to hand out.
+                {tr("💡 Each student gets a 4-digit PIN generated automatically — you'll get a printable list at the end to hand out.")}
               </p>
             </div>
             <button onClick={goNext} className={primaryBtn}>
-              Get started →
+              {tr("Get started →")}
             </button>
           </div>
         )}
 
         {step === "school" && (
           <div className="card-quiet p-8 space-y-5">
-            <h2 className="text-xl font-bold text-ink">School information</h2>
+            <h2 className="text-xl font-bold text-ink">{tr("School information")}</h2>
             <div>
-              <label className={labelClass}>School name</label>
+              <label className={labelClass}>{tr("School name")}</label>
               <input
                 value={school.name}
                 onChange={(e) => setSchool({ ...school, name: e.target.value })}
-                placeholder="e.g., Al Taqwa Academy"
+                placeholder={tr("e.g., Al Taqwa Academy")}
                 className={inputClass}
               />
             </div>
             <div>
-              <label className={labelClass}>Country</label>
+              <label className={labelClass}>{tr("Country")}</label>
               <select value={school.country} onChange={(e) => pickCountry(e.target.value)} className={inputClass}>
                 {countries.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -551,23 +554,23 @@ export default function OnboardPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>City</label>
+                <label className={labelClass}>{tr("City")}</label>
                 <input
                   value={school.city}
                   onChange={(e) => setSchool({ ...school, city: e.target.value })}
-                  placeholder={school.country === "CA" ? "e.g., Edmonton" : "City or town"}
+                  placeholder={school.country === "CA" ? tr("e.g., Edmonton") : tr("City or town")}
                   className={inputClass}
                 />
               </div>
               {school.country === "CA" ? (
                 <div>
-                  <label className={labelClass}>Province</label>
+                  <label className={labelClass}>{tr("Province")}</label>
                   <select
                     value={school.province}
                     onChange={(e) => setSchool({ ...school, province: e.target.value })}
                     className={inputClass}
                   >
-                    {!school.province && <option value="">Choose…</option>}
+                    {!school.province && <option value="">{tr("Choose…")}</option>}
                     {CA_PROVINCES.map((p) => (
                       <option key={p}>{p}</option>
                     ))}
@@ -576,25 +579,25 @@ export default function OnboardPage() {
               ) : (
                 <div>
                   <label className={labelClass}>
-                    State or region <span className="font-normal text-ink-muted">(optional)</span>
+                    {tr("State or region")}{" "}<span className="font-normal text-ink-muted">{tr("(optional)")}</span>
                   </label>
                   <input
                     value={school.province}
                     onChange={(e) => setSchool({ ...school, province: e.target.value })}
-                    placeholder="State, province or region"
+                    placeholder={tr("State, province or region")}
                     className={inputClass}
                   />
                 </div>
               )}
             </div>
             <div>
-              <label className={labelClass}>Time zone</label>
+              <label className={labelClass}>{tr("Time zone")}</label>
               <select
                 value={school.timezone}
                 onChange={(e) => setSchool({ ...school, timezone: e.target.value })}
                 className={inputClass}
               >
-                {!school.timezone && <option value="">Choose a time zone…</option>}
+                {!school.timezone && <option value="">{tr("Choose a time zone…")}</option>}
                 {zones.map((z) => (
                   <option key={z} value={z}>
                     {timeZoneLabel(z)}
@@ -604,8 +607,8 @@ export default function OnboardPage() {
             </div>
             {platformOwner && (
             <fieldset>
-              <legend className={labelClass}>What kind of school is it?</legend>
-              <p className="text-xs text-ink-muted -mt-1 mb-2">Only you see this choice, as MyDiiwaan&apos;s owner.</p>
+              <legend className={labelClass}>{tr("What kind of school is it?")}</legend>
+              <p className="text-xs text-ink-muted -mt-1 mb-2">{tr("Only you see this choice, as MyDiiwaan's owner.")}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {([
                   ["quran", "A Qur'an school", "Students in halaqas."],
@@ -635,42 +638,41 @@ export default function OnboardPage() {
             {academic && (
               <div>
                 <label className={labelClass}>
-                  Campuses <span className="font-normal text-ink-muted">(if it has more than one)</span>
+                  {tr("Campuses")}{" "}<span className="font-normal text-ink-muted">{tr("(if it has more than one)")}</span>
                 </label>
                 <input
                   value={school.campuses}
                   onChange={(e) => setSchool({ ...school, campuses: e.target.value })}
-                  placeholder="e.g., North, South"
+                  placeholder={tr("e.g., North, South")}
                   className={inputClass}
                 />
                 <p className="text-xs text-ink-muted mt-1.5">
-                  Each campus has the same grades, and its own pin for staff sign-in. You bring your students in after
-                  setup, from a spreadsheet.
+                  {tr("Each campus has the same grades, and its own pin for staff sign-in. You bring your students in after setup, from a spreadsheet.")}
                 </p>
               </div>
             )}
             <div className="flex justify-between pt-2">
-              <button onClick={goBack} className={ghostBtn}>← Back</button>
-              <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>Next →</button>
+              <button onClick={goBack} className={ghostBtn}>{tr("← Back")}</button>
+              <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>{tr("Next →")}</button>
             </div>
           </div>
         )}
 
         {step === "admin" && (
           <div className="card-quiet p-8 space-y-5">
-            <h2 className="text-xl font-bold text-ink">Create your admin login</h2>
-            <p className="text-ink-muted text-sm">This is what you&apos;ll use to sign into the Admin Portal.</p>
+            <h2 className="text-xl font-bold text-ink">{tr("Create your admin login")}</h2>
+            <p className="text-ink-muted text-sm">{tr("This is what you'll use to sign into the Admin Portal.")}</p>
             <div>
-              <label className={labelClass}>Full name</label>
+              <label className={labelClass}>{tr("Full name")}</label>
               <input
                 value={admin.fullName}
                 onChange={(e) => setAdmin({ ...admin, fullName: e.target.value })}
-                placeholder="e.g., Ahmed Hassan"
+                placeholder={tr("e.g., Ahmed Hassan")}
                 className={inputClass}
               />
             </div>
             <div>
-              <label className={labelClass}>Email</label>
+              <label className={labelClass}>{tr("Email")}</label>
               <input
                 type="email"
                 value={admin.email}
@@ -684,70 +686,67 @@ export default function OnboardPage() {
                   onClick={() => setAdmin({ ...admin, email: signedIn })}
                   className="mt-2 text-sm font-semibold text-emerald-700 hover:underline"
                 >
-                  Use your login, {signedIn}
+                  {tr("Use your login, {signedIn}", { signedIn })}
                 </button>
               )}
             </div>
             {ownLogin ? (
               <p className="text-sm text-status-info-text bg-status-info-bg rounded-2xl px-4 py-3">
-                You&apos;re signed in as {signedIn}. That login becomes this school&apos;s admin, and keeps
-                the password it already has.
+                {tr("You're signed in as {signedIn}. That login becomes this school's admin, and keeps the password it already has.", { signedIn })}
               </p>
             ) : (
               <div>
-                <label className={labelClass}>Password</label>
+                <label className={labelClass}>{tr("Password")}</label>
                 <input
                   type="password"
                   value={admin.password}
                   onChange={(e) => setAdmin({ ...admin, password: e.target.value })}
-                  placeholder="At least 8 characters"
+                  placeholder={tr("At least 8 characters")}
                   className={inputClass}
                 />
                 <p className="text-xs text-ink-muted mt-2">
-                  If this email already has a MyDiiwaan login with no school yet, enter its password, or sign in
-                  to it first.
+                  {tr("If this email already has a MyDiiwaan login with no school yet, enter its password, or sign in to it first.")}
                 </p>
               </div>
             )}
             <div className="flex justify-between pt-2">
-              <button onClick={goBack} className={ghostBtn}>← Back</button>
-              <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>Next →</button>
+              <button onClick={goBack} className={ghostBtn}>{tr("← Back")}</button>
+              <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>{tr("Next →")}</button>
             </div>
           </div>
         )}
 
         {step === "teachers" && (
           <div className="card-quiet p-8 space-y-5">
-            <h2 className="text-xl font-bold text-ink">Add your teachers</h2>
+            <h2 className="text-xl font-bold text-ink">{tr("Add your teachers")}</h2>
             <p className="text-ink-muted text-sm">
               {academic
-                ? "Each gets their own login. You'll put them on their halaqas after setup, once your students' spreadsheet has made them — or add teachers later, from Admin → Teachers."
-                : "Each teacher gets their own halaqa (class)."}
+                ? tr("Each gets their own login. You'll put them on their halaqas after setup, once your students' spreadsheet has made them — or add teachers later, from Admin → Teachers.")
+                : tr("Each teacher gets their own halaqa (class).")}
             </p>
             {adminEmail && !academic && (
               <p className="text-ink-muted text-sm">
-                Teaching a halaqa yourself? Add yourself with your admin email, {adminEmail}: you&apos;ll teach
-                it with the same login.
+                {tr("Teaching a halaqa yourself? Add yourself with your admin email, {adminEmail}: you'll teach it with the same login.", { adminEmail })}
               </p>
             )}
             <div className={`grid grid-cols-1 gap-3 ${academic ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
               <input
                 value={tempTeacher.name}
                 onChange={(e) => setTempTeacher({ ...tempTeacher, name: e.target.value })}
-                placeholder="Name"
+                placeholder={tr("Name")}
                 className={inputClass}
               />
               <input
                 value={tempTeacher.email}
                 onChange={(e) => setTempTeacher({ ...tempTeacher, email: e.target.value })}
-                placeholder="Email"
+                placeholder={tr("Email")}
                 className={inputClass}
               />
               {!academic && (
                 <input
                   value={tempTeacher.halaqa}
                   onChange={(e) => setTempTeacher({ ...tempTeacher, halaqa: e.target.value })}
-                  placeholder="Halaqa (e.g., Halaqa A)"
+                  placeholder={tr("Halaqa (e.g., Halaqa A)")}
                   className={inputClass}
                 />
               )}
@@ -757,7 +756,7 @@ export default function OnboardPage() {
               disabled={!tempTeacher.name || !tempTeacher.email || (!academic && !tempTeacher.halaqa)}
               className="w-full py-2.5 rounded-2xl border-2 border-dashed border-surface-border text-ink-muted hover:border-emerald-600 hover:text-emerald-600 disabled:opacity-40 transition"
             >
-              + Add teacher
+              {tr("+ Add teacher")}
             </button>
             {teachers.length > 0 && (
               <ul className="divide-y divide-surface-border">
@@ -768,40 +767,38 @@ export default function OnboardPage() {
                       <p className="text-xs text-ink-muted">
                         {t.email}
                         {!academic && ` · ${t.halaqa}`}
-                        {isAdminEmail(t.email) && " · you, with your admin login"}
+                        {isAdminEmail(t.email) && tr(" · you, with your admin login")}
                       </p>
                     </div>
                     <button onClick={() => removeTeacher(t.id)} className="text-status-error-text text-sm hover:underline">
-                      Remove
+                      {tr("Remove")}
                     </button>
                   </li>
                 ))}
               </ul>
             )}
             <div className="flex justify-between pt-2">
-              <button onClick={goBack} className={ghostBtn}>← Back</button>
-              <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>Next →</button>
+              <button onClick={goBack} className={ghostBtn}>{tr("← Back")}</button>
+              <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>{tr("Next →")}</button>
             </div>
           </div>
         )}
 
         {step === "students" && (
           <div className="card-quiet p-8 space-y-5">
-            <h2 className="text-xl font-bold text-ink">Add your students</h2>
-            <p className="text-ink-muted text-sm">Assign each student to a halaqa. PINs are generated automatically.</p>
+            <h2 className="text-xl font-bold text-ink">{tr("Add your students")}</h2>
+            <p className="text-ink-muted text-sm">{tr("Assign each student to a halaqa. PINs are generated automatically.")}</p>
 
             <div className="rounded-2xl border border-dashed border-surface-border p-4 flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <p className="text-sm font-semibold text-ink">Already have a roster?</p>
+                <p className="text-sm font-semibold text-ink">{tr("Already have a roster?")}</p>
                 <p className="text-xs text-ink-muted mt-0.5">
-                  Upload a spreadsheet or Word doc with Name, Age (or Grade), and Halaqa columns —
-                  we&apos;ll add everyone we can read from it. Add a{" "}
-                  <span className="font-semibold">Parent Email</span> column and we&apos;ll build the
-                  parent accounts too.
+                  {tr("Upload a spreadsheet or Word doc with Name, Age (or Grade), and Halaqa columns — we'll add everyone we can read from it. Add a")}{" "}
+                  <span className="font-semibold">{tr("Parent Email")}</span>{" "}{tr("column and we'll build the parent accounts too.")}
                 </p>
               </div>
               <label className={`${ghostBtn} cursor-pointer flex-shrink-0 ${importing ? "opacity-50 pointer-events-none" : ""}`}>
-                {importing ? "Reading…" : "Upload file"}
+                {importing ? tr("Reading…") : tr("Upload file")}
                 <input
                   type="file"
                   accept=".xlsx,.csv,.docx"
@@ -834,7 +831,7 @@ export default function OnboardPage() {
               <input
                 value={tempStudent.name}
                 onChange={(e) => setTempStudent({ ...tempStudent, name: e.target.value })}
-                placeholder="Name"
+                placeholder={tr("Name")}
                 className={inputClass}
               />
               <select
@@ -843,7 +840,7 @@ export default function OnboardPage() {
                 className={inputClass}
               >
                 {Array.from({ length: 15 }, (_, i) => i + 4).map((age) => (
-                  <option key={age} value={age}>{age} years old</option>
+                  <option key={age} value={age}>{tr("{age} years old", { age })}</option>
                 ))}
               </select>
               <select
@@ -851,7 +848,7 @@ export default function OnboardPage() {
                 onChange={(e) => setTempStudent({ ...tempStudent, halaqa: e.target.value })}
                 className={inputClass}
               >
-                <option value="">Select halaqa…</option>
+                <option value="">{tr("Select halaqa…")}</option>
                 {Array.from(new Set(teachers.map((t) => t.halaqa))).map((h) => (
                   <option key={h} value={h}>{h}</option>
                 ))}
@@ -862,7 +859,7 @@ export default function OnboardPage() {
               disabled={!tempStudent.name || !tempStudent.halaqa}
               className="w-full py-2.5 rounded-2xl border-2 border-dashed border-surface-border text-ink-muted hover:border-emerald-600 hover:text-emerald-600 disabled:opacity-40 transition"
             >
-              + Add student
+              {tr("+ Add student")}
             </button>
             {students.length > 0 && (
               <ul className="divide-y divide-surface-border">
@@ -870,34 +867,33 @@ export default function OnboardPage() {
                   <li key={s.id} className="flex items-center justify-between py-2.5">
                     <div>
                       <p className="text-sm font-semibold text-ink">{s.name}</p>
-                      <p className="text-xs text-ink-muted">{s.age} years old · {s.halaqa}</p>
+                      <p className="text-xs text-ink-muted">{tr("{age} years old · {halaqa}", { age: s.age, halaqa: s.halaqa })}</p>
                     </div>
                     <button onClick={() => removeStudent(s.id)} className="text-status-error-text text-sm hover:underline">
-                      Remove
+                      {tr("Remove")}
                     </button>
                   </li>
                 ))}
               </ul>
             )}
             <div className="flex justify-between pt-2">
-              <button onClick={goBack} className={ghostBtn}>← Back</button>
-              <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>Next →</button>
+              <button onClick={goBack} className={ghostBtn}>{tr("← Back")}</button>
+              <button onClick={goNext} disabled={!canProceed()} className={primaryBtn}>{tr("Next →")}</button>
             </div>
           </div>
         )}
 
         {step === "parents" && (
           <div className="card-quiet p-8 space-y-5">
-            <h2 className="text-xl font-bold text-ink">Add parent accounts</h2>
+            <h2 className="text-xl font-bold text-ink">{tr("Add parent accounts")}</h2>
             <p className="text-ink-muted text-sm">
-              A parent signs in and sees only their own children&apos;s attendance and memorisation.
-              Tick every child who belongs to them — one login covers a whole family.
+              {tr("A parent signs in and sees only their own children's attendance and memorisation. Tick every child who belongs to them — one login covers a whole family.")}
             </p>
 
             <div className="bg-status-info-bg rounded-2xl p-4">
               <p className="text-sm text-status-info-text">
-                💡 This step is optional. Skip it and add parents later from{" "}
-                <span className="font-semibold">Admin → Parents</span> — nothing else waits on it.
+                {tr("💡 This step is optional. Skip it and add parents later from")}{" "}
+                <span className="font-semibold">{tr("Admin → Parents")}</span>{" "}{tr("— nothing else waits on it.")}
               </p>
             </div>
 
@@ -905,7 +901,7 @@ export default function OnboardPage() {
               <input
                 value={tempParent.name}
                 onChange={(e) => setTempParent({ ...tempParent, name: e.target.value })}
-                placeholder="Parent name"
+                placeholder={tr("Parent name")}
                 className={inputClass}
               />
               <input
@@ -918,23 +914,23 @@ export default function OnboardPage() {
                   setTempParent({ ...tempParent, email: e.target.value });
                   setParentError(null);
                 }}
-                placeholder="Parent email"
+                placeholder={tr("Parent email")}
                 className={inputClass}
               />
             </div>
 
             <div>
               <label className={labelClass}>
-                Their children
+                {tr("Their children")}
                 {tempParent.childIds.length > 0 && (
-                  <span className="font-normal text-ink-muted"> · {tempParent.childIds.length} selected</span>
+                  <span className="font-normal text-ink-muted">{" "}{tr("· {count} selected", { count: tempParent.childIds.length })}</span>
                 )}
               </label>
               {students.length > 8 && (
                 <input
                   value={childFilter}
                   onChange={(e) => setChildFilter(e.target.value)}
-                  placeholder="Search students…"
+                  placeholder={tr("Search students…")}
                   className={`${inputClass} mb-2`}
                 />
               )}
@@ -961,7 +957,7 @@ export default function OnboardPage() {
                           <span className="block text-sm font-semibold text-ink truncate">{s.name}</span>
                           <span className="block text-xs text-ink-muted truncate">
                             {s.halaqa}
-                            {claimedBy ? ` · already linked to ${claimedBy.name}` : ""}
+                            {claimedBy ? tr(" · already linked to {name}", { name: claimedBy.name }) : ""}
                           </span>
                         </span>
                       </label>
@@ -969,7 +965,7 @@ export default function OnboardPage() {
                   })}
                 {students.filter((s) => s.name.toLowerCase().includes(childFilter.trim().toLowerCase()))
                   .length === 0 && (
-                  <p className="px-4 py-3 text-sm text-ink-muted">No student matches that search.</p>
+                  <p className="px-4 py-3 text-sm text-ink-muted">{tr("No student matches that search.")}</p>
                 )}
               </div>
             </div>
@@ -985,7 +981,7 @@ export default function OnboardPage() {
               disabled={!tempParent.name.trim() || !tempParent.email.trim() || tempParent.childIds.length === 0}
               className="w-full py-2.5 rounded-2xl border-2 border-dashed border-surface-border text-ink-muted hover:border-emerald-600 hover:text-emerald-600 disabled:opacity-40 transition"
             >
-              + Add parent
+              {tr("+ Add parent")}
             </button>
 
             {parents.length > 0 && (
@@ -1006,7 +1002,7 @@ export default function OnboardPage() {
                       onClick={() => removeParent(p.id)}
                       className="text-status-error-text text-sm hover:underline flex-shrink-0"
                     >
-                      Remove
+                      {tr("Remove")}
                     </button>
                   </li>
                 ))}
@@ -1015,16 +1011,15 @@ export default function OnboardPage() {
 
             {unclaimedStudents.length > 0 && parents.length > 0 && (
               <p className="text-xs text-ink-muted">
-                {unclaimedStudents.length} student{unclaimedStudents.length === 1 ? " has" : "s have"} no
-                parent account yet: {unclaimedStudents.slice(0, 6).map((s) => s.name).join(", ")}
-                {unclaimedStudents.length > 6 ? `, and ${unclaimedStudents.length - 6} more` : ""}.
+                {tr("{count} student has no parent account yet:|{count} students have no parent account yet:", { count: unclaimedStudents.length })}{" "}{unclaimedStudents.slice(0, 6).map((s) => s.name).join(", ")}
+                {unclaimedStudents.length > 6 ? tr(", and {n} more", { n: unclaimedStudents.length - 6 }) : ""}.
               </p>
             )}
 
             <div className="flex justify-between pt-2">
-              <button onClick={goBack} className={ghostBtn}>← Back</button>
+              <button onClick={goBack} className={ghostBtn}>{tr("← Back")}</button>
               <button onClick={goNext} className={primaryBtn}>
-                {parents.length === 0 ? "Skip for now →" : "Next →"}
+                {parents.length === 0 ? tr("Skip for now →") : tr("Next →")}
               </button>
             </div>
           </div>
@@ -1032,8 +1027,8 @@ export default function OnboardPage() {
 
         {step === "halaqas" && (
           <div className="card-quiet p-8 space-y-5">
-            <h2 className="text-xl font-bold text-ink">Your halaqas</h2>
-            <p className="text-ink-muted text-sm">Built automatically from the teachers and students you added.</p>
+            <h2 className="text-xl font-bold text-ink">{tr("Your halaqas")}</h2>
+            <p className="text-ink-muted text-sm">{tr("Built automatically from the teachers and students you added.")}</p>
             <ul className="divide-y divide-surface-border">
               {halaqas.map((h) => {
                 const teacher = teachers.find((t) => t.halaqa === h);
@@ -1042,58 +1037,58 @@ export default function OnboardPage() {
                   <li key={h} className="py-3">
                     <p className="text-sm font-semibold text-ink">{h}</p>
                     <p className="text-xs text-ink-muted">
-                      {teacher ? teacher.name : "No teacher assigned"} · {count} student{count === 1 ? "" : "s"}
+                      {teacher ? teacher.name : tr("No teacher assigned")}{" "}· {tr("{count} student|{count} students", { count })}
                     </p>
                   </li>
                 );
               })}
             </ul>
             <div className="flex justify-between pt-2">
-              <button onClick={goBack} className={ghostBtn}>← Back</button>
-              <button onClick={goNext} className={primaryBtn}>Next →</button>
+              <button onClick={goBack} className={ghostBtn}>{tr("← Back")}</button>
+              <button onClick={goNext} className={primaryBtn}>{tr("Next →")}</button>
             </div>
           </div>
         )}
 
         {step === "review" && (
           <div className="card-quiet p-8 space-y-5">
-            <h2 className="text-xl font-bold text-ink">Review &amp; confirm</h2>
+            <h2 className="text-xl font-bold text-ink">{tr("Review & confirm")}</h2>
             <div className="space-y-3 text-sm">
-              <p><span className="text-ink-muted">School:</span> <span className="font-semibold text-ink">{school.name}, {placeLabel(school.city, school.province, school.country)}</span></p>
-              <p><span className="text-ink-muted">Time zone:</span> <span className="font-semibold text-ink">{school.timezone ? timeZoneLabel(school.timezone) : "—"}</span></p>
-              <p><span className="text-ink-muted">Admin:</span> <span className="font-semibold text-ink">{admin.fullName} ({admin.email})</span></p>
+              <p><span className="text-ink-muted">{tr("School:")}</span> <span className="font-semibold text-ink">{school.name}, {placeLabel(school.city, school.province, school.country)}</span></p>
+              <p><span className="text-ink-muted">{tr("Time zone:")}</span> <span className="font-semibold text-ink">{school.timezone ? timeZoneLabel(school.timezone) : "—"}</span></p>
+              <p><span className="text-ink-muted">{tr("Admin:")}</span> <span className="font-semibold text-ink">{admin.fullName} ({admin.email})</span></p>
               <p>
-                <span className="text-ink-muted">Teachers:</span>{" "}
+                <span className="text-ink-muted">{tr("Teachers:")}</span>{" "}
                 <span className="font-semibold text-ink">
                   {new Set(teachers.map((t) => t.email.trim().toLowerCase())).size}
-                  {teachers.some((t) => isAdminEmail(t.email)) && " — including you"}
+                  {teachers.some((t) => isAdminEmail(t.email)) && tr(" — including you")}
                 </span>
               </p>
               {academic ? (
                 <>
                   <p>
-                    <span className="text-ink-muted">Kind:</span>{" "}
-                    <span className="font-semibold text-ink">Academic school — Pre-K to Grade 12, halaqas inside each grade</span>
+                    <span className="text-ink-muted">{tr("Kind:")}</span>{" "}
+                    <span className="font-semibold text-ink">{tr("Academic school — Pre-K to Grade 12, halaqas inside each grade")}</span>
                   </p>
                   <p>
-                    <span className="text-ink-muted">Campuses:</span>{" "}
-                    <span className="font-semibold text-ink">{campusList(school.campuses).join(", ") || "just the one"}</span>
+                    <span className="text-ink-muted">{tr("Campuses:")}</span>{" "}
+                    <span className="font-semibold text-ink">{campusList(school.campuses).join(", ") || tr("just the one")}</span>
                   </p>
                   <p>
-                    <span className="text-ink-muted">Students, parents and halaqas:</span>{" "}
-                    <span className="font-semibold text-ink">after setup, from your spreadsheet (Admin → Students → Import)</span>
+                    <span className="text-ink-muted">{tr("Students, parents and halaqas:")}</span>{" "}
+                    <span className="font-semibold text-ink">{tr("after setup, from your spreadsheet (Admin → Students → Import)")}</span>
                   </p>
                 </>
               ) : (
                 <>
-                  <p><span className="text-ink-muted">Students:</span> <span className="font-semibold text-ink">{students.length}</span></p>
+                  <p><span className="text-ink-muted">{tr("Students:")}</span> <span className="font-semibold text-ink">{students.length}</span></p>
                   <p>
-                    <span className="text-ink-muted">Parents:</span>{" "}
+                    <span className="text-ink-muted">{tr("Parents:")}</span>{" "}
                     <span className="font-semibold text-ink">
-                      {parents.length === 0 ? "none — add them later from Admin → Parents" : parents.length}
+                      {parents.length === 0 ? tr("none — add them later from Admin → Parents") : parents.length}
                     </span>
                   </p>
-                  <p><span className="text-ink-muted">Halaqas:</span> <span className="font-semibold text-ink">{halaqas.length}</span></p>
+                  <p><span className="text-ink-muted">{tr("Halaqas:")}</span> <span className="font-semibold text-ink">{halaqas.length}</span></p>
                 </>
               )}
             </div>
@@ -1101,17 +1096,15 @@ export default function OnboardPage() {
               <label className="flex items-start gap-2.5 text-sm text-ink">
                 <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} className="mt-0.5 w-4 h-4 accent-emerald-700 flex-shrink-0" />
                 <span>
-                  I accept MyDiiwaan&apos;s{" "}
-                  <a href="/terms" target="_blank" rel="noreferrer" className="underline font-semibold">Terms of Service and School Data Agreement</a>{" "}
-                  on behalf of the school.
+                  {tr("I accept MyDiiwaan's")}{" "}
+                  <a href="/terms" target="_blank" rel="noreferrer" className="underline font-semibold">{tr("Terms of Service and School Data Agreement")}</a>{" "}{tr("on behalf of the school.")}
                 </span>
               </label>
               <label className="flex items-start gap-2.5 text-sm text-ink">
                 <input type="checkbox" checked={agreedConsent} onChange={(e) => setAgreedConsent(e.target.checked)} className="mt-0.5 w-4 h-4 accent-emerald-700 flex-shrink-0" />
                 <span>
-                  The school has (or will get, before adding them) parents&apos; agreement to their children&apos;s records
-                  being kept in MyDiiwaan, as described in the{" "}
-                  <a href="/privacy" target="_blank" rel="noreferrer" className="underline font-semibold">privacy policy</a>.
+                  {tr("The school has (or will get, before adding them) parents' agreement to their children's records being kept in MyDiiwaan, as described in the")}{" "}
+                  <a href="/privacy" target="_blank" rel="noreferrer" className="underline font-semibold">{tr("privacy policy")}</a>.
                 </span>
               </label>
             </div>
@@ -1119,9 +1112,9 @@ export default function OnboardPage() {
               <p className="text-status-error-text bg-status-error-bg rounded-card px-4 py-2.5 text-sm">{error}</p>
             )}
             <div className="flex justify-between pt-2">
-              <button onClick={goBack} className={ghostBtn} disabled={loading}>← Back</button>
+              <button onClick={goBack} className={ghostBtn} disabled={loading}>{tr("← Back")}</button>
               <button onClick={submit} disabled={loading || !agreedTerms || !agreedConsent} className={primaryBtn}>
-                {loading ? "Setting up…" : "Confirm & create school"}
+                {loading ? tr("Setting up…") : tr("Confirm & create school")}
               </button>
             </div>
           </div>
@@ -1131,51 +1124,42 @@ export default function OnboardPage() {
           <div className="space-y-5">
             <div className="card-quiet p-8 text-center space-y-4">
               <div className="text-5xl">🎉</div>
-              <h2 className="text-xl font-bold text-ink">Your school is ready!</h2>
+              <h2 className="text-xl font-bold text-ink">{tr("Your school is ready!")}</h2>
               <p className="text-ink-muted text-sm">
-                Sign in at <span className="font-semibold text-ink">/login</span> with <span className="font-semibold text-ink">{result.adminEmail}</span> and{" "}
-                {result.existingAccount ? "the password you already use" : "the password you chose"}.
+                {tr("Sign in at")}{" "}<span className="font-semibold text-ink">/login</span>{" "}{tr("with")}{" "}<span className="font-semibold text-ink">{result.adminEmail}</span>{" "}{tr("and")}{" "}
+                {result.existingAccount ? tr("the password you already use") : tr("the password you chose")}.
               </p>
               {result.adminTeaches && result.adminTeaches.length > 0 && (
                 <p className="text-ink-muted text-sm">
-                  You teach <span className="font-semibold text-ink">{result.adminTeaches.join(", ")}</span> with
-                  that same login: open <span className="font-semibold text-ink">My halaqa</span> in your admin menu.
+                  {tr("You teach")}{" "}<span className="font-semibold text-ink">{result.adminTeaches.join(", ")}</span>{" "}{tr("with that same login: open")}{" "}<span className="font-semibold text-ink">{tr("My halaqa")}</span>{" "}{tr("in your admin menu.")}
                 </p>
               )}
               {academic && (
                 <div className="rounded-2xl border border-emerald-600/30 p-4 text-start space-y-1.5">
-                  <p className="text-sm font-semibold text-ink">Next: your students</p>
+                  <p className="text-sm font-semibold text-ink">{tr("Next: your students")}</p>
                   <p className="text-[13px] text-ink-muted leading-relaxed">
-                    Sign in, open <span className="font-semibold text-ink">Students</span> and tap{" "}
-                    <span className="font-semibold text-ink">Import from a spreadsheet</span>. One row per student, with
-                    their Name, Grade (Pre-K, K, or 1 to 12), Campus, Halaqa, and Parent Name and Parent Email. Each grade&apos;s
-                    halaqas are made from it, every student gets a PIN, and every parent a login. Then put your teachers
-                    on their halaqas under <span className="font-semibold text-ink">Halaqas</span>, and set each
-                    campus&apos;s pin under <span className="font-semibold text-ink">Staff attendance</span>.
+                    {tr("Sign in, open")}{" "}<span className="font-semibold text-ink">{tr("Students")}</span>{" "}{tr("and tap")}{" "}
+                    <span className="font-semibold text-ink">{tr("Import from a spreadsheet")}</span>{tr(". One row per student, with their Name, Grade (Pre-K, K, or 1 to 12), Campus, Halaqa, and Parent Name and Parent Email. Each grade's halaqas are made from it, every student gets a PIN, and every parent a login. Then put your teachers on their halaqas under")}{" "}<span className="font-semibold text-ink">{tr("Halaqas")}</span>{tr(", and set each campus's pin under")}{" "}<span className="font-semibold text-ink">{tr("Staff attendance")}</span>.
                   </p>
                 </div>
               )}
               <div className="bg-status-info-bg rounded-2xl p-4 text-start space-y-1.5">
-                <p className="text-sm font-semibold text-status-info-text">Your students&apos; login link</p>
+                <p className="text-sm font-semibold text-status-info-text">{tr("Your students' login link")}</p>
                 <p className="font-mono text-[12px] text-status-info-text break-all">
                   {origin}/login?school={result.slug}
                 </p>
                 <p className="text-[11px] text-status-info-text/80">
-                  Students must use this exact link — it&apos;s what shows them your school&apos;s names to tap.
-                  The plain login page won&apos;t know which school they belong to.
+                  {tr("Students must use this exact link — it's what shows them your school's names to tap. The plain login page won't know which school they belong to.")}
                 </p>
               </div>
-              <button onClick={() => router.push("/login")} className={primaryBtn}>Go to login →</button>
+              <button onClick={() => router.push("/login")} className={primaryBtn}>{tr("Go to login →")}</button>
             </div>
 
             {result.teachers.length > 0 && (
               <div className="card-quiet p-6">
-                <h3 className="font-bold text-ink mb-1">Teacher logins</h3>
+                <h3 className="font-bold text-ink mb-1">{tr("Teacher logins")}</h3>
                 <p className="text-ink-muted text-xs mb-4">
-                  We&apos;ve emailed each teacher a link to choose their own password. If it doesn&apos;t
-                  reach them (it may be in Junk), give them their email and temporary password below: they
-                  sign in at <span className="font-mono">{origin}/login</span> under &ldquo;Teacher&rdquo;,
-                  and will be asked to set their own password the first time.
+                  {tr("We've emailed each teacher a link to choose their own password. If it doesn't reach them (it may be in Junk), give them their email and temporary password below: they sign in at")}{" "}<span className="font-mono">{origin}/login</span>{" "}{tr("under “Teacher”, and will be asked to set their own password the first time.")}
                 </p>
                 <ul className="divide-y divide-surface-border">
                   {result.teachers.map((t) => (
@@ -1195,12 +1179,9 @@ export default function OnboardPage() {
 
             {result.parents?.length > 0 && (
               <div className="card-quiet p-6">
-                <h3 className="font-bold text-ink mb-1">Parent logins</h3>
+                <h3 className="font-bold text-ink mb-1">{tr("Parent logins")}</h3>
                 <p className="text-ink-muted text-xs mb-4">
-                  We&apos;ve emailed each family a link to choose their own password. If it doesn&apos;t
-                  reach them (it may be in Junk), send them their email and temporary password below: they
-                  sign in at <span className="font-mono">{origin}/login</span> under &ldquo;Parent&rdquo;,
-                  and will be asked to set their own password the first time.
+                  {tr("We've emailed each family a link to choose their own password. If it doesn't reach them (it may be in Junk), send them their email and temporary password below: they sign in at")}{" "}<span className="font-mono">{origin}/login</span>{" "}{tr("under “Parent”, and will be asked to set their own password the first time.")}
                 </p>
                 <ul className="divide-y divide-surface-border">
                   {result.parents.map((p) => (
@@ -1220,8 +1201,8 @@ export default function OnboardPage() {
             )}
 
             <div className="card-quiet p-6">
-              <h3 className="font-bold text-ink mb-1">Student PINs</h3>
-              <p className="text-ink-muted text-xs mb-4">Print this and hand a PIN to each student — they&apos;ll tap their name on the login screen and enter it.</p>
+              <h3 className="font-bold text-ink mb-1">{tr("Student PINs")}</h3>
+              <p className="text-ink-muted text-xs mb-4">{tr("Print this and hand a PIN to each student — they'll tap their name on the login screen and enter it.")}</p>
               <ul className="divide-y divide-surface-border">
                 {/* Keyed by position, not name: two children called Muhammad
                     Ali is normal, and a duplicate key lets React drop one of

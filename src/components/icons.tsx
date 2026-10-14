@@ -9,7 +9,8 @@ interface IconProps {
   className?: string;
 }
 
-function icon(path: React.ReactNode, defaultSize = 16) {
+/** `mirrored` icons point the way the text reads, so they flip in Arabic. */
+function icon(path: React.ReactNode, defaultSize = 16, mirrored = false) {
   return function Icon({ size = defaultSize, className }: IconProps) {
     return (
       <svg
@@ -21,7 +22,7 @@ function icon(path: React.ReactNode, defaultSize = 16) {
         strokeWidth="1.7"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className={className}
+        className={mirrored ? `rtl:-scale-x-100 ${className ?? ""}` : className}
         aria-hidden="true"
       >
         {path}
@@ -67,7 +68,9 @@ export const IconSparkle = icon(
 export const IconArrow = icon(
   <>
     <path d="M5 12h14M13 6l6 6-6 6" />
-  </>
+  </>,
+  16,
+  true
 );
 
 export const IconChart = icon(

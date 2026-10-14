@@ -15,6 +15,7 @@ import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
 import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
+import { phrase } from "@/lib/i18n/phrases";
 
 // Shared with the parent portal so a reply sent here shows up there, and a
 // parent's message shows up here, within the same browser (demo mode only).
@@ -71,7 +72,7 @@ export default function TeacherMessagesPage() {
 
       setUserId(user.id);
       setSchoolId(profile?.school_id ?? null);
-      setTeacherName(profile?.full_name ?? "You");
+      setTeacherName(profile?.full_name ?? phrase("You"));
 
       const roster = narrowToMine(
         (studentRows ?? []).map((s) => ({

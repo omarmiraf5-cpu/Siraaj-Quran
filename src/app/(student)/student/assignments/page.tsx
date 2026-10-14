@@ -27,6 +27,8 @@ import {
 } from "@/components/student-ui";
 import { IconCheck, IconBookOpen, IconClock, IconStar } from "@/components/icons";
 import { StudentWorkSwitch } from "@/components/class-work-ui";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // A colour and a mark per portion, held steady across the app so a child
 // learns the three by sight before they learn them by name.
@@ -40,6 +42,7 @@ const PORTION_STYLE: Record<
 };
 
 export default function StudentAssignmentsPage() {
+  const { tr } = useLanguage();
   // RLS gives a signed-in student exactly one row — their own — so the
   // roster is a list of one. In demo mode it's the sample student.
   const { mode, students } = usePortalRoster([DEMO_CURRENT_STUDENT]);
@@ -84,7 +87,7 @@ export default function StudentAssignmentsPage() {
   if (!ready) {
     return (
       <div className="px-4 pt-10">
-        <LoadingNote>Loading your work…</LoadingNote>
+        <LoadingNote>{tr("Loading your work…")}</LoadingNote>
       </div>
     );
   }
@@ -95,15 +98,15 @@ export default function StudentAssignmentsPage() {
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
         <div className="relative flex items-center gap-5">
           <div className="min-w-0 flex-1">
-            <p className="eyebrow text-white/45">Today&apos;s three</p>
-            <h1 className="page-title text-white text-[30px] mt-1 leading-tight">My work</h1>
+            <p className="eyebrow text-white/45">{tr("Today's three")}</p>
+            <h1 className="page-title text-white text-[30px] mt-1 leading-tight">{tr("My work")}</h1>
             <p className="text-[13px] text-white/55 mt-1.5">
-              {done} of {all.length} finished
+              {tr("{done} of {count} finished", { done, count: all.length })}
             </p>
           </div>
           <div className="flex-shrink-0 rounded-full bg-white/10 p-2 backdrop-blur-sm">
             <div className="rounded-full bg-surface-card p-1.5">
-              <ProgressRing value={overall} colour="saffron" size={72} label="learnt" />
+              <ProgressRing value={overall} colour="saffron" size={72} label={tr("learnt")} />
             </div>
           </div>
         </div>
@@ -150,7 +153,7 @@ export default function StudentAssignmentsPage() {
 
             {items.length === 0 ? (
               <div className="card-quiet p-5">
-                <FriendlyEmpty title="Nothing set yet" sub="Check back soon." mood="calm" />
+                <FriendlyEmpty title={tr("Nothing set yet")} sub={tr("Check back soon.")} mood="calm" />
               </div>
             ) : (
               items.map((a, i) => {
@@ -171,7 +174,7 @@ export default function StudentAssignmentsPage() {
                 // confirmed it.
                 const celebrating = level === 100;
                 const chipColour = celebrating ? "verdigris" : STATUS_COLOUR[a.status];
-                const chipLabel = celebrating ? "Fully memorised!" : ASSIGNMENT_LABELS[a.status];
+                const chipLabel = celebrating ? phrase("Fully memorised!") : ASSIGNMENT_LABELS[a.status];
 
                 return (
                   <article
@@ -194,12 +197,12 @@ export default function StudentAssignmentsPage() {
                           <h3 className="page-title text-[19px] truncate">
                             {surahEnd
                               ? `${surah?.englishName ?? `Surah ${a.surah}`} – ${surahEnd.englishName}`
-                              : (surah ? surah.englishName : `Surah ${a.surah}`)}
+                              : (surah ? surah.englishName : tr("Surah {surah}", { surah: a.surah }))}
                           </h3>
                           {isDone && (
                             <span
                               className={`${ILLUM_CLASS.verdigris} w-6 h-6 rounded-full flex-shrink-0`}
-                              title="Finished"
+                              title={tr("Finished")}
                             >
                               <IconCheck size={13} />
                             </span>
@@ -208,13 +211,12 @@ export default function StudentAssignmentsPage() {
                         <p className="text-[12px] text-ink-muted mt-0.5">
                           {surahEnd ? (
                             <>
-                              Ayah {a.ayah_start} of {surah?.englishName} – Ayah {a.ayah_end} of{" "}
-                              {surahEnd.englishName}
+                              {tr("Ayah {ayah_start} of {englishName} – Ayah {ayah_end} of {englishName2}", { ayah_start: a.ayah_start, englishName: surah?.englishName, ayah_end: a.ayah_end, englishName2: surahEnd.englishName })}
                             </>
                           ) : (
                             <>
-                              Ayahs {a.ayah_start}–{a.ayah_end}
-                              {surah ? ` · page ${surah.startPage}` : ""}
+                              {tr("Ayahs {ayah_start}–{ayah_end}", { ayah_start: a.ayah_start, ayah_end: a.ayah_end })}
+                              {surah ? tr(" · page {startPage}", { startPage: surah.startPage }) : ""}
                             </>
                           )}
                         </p>
@@ -241,7 +243,7 @@ export default function StudentAssignmentsPage() {
 
                     <div>
                       <div className="flex items-center justify-between mb-2.5">
-                        <span className="eyebrow">How much you know</span>
+                        <span className="eyebrow">{tr("How much you know")}</span>
                         <span className="text-[13px] font-bold text-ink tabular-nums">
                           {level}%
                         </span>
@@ -253,7 +255,7 @@ export default function StudentAssignmentsPage() {
                         step={5}
                         value={level}
                         onChange={(e) => setLevel(a.id, Number(e.target.value))}
-                        aria-label={`How much of ${surah?.englishName ?? "this surah"} you know`}
+                        aria-label={tr("How much of {n} you know", { n: surah?.englishName ?? "this surah" })}
                         className="student-range w-full"
                       />
                     </div>

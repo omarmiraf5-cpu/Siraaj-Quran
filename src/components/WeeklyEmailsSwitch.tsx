@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
 
 /** A parent turning the Friday progress emails off or on again, for themselves. */
 export function WeeklyEmailsSwitch() {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const [on, setOn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,21 +36,21 @@ export function WeeklyEmailsSwitch() {
       .update({ weekly_reports_off_at: on ? new Date().toISOString() : null })
       .eq("id", userId);
     setBusy(false);
-    if (saveError) setError("That didn't save. Please try again.");
+    if (saveError) setError(tr("That didn't save. Please try again."));
     else setOn(!on);
   };
   return (
     <section className="card-quiet p-5 flex items-center justify-between gap-4" data-section="weekly-emails">
       <div>
-        <p className="text-[14px] font-semibold text-ink">Friday progress emails</p>
-        <p className="text-[12.5px] text-ink-muted">{on ? "You get an email each Friday about your child's week." : "Off — you won't get the Friday emails."}</p>
+        <p className="text-[14px] font-semibold text-ink">{tr("Friday progress emails")}</p>
+        <p className="text-[12.5px] text-ink-muted">{on ? tr("You get an email each Friday about your child's week.") : tr("Off — you won't get the Friday emails.")}</p>
         {error && <p className="text-[12px] text-red-700 dark:text-red-300 mt-1">{error}</p>}
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label="Friday progress emails"
+        aria-label={tr("Friday progress emails")}
         onClick={flip}
         disabled={busy}
         className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${on ? "bg-emerald-700" : "bg-surface-border"}`}

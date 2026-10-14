@@ -18,6 +18,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
 import type { MapPoint } from "@/components/LocationMap";
+import { phrase } from "@/lib/i18n/phrases";
 
 // Leaflet needs the browser, so the map loads there, when it's asked for.
 const LocationMap = dynamic(() => import("@/components/LocationMap"), {
@@ -105,7 +106,7 @@ const ghost =
   "text-[13px] font-semibold py-2.5 px-5 rounded-xl border border-surface-border text-ink hover:bg-surface-bg-warm disabled:opacity-40 transition";
 
 export default function StaffAttendancePage() {
-  const { language } = useLanguage();
+  const { language, tr } = useLanguage();
   const { mode, api } = useAttendanceApi("admin");
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,19 +118,19 @@ export default function StaffAttendancePage() {
   const load = useCallback(async () => {
     const res = await api("/api/staff-attendance?scope=school");
     const body = await res.json();
-    if (!res.ok) throw new Error(body.error ?? "Could not load staff attendance");
+    if (!res.ok) throw new Error(body.error ?? phrase("Could not load staff attendance"));
     setData(body);
   }, [api]);
 
   useEffect(() => {
     if (mode === "loading") return;
-    load().catch((e) => setError(e.message));
+    load().catch((e) => setError(tr(e.message)));
   }, [mode, load]);
 
   if (mode === "loading" || (!data && !error)) {
     return (
       <div className="max-w-6xl mx-auto pt-10">
-        <LoadingNote>Loading staff attendance…</LoadingNote>
+        <LoadingNote>{tr("Loading staff attendance…")}</LoadingNote>
       </div>
     );
   }
@@ -160,9 +161,9 @@ export default function StaffAttendancePage() {
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Staff"
-        title="Staff attendance"
-        meta={[formatDay(data.today, language), `${inToday} of ${data.teachers.length} in today`, `Due ${formatClock(data.settings.start_time)}`]}
+        eyebrow={tr("Staff")}
+        title={tr("Staff attendance")}
+        meta={[formatDay(data.today, language), tr("{inToday} of {count} in today", { inToday, count: data.teachers.length }), tr("Due {time}", { time: formatClock(data.settings.start_time) })]}
       />
 
       {(!data.settings.configured || editingSettings) && (
@@ -182,15 +183,15 @@ export default function StaffAttendancePage() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile value={`${inToday}/${data.teachers.length}`} label="In today" sub={lateToday ? `${lateToday} late` : "Nobody late"} />
-        <StatTile value={totals.late} label="Late arrivals" sub="Last 4 weeks" />
-        <StatTile value={totals.absent} label="Absences" sub="Not reported" />
-        <StatTile value={totals.reported} label="Reported" sub="Told the office" />
+        <StatTile value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
+        <StatTile value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
+        <StatTile value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
+        <StatTile value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
       </div>
 
-      <SectionCard title="Today" note={`Staff due ${formatClock(data.settings.start_time)} · ${data.settings.grace_minutes} min grace`}>
+      <SectionCard title={tr("Today")} note={tr("Staff due {formatClock} · {grace_minutes} min grace", { formatClock: formatClock(data.settings.start_time), grace_minutes: data.settings.grace_minutes })}>
         {data.teachers.length === 0 ? (
-          <EmptyNote>No teachers yet — add them under Teachers.</EmptyNote>
+          <EmptyNote>{tr("No teachers yet — add them under Teachers.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {data.teachers.map((t) => (
@@ -201,7 +202,7 @@ export default function StaffAttendancePage() {
                     {timesLine(t.today) ||
                       (t.today.report
                         ? `${REASON_LABEL[t.today.report.reason]}${t.today.report.note ? ` — ${t.today.report.note}` : ""}`
-                        : t.today.status === "off" ? "No school today" : "No sign-in yet")}
+                        : t.today.status === "off" ? tr("No school today") : tr("No sign-in yet"))}
                   </p>
                 </div>
                 <StatusPill day={t.today} isToday />
@@ -211,17 +212,17 @@ export default function StaffAttendancePage() {
         )}
       </SectionCard>
 
-      <SectionCard title="Last four weeks" note="Tap a teacher to see each day">
+      <SectionCard title={tr("Last four weeks")} note={tr("Tap a teacher to see each day")}>
         <div className="overflow-x-auto -mx-1">
           <table className="w-full text-[13px] min-w-[520px]">
             <thead>
               <tr className="text-start eyebrow">
-                <th className="text-start font-semibold py-2 px-1">Teacher</th>
-                <th className="text-end font-semibold py-2 px-1">On time</th>
-                <th className="text-end font-semibold py-2 px-1">Late</th>
-                <th className="text-end font-semibold py-2 px-1">Absent</th>
-                <th className="text-end font-semibold py-2 px-1">Reported</th>
-                <th className="text-end font-semibold py-2 px-1">Excused</th>
+                <th className="text-start font-semibold py-2 px-1">{tr("Teacher")}</th>
+                <th className="text-end font-semibold py-2 px-1">{tr("On time")}</th>
+                <th className="text-end font-semibold py-2 px-1">{tr("Late")}</th>
+                <th className="text-end font-semibold py-2 px-1">{tr("Absent")}</th>
+                <th className="text-end font-semibold py-2 px-1">{tr("Reported")}</th>
+                <th className="text-end font-semibold py-2 px-1">{tr("Excused")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-border">
@@ -235,7 +236,7 @@ export default function StaffAttendancePage() {
                   <td className="py-2.5 px-1 text-end tabular-nums">{t.tally.present}</td>
                   <td className="py-2.5 px-1 text-end tabular-nums">
                     {t.tally.late}
-                    {t.tally.late > 0 && <span className="text-ink-muted text-[11px]"> · {t.tally.minutesLate} min</span>}
+                    {t.tally.late > 0 && <span className="text-ink-muted text-[11px]">{" "}{tr("· {minutesLate} min", { minutesLate: t.tally.minutesLate })}</span>}
                   </td>
                   <td className={`py-2.5 px-1 text-end tabular-nums ${t.tally.absent ? "text-red-700 dark:text-red-300 font-semibold" : ""}`}>{t.tally.absent}</td>
                   <td className="py-2.5 px-1 text-end tabular-nums">{t.tally.reported}</td>
@@ -256,9 +257,9 @@ export default function StaffAttendancePage() {
         )}
       </SectionCard>
 
-      <SectionCard title="Reported absences" note={`${upcoming.length} coming up`}>
+      <SectionCard title={tr("Reported absences")} note={tr("{count} coming up", { count: upcoming.length })}>
         {data.reports.length === 0 ? (
-          <EmptyNote>No teacher has reported an absence in this period.</EmptyNote>
+          <EmptyNote>{tr("No teacher has reported an absence in this period.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {[...data.reports].reverse().map((r) => (
@@ -267,7 +268,7 @@ export default function StaffAttendancePage() {
                   {r.teacher_name} · {when(r)}
                   {r.to_date >= data.today && (
                     <span className="ms-2 text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
-                      Coming up
+                      {tr("Coming up")}
                     </span>
                   )}
                 </p>
@@ -282,18 +283,18 @@ export default function StaffAttendancePage() {
       </SectionCard>
 
       {data.settings.configured && !editingSettings && (
-        <SectionCard title="Sign-in settings" note={data.settings.demo ? "Sample school" : undefined}>
+        <SectionCard title={tr("Sign-in settings")} note={data.settings.demo ? tr("Sample school") : undefined}>
           {campuses.length > 0 ? (
             <div className="space-y-3">
               <ul className="divide-y divide-surface-border -my-1">
                 {campuses.map((c) => (
                   <li key={c.id} className="flex items-center justify-between gap-3 py-2.5">
                     <p className="text-[13px] text-ink-body leading-relaxed">
-                      <strong>{c.name} campus</strong>
+                      <strong>{tr("{name} campus", { name: c.name })}</strong>
                       {pinned(c) ? (
-                        <> — teachers sign in within {formatDistance(c.radius_m)} of its pin.</>
+                        <>{" "}{tr("— teachers sign in within {formatDistance} of its pin.", { formatDistance: formatDistance(c.radius_m) })}</>
                       ) : (
-                        <span className="text-amber-700 dark:text-amber-300"> — no pin yet, so teachers there can&apos;t sign in.</span>
+                        <span className="text-amber-700 dark:text-amber-300">{" "}{tr("— no pin yet, so teachers there can't sign in.")}</span>
                       )}
                     </p>
                     <button
@@ -304,25 +305,24 @@ export default function StaffAttendancePage() {
                       }}
                       className={ghost}
                     >
-                      {pinned(c) ? "Change" : "Set its pin"}
+                      {pinned(c) ? tr("Change") : tr("Set its pin")}
                     </button>
                   </li>
                 ))}
               </ul>
               <p className="text-[12.5px] text-ink-muted leading-relaxed">
-                Staff are due at <strong>{formatClock(data.settings.start_time)}</strong>, and a sign-in more than{" "}
-                <strong>{data.settings.grace_minutes} minutes</strong> after that counts as late, on every campus.
+                {tr("Staff are due at")}{" "}<strong>{formatClock(data.settings.start_time)}</strong>{tr(", and a sign-in more than")}{" "}
+                <strong>{tr("{grace_minutes} minutes", { grace_minutes: data.settings.grace_minutes })}</strong>{" "}{tr("after that counts as late, on every campus.")}
               </p>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <p className="text-[13px] text-ink-body leading-relaxed">
-                Teachers can sign in within <strong>{formatDistance(data.settings.radius_m)}</strong> of the school&apos;s
-                pin. Staff are due at <strong>{formatClock(data.settings.start_time)}</strong>, and a sign-in more than{" "}
-                <strong>{data.settings.grace_minutes} minutes</strong> after that counts as late.
+                {tr("Teachers can sign in within")}{" "}<strong>{formatDistance(data.settings.radius_m)}</strong>{" "}{tr("of the school's pin. Staff are due at")}{" "}<strong>{formatClock(data.settings.start_time)}</strong>{tr(", and a sign-in more than")}{" "}
+                <strong>{tr("{grace_minutes} minutes", { grace_minutes: data.settings.grace_minutes })}</strong>{" "}{tr("after that counts as late.")}
               </p>
               <button type="button" onClick={() => setEditingSettings(true)} className={ghost}>
-                Change
+                {tr("Change")}
               </button>
             </div>
           )}
@@ -349,6 +349,7 @@ function TeacherDays({
   onSaved: () => void;
   language: "en" | "so" | "ar";
 }) {
+  const { tr } = useLanguage();
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ status: string; note: string }>({ status: "", note: "" });
   const [saving, setSaving] = useState(false);
@@ -371,7 +372,7 @@ function TeacherDays({
 
   return (
     <div className="mt-4 rounded-2xl border border-surface-border bg-surface-bg-warm p-4">
-      <p className="eyebrow mb-2">{teacher.name} · each school day</p>
+      <p className="eyebrow mb-2">{tr("{name} · each school day", { name: teacher.name })}</p>
       <ul className="divide-y divide-surface-border">
         {days.map((d) => (
           <li key={d.date} className="py-2">
@@ -381,7 +382,7 @@ function TeacherDays({
                 <p className="text-[11.5px] text-ink-muted truncate">
                   {[timesLine(d), d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : "", d.note ? `Office: ${d.note}` : ""]
                     .filter(Boolean)
-                    .join(" · ") || "No sign-in"}
+                    .join(" · ") || tr("No sign-in")}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -394,27 +395,27 @@ function TeacherDays({
                   }}
                   className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-muted hover:text-ink"
                 >
-                  Correct
+                  {tr("Correct")}
                 </button>
               </div>
             </div>
             {editing === d.date && (
               <div className="mt-2 grid grid-cols-1 sm:grid-cols-[180px_1fr_auto] gap-2 items-center">
                 <select value={draft.status} onChange={(e) => setDraft((x) => ({ ...x, status: e.target.value }))} className={input}>
-                  <option value="">As signed in ({statusLabel(d, d.date === today)})</option>
-                  <option value="present">Present</option>
-                  <option value="late">Late</option>
-                  <option value="absent">Absent</option>
-                  <option value="excused">Excused</option>
+                  <option value="">{tr("As signed in ({statusLabel})", { statusLabel: statusLabel(d, d.date === today) })}</option>
+                  <option value="present">{tr("Present")}</option>
+                  <option value="late">{tr("Late")}</option>
+                  <option value="absent">{tr("Absent")}</option>
+                  <option value="excused">{tr("Excused")}</option>
                 </select>
                 <input
                   value={draft.note}
                   onChange={(e) => setDraft((x) => ({ ...x, note: e.target.value.slice(0, 500) }))}
-                  placeholder="Why — e.g. phone had no signal"
+                  placeholder={tr("Why — e.g. phone had no signal")}
                   className={input}
                 />
                 <button type="button" onClick={() => save(d.date)} disabled={saving} className={primary}>
-                  {saving ? "Saving…" : "Save"}
+                  {saving ? tr("Saving…") : tr("Save")}
                 </button>
               </div>
             )}
@@ -455,7 +456,7 @@ function SettingsCard({
   const [busy, setBusy] = useState<"" | "locating" | "saving">("");
   const [error, setError] = useState<string | null>(null);
   const [locateError, setLocateError] = useState<string | null>(null);
-  const { language } = useLanguage();
+  const { language, tr } = useLanguage();
 
   // Picking the spot on a map: the pin is the two numbers above.
   const [mapOpen, setMapOpen] = useState(false);
@@ -501,7 +502,7 @@ function SettingsCard({
     (school.current ??= (async () => {
       // The sample school is in Edmonton, and already on the map.
       if (settings.demo) return { city: null, country: "CA" };
-      const data = await mySchool<{ city: string | null; country: string | null }>(createClient(), "city, country");
+      const data = await mySchool<{ city: string | null; country: string | null }>(createClient(), phrase("city, country"));
       return { city: data?.city ?? null, country: data?.country ?? null };
     })().catch(() => ({ city: null, country: null })));
   const whereIsTown = () =>
@@ -570,7 +571,7 @@ function SettingsCard({
       setLng(fix.longitude.toFixed(6));
       setAccuracy(Math.round(fix.accuracy));
     } catch (e) {
-      setLocateError(e instanceof Error ? e.message : "Couldn't get your location");
+      setLocateError(e instanceof Error ? tr(e.message) : tr("Couldn't get your location"));
       // The map needs no permission: offer it straight away.
       if (!mapOpen) showMap();
     } finally {
@@ -595,19 +596,19 @@ function SettingsCard({
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Could not save");
+      if (!res.ok) throw new Error(body.error ?? phrase("Could not save"));
       onSaved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save");
+      setError(e instanceof Error ? tr(e.message) : tr("Could not save"));
     } finally {
       setBusy("");
     }
   };
 
   return (
-    <SectionCard title={settings.configured ? "Sign-in settings" : "Switch on staff sign-in"} note="Only the office can change these">
+    <SectionCard title={settings.configured ? tr("Sign-in settings") : tr("Switch on staff sign-in")} note={tr("Only the office can change these")}>
       {campuses.length > 0 && (
-        <div role="tablist" aria-label="Campus" className="flex flex-wrap gap-2 mb-4">
+        <div role="tablist" aria-label={tr("Campus")} className="flex flex-wrap gap-2 mb-4">
           {campuses.map((c) => (
             <button
               key={c.id}
@@ -620,58 +621,56 @@ function SettingsCard({
               }`}
             >
               {c.name}
-              {c.latitude == null && <span className="font-normal opacity-80"> · no pin</span>}
+              {c.latitude == null && <span className="font-normal opacity-80">{" "}{tr("· no pin")}</span>}
             </button>
           ))}
         </div>
       )}
       {campus ? (
         <p className="text-[13px] text-ink-body leading-relaxed mb-4">
-          Teachers sign in at whichever campus they&apos;re on, so each needs its pin. For the{" "}
-          <strong>{campus.name}</strong> campus: stand inside it with your phone and tap{" "}
-          <strong>Use my current location</strong>, or tap <strong>Pick on a map</strong> and put the pin on its building.
+          {tr("Teachers sign in at whichever campus they're on, so each needs its pin. For the")}{" "}
+          <strong>{campus.name}</strong>{" "}{tr("campus: stand inside it with your phone and tap")}{" "}
+          <strong>{tr("Use my current location")}</strong>{tr(", or tap")}{" "}<strong>{tr("Pick on a map")}</strong>{" "}{tr("and put the pin on its building.")}
         </p>
       ) : (
         !settings.configured && (
           <p className="text-[13px] text-ink-body leading-relaxed mb-4">
-            Teachers can only sign in on the school premises, so first the portal needs to know where the school is.
-            The easiest way: stand inside the school with your phone and tap <strong>Use my current location</strong>.
-            Or tap <strong>Pick on a map</strong> and put the pin on the school&apos;s building.
+            {tr("Teachers can only sign in on the school premises, so first the portal needs to know where the school is. The easiest way: stand inside the school with your phone and tap")}{" "}<strong>{tr("Use my current location")}</strong>{tr(". Or tap")}{" "}<strong>{tr("Pick on a map")}</strong>{" "}{tr("and put the pin on the school's building.")}
           </p>
         )
       )}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={here} disabled={busy !== ""} className={primary}>
-          {busy === "locating" ? "Finding you…" : "Use my current location"}
+          {busy === "locating" ? tr("Finding you…") : tr("Use my current location")}
         </button>
         <button type="button" onClick={toggleMap} aria-expanded={mapOpen} className={ghost}>
-          {mapOpen ? "Hide the map" : "Pick on a map"}
+          {mapOpen ? tr("Hide the map") : tr("Pick on a map")}
         </button>
         {accuracy != null && (
           <span className="text-[12px] text-ink-muted">
-            Found you to within {formatDistance(accuracy)}
-            {accuracy > 100 ? " — not precise enough; try on a phone, outdoors" : ""}.
+            {tr("Found you to within {formatDistance}", { formatDistance: formatDistance(accuracy) })}
+            {accuracy > 100 ? tr(" — not precise enough; try on a phone, outdoors") : ""}.
           </span>
         )}
       </div>
       {locateError && (
         <p role="alert" className="text-[12.5px] text-red-700 dark:text-red-300 mt-3">
           {locateError}
-          {mapOpen && " Or put the pin on the map below — that needs no permission."}
+          {mapOpen && tr(" Or put the pin on the map below — that needs no permission.")}
         </p>
       )}
       <div className="grid grid-cols-2 gap-3 mt-4">
         <label className="block">
-          <span className="eyebrow block mb-1.5">Latitude</span>
+          <span className="eyebrow block mb-1.5">{tr("Latitude")}</span>
           <input value={lat} onChange={(e) => typed("lat", e.target.value)} placeholder="53.546100" className={input} inputMode="decimal" dir="ltr" />
         </label>
         <label className="block">
-          <span className="eyebrow block mb-1.5">Longitude</span>
+          <span className="eyebrow block mb-1.5">{tr("Longitude")}</span>
           <input value={lng} onChange={(e) => typed("lng", e.target.value)} placeholder="-113.493800" className={input} inputMode="decimal" dir="ltr" />
         </label>
       </div>
       <p className="text-[11.5px] text-ink-muted mt-2">
-        Or copy them from Google Maps: press and hold on the school&apos;s building, and the two numbers appear at the top.
+        {tr("Or copy them from Google Maps: press and hold on the school's building, and the two numbers appear at the top.")}
       </p>
 
       {mapOpen && (
@@ -680,12 +679,12 @@ function SettingsCard({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="The school's address"
-              aria-label="Search for the school's address"
+              placeholder={tr("The school's address")}
+              aria-label={tr("Search for the school's address")}
               className={input}
             />
             <button type="submit" disabled={searching || !query.trim()} className={ghost}>
-              {searching ? "Searching…" : "Search"}
+              {searching ? tr("Searching…") : tr("Search")}
             </button>
           </form>
           {places && places.length > 1 && (
@@ -705,23 +704,22 @@ function SettingsCard({
           )}
           {places && places.length === 0 && (
             <p className="text-[12.5px] text-ink-muted">
-              Nothing found for that. Try the street and the town, or find the school on the map and tap it.
+              {tr("Nothing found for that. Try the street and the town, or find the school on the map and tap it.")}
             </p>
           )}
           {searchFailed && (
             <p className="text-[12.5px] text-ink-muted">
-              The search isn&apos;t answering just now. Find the school on the map and tap it instead.
+              {tr("The search isn't answering just now. Find the school on the map and tap it instead.")}
             </p>
           )}
           <LocationMap point={point} radius={radius} view={view} onPick={pickPoint} />
           <p className="text-[11.5px] text-ink-muted">
-            Tap the school&apos;s building to put the pin on it, or drag the pin. The circle is how close teachers have to
-            be to sign in.
+            {tr("Tap the school's building to put the pin on it, or drag the pin. The circle is how close teachers have to be to sign in.")}
           </p>
         </div>
       )}
 
-      <p className="eyebrow mt-5 mb-2">How close counts as on the premises</p>
+      <p className="eyebrow mt-5 mb-2">{tr("How close counts as on the premises")}</p>
       <div className="flex flex-wrap gap-2">
         {RADII.map((r) => (
           <button
@@ -737,16 +735,16 @@ function SettingsCard({
         ))}
       </div>
       <p className="text-[11.5px] text-ink-muted mt-2">
-        150 m suits most buildings. Go bigger for a large site or a car park teachers arrive through.
+        {tr("150 m suits most buildings. Go bigger for a large site or a car park teachers arrive through.")}
       </p>
 
       <div className="grid grid-cols-2 gap-3 mt-5">
         <label className="block">
-          <span className="eyebrow block mb-1.5">Staff are due at</span>
+          <span className="eyebrow block mb-1.5">{tr("Staff are due at")}</span>
           <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className={input} />
         </label>
         <label className="block">
-          <span className="eyebrow block mb-1.5">Minutes before it counts as late</span>
+          <span className="eyebrow block mb-1.5">{tr("Minutes before it counts as late")}</span>
           <input type="number" min={0} max={120} value={grace} onChange={(e) => setGrace(Number(e.target.value))} className={input} />
         </label>
       </div>
@@ -755,11 +753,11 @@ function SettingsCard({
       <div className="mt-4 flex justify-end gap-2.5">
         {onCancel && (
           <button type="button" onClick={onCancel} className={ghost} disabled={busy !== ""}>
-            Cancel
+            {tr("Cancel")}
           </button>
         )}
         <button type="button" onClick={save} disabled={busy !== "" || !lat || !lng} className={primary}>
-          {busy === "saving" ? "Saving…" : "Save settings"}
+          {busy === "saving" ? tr("Saving…") : tr("Save settings")}
         </button>
       </div>
     </SectionCard>

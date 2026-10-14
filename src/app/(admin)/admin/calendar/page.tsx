@@ -5,6 +5,8 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // Which weekdays carry Qur'an instruction, and which specific dates are
 // closed. Every yearly plan's pace figures and behind-schedule alerts read
@@ -13,13 +15,13 @@ import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 // nothing plan-specific to configure per student.
 
 const WEEKDAYS = [
-  { iso: 1, label: "Mon" },
-  { iso: 2, label: "Tue" },
-  { iso: 3, label: "Wed" },
-  { iso: 4, label: "Thu" },
-  { iso: 5, label: "Fri" },
-  { iso: 6, label: "Sat" },
-  { iso: 7, label: "Sun" },
+  { iso: 1, get label() { return phrase("Mon"); } },
+  { iso: 2, get label() { return phrase("Tue"); } },
+  { iso: 3, get label() { return phrase("Wed"); } },
+  { iso: 4, get label() { return phrase("Thu"); } },
+  { iso: 5, get label() { return phrase("Fri"); } },
+  { iso: 6, get label() { return phrase("Sat"); } },
+  { iso: 7, get label() { return phrase("Sun"); } },
 ];
 
 interface ClosedDate {
@@ -58,7 +60,7 @@ async function demoCalendarFetch(input: string, init?: RequestInit): Promise<Res
   }
   if (method === "POST") {
     if (!(typeof init?.body === "string")) {
-      return reply({ error: "Uploading a file isn't available in the sample portal — add a date below instead." }, 400);
+      return reply({ error: phrase("Uploading a file isn't available in the sample portal — add a date below instead.") }, 400);
     }
     const { date, label } = JSON.parse(init.body);
     const added = { id: `demo-closed-${Date.now().toString(36)}`, date, label };
@@ -72,7 +74,7 @@ async function demoCalendarFetch(input: string, init?: RequestInit): Promise<Res
     writeDemoStore(DEMO_CALENDAR_KEY, store);
     return reply({ ok: true });
   }
-  return reply({ error: "Not available in the sample portal" }, 404);
+  return reply({ error: phrase("Not available in the sample portal") }, 404);
 }
 
 function mergeById(prev: ClosedDate[], added: ClosedDate[]): ClosedDate[] {
@@ -82,6 +84,7 @@ function mergeById(prev: ClosedDate[], added: ClosedDate[]): ClosedDate[] {
 }
 
 export default function AdminCalendarPage() {
+  const { tr } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
@@ -113,11 +116,11 @@ export default function AdminCalendarPage() {
         demo.current = !user;
         const res = await api("/api/school-calendar");
         const payload = await res.json();
-        if (!res.ok) throw new Error(payload.error || "Couldn't load the school calendar.");
+        if (!res.ok) throw new Error(payload.error || phrase("Couldn't load the school calendar."));
         setWeekdays(payload.weekdays);
         setClosedDates(payload.closedDates);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't load the school calendar.");
+        setError(e instanceof Error ? tr(e.message) : tr("Couldn't load the school calendar."));
       } finally {
         setLoading(false);
       }
@@ -130,7 +133,7 @@ export default function AdminCalendarPage() {
       ? weekdays.filter((d) => d !== iso)
       : [...weekdays, iso].sort((a, b) => a - b);
     if (next.length === 0) {
-      setError("At least one instructional day a week is required.");
+      setError(tr("At least one instructional day a week is required."));
       return;
     }
     const prev = weekdays;
@@ -148,7 +151,7 @@ export default function AdminCalendarPage() {
       setWeekdays(payload.weekdays);
     } catch (e) {
       setWeekdays(prev);
-      setError(e instanceof Error ? e.message : "Couldn't update the weekly pattern.");
+      setError(e instanceof Error ? tr(e.message) : tr("Couldn't update the weekly pattern."));
     } finally {
       setSavingWeekdays(false);
     }
@@ -163,12 +166,12 @@ export default function AdminCalendarPage() {
       body.append("file", file);
       const res = await api("/api/school-calendar", { method: "POST", body });
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "Couldn't read that file.");
+      if (!res.ok) throw new Error(payload.error || phrase("Couldn't read that file."));
       const added: ClosedDate[] = payload.added;
       setClosedDates((prev) => mergeById(prev, added));
-      setUploadNotice(`Added ${added.length} closed date${added.length === 1 ? "" : "s"}.`);
+      setUploadNotice(tr("Added {count} closed date.|Added {count} closed dates.", { count: added.length }));
     } catch (e) {
-      setUploadError(e instanceof Error ? e.message : "Couldn't read that file.");
+      setUploadError(e instanceof Error ? tr(e.message) : tr("Couldn't read that file."));
     } finally {
       setUploading(false);
     }
@@ -185,13 +188,13 @@ export default function AdminCalendarPage() {
         body: JSON.stringify({ date: newDate, label: newLabel.trim() || null }),
       });
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "Couldn't add that date.");
+      if (!res.ok) throw new Error(payload.error || phrase("Couldn't add that date."));
       const added: ClosedDate[] = payload.added;
       setClosedDates((prev) => mergeById(prev, added));
       setNewDate("");
       setNewLabel("");
     } catch (e) {
-      setAddError(e instanceof Error ? e.message : "Couldn't add that date.");
+      setAddError(e instanceof Error ? tr(e.message) : tr("Couldn't add that date."));
     } finally {
       setAddingDate(false);
     }
@@ -204,18 +207,18 @@ export default function AdminCalendarPage() {
       const res = await api(`/api/school-calendar?id=${id}`, { method: "DELETE" });
       if (!res.ok) {
         const payload = await res.json();
-        throw new Error(payload.error || "Couldn't remove that date.");
+        throw new Error(payload.error || phrase("Couldn't remove that date."));
       }
     } catch (e) {
       setClosedDates(prev);
-      setError(e instanceof Error ? e.message : "Couldn't remove that date.");
+      setError(e instanceof Error ? tr(e.message) : tr("Couldn't remove that date."));
     }
   };
 
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto pb-20 pt-2">
-        <LoadingNote>Loading the school calendar…</LoadingNote>
+        <LoadingNote>{tr("Loading the school calendar…")}</LoadingNote>
       </div>
     );
   }
@@ -223,11 +226,11 @@ export default function AdminCalendarPage() {
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Scheduling"
-        title="School Calendar"
+        eyebrow={tr("Scheduling")}
+        title={tr("School Calendar")}
         meta={[
-          `${weekdays.length} instructional day${weekdays.length === 1 ? "" : "s"} a week`,
-          `${closedDates.length} closed date${closedDates.length === 1 ? "" : "s"}`,
+          tr("{count} instructional day a week|{count} instructional days a week", { count: weekdays.length }),
+          tr("{count} closed date|{count} closed dates", { count: closedDates.length }),
         ]}
       />
 
@@ -235,10 +238,9 @@ export default function AdminCalendarPage() {
         <p className="text-sm text-status-error-text bg-status-error-bg rounded-xl px-3 py-2">{error}</p>
       )}
 
-      <SectionCard title="Instructional days" note={savingWeekdays ? "Saving…" : undefined}>
+      <SectionCard title={tr("Instructional days")} note={savingWeekdays ? tr("Saving…") : undefined}>
         <p className="text-xs text-ink-muted -mt-2 mb-3">
-          Every yearly plan&apos;s pace and behind-schedule alerts are built around these days.
-          Uncheck a day your school doesn&apos;t hold Qur&apos;an class on — a PE-only Friday, say.
+          {tr("Every yearly plan's pace and behind-schedule alerts are built around these days. Uncheck a day your school doesn't hold Qur'an class on — a PE-only Friday, say.")}
         </p>
         <div className="flex flex-wrap gap-2">
           {WEEKDAYS.map((w) => {
@@ -262,25 +264,23 @@ export default function AdminCalendarPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Closed dates" note={`${closedDates.length} on file`}>
+      <SectionCard title={tr("Closed dates")} note={tr("{count} on file", { count: closedDates.length })}>
         <p className="text-xs text-ink-muted -mt-2 mb-3">
-          Holidays, breaks, and professional-development days — any date no student is expected to
-          make progress. These are skipped the same way a non-instructional weekday is.
+          {tr("Holidays, breaks, and professional-development days — any date no student is expected to make progress. These are skipped the same way a non-instructional weekday is.")}
         </p>
 
         <div className="rounded-2xl border border-dashed border-surface-border p-4 flex items-center justify-between gap-3 flex-wrap mb-4">
           <div>
-            <p className="text-sm font-semibold text-ink">Upload a calendar</p>
+            <p className="text-sm font-semibold text-ink">{tr("Upload a calendar")}</p>
             <p className="text-xs text-ink-muted mt-0.5">
-              A spreadsheet with a <span className="font-semibold">Date</span> column (or{" "}
-              <span className="font-semibold">Start</span>/<span className="font-semibold">End</span> for
-              a range like winter break), plus an optional <span className="font-semibold">Label</span>.
+              {tr("A spreadsheet with a")}{" "}<span className="font-semibold">{tr("Date")}</span>{" "}{tr("column (or")}{" "}
+              <span className="font-semibold">{tr("Start")}</span>/<span className="font-semibold">{tr("End")}</span>{" "}{tr("for a range like winter break), plus an optional")}{" "}<span className="font-semibold">{tr("Label")}</span>.
             </p>
           </div>
           <label
             className={`${ghostBtn} cursor-pointer flex-shrink-0 ${uploading ? "opacity-50 pointer-events-none" : ""}`}
           >
-            {uploading ? "Reading…" : "Upload file"}
+            {uploading ? tr("Reading…") : tr("Upload file")}
             <input
               type="file"
               accept=".xlsx,.csv"
@@ -314,7 +314,7 @@ export default function AdminCalendarPage() {
           <input
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
-            placeholder="Label (optional) — e.g. Eid holiday"
+            placeholder={tr("Label (optional) — e.g. Eid holiday")}
             className={inputClass}
           />
           <button
@@ -323,13 +323,13 @@ export default function AdminCalendarPage() {
             disabled={!newDate || addingDate}
             className="px-4 py-2 rounded-2xl border-2 border-dashed border-surface-border text-ink-muted hover:border-emerald-600 hover:text-emerald-600 disabled:opacity-40 transition whitespace-nowrap"
           >
-            + Add date
+            {tr("+ Add date")}
           </button>
         </div>
         {addError && <p className="text-sm text-status-error-text mb-2">{addError}</p>}
 
         {closedDates.length === 0 ? (
-          <EmptyNote>No closed dates yet — classes are assumed to run every instructional weekday.</EmptyNote>
+          <EmptyNote>{tr("No closed dates yet — classes are assumed to run every instructional weekday.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1 mt-2">
             {closedDates.map((d) => (
@@ -343,7 +343,7 @@ export default function AdminCalendarPage() {
                   onClick={() => removeDate(d.id)}
                   className="text-status-error-text text-sm hover:underline"
                 >
-                  Remove
+                  {tr("Remove")}
                 </button>
               </li>
             ))}

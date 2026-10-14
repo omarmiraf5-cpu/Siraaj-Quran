@@ -33,7 +33,7 @@ export function StudentDetailPanel({
   studentId: string;
   onClose: () => void;
 }) {
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const student = DEMO_STUDENTS.find((s) => s.id === studentId);
   const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
 
@@ -105,7 +105,7 @@ export function StudentDetailPanel({
                             `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
                           ) : (
                             <>
-                              {surah ? surah.englishName : `Surah ${a.surah}`}
+                              {surah ? surah.englishName : tr("Surah {surah}", { surah: a.surah })}
                               <span className="font-normal text-ink-muted">
                                 {" "}
                                 · {t("common.ayahs")} {a.ayah_start}–{a.ayah_end}

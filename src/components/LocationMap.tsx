@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { phrase } from "@/lib/i18n/phrases";
 
 // A map to put the school on: OpenStreetMap's, through Leaflet. Tapping the
 // map puts the pin there, and the pin can be dragged; around it, the circle
@@ -107,7 +108,7 @@ export default function LocationMap({
       ring.current.setLatLng(at);
     }
     if (!pin.current) {
-      const marker = L.marker(at, { icon: PIN, draggable: true, title: "The school", keyboard: false }).addTo(m);
+      const marker = L.marker(at, { icon: PIN, draggable: true, title: phrase("The school"), keyboard: false }).addTo(m);
       marker.on("dragend", () => choose(marker.getLatLng()));
       pin.current = marker;
     } else {

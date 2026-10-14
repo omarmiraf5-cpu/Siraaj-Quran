@@ -9,6 +9,7 @@ import { MessageThread } from "@/components/MessageThread";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // Shared with the teacher portal so a message sent here shows up there, and
 // a reply shows up here, within the same browser (demo mode only).
@@ -61,7 +62,7 @@ export default function ParentMessagesPage() {
         .single();
       setUserId(user.id);
       setSchoolId(profile?.school_id ?? null);
-      setParentName(profile?.full_name ?? "You");
+      setParentName(profile?.full_name ?? phrase("You"));
 
       const { data: rows } = await supabase
         .from("messages")

@@ -32,7 +32,9 @@ import {
   type Plan,
   type PlanProgress,
   type ProgressEntry,
-} from "@/lib/yearlyPlan";
+ translateAlert } from "@/lib/yearlyPlan";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 /**
  * Parent side of the yearly plan: one child's year, filterable down to a
@@ -63,6 +65,7 @@ interface PlanPayload {
 }
 
 export default function ParentYearlyPlanPage() {
+  const { tr } = useLanguage();
   const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
   // The sample portal answers these requests in the browser from the
   // sample school's plans — see demoPlans.ts.
@@ -110,7 +113,7 @@ export default function ParentYearlyPlanPage() {
         setError(
           body?.code === "encryption_not_configured"
             ? null
-            : "We couldn't load the plan just now. Please try again in a moment."
+            : tr("We couldn't load the plan just now. Please try again in a moment.")
         );
         setPayload(null);
         return;
@@ -118,7 +121,7 @@ export default function ParentYearlyPlanPage() {
       setPayload(body);
     } catch (err) {
       console.error("Yearly plan load failed:", err);
-      setError("We couldn't load the plan just now. Please try again in a moment.");
+      setError(tr("We couldn't load the plan just now. Please try again in a moment."));
       setPayload(null);
     } finally {
       setLoading(false);
@@ -181,7 +184,7 @@ export default function ParentYearlyPlanPage() {
         body: JSON.stringify({ id }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not dismiss that notice");
+      if (!res.ok) throw new Error(body.error || phrase("Could not dismiss that notice"));
       setPayload((prev) =>
         prev
           ? {
@@ -193,7 +196,7 @@ export default function ParentYearlyPlanPage() {
           : prev
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not dismiss that notice");
+      setError(err instanceof Error ? tr(err.message) : tr("Could not dismiss that notice"));
     } finally {
       setAcknowledging(null);
     }
@@ -202,7 +205,7 @@ export default function ParentYearlyPlanPage() {
   if (mode === "loading") {
     return (
       <div className="space-y-6 max-w-6xl">
-        <LoadingNote>Loading…</LoadingNote>
+        <LoadingNote>{tr("Loading…")}</LoadingNote>
       </div>
     );
   }
@@ -216,13 +219,13 @@ export default function ParentYearlyPlanPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       <PortalHero
-        eyebrow="Parent"
-        title="Yearly plan"
-        meta={[child ? child.name : "—", plan ? plan.academic_year : "No plan yet"]}
+        eyebrow={tr("Parent")}
+        title={tr("Yearly plan")}
+        meta={[child ? child.name : "—", plan ? plan.academic_year : phrase("No plan yet")]}
       />
 
       {children.length > 1 && (
-        <SectionCard title="Child">
+        <SectionCard title={tr("Child")}>
           <div className="flex flex-wrap gap-2">
             {children.map((c) => (
               <button
@@ -242,10 +245,10 @@ export default function ParentYearlyPlanPage() {
       )}
 
       {errorCode === "encryption_not_configured" && (
-        <SectionCard title="Yearly plan">
+        <SectionCard title={tr("Yearly plan")}>
           <PlanEmptyState
-            title="Not switched on yet"
-            body="Your school hasn't finished setting up yearly plans. Nothing is wrong with your account — this page will fill in once they have."
+            title={tr("Not switched on yet")}
+            body={tr("Your school hasn't finished setting up yearly plans. Nothing is wrong with your account — this page will fill in once they have.")}
           />
         </SectionCard>
       )}
@@ -256,15 +259,13 @@ export default function ParentYearlyPlanPage() {
         </p>
       )}
 
-      {loading && <LoadingNote>Loading the plan…</LoadingNote>}
+      {loading && <LoadingNote>{tr("Loading the plan…")}</LoadingNote>}
 
       {!loading && payload && !plan && (
-        <SectionCard title="Yearly plan">
+        <SectionCard title={tr("Yearly plan")}>
           <PlanEmptyState
-            title="No plan has been set yet"
-            body={`${
-              child?.name ?? "Your child"
-            } does not have a yearly plan on file. Their teacher sets one out at the start of the year — it will appear here as soon as it does.`}
+            title={tr("No plan has been set yet")}
+            body={tr("{n} does not have a yearly plan on file. Their teacher sets one out at the start of the year — it will appear here as soon as it does.", { n: child?.name ?? phrase("Your child") })}
           />
         </SectionCard>
       )}
@@ -277,8 +278,8 @@ export default function ParentYearlyPlanPage() {
                 <PlanAlertBanner
                   key={a.id}
                   level={a.level}
-                  title={a.title}
-                  detail={a.detail}
+                  title={translateAlert(a).title}
+                  detail={translateAlert(a).detail}
                   acknowledged={Boolean(a.acknowledged_at)}
                   busy={acknowledging === a.id}
                   onAcknowledge={() => acknowledge(a.id)}
@@ -288,7 +289,7 @@ export default function ParentYearlyPlanPage() {
           )}
 
           <SectionCard
-            title={readable(plan.title, "This year")}
+            title={readable(plan.title, phrase("This year"))}
             note={
               <span className="inline-flex items-center gap-2">
                 {plan.academic_year}
@@ -306,15 +307,15 @@ export default function ParentYearlyPlanPage() {
                 <div className="flex flex-wrap gap-y-4">
                   <PlanFigure
                     value={formatQuantity(progress.actualUnits)}
-                    label={`${unitLabel(2, plan.unit)} done`}
+                    label={tr("{unitLabel} done", { unitLabel: unitLabel(2, plan.unit) })}
                     tone={paceColor(progress.pace)}
                   />
                   <PlanFigure
                     value={formatApprox(progress.expectedUnits)}
-                    label="expected by today"
+                    label={tr("expected by today")}
                   />
-                  <PlanFigure value={formatQuantity(progress.totalUnits)} label="the whole year" />
-                  <PlanFigure value={progress.daysRemaining} label="days left" />
+                  <PlanFigure value={formatQuantity(progress.totalUnits)} label={tr("the whole year")} />
+                  <PlanFigure value={progress.daysRemaining} label={tr("days left")} />
                 </div>
                 <div className="mt-5">
                   <PaceBar
@@ -327,14 +328,14 @@ export default function ParentYearlyPlanPage() {
                       thing a parent actually wants to know is the gap. */}
                   <p className="text-[12.5px] text-ink-body mt-2.5 leading-relaxed">
                     {progress.varianceUnits >= 0
-                      ? `${child?.name ?? "Your child"} is ${`${formatApprox(progress.varianceUnits)} ${unitLabel(progress.varianceUnits, plan.unit)}`} ahead of where the plan expects them today.`
-                      : `${child?.name ?? "Your child"} is ${`${formatApprox(Math.abs(progress.varianceUnits))} ${unitLabel(progress.varianceUnits, plan.unit)}`} short of where the plan expects them today.`}{" "}
+                      ? tr("{n} is {n2} ahead of where the plan expects them today.", { n: child?.name ?? phrase("Your child"), n2: `${formatApprox(progress.varianceUnits)} ${unitLabel(progress.varianceUnits, plan.unit)}` })
+                      : tr("{n} is {n2} short of where the plan expects them today.", { n: child?.name ?? phrase("Your child"), n2: `${formatApprox(Math.abs(progress.varianceUnits))} ${unitLabel(progress.varianceUnits, plan.unit)}` })}{" "}
                     {/* A projection past the whole plan just means "on course to
                         finish" — early in a year, a few good days would
                         otherwise read as finishing at 479 of 230. */}
                     {progress.projectedUnits >= progress.totalUnits
-                      ? "At the current pace the whole year's plan will be finished on time."
-                      : `At the current pace the year finishes at about ${formatApprox(progress.projectedUnits)} of ${formatQuantity(progress.totalUnits)}.`}
+                      ? tr("At the current pace the whole year's plan will be finished on time.")
+                      : tr("At the current pace the year finishes at about {formatApprox} of {formatQuantity}.", { formatApprox: formatApprox(progress.projectedUnits), formatQuantity: formatQuantity(progress.totalUnits) })}
                   </p>
                 </div>
               </div>
@@ -343,7 +344,7 @@ export default function ParentYearlyPlanPage() {
             {plan.notes && (
               <>
                 <div className="gold-rule my-5" />
-                <p className="eyebrow mb-2">From the teacher</p>
+                <p className="eyebrow mb-2">{tr("From the teacher")}</p>
                 <p className="text-[13px] text-ink-body leading-relaxed whitespace-pre-line">
                   {readable(plan.notes)}
                 </p>
@@ -360,16 +361,16 @@ export default function ParentYearlyPlanPage() {
           />
 
           <SectionCard
-            title="Break it down"
+            title={tr("Break it down")}
             note={
               <SegmentedSwitch<PeriodGrain>
-                label="Choose a period"
+                label={tr("Choose a period")}
                 value={grain}
                 onChange={setGrain}
                 options={[
-                  { value: "year", label: "Year" },
-                  { value: "month", label: "Month" },
-                  { value: "week", label: "Week" },
+                  { value: "year", label: phrase("Year") },
+                  { value: "month", label: phrase("Month") },
+                  { value: "week", label: phrase("Week") },
                 ]}
               />
             }
@@ -380,7 +381,7 @@ export default function ParentYearlyPlanPage() {
                   onClick={() => setPeriodIndex(Math.max(0, periodIndex - 1))}
                   disabled={periodIndex === 0}
                   className="px-3 py-2 rounded-lg border border-surface-border text-ink-muted hover:text-ink disabled:opacity-30 transition"
-                  aria-label="Previous period"
+                  aria-label={tr("Previous period")}
                 >
                   {/* A chevron: two line segments, nothing representational. */}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="rtl:rotate-180">
@@ -390,14 +391,14 @@ export default function ParentYearlyPlanPage() {
                 <div className="text-center min-w-0">
                   <p className="page-title text-[15px] truncate">{slice?.label}</p>
                   {slice?.isCurrent && (
-                    <p className="eyebrow mt-1 text-brand-gold-dark">Current</p>
+                    <p className="eyebrow mt-1 text-brand-gold-dark">{tr("Current")}</p>
                   )}
                 </div>
                 <button
                   onClick={() => setPeriodIndex(Math.min(slices.length - 1, periodIndex + 1))}
                   disabled={periodIndex >= slices.length - 1}
                   className="px-3 py-2 rounded-lg border border-surface-border text-ink-muted hover:text-ink disabled:opacity-30 transition"
-                  aria-label="Next period"
+                  aria-label={tr("Next period")}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="rtl:rotate-180">
                     <path d="m9 18 6-6-6-6" />
@@ -416,8 +417,7 @@ export default function ParentYearlyPlanPage() {
                     of{" "}
                     <span className="font-semibold text-ink tabular-nums">
                       {formatApprox(slice.expectedUnits)}
-                    </span>{" "}
-                    {unitLabel(2, plan.unit)} expected in this {grain}
+                    </span>{" "}{tr("{unitLabel} expected in this {grain}", { unitLabel: unitLabel(2, plan.unit), grain })}
                   </p>
                   <span className="eyebrow">
                     {slice.from} — {slice.to}
@@ -460,12 +460,12 @@ export default function ParentYearlyPlanPage() {
                 return (
                   <PlanEmptyState
                     title={
-                      grain === "year" ? "No milestones set yet" : `Nothing falls due in this ${grain}`
+                      grain === "year" ? tr("No milestones set yet") : tr("Nothing falls due in this {grain}", { grain })
                     }
                     body={
                       grain === "year"
-                        ? "The teacher has created the plan but not yet broken it into segments."
-                        : "Work still counts towards the next milestone — use the arrows above to look ahead or back."
+                        ? tr("The teacher has created the plan but not yet broken it into segments.")
+                        : tr("Work still counts towards the next milestone — use the arrows above to look ahead or back.")
                     }
                   />
                 );

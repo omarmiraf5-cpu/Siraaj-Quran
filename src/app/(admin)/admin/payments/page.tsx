@@ -30,17 +30,20 @@ import { ExpensesPanel } from "@/components/ExpensesPanel";
 import { FinanceOverview } from "@/components/FinanceOverview";
 import { balanceFor } from "@/lib/balances";
 import { monthOf, todayIso } from "@/lib/finance";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 type Tab = "overview" | "fees" | "salaries" | "expenses";
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "fees", label: "Fees" },
-  { id: "salaries", label: "Salaries" },
-  { id: "expenses", label: "Expenses" },
+  { id: "overview", get label() { return phrase("Overview"); } },
+  { id: "fees", get label() { return phrase("Fees"); } },
+  { id: "salaries", get label() { return phrase("Salaries"); } },
+  { id: "expenses", get label() { return phrase("Expenses"); } },
 ];
 const TAB_KEY = "payments_tab";
 
 export default function AdminPaymentsPage() {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
@@ -178,7 +181,7 @@ export default function AdminPaymentsPage() {
     });
     setSaving(false);
     if (error) {
-      setFormError(error.message);
+      setFormError(tr(error.message));
       return;
     }
     await loadRealFees();
@@ -223,7 +226,7 @@ export default function AdminPaymentsPage() {
     setPayAmount("");
   };
 
-  const studentName = (id: string) => students.find((s) => s.id === id)?.name ?? "Unknown student";
+  const studentName = (id: string) => students.find((s) => s.id === id)?.name ?? phrase("Unknown student");
 
   const billed = fees.reduce((sum, f) => sum + f.amountDue, 0);
   const collected = fees.reduce((sum, f) => sum + f.amountPaid, 0);
@@ -239,14 +242,14 @@ export default function AdminPaymentsPage() {
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Finance"
-        title="Payments"
+        eyebrow={tr("Finance")}
+        title={tr("Payments")}
         meta={
           tab === "fees"
-            ? [`${money(collected)} collected`, `${money(outstanding)} outstanding`]
+            ? [tr("{amount} collected", { amount: money(collected) }), tr("{amount} outstanding", { amount: money(outstanding) })]
             : tab === "overview"
-              ? [`${money(balanceFor(fees, monthOf(todayIso())).outstanding)} outstanding`, "Fees, salaries and expenses together"]
-              : [tab === "salaries" ? "What the school pays its staff" : "What the school spends"]
+              ? [tr("{amount} outstanding", { amount: money(balanceFor(fees, monthOf(todayIso())).outstanding) }), tr("Fees, salaries and expenses together")]
+              : [tab === "salaries" ? tr("What the school pays its staff") : tr("What the school spends")]
         }
         actions={
           tab === "fees" ? (
@@ -255,13 +258,13 @@ export default function AdminPaymentsPage() {
               onClick={() => setShowForm((v) => !v)}
               className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
             >
-              {showForm ? "Cancel" : "+ Record fee"}
+              {showForm ? tr("Cancel") : tr("+ Record fee")}
             </button>
           ) : undefined
         }
       />
 
-      <div role="tablist" aria-label="Payments" className="flex gap-1 p-1 rounded-2xl bg-surface-card border border-surface-border">
+      <div role="tablist" aria-label={tr("Payments")} className="flex gap-1 p-1 rounded-2xl bg-surface-card border border-surface-border">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -285,22 +288,22 @@ export default function AdminPaymentsPage() {
       {tab === "fees" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatTile value={money(billed)} label="Billed" sub={`${fees.length} charges`} />
-            <StatTile value={money(collected)} label="Collected" sub="received to date" />
-            <StatTile value={money(outstanding)} label="Outstanding" sub="still owed" />
-            <StatTile value={unpaidCount} label="Unpaid" sub={unpaidCount === 1 ? "charge" : "charges"} />
+            <StatTile value={money(billed)} label={tr("Billed")} sub={tr("{count} charges", { count: fees.length })} />
+            <StatTile value={money(collected)} label={tr("Collected")} sub={tr("received to date")} />
+            <StatTile value={money(outstanding)} label={tr("Outstanding")} sub={tr("still owed")} />
+            <StatTile value={unpaidCount} label={tr("Unpaid")} sub={unpaidCount === 1 ? "charge" : "charges"} />
           </div>
 
           {showForm && (
             <form onSubmit={addFee} className="card-quiet p-5 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-ink mb-2">Student *</label>
+                <label className="block text-sm font-semibold text-ink mb-2">{tr("Student *")}</label>
                 <select
                   value={newStudent}
                   onChange={(e) => setNewStudent(e.target.value)}
                   className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                 >
-                  <option value="">Choose a student…</option>
+                  <option value="">{tr("Choose a student…")}</option>
                   {students.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -309,17 +312,17 @@ export default function AdminPaymentsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-ink mb-2">Description *</label>
+                <label className="block text-sm font-semibold text-ink mb-2">{tr("Description *")}</label>
                 <input
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="e.g. Term 1 tuition"
+                  placeholder={tr("e.g. Term 1 tuition")}
                   className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-ink mb-2">Amount *</label>
+                  <label className="block text-sm font-semibold text-ink mb-2">{tr("Amount *")}</label>
                   <input
                     type="number"
                     min="0"
@@ -331,7 +334,7 @@ export default function AdminPaymentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-ink mb-2">Due date *</label>
+                  <label className="block text-sm font-semibold text-ink mb-2">{tr("Due date *")}</label>
                   <input
                     type="date"
                     value={newDueDate}
@@ -346,16 +349,16 @@ export default function AdminPaymentsPage() {
                 disabled={!newStudent || !newAmount || !newDueDate || saving}
                 className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
               >
-                {saving ? "Saving…" : "Record fee"}
+                {saving ? tr("Saving…") : tr("Record fee")}
               </button>
             </form>
           )}
 
-          <SectionCard title="All charges" note={`${fees.length} total`}>
+          <SectionCard title={tr("All charges")} note={tr("{count} total", { count: fees.length })}>
             {!ready ? (
               <LoadingNote />
             ) : sorted.length === 0 ? (
-              <EmptyNote>No fees recorded yet.</EmptyNote>
+              <EmptyNote>{tr("No fees recorded yet.")}</EmptyNote>
             ) : (
               <ul className="divide-y divide-surface-border -my-1">
                 {sorted.map((f) => {
@@ -379,7 +382,7 @@ export default function AdminPaymentsPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-semibold text-ink truncate">{studentName(f.studentId)}</p>
                           <p className="text-[11px] text-ink-muted truncate">
-                            {f.description} · due {f.dueDate}
+                            {tr("{description} · due {dueDate}", { description: f.description, dueDate: f.dueDate })}
                           </p>
                         </div>
                         <div className="text-end flex-shrink-0">
@@ -399,15 +402,15 @@ export default function AdminPaymentsPage() {
                         <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                           {status === "paid" ? (
                             <p className="text-[13px] text-ink-muted">
-                              Paid in full on {f.dueDate}. Nothing outstanding.
+                              {tr("Paid in full on {dueDate}. Nothing outstanding.", { dueDate: f.dueDate })}
                             </p>
                           ) : (
                             <>
                               <p className="text-[13px] text-ink-muted">
-                                {money(remaining)} still outstanding.
+                                {tr("{amount} still outstanding.", { amount: money(remaining) })}
                               </p>
                               <div>
-                                <label className="block text-xs font-semibold text-ink mb-1.5">Payment received</label>
+                                <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Payment received")}</label>
                                 <input
                                   type="number"
                                   min="0"
@@ -426,14 +429,14 @@ export default function AdminPaymentsPage() {
                                   disabled={!Number(payAmount)}
                                   className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
                                 >
-                                  Record payment
+                                  {tr("Record payment")}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setPayAmount(String(remaining))}
                                   className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
                                 >
-                                  Paid in full
+                                  {tr("Paid in full")}
                                 </button>
                               </div>
                             </>

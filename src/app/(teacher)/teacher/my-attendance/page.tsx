@@ -7,6 +7,7 @@ import { SignInCard, StatusPill, timesLine, useAttendanceApi } from "@/component
 import { REASON_LABEL, type AbsenceReport, type StaffDay, type StaffTally } from "@/lib/attendanceRules";
 import { formatDay } from "@/data/demo";
 import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 /**
  * A teacher's own attendance, under "Sign in" in the menu: signing in and
@@ -26,7 +27,7 @@ const input =
   "w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition";
 
 export default function MyAttendancePage() {
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const { mode, api } = useAttendanceApi("teacher");
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,14 +38,14 @@ export default function MyAttendancePage() {
   const load = useCallback(async () => {
     const res = await api("/api/staff-attendance");
     const body = await res.json();
-    if (!res.ok) throw new Error(body.error ?? "Could not load your attendance");
+    if (!res.ok) throw new Error(body.error ?? phrase("Could not load your attendance"));
     setData(body);
     setForm((f) => (f.from ? f : { ...f, from: body.today, to: body.today }));
   }, [api]);
 
   useEffect(() => {
     if (mode === "loading") return;
-    load().catch((e) => setError(e.message));
+    load().catch((e) => setError(tr(e.message)));
   }, [mode, load]);
 
   const report = async () => {
@@ -58,12 +59,12 @@ export default function MyAttendancePage() {
         body: JSON.stringify({ from_date: form.from, to_date: form.to || form.from, reason: form.reason, note: form.note || null }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Could not send the report");
+      if (!res.ok) throw new Error(body.error ?? phrase("Could not send the report"));
       setSent("Sent — the office has been told.");
       setForm((f) => ({ ...f, note: "" }));
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send the report");
+      setError(e instanceof Error ? tr(e.message) : tr("Could not send the report"));
     } finally {
       setSending(false);
     }
@@ -73,14 +74,14 @@ export default function MyAttendancePage() {
     setError(null);
     const res = await api(`/api/staff-absence?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     const body = await res.json();
-    if (!res.ok) setError(body.error ?? "Could not withdraw it");
+    if (!res.ok) setError(tr(body.error ?? "Could not withdraw it"));
     else await load();
   };
 
   if (mode === "loading" || (!data && !error)) {
     return (
       <div className="max-w-4xl mx-auto pt-10">
-        <LoadingNote>Loading your attendance…</LoadingNote>
+        <LoadingNote>{tr("Loading your attendance…")}</LoadingNote>
       </div>
     );
   }
@@ -93,26 +94,26 @@ export default function MyAttendancePage() {
   return (
     <div className="max-w-4xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Staff"
+        eyebrow={tr("Staff")}
         title={t("nav.signIn")}
-        meta={data ? [formatDay(data.today, language), "Last 4 weeks"] : []}
+        meta={data ? [formatDay(data.today, language), tr("Last 4 weeks")] : []}
       />
 
       <SignInCard api={api} onChange={() => load().catch(() => {})} />
 
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatTile value={data.tally.present} label="On time" sub={`of ${data.tally.schoolDays} school days`} />
-          <StatTile value={data.tally.late} label="Late" sub={data.tally.late ? `${data.tally.minutesLate} min in all` : "None"} />
-          <StatTile value={data.tally.absent} label="Absent" sub="Not reported" />
-          <StatTile value={data.tally.reported + data.tally.excused} label="Reported" sub="Or excused by the office" />
+          <StatTile value={data.tally.present} label={tr("On time")} sub={tr("of {schoolDays} school days", { schoolDays: data.tally.schoolDays })} />
+          <StatTile value={data.tally.late} label={tr("Late")} sub={data.tally.late ? tr("{minutesLate} min in all", { minutesLate: data.tally.minutesLate }) : tr("None")} />
+          <StatTile value={data.tally.absent} label={tr("Absent")} sub={tr("Not reported")} />
+          <StatTile value={data.tally.reported + data.tally.excused} label={tr("Reported")} sub={tr("Or excused by the office")} />
         </div>
       )}
 
-      <SectionCard title="Report an absence" note="The office is told straight away">
+      <SectionCard title={tr("Report an absence")} note={tr("The office is told straight away")}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="block">
-            <span className="eyebrow block mb-1.5">First day away</span>
+            <span className="eyebrow block mb-1.5">{tr("First day away")}</span>
             <input
               type="date"
               value={form.from}
@@ -122,7 +123,7 @@ export default function MyAttendancePage() {
             />
           </label>
           <label className="block">
-            <span className="eyebrow block mb-1.5">Last day away</span>
+            <span className="eyebrow block mb-1.5">{tr("Last day away")}</span>
             <input
               type="date"
               value={form.to}
@@ -132,7 +133,7 @@ export default function MyAttendancePage() {
             />
           </label>
         </div>
-        <p className="eyebrow mt-4 mb-2">Reason</p>
+        <p className="eyebrow mt-4 mb-2">{tr("Reason")}</p>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(REASON_LABEL) as AbsenceReport["reason"][]).map((r) => (
             <button
@@ -150,12 +151,12 @@ export default function MyAttendancePage() {
           ))}
         </div>
         <label className="block mt-4">
-          <span className="eyebrow block mb-1.5">Note for the office (optional)</span>
+          <span className="eyebrow block mb-1.5">{tr("Note for the office (optional)")}</span>
           <textarea
             value={form.note}
             onChange={(e) => setForm((f) => ({ ...f, note: e.target.value.slice(0, 500) }))}
             rows={2}
-            placeholder="e.g. Doctor's appointment in the morning"
+            placeholder={tr("e.g. Doctor's appointment in the morning")}
             className={`${input} resize-none`}
           />
         </label>
@@ -167,14 +168,14 @@ export default function MyAttendancePage() {
             disabled={sending || !form.from}
             className="bg-brand-navy text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-40 active:scale-[.98] transition-all"
           >
-            {sending ? "Sending…" : "Send to the office"}
+            {sending ? tr("Sending…") : tr("Send to the office")}
           </button>
         </div>
 
         {upcoming.length > 0 && (
           <>
             <div className="gold-rule my-4" />
-            <p className="eyebrow mb-2">Already reported</p>
+            <p className="eyebrow mb-2">{tr("Already reported")}</p>
             <ul className="divide-y divide-surface-border -my-1">
               {upcoming.map((r) => (
                 <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
@@ -191,7 +192,7 @@ export default function MyAttendancePage() {
                       onClick={() => withdraw(r.id)}
                       className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-muted hover:text-ink flex-shrink-0"
                     >
-                      Withdraw
+                      {tr("Withdraw")}
                     </button>
                   )}
                 </li>
@@ -207,9 +208,9 @@ export default function MyAttendancePage() {
         </div>
       )}
 
-      <SectionCard title="The last four weeks" note={`${schoolDays.length} school days`}>
+      <SectionCard title={tr("The last four weeks")} note={tr("{count} school days", { count: schoolDays.length })}>
         {schoolDays.length === 0 ? (
-          <EmptyNote>No school days in the last four weeks.</EmptyNote>
+          <EmptyNote>{tr("No school days in the last four weeks.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {schoolDays.map((d) => (
@@ -218,7 +219,7 @@ export default function MyAttendancePage() {
                   <p className="text-[13px] font-semibold text-ink">{formatDay(d.date, language)}</p>
                   <p className="text-[11.5px] text-ink-muted truncate">
                     {timesLine(d) ||
-                      (d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : d.note ?? "No sign-in")}
+                      (d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : d.note ?? tr("No sign-in"))}
                   </p>
                 </div>
                 <StatusPill day={d} isToday={d.date === data?.today} />

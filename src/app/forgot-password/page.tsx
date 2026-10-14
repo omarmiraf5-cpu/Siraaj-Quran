@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // "Forgot your password?" from the sign-in page. Whatever address is
 // entered, the answer is the same "check your email": the server only
 // sends to real admin, teacher and parent accounts, and doesn't say which
 // addresses those are.
 export default function ForgotPasswordPage() {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -39,11 +40,11 @@ export default function ForgotPasswordPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "That didn't go through. Please try again.");
+        throw new Error(data.error || phrase("That didn't go through. Please try again."));
       }
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That didn't go through. Please try again.");
+      setError(err instanceof Error ? tr(err.message) : tr("That didn't go through. Please try again."));
     } finally {
       setSending(false);
     }

@@ -1,3 +1,5 @@
+import { phrase } from "@/lib/i18n/phrases";
+
 /**
  * The grades an academic school's students are in: Pre-K (-1),
  * Kindergarten (0), then Grades 1 to 12. A Qur'an school's students carry a
@@ -12,7 +14,7 @@ export function isGrade(value: unknown): value is number {
 
 /** "Pre-K", "Kindergarten", "Grade 3". */
 export function gradeLabel(grade: number): string {
-  return grade === PRE_K ? "Pre-K" : grade === 0 ? "Kindergarten" : `Grade ${grade}`;
+  return grade === PRE_K ? phrase("Pre-K") : grade === 0 ? phrase("Kindergarten") : phrase("Grade {grade}", { grade });
 }
 
 /**

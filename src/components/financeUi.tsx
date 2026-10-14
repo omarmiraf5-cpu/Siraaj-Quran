@@ -1,6 +1,7 @@
 "use client";
 
 import { monthLabel, shiftMonth } from "@/lib/finance";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // Pieces the Salaries and Expenses tabs share.
 
@@ -14,18 +15,19 @@ export const ghost =
 
 /** ‹ October 2026 › — which month the tab shows. */
 export function MonthBar({ month, onChange, thisMonth }: { month: string; onChange: (m: string) => void; thisMonth: string }) {
+  const { tr } = useLanguage();
   const arrow =
     "w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink flex items-center justify-center hover:bg-surface-bg-warm transition disabled:opacity-30";
   return (
     <div className="flex items-center justify-between gap-3">
-      <button type="button" onClick={() => onChange(shiftMonth(month, -1))} aria-label="Previous month" className={arrow}>
-        ‹
+      <button type="button" onClick={() => onChange(shiftMonth(month, -1))} aria-label={tr("Previous month")} className={arrow}>
+        <span className="inline-block rtl:-scale-x-100">‹</span>
       </button>
       <div className="text-center">
         <p className="font-display text-lg font-bold text-ink leading-tight">{monthLabel(month)}</p>
         {month !== thisMonth && (
           <button type="button" onClick={() => onChange(thisMonth)} className="text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
-            Back to this month
+            {tr("Back to this month")}
           </button>
         )}
       </div>
@@ -34,10 +36,10 @@ export function MonthBar({ month, onChange, thisMonth }: { month: string; onChan
         onClick={() => onChange(shiftMonth(month, 1))}
         // Up to next month: a salary can be paid ahead.
         disabled={month >= shiftMonth(thisMonth, 1)}
-        aria-label="Next month"
+        aria-label={tr("Next month")}
         className={arrow}
       >
-        ›
+        <span className="inline-block rtl:-scale-x-100">›</span>
       </button>
     </div>
   );

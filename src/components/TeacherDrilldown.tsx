@@ -181,7 +181,7 @@ function AssignmentList({
   assignments: typeof DEMO_ASSIGNMENTS;
   onSelect: (id: string) => void;
 }) {
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   if (assignments.length === 0) {
     return <EmptyNote>{t("common.nothingHereAllClear")}</EmptyNote>;
   }
@@ -216,7 +216,7 @@ function AssignmentList({
                     </span>
                   </p>
                   <p className="text-[12px] text-ink-body">
-                    {surah ? surah.englishName : `Surah ${a.surah}`}
+                    {surah ? surah.englishName : tr("Surah {surah}", { surah: a.surah })}
                     <span className="text-ink-muted">
                       {" "}
                       · {t("common.ayahs")} {a.ayah_start}–{a.ayah_end}

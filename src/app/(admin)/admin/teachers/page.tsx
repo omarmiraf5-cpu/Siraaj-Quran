@@ -25,6 +25,8 @@ import { createClient } from "@/lib/supabase/client";
 import { welcomeNote } from "@/lib/welcomeNote";
 import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
 import { loadSchoolTeachers, saveHalaqaTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 /** The halaqas as chips, to tick the ones someone teaches. */
 function HalaqaChips({
@@ -36,14 +38,14 @@ function HalaqaChips({
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
+  const { tr } = useLanguage();
   if (halaqas.length === 0) {
     return (
       <p className="text-xs text-ink-muted">
-        There are no halaqas yet. Add one under{" "}
+        {tr("There are no halaqas yet. Add one under")}{" "}
         <Link href="/admin/halaqas" className="font-semibold underline underline-offset-2">
-          Halaqas
-        </Link>{" "}
-        and tick yourself as its teacher.
+          {tr("Halaqas")}
+        </Link>{" "}{tr("and tick yourself as its teacher.")}
       </p>
     );
   }
@@ -71,6 +73,7 @@ function HalaqaChips({
 }
 
 export default function AdminTeachersPage() {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
@@ -201,11 +204,11 @@ export default function AdminTeachersPage() {
         setShowForm(false);
         setInviteNote(
           names.length > 0
-            ? `You teach ${names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0]} with your own login — open My halaqa in the menu to get to your students.`
-            : "You don't teach a halaqa now."
+            ? tr("You teach {halaqas} with your own login — open My halaqa in the menu to get to your students.", { halaqas: names.length > 1 ? tr("{list} and {last}", { list: names.slice(0, -1).join(", "), last: names.at(-1) }) : names[0] })
+            : tr("You don't teach a halaqa now.")
         );
       } catch (err) {
-        setTeachError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+        setTeachError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
       } finally {
         setInviting(false);
       }
@@ -242,22 +245,22 @@ export default function AdminTeachersPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || "Failed to create teacher");
+      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || phrase("Failed to create teacher"));
       await loadRealTeachers();
       setNewName("");
       setNewEmail("");
       setShowForm(false);
       setInviteNote(
         data.joined
-          ? `${data.full_name || data.email} already teaches at ${data.other_school || "another school"} with this email, so they've been added to your school too — the same login and password. ${
-              data.welcome_email === "sent"
-                ? "We've emailed them that they can switch between their schools from the menu."
-                : `The email telling them didn't send (${data.welcome_email}), so let them know: they switch schools from the menu.`
-            }`
-          : `Account created for ${data.email}. ${welcomeNote(data.welcome_email)}Temporary password: ${data.temp_password} — share it with them if the email doesn't reach them. They'll be asked to set their own password the first time they use it.`
+          ? tr("{name} already teaches at {school} with this email, so they've been added to your school too — the same login and password.", { name: data.full_name || data.email, school: data.other_school || tr("another school") }) +
+            " " +
+            (data.welcome_email === "sent"
+              ? tr("We've emailed them that they can switch between their schools from the menu.")
+              : tr("The email telling them didn't send ({reason}), so let them know: they switch schools from the menu.", { reason: data.welcome_email }))
+          : tr("Account created for {email}. {welcomeNote}Temporary password: {temp_password} — share it with them if the email doesn't reach them. They'll be asked to set their own password the first time they use it.", { email: data.email, welcomeNote: welcomeNote(data.welcome_email), temp_password: data.temp_password })
       );
     } catch (err) {
-      setInviteNote(err instanceof Error ? err.message : "Failed to create teacher");
+      setInviteNote(err instanceof Error ? tr(err.message) : tr("Failed to create teacher"));
     } finally {
       setInviting(false);
     }
@@ -281,7 +284,7 @@ export default function AdminTeachersPage() {
       await saveMyTeaching(mine, draftName);
       setEditingId(null);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+      setSaveError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
       setSavingEdit(false);
     }
@@ -292,7 +295,7 @@ export default function AdminTeachersPage() {
   // password doesn't have to travel to whoever holds the database.
   const resetPassword = async (t: DemoTeacher) => {
     if (isDemo) {
-      setResetNote("Sample data — there's no real account to reset.");
+      setResetNote(tr("Sample data — there's no real account to reset."));
       return;
     }
     setResetting(true);
@@ -304,12 +307,12 @@ export default function AdminTeachersPage() {
         body: JSON.stringify({ user_id: t.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't reset the password");
+      if (!res.ok) throw new Error(data.error || phrase("Couldn't reset the password"));
       setResetNote(
-        `New temporary password for ${data.full_name || t.name}: ${data.temp_password} — share it with them. They'll set their own the next time they sign in.`
+        tr("New temporary password for {n}: {temp_password} — share it with them. They'll set their own the next time they sign in.", { n: data.full_name || t.name, temp_password: data.temp_password })
       );
     } catch (err) {
-      setResetNote(err instanceof Error ? err.message : "Couldn't reset the password");
+      setResetNote(err instanceof Error ? tr(err.message) : tr("Couldn't reset the password"));
     } finally {
       setResetting(false);
     }
@@ -319,7 +322,7 @@ export default function AdminTeachersPage() {
   // nobody has to pass one on.
   const emailResetLink = async (t: DemoTeacher) => {
     if (isDemo) {
-      setResetNote("Sample data — there's no real account to email.");
+      setResetNote(tr("Sample data — there's no real account to email."));
       return;
     }
     setResetting(true);
@@ -331,12 +334,12 @@ export default function AdminTeachersPage() {
         body: JSON.stringify({ user_id: t.id, by: "email" }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't send the email");
+      if (!res.ok) throw new Error(data.error || phrase("Couldn't send the email"));
       setResetNote(
-        `Emailed ${data.email} a link to choose a new password. It works once, for 14 days, and their current password keeps working until they use it.`
+        tr("Emailed {email} a link to choose a new password. It works once, for 14 days, and their current password keeps working until they use it.", { email: data.email })
       );
     } catch (err) {
-      setResetNote(err instanceof Error ? err.message : "Couldn't send the email");
+      setResetNote(err instanceof Error ? tr(err.message) : tr("Couldn't send the email"));
     } finally {
       setResetting(false);
     }
@@ -367,7 +370,7 @@ export default function AdminTeachersPage() {
       await loadRealTeachers();
       setEditingId(null);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+      setSaveError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
       setSavingEdit(false);
     }
@@ -378,16 +381,16 @@ export default function AdminTeachersPage() {
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Staff"
-        title="Teachers"
-        meta={[`${teachers.length} total`, `${activeCount} active`]}
+        eyebrow={tr("Staff")}
+        title={tr("Teachers")}
+        meta={[tr("{count} total", { count: teachers.length }), tr("{count} active", { count: activeCount })]}
         actions={
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
             className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
           >
-            {showForm ? "Cancel" : "+ Add teacher"}
+            {showForm ? tr("Cancel") : tr("+ Add teacher")}
           </button>
         }
       />
@@ -396,17 +399,17 @@ export default function AdminTeachersPage() {
         <form onSubmit={addTeacher} className="card-quiet p-5 space-y-4">
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              {isSelf ? "Your name, as parents and children see it" : "Full name *"}
+              {isSelf ? tr("Your name, as parents and children see it") : tr("Full name *")}
             </label>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder={isSelf ? me?.name || "e.g. Ustadh Omar" : "e.g. Ustadha Warsan"}
+              placeholder={isSelf ? me?.name || tr("e.g. Ustadh Omar") : tr("e.g. Ustadha Warsan")}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Email *</label>
+            <label className="block text-sm font-semibold text-ink mb-2">{tr("Email *")}</label>
             <input
               type="email"
               value={newEmail}
@@ -418,8 +421,7 @@ export default function AdminTeachersPage() {
           {isSelf ? (
             <div className="rounded-2xl border border-emerald-600/30 bg-surface-bg-warm p-4 space-y-3">
               <p className="text-sm text-ink leading-relaxed">
-                That&apos;s you. Your admin login works for teaching too, so there&apos;s no second login to make —
-                tick the halaqas you teach.
+                {tr("That's you. Your admin login works for teaching too, so there's no second login to make — tick the halaqas you teach.")}
               </p>
               <HalaqaChips halaqas={halaqas} selected={mine} onChange={setMine} />
               {teachError && <p className="text-xs text-red-600 dark:text-red-400">{teachError}</p>}
@@ -427,9 +429,9 @@ export default function AdminTeachersPage() {
           ) : (
             <p className="text-xs text-ink-muted">
               {isDemo
-                ? "New teachers start without a halaqa — assign one from the Halaqas page."
-                : "We'll email them a link to choose their own password, and you'll get a temporary password to share in case the email doesn't reach them. They start without a halaqa assigned."}
-              {me && ` Teaching a halaqa yourself? Enter your own email, ${me.email}.`}
+                ? tr("New teachers start without a halaqa — assign one from the Halaqas page.")
+                : tr("We'll email them a link to choose their own password, and you'll get a temporary password to share in case the email doesn't reach them. They start without a halaqa assigned.")}
+              {me && tr(" Teaching a halaqa yourself? Enter your own email, {email}.", { email: me.email })}
             </p>
           )}
           <button
@@ -437,7 +439,7 @@ export default function AdminTeachersPage() {
             disabled={isSelf ? inviting || halaqas.length === 0 : !newName.trim() || !newEmail.trim() || inviting}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            {isSelf ? (inviting ? "Saving…" : "Teach with my login") : isDemo ? "Add teacher" : inviting ? "Creating…" : "Create login"}
+            {isSelf ? (inviting ? tr("Saving…") : tr("Teach with my login")) : isDemo ? tr("Add teacher") : inviting ? tr("Creating…") : tr("Create login")}
           </button>
         </form>
       )}
@@ -448,11 +450,11 @@ export default function AdminTeachersPage() {
         </div>
       )}
 
-      <SectionCard title="All teachers" note={`${teachers.length} total`}>
+      <SectionCard title={tr("All teachers")} note={tr("{count} total", { count: teachers.length })}>
         {!ready ? (
           <LoadingNote />
         ) : teachers.length === 0 ? (
-          <EmptyNote>No teachers yet.</EmptyNote>
+          <EmptyNote>{tr("No teachers yet.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {teachers.map((t) => {
@@ -487,12 +489,12 @@ export default function AdminTeachersPage() {
                     </div>
                     {t.admin && (
                       <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex-shrink-0">
-                        {t.id === me?.id ? "You · admin" : "Admin"}
+                        {t.id === me?.id ? tr("You · admin") : tr("Admin")}
                       </span>
                     )}
                     {inactive && (
                       <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
-                        Inactive
+                        {tr("Inactive")}
                       </span>
                     )}
                     <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
@@ -505,10 +507,10 @@ export default function AdminTeachersPage() {
                       {t.id === me?.id ? (
                         <>
                           <p className="text-[12.5px] text-ink-body leading-relaxed">
-                            This is your own login: you run the school with it, and teach with it too.
+                            {tr("This is your own login: you run the school with it, and teach with it too.")}
                           </p>
                           <div>
-                            <label className="block text-xs font-semibold text-ink mb-1.5">Your name, as parents and children see it</label>
+                            <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Your name, as parents and children see it")}</label>
                             <input
                               value={draftName}
                               onChange={(e) => setDraftName(e.target.value)}
@@ -516,7 +518,7 @@ export default function AdminTeachersPage() {
                             />
                           </div>
                           <div>
-                            <p className="block text-xs font-semibold text-ink mb-1.5">The halaqas you teach</p>
+                            <p className="block text-xs font-semibold text-ink mb-1.5">{tr("The halaqas you teach")}</p>
                             <HalaqaChips halaqas={halaqas} selected={mine} onChange={setMine} />
                           </div>
                           {saveError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{saveError}</p>}
@@ -527,23 +529,22 @@ export default function AdminTeachersPage() {
                               disabled={savingEdit}
                               className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
                             >
-                              {savingEdit ? "Saving…" : "Save"}
+                              {savingEdit ? tr("Saving…") : tr("Save")}
                             </button>
                             <button
                               type="button"
                               onClick={() => setEditingId(null)}
                               className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
                             >
-                              Cancel
+                              {tr("Cancel")}
                             </button>
                           </div>
                         </>
                       ) : (
                         <p className="text-[12.5px] text-ink-body leading-relaxed">
-                          {t.name} runs the school with this login, and teaches with it too. Which halaqas they teach is
-                          set under{" "}
+                          {tr("{name} runs the school with this login, and teaches with it too. Which halaqas they teach is set under", { name: t.name })}{" "}
                           <Link href="/admin/halaqas" className="font-semibold underline underline-offset-2">
-                            Halaqas
+                            {tr("Halaqas")}
                           </Link>
                           .
                         </p>
@@ -554,7 +555,7 @@ export default function AdminTeachersPage() {
                   {isOpen && !t.admin && (
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                       <div>
-                        <label className="block text-xs font-semibold text-ink mb-1.5">Full name</label>
+                        <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Full name")}</label>
                         <input
                           value={draftName}
                           onChange={(e) => setDraftName(e.target.value)}
@@ -562,7 +563,7 @@ export default function AdminTeachersPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-ink mb-1.5">Email</label>
+                        <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Email")}</label>
                         <input
                           type="email"
                           value={draftEmail}
@@ -572,7 +573,7 @@ export default function AdminTeachersPage() {
                         />
                         {!isDemo && (
                           <p className="text-[11px] text-ink-muted mt-1">
-                            Email is the sign-in address and can&apos;t be changed here.
+                            {tr("Email is the sign-in address and can't be changed here.")}
                           </p>
                         )}
                       </div>
@@ -583,12 +584,12 @@ export default function AdminTeachersPage() {
                           onChange={(e) => setDraftActive(e.target.checked)}
                           className="w-4 h-4 rounded"
                         />
-                        Active
+                        {tr("Active")}
                       </label>
                       <p className="text-[11px] text-ink-muted -mt-1 leading-relaxed">
                         {t.otherSchools
-                          ? `Untick to switch ${t.name} off at your school: they can't see anything here until you switch them back on. Their other school isn't affected.`
-                          : `Untick to switch ${t.name} off: they can't sign in or see anything until you switch them back on.`}
+                          ? tr("Untick to switch {name} off at your school: they can't see anything here until you switch them back on. Their other school isn't affected.", { name: t.name })
+                          : tr("Untick to switch {name} off: they can't sign in or see anything until you switch them back on.", { name: t.name })}
                       </p>
                       {saveError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{saveError}</p>}
                       <div className="flex items-center gap-2">
@@ -598,14 +599,14 @@ export default function AdminTeachersPage() {
                           disabled={savingEdit}
                           className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all disabled:opacity-50"
                         >
-                          {savingEdit ? "Saving…" : "Save"}
+                          {savingEdit ? tr("Saving…") : tr("Save")}
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditingId(null)}
                           className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
                         >
-                          Cancel
+                          {tr("Cancel")}
                         </button>
                       </div>
 
@@ -617,7 +618,7 @@ export default function AdminTeachersPage() {
                             disabled={resetting}
                             className="text-[13px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline transition-colors disabled:opacity-50"
                           >
-                            Email a reset link
+                            {tr("Email a reset link")}
                           </button>
                           <button
                             type="button"
@@ -625,7 +626,7 @@ export default function AdminTeachersPage() {
                             disabled={resetting}
                             className="text-[13px] font-semibold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
                           >
-                            {resetting ? "Working…" : "Get a temporary password"}
+                            {resetting ? tr("Working…") : tr("Get a temporary password")}
                           </button>
                         </div>
                         {resetNote && (
@@ -637,17 +638,16 @@ export default function AdminTeachersPage() {
                         <div className="pt-3 border-t border-surface-border">
                           {t.otherSchools && (
                             <p className="text-[11.5px] text-ink-muted leading-relaxed mb-2">
-                              {t.name} also teaches at another school with this same login. Switching them off or removing
-                              them here only affects your school.
+                              {tr("{name} also teaches at another school with this same login. Switching them off or removing them here only affects your school.", { name: t.name })}
                             </p>
                           )}
                           <DeleteAccount
                             name={t.name}
-                            action={t.otherSchools ? "Remove from this school" : undefined}
+                            action={t.otherSchools ? phrase("Remove from this school") : undefined}
                             consequences={
                               t.otherSchools
-                                ? `${t.name} leaves your school only: their login stays, for their other school. What they recorded here stays with you, and a halaqa they teach alone here will need another teacher.`
-                                : `This deletes ${t.name}'s sign-in for good. The register, lessons and messages they recorded stay with the school without their name, and a halaqa they teach alone will need another teacher. To keep them but stop them signing in, untick Active instead.`
+                                ? tr("{name} leaves your school only: their login stays, for their other school. What they recorded here stays with you, and a halaqa they teach alone here will need another teacher.", { name: t.name })
+                                : tr("This deletes {name}'s sign-in for good. The register, lessons and messages they recorded stay with the school without their name, and a halaqa they teach alone will need another teacher. To keep them but stop them signing in, untick Active instead.", { name: t.name })
                             }
                             onDelete={async () => {
                               await deleteAccount(t.id);

@@ -1,3 +1,5 @@
+import { translateFields } from "@/lib/i18n/phrases";
+
 /**
  * Tajweed Rules Reference
  * Colors and definitions for Quranic recitation rules
@@ -143,3 +145,6 @@ export function getLetterRules(letter: string): TajweedRule[] {
     .map((id) => getTajweedRule(id))
     .filter((rule): rule is TajweedRule => rule !== null);
 }
+
+// In Arabic each rule's name, description and details read in Arabic.
+for (const rule of Object.values(TAJWEED_RULES)) translateFields(rule, ["name", "description", "details"]);

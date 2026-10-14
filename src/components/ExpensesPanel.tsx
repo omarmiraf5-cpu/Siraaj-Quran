@@ -23,6 +23,8 @@ import {
   type ExpenseCategory,
   type PayMethod,
 } from "@/lib/finance";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // The month's spending: what, how much, to whom, by category.
 
@@ -53,6 +55,7 @@ interface Draft {
 const blankDraft = (): Draft => ({ spentOn: todayIso(), category: "supplies", description: "", amount: "", paidTo: "", method: "cash" });
 
 export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; schoolId: string | null; userId: string | null }) {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const thisMonth = monthOf(todayIso());
   const [month, setMonth] = useState(thisMonth);
@@ -109,11 +112,11 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
     if (!draft) return;
     const amount = parseAmount(draft.amount);
     if (amount === null) {
-      setError("Enter the amount, like 79.99.");
+      setError(tr("Enter the amount, like 79.99."));
       return;
     }
     if (!draft.description.trim()) {
-      setError("What was it for?");
+      setError(tr("What was it for?"));
       return;
     }
     setBusy(true);
@@ -141,7 +144,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
         created_by: userId,
       });
       if (saveError) {
-        setError(saveError.message);
+        setError(tr(saveError.message));
         setBusy(false);
         return;
       }
@@ -154,7 +157,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
   };
 
   const remove = async (e: Expense) => {
-    if (!window.confirm(`Remove "${e.description}" (${money(e.amount)}) from ${shortDate(e.spentOn)}?`)) return;
+    if (!window.confirm(tr("Remove \"{description}\" ({amount}) from {shortDate}?", { description: e.description, amount: money(e.amount), shortDate: shortDate(e.spentOn) }))) return;
     if (isDemo) {
       writeDemoStore(
         DEMO_EXPENSES_KEY,
@@ -163,7 +166,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
     } else {
       const { error: deleteError } = await supabase.from("expenses").delete().eq("id", e.id);
       if (deleteError) {
-        setError(deleteError.message);
+        setError(tr(deleteError.message));
         return;
       }
     }
@@ -173,7 +176,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
 
   if (notReady) {
     return (
-      <SectionCard title="Expenses">
+      <SectionCard title={tr("Expenses")}>
         <EmptyNote>{notReady}</EmptyNote>
       </SectionCard>
     );
@@ -186,15 +189,15 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <StatTile value={money(total)} label="Spent" sub={`${expenses.length} expense${expenses.length === 1 ? "" : "s"}`} />
+        <StatTile value={money(total)} label={tr("Spent")} sub={tr("{count} expense|{count} expenses", { count: expenses.length })} />
         <StatTile
           value={byCategory[0] ? EXPENSE_CATEGORY_LABELS[byCategory[0].category] : "—"}
-          label="Biggest"
-          sub={byCategory[0] ? money(byCategory[0].amount) : "nothing yet"}
+          label={tr("Biggest")}
+          sub={byCategory[0] ? money(byCategory[0].amount) : tr("nothing yet")}
         />
         <div className="col-span-2 md:col-span-1 flex items-center">
           <button type="button" onClick={() => { setDraft(draft ? null : blankDraft()); setError(null); }} className={`${primary} w-full py-3`}>
-            {draft ? "Cancel" : "+ Add expense"}
+            {draft ? tr("Cancel") : tr("+ Add expense")}
           </button>
         </div>
       </div>
@@ -203,11 +206,11 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
         <div className="card-quiet p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={label}>Date *</label>
+              <label className={label}>{tr("Date *")}</label>
               <input type="date" value={draft.spentOn} max={todayIso()} onChange={(e) => setDraft({ ...draft, spentOn: e.target.value })} className={field} />
             </div>
             <div>
-              <label className={label}>Category *</label>
+              <label className={label}>{tr("Category *")}</label>
               <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as ExpenseCategory })} className={field}>
                 {EXPENSE_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -218,16 +221,16 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
             </div>
           </div>
           <div>
-            <label className={label}>What for *</label>
-            <input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="e.g. Qa'idah books for Grade 1" maxLength={200} className={field} />
+            <label className={label}>{tr("What for *")}</label>
+            <input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder={tr("e.g. Qa'idah books for Grade 1")} maxLength={200} className={field} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={label}>Amount *</label>
+              <label className={label}>{tr("Amount *")}</label>
               <input inputMode="decimal" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} placeholder="79.99" className={field} />
             </div>
             <div>
-              <label className={label}>How</label>
+              <label className={label}>{tr("How")}</label>
               <select value={draft.method} onChange={(e) => setDraft({ ...draft, method: e.target.value as PayMethod })} className={field}>
                 {EXPENSE_METHODS.map((m) => (
                   <option key={m} value={m}>
@@ -238,19 +241,19 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
             </div>
           </div>
           <div>
-            <label className={label}>Paid to</label>
-            <input value={draft.paidTo} onChange={(e) => setDraft({ ...draft, paidTo: e.target.value })} placeholder="Optional, e.g. the bookstore" maxLength={120} className={field} />
+            <label className={label}>{tr("Paid to")}</label>
+            <input value={draft.paidTo} onChange={(e) => setDraft({ ...draft, paidTo: e.target.value })} placeholder={tr("Optional, e.g. the bookstore")} maxLength={120} className={field} />
           </div>
           {error && <p className="text-[12.5px] text-status-error-text">{error}</p>}
           <button type="button" onClick={save} disabled={busy || !draft.amount || !draft.description.trim()} className={`${primary} w-full`}>
-            {busy ? "Saving…" : "Save expense"}
+            {busy ? tr("Saving…") : tr("Save expense")}
           </button>
         </div>
       )}
 
       {byCategory.length > 0 && (
         <div className="card-quiet p-4">
-          <p className="eyebrow mb-2">By category</p>
+          <p className="eyebrow mb-2">{tr("By category")}</p>
           <ul className="flex flex-wrap gap-2">
             {byCategory.map((c) => (
               <li key={c.category} className="text-[12.5px] rounded-full border border-surface-border bg-surface-card px-3 py-1 text-ink">
@@ -261,11 +264,11 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
         </div>
       )}
 
-      <SectionCard title="Expenses" note={`${expenses.length} this month`}>
+      <SectionCard title={tr("Expenses")} note={tr("{count} this month", { count: expenses.length })}>
         {!ready ? (
           <LoadingNote />
         ) : expenses.length === 0 ? (
-          <EmptyNote>Nothing spent this month yet.</EmptyNote>
+          <EmptyNote>{tr("Nothing spent this month yet.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {expenses.map((e) => {
@@ -290,9 +293,9 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                   </button>
                   {isOpen && (
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-3 flex items-center justify-between gap-3">
-                      <p className="text-[12px] text-ink-muted">Entered by mistake?</p>
+                      <p className="text-[12px] text-ink-muted">{tr("Entered by mistake?")}</p>
                       <button type="button" onClick={() => remove(e)} className={`${ghost} text-red-700 dark:text-red-300`}>
-                        Remove
+                        {tr("Remove")}
                       </button>
                     </div>
                   )}

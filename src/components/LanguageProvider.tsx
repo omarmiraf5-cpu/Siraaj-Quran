@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { translations, RTL_LANGUAGES, type Language } from "@/lib/i18n/translations";
+import { setCurrentLanguage } from "@/lib/i18n/current";
+import { translatePhrase, type PhraseVars, type Translated } from "@/lib/i18n/phrases";
 
 const STORAGE_KEY = "language";
 
@@ -10,6 +12,8 @@ interface LanguageContextValue {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: string) => string;
+  /** Translates English UI text itself — see lib/i18n/phrases. */
+  tr: <V extends PhraseVars | undefined = undefined>(text: string, vars?: V) => Translated<V>;
   dir: "ltr" | "rtl";
 }
 
@@ -70,11 +74,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     createClient().auth.updateUser({ data: { language: lang } }).catch(() => {});
   };
 
+  // Before the children render, so lib helpers they call agree with tr.
+  setCurrentLanguage(language);
+
   const t = (key: string) => translations[language]?.[key] ?? translations.en[key] ?? key;
+  const tr = <V extends PhraseVars | undefined = undefined>(text: string, vars?: V) => translatePhrase(language, text, vars);
   const dir = RTL_LANGUAGES.includes(language) ? "rtl" : "ltr";
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, dir }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, tr, dir }}>
       {children}
     </LanguageContext.Provider>
   );

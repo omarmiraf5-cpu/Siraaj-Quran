@@ -40,7 +40,7 @@ const OVERRIDES_KEY = "demo_assignment_overrides";
 const LOG_KEY = "demo_recitation_log_v1";
 
 export default function ParentQuranProgressPage() {
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
@@ -206,7 +206,7 @@ export default function ParentQuranProgressPage() {
                             rangeLabel
                           ) : (
                             <>
-                              {surah ? surah.englishName : `Surah ${a.surah}`}
+                              {surah ? surah.englishName : tr("Surah {surah}", { surah: a.surah })}
                               <span className="font-normal text-ink-muted"> · {rangeLabel}</span>
                             </>
                           )}

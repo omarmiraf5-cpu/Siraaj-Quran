@@ -261,7 +261,7 @@ function LessonBody({
   reciter: Reciter;
   onReciterChange: (id: string) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const lessonKey = `${book.id}:${lesson.id}`;
   const tiles = useMemo(() => lessonTiles(lesson), [lesson]);
   // Recording the tiles one by one: the tile chosen, or null when not.
@@ -364,7 +364,7 @@ function LessonBody({
                     <span lang="ar" className="font-arabic text-ink text-[23px] leading-[1.9] px-2">
                       {printed}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">read as</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">{tr("read as")}</span>
                     <span
                       lang="ar"
                       className={`${ILLUM_CLASS.verdigris} !rounded-lg w-full font-arabic text-[21px] leading-[1.9] px-2.5`}
@@ -420,7 +420,7 @@ function LessonBody({
 
       {lesson.note && (
         <div dir="ltr" className={`${ILLUM_CLASS[colour]} rounded-2xl px-4 py-3 mt-4 !block`}>
-          <p className="text-[10px] font-bold uppercase tracking-wider opacity-80 mb-1">For the teacher</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider opacity-80 mb-1">{tr("For the teacher")}</p>
           <p className="text-[13px] leading-snug">
             <Prose text={lesson.note} />
           </p>
@@ -458,7 +458,7 @@ export function QaidahLessons({
   /** A teacher's: recording a lesson, whole or a tile at a time. */
   recorder?: LessonRecorderControls;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [ownOpen, setOwnOpen] = useState<number | null>(current?.lesson ?? 1);
   const openLesson = open !== undefined ? open : ownOpen;
   const setOpenLesson = onOpenChange ?? setOwnOpen;
@@ -511,13 +511,15 @@ export function QaidahLessons({
                 {/* Wraps rather than truncating: on a phone most of the
                     book's lesson names are longer than one line. */}
                 <span className="block page-title text-[16px] leading-snug">{lesson.title}</span>
-                <span
-                  className="block font-arabic text-[15px] text-ink-muted mt-0.5 truncate"
-                  dir="rtl"
-                  lang="ar"
-                >
-                  {lesson.arabicTitle}
-                </span>
+                {language !== "ar" && (
+                  <span
+                    className="block font-arabic text-[15px] text-ink-muted mt-0.5 truncate"
+                    dir="rtl"
+                    lang="ar"
+                  >
+                    {lesson.arabicTitle}
+                  </span>
+                )}
                 {(isCurrent || isPassed || count > 0 || recorded) && (
                   <span className="flex flex-wrap gap-1.5 mt-1.5">
                     {isCurrent && (
@@ -585,6 +587,7 @@ export function QaidahLessons({
 
 /** What working through the book involves, shown above its lessons. */
 export function QaidahSummary({ book }: { book: QaidahBook }) {
+  const { tr } = useLanguage();
   return (
     <section className="card-quiet card-feature p-5">
       <div className="flex items-start gap-3.5">
@@ -592,10 +595,9 @@ export function QaidahSummary({ book }: { book: QaidahBook }) {
           <IconCheck size={18} />
         </span>
         <div dir="ltr">
-          <h2 className="page-title text-[16px]">How this works</h2>
+          <h2 className="page-title text-[16px]">{tr("How this works")}</h2>
           <p className="text-[13px] text-ink-body leading-relaxed mt-1">
-            {book.summary} Work through the lessons in order — each one assumes the one
-            before it. Read every row aloud.
+            {tr("{summary} Work through the lessons in order — each one assumes the one before it. Read every row aloud.", { summary: book.summary })}
           </p>
         </div>
       </div>
@@ -611,7 +613,7 @@ export function QaidahBookTabs({
   value: QaidahBookId;
   onChange: (book: QaidahBookId) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   return (
     <div role="tablist" aria-label={t("qaidah.book")} className="grid grid-cols-3 gap-2">
       {QAIDAH_BOOKS.map((b) => {
@@ -630,15 +632,17 @@ export function QaidahBookTabs({
             }`}
           >
             <span className="block text-[13px] font-semibold leading-tight">{b.name}</span>
-            <span
-              className={`block font-arabic text-[13px] leading-snug mt-0.5 ${
-                active ? "text-brand-gold-light" : "text-ink-muted"
-              }`}
-              dir="rtl"
-              lang="ar"
-            >
-              {b.arabicName}
-            </span>
+            {language !== "ar" && (
+              <span
+                className={`block font-arabic text-[13px] leading-snug mt-0.5 ${
+                  active ? "text-brand-gold-light" : "text-ink-muted"
+                }`}
+                dir="rtl"
+                lang="ar"
+              >
+                {b.arabicName}
+              </span>
+            )}
             <span className={`block text-[11px] mt-0.5 ${active ? "text-white/60" : "text-ink-muted"}`}>
               {b.lessons.length} {t("qaidah.lessonsCount")}
             </span>

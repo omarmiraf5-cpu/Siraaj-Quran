@@ -1,5 +1,6 @@
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import type { AttendanceDay } from "@/data/demo";
+import { phrase } from "@/lib/i18n/phrases";
 
 // Points and levels for the student portal.
 //
@@ -73,10 +74,10 @@ export function levelFor(totalXp: number): LevelState {
 /** The line under the level bar. Encouraging, and honest about the distance. */
 export function levelMessage(state: LevelState): string {
   if (state.percent >= 80) {
-    return `${state.toNext} XP to Level ${state.level + 1} — nearly there!`;
+    return phrase("{xp} XP to Level {level} — nearly there!", { xp: state.toNext, level: state.level + 1 });
   }
   if (state.percent >= 40) {
-    return `${state.toNext} XP to Level ${state.level + 1} — keep going.`;
+    return phrase("{xp} XP to Level {level} — keep going.", { xp: state.toNext, level: state.level + 1 });
   }
-  return `${state.toNext} XP to Level ${state.level + 1}.`;
+  return phrase("{xp} XP to Level {level}.", { xp: state.toNext, level: state.level + 1 });
 }

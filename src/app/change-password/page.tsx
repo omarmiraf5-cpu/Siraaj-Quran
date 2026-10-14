@@ -15,7 +15,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 export default function ChangePasswordPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
 
   const [ready, setReady] = useState(false);
   const [required, setRequired] = useState(false);
@@ -58,7 +58,7 @@ export default function ChangePasswordPage() {
     setSaving(false);
 
     if (updateError) {
-      setError(updateError.message);
+      setError(tr(updateError.message));
       return;
     }
 

@@ -9,6 +9,8 @@ import { demoSalaryPayments } from "@/components/SalariesPanel";
 import { demoExpenses } from "@/components/ExpensesPanel";
 import { financeProblem, monthLabel, monthOf, sum, todayIso } from "@/lib/finance";
 import { balanceFor, balancesByStudent } from "@/lib/balances";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // The office's money on one page: fees, salaries and expenses — for a month
 // and in all — and what families owe: the old balance, the month's fees,
@@ -31,6 +33,7 @@ export function FinanceOverview({
   students: DemoStudent[];
   feesReady: boolean;
 }) {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const thisMonth = monthOf(todayIso());
   const [month, setMonth] = useState(thisMonth);
@@ -72,7 +75,7 @@ export function FinanceOverview({
   const expensesAll = sum(expenses.map((x) => x.amount));
   const netAll = collected - salariesAll - expensesAll;
 
-  const name = (id: string) => students.find((s) => s.id === id)?.name ?? "Unknown student";
+  const name = (id: string) => students.find((s) => s.id === id)?.name ?? phrase("Unknown student");
   const rows = balancesByStudent(fees, month).filter((r) => r.outstanding > 0 || r.monthBilled > 0);
   const owing = rows.filter((r) => r.outstanding > 0);
   const shown = showAll ? rows : owing;
@@ -91,56 +94,56 @@ export function FinanceOverview({
         </div>
       )}
 
-      <SectionCard title={`${monthLabel(month)} totals`} note="money in and out">
+      <SectionCard title={tr("{month} totals", { month: monthLabel(month) })} note={tr("money in and out")}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-section="month-totals">
-          <StatTile value={money(school.monthPaid)} label="Fees" sub={`paid of ${money(school.monthBilled)} billed`} />
-          <StatTile value={money(salariesMonth)} label="Salaries" sub="paid to staff" />
-          <StatTile value={money(expensesMonth)} label="Expenses" sub="spent" />
-          <StatTile value={signed(netMonth)} label="Left over" sub="fees − salaries − expenses" />
+          <StatTile value={money(school.monthPaid)} label={tr("Fees")} sub={tr("paid of {amount} billed", { amount: money(school.monthBilled) })} />
+          <StatTile value={money(salariesMonth)} label={tr("Salaries")} sub={tr("paid to staff")} />
+          <StatTile value={money(expensesMonth)} label={tr("Expenses")} sub={tr("spent")} />
+          <StatTile value={signed(netMonth)} label={tr("Left over")} sub={tr("fees − salaries − expenses")} />
         </div>
       </SectionCard>
 
-      <SectionCard title="All-time totals" note="since records began">
+      <SectionCard title={tr("All-time totals")} note={tr("since records began")}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-section="all-totals">
-          <StatTile value={money(collected)} label="Fees collected" sub={`of ${money(sum(fees.map((f) => f.amountDue)))} billed`} />
-          <StatTile value={money(salariesAll)} label="Salaries" sub={`${salaries.length} payments`} />
-          <StatTile value={money(expensesAll)} label="Expenses" sub={`${expenses.length} records`} />
-          <StatTile value={signed(netAll)} label="Balance" sub="collected − paid out" />
+          <StatTile value={money(collected)} label={tr("Fees collected")} sub={tr("of {amount} billed", { amount: money(sum(fees.map((f) => f.amountDue))) })} />
+          <StatTile value={money(salariesAll)} label={tr("Salaries")} sub={tr("{count} payments", { count: salaries.length })} />
+          <StatTile value={money(expensesAll)} label={tr("Expenses")} sub={tr("{count} records", { count: expenses.length })} />
+          <StatTile value={signed(netAll)} label={tr("Balance")} sub={tr("collected − paid out")} />
         </div>
       </SectionCard>
 
-      <SectionCard title="Fee balances" note={`as of ${monthLabel(month)}`}>
+      <SectionCard title={tr("Fee balances")} note={tr("as of {month}", { month: monthLabel(month) })}>
         <div className="grid grid-cols-3 gap-3" data-section="balances">
-          <StatTile value={money(school.old)} label="Old balance" sub={`unpaid from before ${monthLabel(month)}`} />
-          <StatTile value={money(school.monthOwed)} label="Monthly balance" sub={`still owed for ${monthLabel(month)}`} />
-          <StatTile value={money(school.outstanding)} label="Outstanding" sub="old + monthly" />
+          <StatTile value={money(school.old)} label={tr("Old balance")} sub={tr("unpaid from before {month}", { month: monthLabel(month) })} />
+          <StatTile value={money(school.monthOwed)} label={tr("Monthly balance")} sub={tr("still owed for {month}", { month: monthLabel(month) })} />
+          <StatTile value={money(school.outstanding)} label={tr("Outstanding")} sub={tr("old + monthly")} />
         </div>
         {school.upcoming > 0 && (
           <p className="mt-3 text-[12px] text-ink-muted">
-            {money(school.upcoming)} more is billed for after {monthLabel(month)} and isn&apos;t due yet.
+            {tr("{amount} more is billed for after {month} and isn't due yet.", { amount: money(school.upcoming), month: monthLabel(month) })}
           </p>
         )}
       </SectionCard>
 
       <SectionCard
-        title="Balance by student"
-        note={`${owing.length} owing`}
+        title={tr("Balance by student")}
+        note={tr("{count} owing", { count: owing.length })}
       >
         {rows.length === 0 ? (
-          <EmptyNote>No fees billed up to {monthLabel(month)}.</EmptyNote>
+          <EmptyNote>{tr("No fees billed up to {month}.", { month: monthLabel(month) })}</EmptyNote>
         ) : (
           <>
             {shown.length === 0 ? (
-              <EmptyNote>Every student is paid up.</EmptyNote>
+              <EmptyNote>{tr("Every student is paid up.")}</EmptyNote>
             ) : (
               <div className="overflow-x-auto -mx-1">
                 <table className="w-full text-[13px]" data-section="by-student">
                   <thead>
                     <tr className="text-[11px] uppercase tracking-wide text-ink-muted">
-                      <th className="text-start font-semibold py-2 px-1">Student</th>
-                      <th className="text-end font-semibold py-2 px-1">Old</th>
-                      <th className="text-end font-semibold py-2 px-1">This month</th>
-                      <th className="text-end font-semibold py-2 px-1">Outstanding</th>
+                      <th className="text-start font-semibold py-2 px-1">{tr("Student")}</th>
+                      <th className="text-end font-semibold py-2 px-1">{tr("Old")}</th>
+                      <th className="text-end font-semibold py-2 px-1">{tr("This month")}</th>
+                      <th className="text-end font-semibold py-2 px-1">{tr("Outstanding")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-surface-border">
@@ -171,13 +174,13 @@ export function FinanceOverview({
                 onClick={() => setShowAll((v) => !v)}
                 className="mt-3 text-[12px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
               >
-                {showAll ? "Show only students who owe" : `Show paid-up students too (${rows.length - owing.length})`}
+                {showAll ? tr("Show only students who owe") : tr("Show paid-up students too ({n})", { n: rows.length - owing.length })}
               </button>
             )}
           </>
         )}
         <p className="mt-3 text-[11px] text-ink-muted">
-          A charge counts in the month it&apos;s due. Anything still unpaid from earlier months is the old balance.
+          {tr("A charge counts in the month it's due. Anything still unpaid from earlier months is the old balance.")}
         </p>
       </SectionCard>
     </div>

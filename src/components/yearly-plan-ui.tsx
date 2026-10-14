@@ -26,8 +26,11 @@ import {
   type DailyPacePlan,
 } from "@/lib/mushafPlan";
 import type { SchoolCalendar } from "@/lib/schoolCalendar";
+import { dateLocale } from "@/lib/i18n/current";
 import { Modal, SectionCard, EmptyNote } from "@/components/portal-ui";
 import { Mushaf } from "@/components/Mushaf";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 /**
  * The yearly-plan module's own visual language.
@@ -109,6 +112,7 @@ export function PaceDial({
   pace: PaceStatus;
   size?: number;
 }) {
+  const { tr } = useLanguage();
   const stroke = 10;
   const gap = 7; // between the two rings
   const rOuter = (size - stroke) / 2 - 2;
@@ -126,9 +130,9 @@ export function PaceDial({
       height={size}
       viewBox={`0 0 ${size} ${size}`}
       role="img"
-      aria-label={`${Math.round(actual)} percent complete against ${Math.round(
+      aria-label={tr("{round} percent complete against {round2} percent expected — {PACE_LABEL}", { round: Math.round(actual), round2: Math.round(
         expected
-      )} percent expected — ${PACE_LABEL[pace]}`}
+      ), PACE_LABEL: PACE_LABEL[pace] })}
       className="flex-shrink-0"
     >
       {/* Rotated so both arcs start at twelve o'clock rather than three. */}
@@ -199,7 +203,7 @@ export function PaceDial({
         className="fill-ink-muted"
         style={{ fontSize: 10, letterSpacing: "0.14em", fontWeight: 700 }}
       >
-        {`OF ${Math.round(expected)}% DUE`}
+        {tr("OF {round}% DUE", { round: Math.round(expected) })}
       </text>
     </svg>
   );
@@ -311,6 +315,7 @@ export function PlanAlertBanner({
   onAcknowledge?: () => void;
   busy?: boolean;
 }) {
+  const { tr } = useLanguage();
   const colour = level === "critical" ? ALERT : level === "warning" ? GOLD_DARK : NAVY;
 
   return (
@@ -339,7 +344,7 @@ export function PlanAlertBanner({
           disabled={busy}
           className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-muted hover:text-ink disabled:opacity-40 flex-shrink-0 mt-0.5"
         >
-          {acknowledged ? "Seen" : "Dismiss"}
+          {acknowledged ? tr("Seen") : tr("Dismiss")}
         </button>
       )}
     </div>
@@ -460,6 +465,7 @@ export function MilestoneRow({
   onViewMushaf?: (m: Milestone) => void;
   children?: React.ReactNode;
 }) {
+  const { tr } = useLanguage();
   const pct = milestonePercent(milestone);
   const overdue = isOverdue(milestone, today);
   const done = milestone.status === "completed";
@@ -516,12 +522,12 @@ export function MilestoneRow({
           <div className="mt-2.5 flex items-center gap-3 flex-wrap">
             {done && (
               <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-brand-gold-dark">
-                Completed{milestone.completed_on ? ` · ${milestone.completed_on}` : ""}
+                {tr("Completed")}{milestone.completed_on ? ` · ${milestone.completed_on}` : ""}
               </span>
             )}
             {overdue && (
               <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-status-error-text">
-                Past due
+                {tr("Past due")}
               </span>
             )}
             {onRecord && (
@@ -530,7 +536,7 @@ export function MilestoneRow({
                 onClick={onRecord}
                 className="text-[11px] font-bold uppercase tracking-[0.1em] text-brand-navy dark:text-brand-gold hover:underline"
               >
-                Record progress
+                {tr("Record progress")}
               </button>
             )}
             {onViewMushaf && mushafRange(milestone) && (
@@ -539,7 +545,7 @@ export function MilestoneRow({
                 onClick={() => onViewMushaf(milestone)}
                 className="text-[11px] font-bold uppercase tracking-[0.1em] text-brand-navy dark:text-brand-gold hover:underline"
               >
-                View in Mushaf
+                {tr("View in Mushaf")}
               </button>
             )}
           </div>
@@ -640,6 +646,7 @@ export function MilestoneNavigator({
   onFocus: (id: string) => void;
   onViewMushaf?: (m: Milestone) => void;
 }) {
+  const { tr } = useLanguage();
   if (milestones.length === 0) return null;
 
   const index = Math.max(
@@ -659,7 +666,7 @@ export function MilestoneNavigator({
           type="button"
           onClick={() => goTo(index - 1)}
           disabled={index === 0}
-          aria-label="Previous milestone"
+          aria-label={tr("Previous milestone")}
           className="flex-shrink-0 p-2 rounded-lg border border-surface-border text-ink-muted hover:text-ink disabled:opacity-30 disabled:pointer-events-none transition"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="rtl:rotate-180">
@@ -669,7 +676,7 @@ export function MilestoneNavigator({
 
         <div className="flex-1 min-w-0 text-center">
           <p className="eyebrow">
-            Milestone {index + 1} of {milestones.length}
+            {tr("Milestone {n} of {count}", { n: index + 1, count: milestones.length })}
           </p>
           <p className="page-title text-[15px] truncate mt-0.5">
             {focused.title?.trim() ? milestoneTitle(focused) : mushafRange(focused) || milestoneTitle(focused)}
@@ -680,7 +687,7 @@ export function MilestoneNavigator({
           type="button"
           onClick={() => goTo(index + 1)}
           disabled={index === milestones.length - 1}
-          aria-label="Next milestone"
+          aria-label={tr("Next milestone")}
           className="flex-shrink-0 p-2 rounded-lg border border-surface-border text-ink-muted hover:text-ink disabled:opacity-30 disabled:pointer-events-none transition"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="rtl:rotate-180">
@@ -696,7 +703,7 @@ export function MilestoneNavigator({
             onClick={() => onViewMushaf(focused)}
             className="text-[11px] font-bold uppercase tracking-[0.1em] text-brand-navy dark:text-brand-gold hover:underline"
           >
-            View in Mushaf
+            {tr("View in Mushaf")}
           </button>
         </div>
       )}
@@ -708,7 +715,7 @@ export function MilestoneNavigator({
           the same size for a 4-milestone plan and a 40-milestone one. */}
       <div
         role="tablist"
-        aria-label="Jump to a milestone"
+        aria-label={tr("Jump to a milestone")}
         className="mt-3 flex gap-1.5 overflow-x-auto pb-1"
       >
         {milestones.map((m, i) => {
@@ -722,7 +729,7 @@ export function MilestoneNavigator({
               type="button"
               role="tab"
               aria-selected={isFocused}
-              aria-label={`Milestone ${i + 1}${done ? ", completed" : overdue ? ", past due" : ""}`}
+              aria-label={done ? phrase("Milestone {n}, completed", { n: i + 1 }) : overdue ? phrase("Milestone {n}, past due", { n: i + 1 }) : phrase("Milestone {n}", { n: i + 1 })}
               title={mushafRange(m) || milestoneTitle(m)}
               onClick={() => goTo(i)}
               className={`flex-shrink-0 w-8 h-8 rounded-full text-[12px] font-bold tabular-nums flex items-center justify-center border transition ${
@@ -768,7 +775,7 @@ export function PlanFigure({
 }
 
 function weekdayLabel(iso: string): string {
-  return new Date(iso + "T12:00:00Z").toLocaleDateString("en-CA", {
+  return new Date(iso + "T12:00:00Z").toLocaleDateString(dateLocale("en-CA"), {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -808,6 +815,7 @@ export function DailyWorkPanel({
   today?: string;
   onViewFullYear?: () => void;
 }) {
+  const { tr } = useLanguage();
   const dailyAmount = dailyPaceOf(plan, cal, totalUnits);
   if (dailyAmount == null) return null;
   const start: Position = { surah: plan.start_surah!, ayah: plan.start_ayah! };
@@ -826,12 +834,12 @@ export function DailyWorkPanel({
 
   return (
     <SectionCard
-      title="This week's work"
+      title={tr("This week's work")}
       note={
         <span className="inline-flex items-center gap-3">
           {plan.daily_review_amount && (
             <span className="whitespace-nowrap">
-              + {formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit)} review daily
+              {tr("+ {formatUnits} review daily", { formatUnits: formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit) })}
             </span>
           )}
           {onViewFullYear && (
@@ -840,14 +848,14 @@ export function DailyWorkPanel({
               onClick={onViewFullYear}
               className="font-semibold text-brand-navy dark:text-brand-gold hover:underline whitespace-nowrap"
             >
-              Whole year →
+              {tr("Whole year →")}
             </button>
           )}
         </span>
       }
     >
       {rows.length === 0 ? (
-        <EmptyNote>No school days fall in this week.</EmptyNote>
+        <EmptyNote>{tr("No school days fall in this week.")}</EmptyNote>
       ) : (
         <ul className="divide-y divide-surface-border -my-1">
           {days.map((d) => {
@@ -864,7 +872,7 @@ export function DailyWorkPanel({
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide">
                     {weekdayLabel(d)}
-                    {isToday && <span className="text-brand-navy dark:text-brand-gold"> · Today</span>}
+                    {isToday && <span className="text-brand-navy dark:text-brand-gold">{" "}{tr("· Today")}</span>}
                   </p>
                   {row ? (
                     <>
@@ -875,13 +883,13 @@ export function DailyWorkPanel({
                     </>
                   ) : (
                     <p className="text-[13px] text-ink-muted mt-0.5 italic">
-                      {inSpan ? "No class" : "Outside the plan's dates"}
+                      {inSpan ? tr("No class") : tr("Outside the plan's dates")}
                     </p>
                   )}
                 </div>
                 {row && plan.daily_review_amount ? (
                   <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-bg-warm text-ink-muted flex-shrink-0 whitespace-nowrap">
-                    + {formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit)} review
+                    {tr("+ {formatUnits} review", { formatUnits: formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit) })}
                   </span>
                 ) : null}
               </li>
@@ -894,7 +902,7 @@ export function DailyWorkPanel({
 }
 
 function monthTitle(iso: string): string {
-  return new Date(iso + "T12:00:00Z").toLocaleDateString("en-CA", {
+  return new Date(iso + "T12:00:00Z").toLocaleDateString(dateLocale("en-CA"), {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -925,6 +933,7 @@ export function FullYearScheduleModal({
   totalUnits?: number;
   onClose: () => void;
 }) {
+  const { tr } = useLanguage();
   if (!open) return null;
   const dailyAmount = dailyPaceOf(plan, cal, totalUnits);
   if (dailyAmount == null) return null;
@@ -951,16 +960,16 @@ export function FullYearScheduleModal({
 
   return (
     <Modal
-      title="The whole year, day by day"
-      subtitle={`${rows.length} school day${rows.length === 1 ? "" : "s"}, about ${formatUnits(
+      title={tr("The whole year, day by day")}
+      subtitle={tr("{count} school day, about {formatUnits} each|{count} school days, about {formatUnits} each", { count: rows.length, formatUnits: formatUnits(
         dailyAmount,
         plan.unit
-      )} each`}
+      ) })}
       wide
       onClose={onClose}
     >
       {rows.length === 0 ? (
-        <EmptyNote>No school days fall in this plan's dates.</EmptyNote>
+        <EmptyNote>{tr("No school days fall in this plan's dates.")}</EmptyNote>
       ) : (
         <div className="space-y-6 max-h-[65vh] overflow-y-auto">
           {months.map((m) => (
@@ -978,7 +987,7 @@ export function FullYearScheduleModal({
                     </span>
                     {plan.daily_review_amount ? (
                       <span className="text-[11px] text-ink-muted flex-shrink-0 whitespace-nowrap">
-                        + {formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit)} review
+                        {tr("+ {formatUnits} review", { formatUnits: formatUnits(plan.daily_review_amount, plan.daily_review_unit ?? plan.unit) })}
                       </span>
                     ) : null}
                   </li>

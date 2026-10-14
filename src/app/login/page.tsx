@@ -13,6 +13,7 @@ import { SHOW_DEMO_LOGINS } from "@/lib/demoMode";
 import type { Role } from "@/lib/types";
 import { homeOf, mayOpen } from "@/lib/portalAccess";
 import { safeNextPath } from "@/lib/safeNextPath";
+import { ByLanguage } from "@/components/ByLanguage";
 
 const ROLES: { key: Role; labelKey: string; portalKey: string }[] = [
   { key: "parent",  labelKey: "role.parent",  portalKey: "login.portal.parent"  },
@@ -82,6 +83,7 @@ interface RosterStudent {
 }
 
 export default function LoginPage() {
+  const { tr } = useLanguage();
   const router   = useRouter();
   const supabase = createClient();
   const { t }    = useLanguage();
@@ -334,7 +336,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="w-32 h-32 rounded-2xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark mb-4 flex-shrink-0">
-          <Image src="/crest.jpg" alt="MyDiiwaan crest" width={128} height={128} className="object-cover w-full h-full" />
+          <Image src="/crest.jpg" alt={tr("MyDiiwaan crest")} width={128} height={128} className="object-cover w-full h-full" />
         </div>
 
         {/* Title */}
@@ -362,10 +364,14 @@ export default function LoginPage() {
             ﴿اقْرَأْ وَرَبُّكَ الْأَكْرَمُ ۝ الَّذِي عَلَّمَ بِالْقَلَمِ ۝ عَلَّمَ الْإِنْسَانَ مَا لَمْ يَعْلَمْ﴾
           </p>
           <p className="text-white/45 text-xs font-arabic" dir="rtl" lang="ar">[العلق: ٣–٥]</p>
-          <p className="font-serif text-white/80 text-[15px] leading-relaxed pt-1" dir="ltr">
-            &ldquo;Read, and your Lord is the Most Generous — Who taught by the pen —
-            taught man what he knew not.&rdquo;
-          </p>
+          <ByLanguage
+            en={
+              <p className="font-serif text-white/80 text-[15px] leading-relaxed pt-1" dir="ltr">
+                “Read, and your Lord is the Most Generous — Who taught by the pen — taught man what he knew not.”
+              </p>
+            }
+            ar={null}
+          />
         </div>
 
         {/* Abu Hayyan Quote */}
@@ -374,13 +380,15 @@ export default function LoginPage() {
             قَالَ أَبُو حَيَّانَ الأَنْدَلُسِيُّ فِي البَحْرِ المُحِيطِ:
             «وَلَيْسَ وَرَاءَ التَّكَرُّمِ بِإِفَادَةِ الْفَوَائِدِ الْعِلْمِيَّةِ تَكَرُّمٌ، حَيْثُ قَالَ: ﴿الأَكْرَمُ الَّذِي عَلَّمَ بِالْقَلَمِ عَلَّمَ الإِنْسَانَ مَا لَمْ يَعْلَمْ﴾، فَدَلَّ عَلَى كَمَالِ كَرَمِهِ بِأَنَّ عَلَّمَ عِبَادَهُ مَا لَمْ يَعْلَمُوا، وَنَقَلَهُمْ مِنْ ظُلْمَةِ الْجَهْلِ إِلَى نُورِ الْعِلْمِ»
           </p>
-          <p className="font-serif text-white/70 text-[13px] leading-relaxed border-t border-white/15 pt-2.5" dir="ltr">
-            &ldquo;There is no generosity beyond the generosity of imparting knowledge — for He said:
-            ﹛the Most Generous, Who taught by the pen, taught man what he knew not﹜ —
-            indicating the perfection of His generosity in teaching His servants what they knew not,
-            and transferring them from the darkness of ignorance to the light of knowledge.&rdquo;
-            <span className="block not-italic text-brand-gold-light/70 mt-1.5 text-xs tracking-wide">— Abu Ḥayyān al-Andalusī, Al-Baḥr al-Muḥīṭ</span>
-          </p>
+          <ByLanguage
+            en={
+              <p className="font-serif text-white/70 text-[13px] leading-relaxed border-t border-white/15 pt-2.5" dir="ltr">
+                “There is no generosity beyond the generosity of imparting knowledge — for He said: ﹛the Most Generous, Who taught by the pen, taught man what he knew not﹜ — indicating the perfection of His generosity in teaching His servants what they knew not, and transferring them from the darkness of ignorance to the light of knowledge.”
+                <span className="block not-italic text-brand-gold-light/70 mt-1.5 text-xs tracking-wide">— Abu Ḥayyān al-Andalusī, Al-Baḥr al-Muḥīṭ</span>
+              </p>
+            }
+            ar={null}
+          />
         </div>
       </div>
 
@@ -416,10 +424,15 @@ export default function LoginPage() {
               >
                 {r.arabic}
               </p>
-              <p className="font-serif text-white/85 text-[15px] leading-relaxed" dir="ltr">
-                &ldquo;{r.english}&rdquo;
-              </p>
-              <p className="text-white/50 text-xs tracking-wide" dir="ltr">— {r.source}</p>
+              <ByLanguage
+                en={
+                  <p className="font-serif text-white/85 text-[15px] leading-relaxed" dir="ltr">
+                    &ldquo;{r.english}&rdquo;
+                  </p>
+                }
+                ar={null}
+              />
+              <p className="text-white/50 text-xs tracking-wide">— {tr(r.source)}</p>
             </div>
           );
         })()}

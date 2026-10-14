@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { download, fileNameFor, printPinSheet } from "@/lib/sheetTools";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // Students who can't sign in yet — no PIN, or no sign-in behind it — given
 // PINs all at once, a batch at a time (/api/admin/student-pins), and the
@@ -33,6 +35,7 @@ export default function StudentPins({
   refreshKey: number;
   onDone: () => void;
 }) {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const [without, setWithout] = useState<number | null>(null);
   const [phase, setPhase] = useState<"idle" | "giving" | "done">("idle");
@@ -52,7 +55,7 @@ export default function StudentPins({
   }, [refreshKey, phase]);
 
   const giveAll = async () => {
-    if (!window.confirm(`Give a new PIN to each of the ${without} students who can't sign in yet? Students who already have a PIN keep it.`)) return;
+    if (!window.confirm(tr("Give a new PIN to each of the {without} students who can't sign in yet? Students who already have a PIN keep it.", { without }))) return;
     setPhase("giving");
     setError(null);
     setTotal(without ?? 0);
@@ -67,9 +70,9 @@ export default function StudentPins({
           body: JSON.stringify({ skip }),
         });
         body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error ?? "That didn't go through");
+        if (!res.ok) throw new Error(body.error ?? phrase("That didn't go through"));
       } catch (e) {
-        setError(`${e instanceof Error ? e.message : "That didn't go through"}. Press the button again to carry on — students already done keep their PIN.`);
+        setError(phrase("{problem}. Press the button again to carry on — students already done keep their PIN.", { problem: e instanceof Error ? phrase(e.message) : phrase("That didn't go through") }));
         break;
       }
       const results = body.results ?? [];
@@ -103,26 +106,26 @@ export default function StudentPins({
   if (phase === "idle" && without === 0) {
     return (
       <p className="text-[12.5px] text-ink-muted px-1">
-        Every student has a sign-in PIN.{" "}
+        {tr("Every student has a sign-in PIN.")}{" "}
         <button type="button" onClick={printEveryone} disabled={printing} className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
-          {printing ? "Getting them…" : "Print everyone's PINs"}
+          {printing ? tr("Getting them…") : tr("Print everyone's PINs")}
         </button>
       </p>
     );
   }
 
   return (
-    <section aria-label="Student PINs" className="card-quiet p-4 space-y-3">
+    <section aria-label={tr("Student PINs")} className="card-quiet p-4 space-y-3">
       {phase === "idle" && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[13.5px] font-semibold text-ink">
-              {without} student{without === 1 ? " can't" : "s can't"} sign in yet
+              {tr("{count} student can't sign in yet|{count} students can't sign in yet", { count: without })}
             </p>
-            <p className="text-[12px] text-ink-muted">They have no PIN. Give them all one at once, then print the list to hand out.</p>
+            <p className="text-[12px] text-ink-muted">{tr("They have no PIN. Give them all one at once, then print the list to hand out.")}</p>
           </div>
           <button type="button" onClick={giveAll} className={primary}>
-            Give them PINs
+            {tr("Give them PINs")}
           </button>
         </div>
       )}
@@ -130,7 +133,7 @@ export default function StudentPins({
       {phase === "giving" && (
         <div>
           <p className="text-[13.5px] font-semibold text-ink">
-            Giving PINs… {given.length} of {total}
+            {tr("Giving PINs… {count} of {total}", { count: given.length, total })}
           </p>
           <div className="mt-2 h-2 rounded-full bg-surface-bg-warm overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={given.length}>
             <div className="h-full bg-emerald-600 transition-all" style={{ width: `${total ? Math.min(100, (given.length / total) * 100) : 0}%` }} />
@@ -141,12 +144,12 @@ export default function StudentPins({
       {phase === "done" && (
         <div className="space-y-3">
           <p className="text-[13.5px] font-semibold text-ink">
-            {made.length} PIN{made.length === 1 ? "" : "s"} given.
-            {without > 0 && <span className="font-normal text-ink-muted"> {without} still to do.</span>}
+            {tr("{count} PIN given.|{count} PINs given.", { count: made.length })}
+            {without > 0 && <span className="font-normal text-ink-muted"> {tr("{without} still to do.", { without })}</span>}
           </p>
           {failed.length > 0 && (
             <p className="text-[12.5px] text-status-error-text">
-              Couldn&apos;t give {failed.length}: {failed.slice(0, 6).map((f) => f.name).join(", ")}
+              {tr("Couldn't give {count}:", { count: failed.length })}{" "}{failed.slice(0, 6).map((f) => f.name).join(", ")}
               {failed.length > 6 ? "…" : ""} — {failed[0].error}
             </p>
           )}
@@ -155,7 +158,7 @@ export default function StudentPins({
             {made.length > 0 && (
               <>
                 <button type="button" onClick={() => printPinSheet(schoolName, withPlace(made))} className={primary}>
-                  Print the PIN list
+                  {tr("Print the PIN list")}
                 </button>
                 <button
                   type="button"
@@ -167,17 +170,17 @@ export default function StudentPins({
                   }
                   className={ghost}
                 >
-                  Download as a spreadsheet
+                  {tr("Download as a spreadsheet")}
                 </button>
               </>
             )}
             {without > 0 && (
               <button type="button" onClick={giveAll} className={ghost}>
-                Carry on
+                {tr("Carry on")}
               </button>
             )}
             <button type="button" onClick={() => { setPhase("idle"); setGiven([]); }} className={ghost}>
-              Close
+              {tr("Close")}
             </button>
           </div>
         </div>

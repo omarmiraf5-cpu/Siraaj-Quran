@@ -1,3 +1,5 @@
+import { labels, translateFields } from "@/lib/i18n/phrases";
+
 // Stars and badges — the teacher's own recognition, separate from the XP in
 // lib/progress.ts. XP is computed from what a student has measurably done
 // (memorised, finished, turned up); a star is a teacher deciding that
@@ -14,9 +16,9 @@ export const STAR_REASONS: { key: StarReason; label: string; emoji: string }[] =
   { key: "effort", label: "Excellent effort", emoji: "🏆" },
 ];
 
-export const STAR_REASON_LABELS: Record<StarReason, string> = Object.fromEntries(
-  STAR_REASONS.map((r) => [r.key, r.label])
-) as Record<StarReason, string>;
+export const STAR_REASON_LABELS: Record<StarReason, string> = labels(
+  Object.fromEntries(STAR_REASONS.map((r) => [r.key, r.label])) as Record<StarReason, string>
+);
 
 export const STAR_REASON_EMOJI: Record<StarReason, string> = Object.fromEntries(
   STAR_REASONS.map((r) => [r.key, r.emoji])
@@ -39,9 +41,9 @@ export const BADGES: { key: BadgeKind; label: string; blurb: string; emoji: stri
   { key: "consistent_learner", label: "Consistent Learner", blurb: "Steady week after week", emoji: "🔵" },
 ];
 
-export const BADGE_LABELS: Record<BadgeKind, string> = Object.fromEntries(
-  BADGES.map((b) => [b.key, b.label])
-) as Record<BadgeKind, string>;
+export const BADGE_LABELS: Record<BadgeKind, string> = labels(
+  Object.fromEntries(BADGES.map((b) => [b.key, b.label])) as Record<BadgeKind, string>
+);
 
 export const BADGE_EMOJI: Record<BadgeKind, string> = Object.fromEntries(
   BADGES.map((b) => [b.key, b.emoji])
@@ -123,3 +125,8 @@ export function allStars(created: DemoStar[]): DemoStar[] {
 export function allBadges(created: DemoBadge[]): DemoBadge[] {
   return [...DEMO_BADGES, ...created].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
+
+// Read in the current language wherever they're shown (lib/i18n/phrases).
+for (const r of STAR_REASONS) translateFields(r, ["label"]);
+for (const b of BADGES) translateFields(b, ["label", "blurb"]);
+for (const t of TIERS) translateFields(t, ["label"]);

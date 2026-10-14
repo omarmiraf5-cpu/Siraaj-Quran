@@ -14,8 +14,10 @@ import {
   useQaidahBookChoice,
 } from "@/components/QaidahBook";
 import { MyQaidahLesson } from "@/components/QaidahLessonCard";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function StudentQaidahPage() {
+  const { tr } = useLanguage();
   // A signed-in child's roster is just themselves; the sample portal's is
   // the sample child.
   const { mode, students } = usePortalRoster([DEMO_CURRENT_STUDENT]);
@@ -55,8 +57,8 @@ export default function StudentQaidahPage() {
       <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
         <div className="relative">
-          <p className="eyebrow text-white/45">Learning to read</p>
-          <h1 className="page-title text-white text-[30px] mt-1 leading-tight">Qa&apos;idah</h1>
+          <p className="eyebrow text-white/45">{tr("Learning to read")}</p>
+          <h1 className="page-title text-white text-[30px] mt-1 leading-tight">{tr("Qa'idah")}</h1>
           <p
             className="font-calligraphy text-[26px] text-brand-gold-light mt-1.5 leading-tight"
             dir="rtl"
@@ -65,7 +67,7 @@ export default function StudentQaidahPage() {
             {book.arabicName}
           </p>
           <p className="text-[13px] text-white/55 mt-2.5">
-            {book.lessons.length} lessons
+            {tr("{count} lessons", { count: book.lessons.length })}
             <span className="text-white/25 mx-2">·</span>
             {book.name}
           </p>

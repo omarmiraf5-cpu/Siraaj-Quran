@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ARBAEEN, ARBAEEN_THEMES, type Hadith } from "@/data/arbaeen";
 import { ILLUM_CLASS, GRAD_CLASS, ILLUM, type IllumColour } from "@/components/student-ui";
 import { IconArrow, IconStar } from "@/components/icons";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // Each theme keeps one colour across the whole collection, so the two hadith
 // on brotherhood are visibly a pair. Assigned by position in the theme list
@@ -15,6 +16,7 @@ function themeColour(theme: string): IllumColour {
 }
 
 export function ArbaeenBook() {
+  const { tr } = useLanguage();
   const [open, setOpen] = useState<number | null>(1);
   const [theme, setTheme] = useState<string | null>(null);
 
@@ -26,11 +28,11 @@ export function ArbaeenBook() {
           about intention. */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         <FilterChip active={theme === null} onClick={() => setTheme(null)}>
-          All {ARBAEEN.length}
+          {tr("All {count}", { count: ARBAEEN.length })}
         </FilterChip>
         {ARBAEEN_THEMES.map((t) => (
           <FilterChip key={t} active={theme === t} onClick={() => setTheme(t)}>
-            {t}
+            {tr(t)}
           </FilterChip>
         ))}
       </div>
@@ -83,6 +85,7 @@ function HadithCard({
   onToggle: () => void;
   delay: number;
 }) {
+  const { tr, language } = useLanguage();
   const colour = themeColour(hadith.theme);
 
   return (
@@ -104,18 +107,18 @@ function HadithCard({
 
         <span className="flex-1 min-w-0">
           <span className="flex items-center gap-2">
-            <span className="page-title text-[16px] truncate">{hadith.theme}</span>
+            <span className="page-title text-[16px] truncate">{tr(hadith.theme)}</span>
             {hadith.qudsi && (
               <span
                 className={`${ILLUM_CLASS.saffron} inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide flex-shrink-0`}
               >
                 <IconStar size={9} />
-                Qudsi
+                {tr("Qudsi")}
               </span>
             )}
           </span>
           <span className="block text-[12px] text-ink-muted mt-0.5 truncate">
-            {hadith.narrator} · {hadith.source}
+            {tr(hadith.narrator)} · {tr(hadith.source)}
           </span>
         </span>
 
@@ -151,13 +154,14 @@ function HadithCard({
             </p>
           </div>
 
-          <div className="gold-rule my-4" />
+          {language !== "ar" && <div className="gold-rule my-4" />}
 
           {/* Explicit ltr: the app's own language setting can be Arabic
               (dir="rtl" on <html>), but this translation is always English
               regardless — without this it inherits rtl and the bidi
               algorithm reorders its punctuation to the wrong ends. */}
-          <div dir="ltr">
+          {/* In Arabic the hadith above is the whole of it. */}
+          {language !== "ar" && <div dir="ltr">
             <p className="text-[12px] text-ink-muted leading-relaxed">{hadith.isnadEn}</p>
             <p className="font-serif text-[15px] text-ink-body leading-relaxed mt-1.5">
               {hadith.english}
@@ -165,7 +169,7 @@ function HadithCard({
             <p className="text-[12px] text-ink-muted leading-relaxed mt-2">
               {hadith.attributionEn}
             </p>
-          </div>
+          </div>}
         </div>
       )}
     </article>
@@ -174,6 +178,7 @@ function HadithCard({
 
 /** The note at the top of the Forty Hadith page. */
 export function ArbaeenSummary() {
+  const { tr } = useLanguage();
   const qudsi = ARBAEEN.filter((h) => h.qudsi).length;
   return (
     <section className="card-quiet card-feature p-5">
@@ -182,11 +187,9 @@ export function ArbaeenSummary() {
           <IconStar size={18} />
         </span>
         <div>
-          <h2 className="page-title text-[16px]">Al-Arba&apos;un an-Nawawiyyah</h2>
+          <h2 className="page-title text-[16px]">{tr("Al-Arba'un an-Nawawiyyah")}</h2>
           <p className="text-[13px] text-ink-body leading-relaxed mt-1">
-            {ARBAEEN.length} hadith gathered by Imam an-Nawawi, {qudsi} of them
-            qudsi. Between them they carry most of what a Muslim needs to
-            practise the religion. Tap one to read it in Arabic and English.
+            {tr("{count} hadith gathered by Imam an-Nawawi, {qudsi} of them qudsi. Between them they carry most of what a Muslim needs to practise the religion. Tap one to read it in Arabic and English.", { count: ARBAEEN.length, qudsi })}
           </p>
         </div>
       </div>

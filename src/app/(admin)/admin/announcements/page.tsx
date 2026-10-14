@@ -13,10 +13,13 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 const AUDIENCES: AnnouncementAudience[] = ["all", "parents", "teachers", "students"];
 
 export default function AdminAnnouncementsPage() {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
@@ -48,7 +51,7 @@ export default function AdminAnnouncementsPage() {
         audience: a.audience as AnnouncementAudience,
         authorName:
           (a as unknown as { profiles: { full_name: string } | null }).profiles?.full_name ??
-          "School office",
+          phrase("School office"),
         pinned: a.pinned,
         createdAt: (a.created_at ?? "").slice(0, 10),
       }))
@@ -94,7 +97,7 @@ export default function AdminAnnouncementsPage() {
         title: title.trim(),
         body: body.trim(),
         audience,
-        authorName: "School office",
+        authorName: phrase("School office"),
         pinned,
         createdAt: new Date().toISOString().slice(0, 10),
       };
@@ -117,7 +120,7 @@ export default function AdminAnnouncementsPage() {
     });
     setSaving(false);
     if (error) {
-      setFormError(error.message);
+      setFormError(tr(error.message));
       return;
     }
     await loadReal();
@@ -173,16 +176,16 @@ export default function AdminAnnouncementsPage() {
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Communication"
-        title="Announcements"
-        meta={[`${items.length} posted`, pinnedCount ? `${pinnedCount} pinned` : "none pinned"]}
+        eyebrow={tr("Communication")}
+        title={tr("Announcements")}
+        meta={[tr("{count} posted", { count: items.length }), pinnedCount ? tr("{count} pinned", { count: pinnedCount }) : tr("none pinned")]}
         actions={
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
             className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
           >
-            {showForm ? "Cancel" : "+ New announcement"}
+            {showForm ? tr("Cancel") : tr("+ New announcement")}
           </button>
         }
       />
@@ -190,26 +193,26 @@ export default function AdminAnnouncementsPage() {
       {showForm && (
         <form onSubmit={post} className="card-quiet p-5 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Title *</label>
+            <label className="block text-sm font-semibold text-ink mb-2">{tr("Title *")}</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. No classes this Saturday"
+              placeholder={tr("e.g. No classes this Saturday")}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Message *</label>
+            <label className="block text-sm font-semibold text-ink mb-2">{tr("Message *")}</label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
-              placeholder="Write the announcement…"
+              placeholder={tr("Write the announcement…")}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition resize-y"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Send to</label>
+            <label className="block text-sm font-semibold text-ink mb-2">{tr("Send to")}</label>
             <div className="flex flex-wrap gap-2">
               {AUDIENCES.map((a) => (
                 <button
@@ -234,7 +237,7 @@ export default function AdminAnnouncementsPage() {
               onChange={(e) => setPinned(e.target.checked)}
               className="w-4 h-4 rounded"
             />
-            Pin to the top of everyone&apos;s dashboard
+            {tr("Pin to the top of everyone's dashboard")}
           </label>
           {formError && <p className="text-sm text-status-error-text">{formError}</p>}
           <button
@@ -242,14 +245,14 @@ export default function AdminAnnouncementsPage() {
             disabled={!title.trim() || !body.trim() || saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            {saving ? "Posting…" : "Post announcement"}
+            {saving ? tr("Posting…") : tr("Post announcement")}
           </button>
         </form>
       )}
 
-      <SectionCard title="Posted" note={`${items.length} total`}>
+      <SectionCard title={tr("Posted")} note={tr("{count} total", { count: items.length })}>
         {items.length === 0 ? (
-          <EmptyNote>No announcements yet.</EmptyNote>
+          <EmptyNote>{tr("No announcements yet.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {items.map((a) => (
@@ -259,7 +262,7 @@ export default function AdminAnnouncementsPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       {a.pinned && (
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
-                          Pinned
+                          {tr("Pinned")}
                         </span>
                       )}
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300">
@@ -279,14 +282,14 @@ export default function AdminAnnouncementsPage() {
                     onClick={() => togglePin(a)}
                     className="text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
                   >
-                    {a.pinned ? "Unpin" : "Pin"}
+                    {a.pinned ? tr("Unpin") : tr("Pin")}
                   </button>
                   <button
                     type="button"
                     onClick={() => remove(a)}
                     className="text-[12px] font-semibold text-ink-muted hover:text-status-error-text transition-colors"
                   >
-                    Delete
+                    {tr("Delete")}
                   </button>
                 </div>
               </li>

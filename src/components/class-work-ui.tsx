@@ -35,6 +35,7 @@ import {
   type Subject,
   type SubmissionStatus,
 } from "@/lib/classWork";
+import { phrase } from "@/lib/i18n/phrases";
 
 /* ── Which portal is this ──────────────────────────────────────────── */
 
@@ -65,7 +66,7 @@ async function call<T>(api: Api, url: string, method = "GET", body?: unknown): P
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? "That didn't go through. Please try again.");
+  if (!res.ok) throw new Error(data.error ?? phrase("That didn't go through. Please try again."));
   return data as T;
 }
 
@@ -85,7 +86,7 @@ function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(new Error(`“${file.name}” couldn't be read.`));
+    r.onerror = () => reject(new Error(phrase("“{name}” couldn't be read.", { name: file.name })));
     r.readAsDataURL(file);
   });
 }
@@ -103,8 +104,8 @@ async function uploadFile(
   assignmentId?: string
 ): Promise<FileRef> {
   const type = fileType(file.name, file.type);
-  if (!type) throw new Error(`“${file.name}” can't be uploaded. Use a photo, a PDF, a Word or PowerPoint file, or a recording.`);
-  if (file.size > FILE_LIMITS.maxBytes) throw new Error(`“${file.name}” is too big — the most is ${fileSize(FILE_LIMITS.maxBytes)}.`);
+  if (!type) throw new Error(phrase("“{name}” can't be uploaded. Use a photo, a PDF, a Word or PowerPoint file, or a recording.", { name: file.name }));
+  if (file.size > FILE_LIMITS.maxBytes) throw new Error(phrase("“{name}” is too big — the most is {size}.", { name: file.name, size: fileSize(FILE_LIMITS.maxBytes) }));
   const link = await call<{ path?: string; token?: string; demo?: boolean; prefix?: string }>(api, "/api/class-work/files", "POST", {
     purpose,
     assignment_id: assignmentId,
@@ -114,7 +115,7 @@ async function uploadFile(
   });
   if (link.demo || mode === "demo") {
     if (file.size > DEMO_MAX_BYTES) {
-      throw new Error(`The sample portal keeps files in this browser, so they can be up to ${fileSize(DEMO_MAX_BYTES)} here.`);
+      throw new Error(phrase("The sample portal keeps files in this browser, so they can be up to {size} here.", { size: fileSize(DEMO_MAX_BYTES) }));
     }
     return {
       path: `${link.prefix ?? "demo/"}${Date.now().toString(36)}-${file.name}`,
@@ -133,7 +134,7 @@ async function uploadFile(
   const { error } = await createClient()
     .storage.from(FILE_BUCKET)
     .uploadToSignedUrl(link.path!, link.token!, labelled, { contentType: type });
-  if (error) throw new Error(`“${file.name}” didn't finish uploading. Please try again.`);
+  if (error) throw new Error(phrase("“{name}” didn't finish uploading. Please try again.", { name: file.name }));
   // A local preview until the server sends back a link of its own.
   return { path: link.path!, name: file.name, size: file.size, type, url: URL.createObjectURL(file) };
 }
@@ -412,7 +413,7 @@ interface StaffList {
 }
 
 export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const { mode, api } = useClassWorkApi(role);
   const [data, setData] = useState<StaffList | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -425,7 +426,7 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
       setData(await call<StaffList>(api, "/api/class-work"));
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load the assignments.");
+      setError(e instanceof Error ? tr(e.message) : tr("Couldn't load the assignments."));
     }
   }, [api]);
 
@@ -593,7 +594,7 @@ function Composer({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const [subject, setSubject] = useState<Subject>("islamic_studies");
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -613,7 +614,7 @@ function Composer({
       try {
         added.push(await uploadFile(api, mode, f, "assignment"));
       } catch (e) {
-        setError(e instanceof Error ? e.message : "That file didn't upload.");
+        setError(e instanceof Error ? tr(e.message) : tr("That file didn't upload."));
       }
     }
     setAttachments((a) => [...a, ...added]);
@@ -637,7 +638,7 @@ function Composer({
       else others.push(s);
     }
     const list = [...byHalaqa.entries()].filter(([, s]) => s.length > 0);
-    if (others.length) list.push(["Other students", others]);
+    if (others.length) list.push([phrase("Other students"), others]);
     return list;
   }, [roster]);
 
@@ -672,7 +673,7 @@ function Composer({
       });
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't set the assignment.");
+      setError(e instanceof Error ? tr(e.message) : tr("Couldn't set the assignment."));
       setSaving(false);
     }
   };
@@ -693,7 +694,7 @@ function Composer({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value.slice(0, LIMITS.title))}
-              placeholder={subject === "arabic" ? "e.g. Days of the week" : "e.g. The Five Pillars of Islam"}
+              placeholder={subject === "arabic" ? tr("e.g. Days of the week") : tr("e.g. The Five Pillars of Islam")}
               className={input}
               dir="auto"
             />
@@ -710,7 +711,7 @@ function Composer({
             value={instructions}
             onChange={(e) => setInstructions(e.target.value.slice(0, LIMITS.instructions))}
             rows={2}
-            placeholder="Optional — e.g. Read pages 12–15 first."
+            placeholder={tr("Optional — e.g. Read pages 12–15 first.")}
             className={`${input} resize-y`}
             dir="auto"
           />
@@ -760,14 +761,14 @@ function Composer({
                 value={q.prompt}
                 onChange={(e) => edit(i, { prompt: e.target.value.slice(0, LIMITS.prompt) })}
                 rows={2}
-                placeholder={q.kind === "choice" ? "e.g. How many times a day do Muslims pray?" : "e.g. Name the five pillars of Islam."}
+                placeholder={q.kind === "choice" ? tr("e.g. How many times a day do Muslims pray?") : tr("e.g. Name the five pillars of Islam.")}
                 className={`${input} mt-2.5 resize-y`}
                 dir="auto"
               />
               {q.kind === "upload" && <p className="mt-2 text-[11.5px] text-ink-muted">{t("cw.uploadHint")}</p>}
               {q.kind === "choice" && (
                 <div className="mt-2.5 space-y-2">
-                  <p className="text-[11.5px] text-ink-muted">Tick the right answer.</p>
+                  <p className="text-[11.5px] text-ink-muted">{tr("Tick the right answer.")}</p>
                   {q.options.map((o, oi) => (
                     <div key={oi} className="flex items-center gap-2">
                       <input
@@ -783,7 +784,7 @@ function Composer({
                         onChange={(e) =>
                           edit(i, { options: q.options.map((x, xi) => (xi === oi ? e.target.value.slice(0, LIMITS.option) : x)) })
                         }
-                        placeholder={`Choice ${oi + 1}`}
+                        placeholder={tr("Choice {n}", { n: oi + 1 })}
                         className={`${input} py-2`}
                         dir="auto"
                       />
@@ -797,7 +798,7 @@ function Composer({
                             })
                           }
                           className="w-7 h-7 rounded-full text-ink-muted hover:text-red-700 flex items-center justify-center flex-shrink-0"
-                          aria-label={`Remove choice ${oi + 1}`}
+                          aria-label={tr("Remove choice {n}", { n: oi + 1 })}
                         >
                           <IconX size={13} />
                         </button>
@@ -810,7 +811,7 @@ function Composer({
                       onClick={() => edit(i, { options: [...q.options, ""] })}
                       className="text-[12px] font-semibold text-ink-muted hover:text-ink"
                     >
-                      + Choice
+                      {tr("+ Choice")}
                     </button>
                   )}
                 </div>
@@ -853,7 +854,7 @@ function Composer({
             {t("cw.for")} · {chosen.size}
           </p>
           {groups.length === 0 ? (
-            <EmptyNote>No students yet.</EmptyNote>
+            <EmptyNote>{tr("No students yet.")}</EmptyNote>
           ) : (
             <div className="space-y-3">
               {groups.map(([halaqa, students]) => {
@@ -925,7 +926,7 @@ interface Detail {
 }
 
 function AssignmentDetail({ id, api, today, onClose }: { id: string; api: Api; today: string; onClose: () => void }) {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [marking, setMarking] = useState<string | null>(null);
@@ -933,17 +934,17 @@ function AssignmentDetail({ id, api, today, onClose }: { id: string; api: Api; t
   useEffect(() => {
     call<Detail>(api, `/api/class-work/${id}`)
       .then(setDetail)
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(tr(e.message)));
   }, [api, id]);
 
   const remove = async () => {
     if (!detail) return;
-    if (!window.confirm(`Delete “${detail.assignment.title}” for everyone it was set for? Their answers and marks go too.`)) return;
+    if (!window.confirm(tr("Delete “{title}” for everyone it was set for? Their answers and marks go too.", { title: detail.assignment.title }))) return;
     try {
       await call(api, `/api/class-work/${id}`, "DELETE");
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't delete it.");
+      setError(e instanceof Error ? tr(e.message) : tr("Couldn't delete it."));
     }
   };
 
@@ -1030,7 +1031,7 @@ function MarkingView({
   onBack: () => void;
   onSaved: (s: ClassSubmission) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   // Each question's mark as typed: what it was given before, or for a
   // multiple-choice question what it earned itself.
   const [marks, setMarks] = useState<Record<string, string>>(() =>
@@ -1062,7 +1063,7 @@ function MarkingView({
       const { submission: saved } = await call<{ submission: ClassSubmission }>(api, `/api/class-work/${assignment.id}/${path}`, "POST", body);
       onSaved(saved);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "That didn't go through.");
+      setError(e instanceof Error ? tr(e.message) : tr("That didn't go through."));
       setBusy(false);
     }
   };
@@ -1119,7 +1120,7 @@ function MarkingView({
           value={feedback}
           onChange={(e) => setFeedback(e.target.value.slice(0, LIMITS.feedback))}
           rows={2}
-          placeholder="Optional — e.g. Masha'Allah, well done!"
+          placeholder={tr("Optional — e.g. Masha'Allah, well done!")}
           className={`${input} resize-y`}
           dir="auto"
         />
@@ -1209,7 +1210,7 @@ function writeDraft(id: string, answers: Answers | null) {
 }
 
 export function StudentClassWork() {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const { mode, api } = useClassWorkApi("student");
   const [items, setItems] = useState<ClassWorkItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1220,7 +1221,7 @@ export function StudentClassWork() {
       const data = await call<{ items: ClassWorkItem[] }>(api, "/api/class-work");
       setItems(data.items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load your work.");
+      setError(e instanceof Error ? tr(e.message) : tr("Couldn't load your work."));
     }
   }, [api]);
   useEffect(() => {
@@ -1293,7 +1294,7 @@ export function StudentClassWork() {
         t("cw.status.assigned"),
         todo,
         <div className="card-quiet p-5">
-          <FriendlyEmpty title={t("cw.nothingYet")} sub="Check back soon." mood="happy" />
+          <FriendlyEmpty title={t("cw.nothingYet")} sub={tr("Check back soon.")} mood="happy" />
         </div>
       )}
       {waiting.length > 0 && section(t("cw.status.submitted"), waiting)}
@@ -1327,7 +1328,7 @@ function WorkSheet({
   onClose: () => void;
   onHandedIn: (s: ClassSubmission) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const { assignment: a, submission: s } = item;
   const open = s.status === "assigned";
   // Picks up where they left off: a draft on this device, or — when the
@@ -1356,7 +1357,7 @@ function WorkSheet({
       try {
         added.push(await uploadFile(api, mode, f, "answer", a.id));
       } catch (e) {
-        setError(e instanceof Error ? e.message : "That file didn't upload.");
+        setError(e instanceof Error ? tr(e.message) : tr("That file didn't upload."));
       }
     }
     setAnswers((prev) => {
@@ -1371,7 +1372,7 @@ function WorkSheet({
   const unanswered = a.questions.filter((q) => !isAnswered(q, answers[q.id])).length;
 
   const handIn = async () => {
-    if (unanswered > 0 && !window.confirm(`${unanswered} question${unanswered === 1 ? " is" : "s are"} not answered yet. Hand it in anyway?`)) return;
+    if (unanswered > 0 && !window.confirm(phrase("{count} question is not answered yet. Hand it in anyway?|{count} questions are not answered yet. Hand it in anyway?", { count: unanswered }))) return;
     setBusy(true);
     setError(null);
     try {
@@ -1379,7 +1380,7 @@ function WorkSheet({
       writeDraft(a.id, null);
       onHandedIn(submission);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "That didn't go through.");
+      setError(e instanceof Error ? tr(e.message) : tr("That didn't go through."));
     } finally {
       setBusy(false);
     }
@@ -1508,7 +1509,7 @@ function WorkSheet({
 /* ══ The parent ════════════════════════════════════════════════════ */
 
 export function ParentClassWork() {
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const { mode, api } = useClassWorkApi("parent");
   const [data, setData] = useState<{ children: Array<{ id: string; name: string }>; items: ClassWorkItem[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1522,7 +1523,7 @@ export function ParentClassWork() {
         setData(d);
         setChild((c) => c || d.children[0]?.id || "");
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(tr(e.message)));
   }, [mode, api]);
 
   const today = todayFor(mode);

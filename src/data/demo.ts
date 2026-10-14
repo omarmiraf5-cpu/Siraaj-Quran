@@ -1,4 +1,6 @@
 import type { QuranicAssignment, HifzPortion, DailyRating } from "@/hooks/useQuranicAssignments";
+import { currentLanguage } from "@/lib/i18n/current";
+import { labels, phrase } from "@/lib/i18n/phrases";
 
 // Sample data used to populate the portals before a school has real records
 // in the database. Every screen draws from this one file so the same students
@@ -445,11 +447,11 @@ export function dueLabel(due: string | null): DueLabel | null {
   const days = daysFromToday(due);
   if (days < 0) {
     const n = Math.abs(days);
-    return { text: `${n} day${n === 1 ? "" : "s"} overdue`, urgent: true, overdue: true };
+    return { text: phrase("{count} day overdue|{count} days overdue", { count: n }), urgent: true, overdue: true };
   }
-  if (days === 0) return { text: "Due today", urgent: true, overdue: false };
-  if (days === 1) return { text: "Due tomorrow", urgent: true, overdue: false };
-  return { text: `Due in ${days} days`, urgent: days <= 3, overdue: false };
+  if (days === 0) return { text: phrase("Due today"), urgent: true, overdue: false };
+  if (days === 1) return { text: phrase("Due tomorrow"), urgent: true, overdue: false };
+  return { text: phrase("Due in {count} days", { count: days }), urgent: days <= 3, overdue: false };
 }
 
 // ── The three daily portions ────────────────────────────────────────────
@@ -457,24 +459,30 @@ export function dueLabel(due: string | null): DueLabel | null {
 // student is freshest, then the recent ground, then the old.
 export const HIFZ_PORTIONS: HifzPortion[] = ["new", "recent", "old"];
 
-export const PORTION_LABELS: Record<HifzPortion, string> = {
+export const PORTION_LABELS: Record<HifzPortion, string> = labels({
   new: "New lesson",
   recent: "Recent revision",
   old: "Old revision",
-};
+});
 
+// Shown beside the English heading; in Arabic the heading already is the
+// Arabic, so this goes quiet rather than say it twice.
 export const PORTION_ARABIC: Record<HifzPortion, string> = {
   new: "الدَّرْسُ الْجَدِيدُ",
   recent: "الْمُرَاجَعَةُ الْقَرِيبَةُ",
   old: "الْمُرَاجَعَةُ الْبَعِيدَةُ",
 };
+for (const k of Object.keys(PORTION_ARABIC) as HifzPortion[]) {
+  const arabic = PORTION_ARABIC[k];
+  Object.defineProperty(PORTION_ARABIC, k, { enumerable: true, get: () => (currentLanguage() === "ar" ? "" : arabic) });
+}
 
 /** What each portion is for, in a line. */
-export const PORTION_BLURB: Record<HifzPortion, string> = {
+export const PORTION_BLURB: Record<HifzPortion, string> = labels({
   new: "Today's new memorisation.",
   recent: "What was learnt lately, kept warm.",
   old: "Older ground, cycled so it is not lost.",
-};
+});
 
 export function assignmentsByPortion(
   assignments: QuranicAssignment[]
@@ -486,12 +494,12 @@ export function assignmentsByPortion(
   };
 }
 
-export const ASSIGNMENT_LABELS: Record<QuranicAssignment["status"], string> = {
+export const ASSIGNMENT_LABELS: Record<QuranicAssignment["status"], string> = labels({
   assigned: "To start",
   in_progress: "In progress",
   completed: "Completed",
   needs_review: "Needs review",
-};
+});
 
 // Status chips, shared so an assignment looks the same in every portal.
 export const ASSIGNMENT_STYLES: Record<QuranicAssignment["status"], string> = {
@@ -531,7 +539,7 @@ const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "ما
 // mismatch. Reading the parts in UTC keeps it stable everywhere. `lang`
 // defaults to English so the ~20 call sites that haven't been threaded
 // through with the current language yet keep working unchanged.
-export function formatDay(iso: string, lang: "en" | "so" | "ar" = "en"): string {
+export function formatDay(iso: string, lang: "en" | "so" | "ar" = currentLanguage()): string {
   const d = new Date(iso + "T00:00:00Z");
   const day = d.getUTCDay();
   const date = d.getUTCDate();
@@ -625,7 +633,7 @@ export function formatMessageTime(iso: string): string {
   const h = d.getUTCHours();
   const m = d.getUTCMinutes();
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  const ampm = h < 12 ? "am" : "pm";
+  const ampm = currentLanguage() === "ar" ? (h < 12 ? " ص" : " م") : h < 12 ? "am" : "pm";
   return `${formatDay(iso.slice(0, 10))} · ${h12}:${String(m).padStart(2, "0")}${ampm}`;
 }
 
@@ -781,11 +789,11 @@ export function feeStatus(fee: Pick<DemoFee, "amountDue" | "amountPaid">): FeeSt
   return "due";
 }
 
-export const FEE_STATUS_LABELS: Record<FeeStatus, string> = {
+export const FEE_STATUS_LABELS: Record<FeeStatus, string> = labels({
   paid: "Paid",
   partial: "Partial",
   due: "Due",
-};
+});
 
 export const FEE_STATUS_STYLES: Record<FeeStatus, string> = {
   paid: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
@@ -837,12 +845,12 @@ export interface DemoAnnouncement {
   createdAt: string;
 }
 
-export const ANNOUNCEMENT_AUDIENCE_LABELS: Record<AnnouncementAudience, string> = {
+export const ANNOUNCEMENT_AUDIENCE_LABELS: Record<AnnouncementAudience, string> = labels({
   all: "Everyone",
   teachers: "Teachers",
   parents: "Parents",
   students: "Students",
-};
+});
 
 export const DEMO_ANNOUNCEMENTS: DemoAnnouncement[] = [
   {

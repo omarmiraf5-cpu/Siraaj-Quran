@@ -12,8 +12,10 @@ import {
 } from "@/components/QaidahBook";
 import { QaidahAssignPanel, useQaidahClassroom } from "@/components/QaidahAssignPanel";
 import { PortalHero } from "@/components/PortalHero";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function TeacherQaidahPage() {
+  const { tr } = useLanguage();
   const room = useQaidahClassroom();
   const [bookId, setBookId] = useQaidahBookChoice();
   const book = qaidahBook(bookId);
@@ -34,8 +36,8 @@ export default function TeacherQaidahPage() {
     <div className="max-w-6xl mx-auto space-y-4 pt-2">
       <PortalHero
         eyebrow={book.name}
-        title="Qa'idah"
-        meta={[`${QAIDAH_BOOKS.length} books`, `${book.lessons.length} lessons in this one`]}
+        title={tr("Qa'idah")}
+        meta={[tr("{count} book|{count} books", { count: QAIDAH_BOOKS.length }), tr("{count} lesson in this one|{count} lessons in this one", { count: book.lessons.length })]}
       />
       <QaidahBookTabs value={bookId} onChange={setBookId} />
 

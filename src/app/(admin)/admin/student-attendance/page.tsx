@@ -21,6 +21,7 @@ import { allRows } from "@/lib/rosterExport";
 import { addDays } from "@/lib/planDates";
 import { download, fileNameFor } from "@/lib/sheetTools";
 import { mySchool } from "@/lib/mySchool";
+import { phrase } from "@/lib/i18n/phrases";
 
 // The school's student registers, for the office: how a day went halaqa by
 // halaqa (and which registers haven't been taken), and each child's
@@ -62,7 +63,7 @@ const localToday = () => new Date().toLocaleDateString("en-CA");
 
 export default function StudentAttendancePage() {
   const supabase = createClient();
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [today, setToday] = useState(localToday());
@@ -226,7 +227,7 @@ export default function StudentAttendancePage() {
     })
     .sort((a, b) => b.c.absent - a.c.absent || (a.rate ?? 101) - (b.rate ?? 101) || a.s.name.localeCompare(b.s.name));
   const visibleRows = showAll ? rows : rows.slice(0, 25);
-  const periodLabel = period === "7" ? "the last 7 days" : period === "28" ? "the last 4 weeks" : "this month";
+  const periodLabel = period === "7" ? phrase("the last 7 days") : period === "28" ? phrase("the last 4 weeks") : phrase("this month");
 
   const downloadSheet = () =>
     download(fileNameFor(schoolName || "School", `student attendance ${from} to ${today}`), [
@@ -259,15 +260,15 @@ export default function StudentAttendancePage() {
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Registers"
+        eyebrow={tr("Registers")}
         title={t("nav.studentAttendance")}
-        meta={[formatDay(day, language), `${shown.length} students`, unmarked > 0 ? `${unmarked} not marked` : "everyone marked"]}
+        meta={[formatDay(day, language), tr("{count} student|{count} students", { count: shown.length }), unmarked > 0 ? tr("{count} not marked", { count: unmarked }) : tr("everyone marked")]}
       />
 
       <div className="flex flex-wrap items-center gap-2" data-section="filters">
         {graded && (
-          <select value={gradeFilter} onChange={(e) => { setGradeFilter(e.target.value); setHalaqaFilter(""); }} aria-label="Grade" className={select}>
-            <option value="">Every grade</option>
+          <select value={gradeFilter} onChange={(e) => { setGradeFilter(e.target.value); setHalaqaFilter(""); }} aria-label={tr("Grade")} className={select}>
+            <option value="">{tr("Every grade")}</option>
             {GRADES.map((g) => (
               <option key={g} value={g}>
                 {gradeLabel(g)}
@@ -276,8 +277,8 @@ export default function StudentAttendancePage() {
           </select>
         )}
         {campuses.length > 1 && (
-          <select value={campusFilter} onChange={(e) => { setCampusFilter(e.target.value); setHalaqaFilter(""); }} aria-label="Campus" className={select}>
-            <option value="">Every campus</option>
+          <select value={campusFilter} onChange={(e) => { setCampusFilter(e.target.value); setHalaqaFilter(""); }} aria-label={tr("Campus")} className={select}>
+            <option value="">{tr("Every campus")}</option>
             {campuses.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -285,23 +286,23 @@ export default function StudentAttendancePage() {
             ))}
           </select>
         )}
-        <select value={halaqaFilter} onChange={(e) => setHalaqaFilter(e.target.value)} aria-label={graded ? "Teacher" : "Halaqa"} className={select}>
-          <option value="">{graded ? "Every teacher" : "Every halaqa"}</option>
+        <select value={halaqaFilter} onChange={(e) => setHalaqaFilter(e.target.value)} aria-label={graded ? tr("Teacher") : tr("Halaqa")} className={select}>
+          <option value="">{graded ? tr("Every teacher") : tr("Every halaqa")}</option>
           {halaqaChoices.map((h) => (
             <option key={h.id} value={h.id}>
               {halaqaLabel(h)}
               {h.teacher && h.teacher !== h.name ? ` (${h.teacher})` : ""}
             </option>
           ))}
-          <option value="none">{graded ? "No teacher yet" : "No halaqa yet"}</option>
+          <option value="none">{graded ? tr("No teacher yet") : tr("No halaqa yet")}</option>
         </select>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search a student…" className={`${select} flex-1 min-w-[10rem]`} />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr("Search a student…")} className={`${select} flex-1 min-w-[10rem]`} />
       </div>
 
       {/* The day */}
       <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={() => setDay(addDays(day, -1))} aria-label="Previous day" className="w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink">
-          ‹
+        <button type="button" onClick={() => setDay(addDays(day, -1))} aria-label={tr("Previous day")} className="w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink">
+          <span className="inline-block rtl:-scale-x-100">‹</span>
         </button>
         <div className="text-center">
           <p className="font-display text-lg font-bold text-ink leading-tight">{formatDay(day, language)}</p>
@@ -310,31 +311,31 @@ export default function StudentAttendancePage() {
             value={day}
             max={today}
             onChange={(e) => e.target.value && setDay(e.target.value)}
-            aria-label="Day"
+            aria-label={tr("Day")}
             className="mt-1 text-[12px] bg-transparent text-ink-muted"
           />
           {day !== today && (
             <button type="button" onClick={() => setDay(today)} className="block mx-auto text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
-              Back to today
+              {tr("Back to today")}
             </button>
           )}
         </div>
-        <button type="button" onClick={() => setDay(addDays(day, 1))} disabled={day >= today} aria-label="Next day" className="w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink disabled:opacity-30">
-          ›
+        <button type="button" onClick={() => setDay(addDays(day, 1))} disabled={day >= today} aria-label={tr("Next day")} className="w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink disabled:opacity-30">
+          <span className="inline-block rtl:-scale-x-100">›</span>
         </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3" data-section="day-tally">
-        <StatTile value={dayTally.present} label={t("common.present")} sub="on time" />
-        <StatTile value={dayTally.late} label={t("common.late")} sub="came late" />
-        <StatTile value={dayTally.absent} label={t("common.absent")} sub="not in" />
-        <StatTile value={dayTally.excused} label={t("common.excused")} sub="with a reason" />
-        <StatTile value={unmarked} label="Not marked" sub="no register yet" />
+        <StatTile value={dayTally.present} label={t("common.present")} sub={tr("on time")} />
+        <StatTile value={dayTally.late} label={t("common.late")} sub={tr("came late")} />
+        <StatTile value={dayTally.absent} label={t("common.absent")} sub={tr("not in")} />
+        <StatTile value={dayTally.excused} label={t("common.excused")} sub={tr("with a reason")} />
+        <StatTile value={unmarked} label={tr("Not marked")} sub={tr("no register yet")} />
       </div>
 
-      <SectionCard title={graded ? "Each teacher's register" : "Each halaqa's register"} note={formatDay(day, language)}>
+      <SectionCard title={graded ? tr("Each teacher's register") : tr("Each halaqa's register")} note={formatDay(day, language)}>
         {groups.length === 0 ? (
-          <EmptyNote>No students match these filters.</EmptyNote>
+          <EmptyNote>{tr("No students match these filters.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1" data-section="registers">
             {groups.map((g) => {
@@ -354,19 +355,19 @@ export default function StudentAttendancePage() {
                       <p className="text-[13px] font-semibold text-ink truncate">{g.label}</p>
                       <p className="text-[11px] text-ink-muted truncate">
                         {g.teacher && g.teacher !== g.label.split(" · ").pop() ? `${g.teacher} · ` : ""}
-                        {g.kids.length} students
+                        {tr("{count} students", { count: g.kids.length })}
                       </p>
                     </div>
                     <div className="text-end flex-shrink-0 text-[12px]">
                       {done === 0 ? (
-                        <span className="font-semibold text-amber-700 dark:text-amber-300">Not taken</span>
+                        <span className="font-semibold text-amber-700 dark:text-amber-300">{tr("Not taken")}</span>
                       ) : (
                         <span className="tabular-nums">
-                          <span className={STATUS_TEXT.present}>{count("present")} present</span>
-                          {count("late") > 0 && <span className={STATUS_TEXT.late}> · {count("late")} late</span>}
-                          {count("absent") > 0 && <span className={STATUS_TEXT.absent}> · {count("absent")} absent</span>}
-                          {count("excused") > 0 && <span className={STATUS_TEXT.excused}> · {count("excused")} excused</span>}
-                          {done < g.kids.length && <span className="text-ink-muted"> · {g.kids.length - done} not marked</span>}
+                          <span className={STATUS_TEXT.present}>{tr("{count} present", { count: count("present") })}</span>
+                          {count("late") > 0 && <span className={STATUS_TEXT.late}>{" "}{tr("· {count} late", { count: count("late") })}</span>}
+                          {count("absent") > 0 && <span className={STATUS_TEXT.absent}>{" "}{tr("· {count} absent", { count: count("absent") })}</span>}
+                          {count("excused") > 0 && <span className={STATUS_TEXT.excused}>{" "}{tr("· {count} excused", { count: count("excused") })}</span>}
+                          {done < g.kids.length && <span className="text-ink-muted">{" "}{tr("· {n} not marked", { n: g.kids.length - done })}</span>}
                         </span>
                       )}
                     </div>
@@ -381,7 +382,7 @@ export default function StudentAttendancePage() {
                         return (
                           <li key={k.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
                             <span className="text-ink truncate">{k.name}</span>
-                            <span className={`font-semibold flex-shrink-0 ${STATUS_TEXT[st ?? "none"]}`}>{st ? t(`common.${st}`) : "Not marked"}</span>
+                            <span className={`font-semibold flex-shrink-0 ${STATUS_TEXT[st ?? "none"]}`}>{st ? t(`common.${st}`) : tr("Not marked")}</span>
                           </li>
                         );
                       })}
@@ -396,36 +397,36 @@ export default function StudentAttendancePage() {
 
       {/* The stretch */}
       <SectionCard
-        title="Each student"
+        title={tr("Each student")}
         note={
           <span className="inline-flex items-center gap-2">
-            <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} aria-label="Period" className="bg-surface-card border border-surface-border rounded-lg px-2 py-1 text-[12px] text-ink normal-case tracking-normal">
-              <option value="7">Last 7 days</option>
-              <option value="28">Last 4 weeks</option>
-              <option value="month">This month</option>
+            <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} aria-label={tr("Period")} className="bg-surface-card border border-surface-border rounded-lg px-2 py-1 text-[12px] text-ink normal-case tracking-normal">
+              <option value="7">{tr("Last 7 days")}</option>
+              <option value="28">{tr("Last 4 weeks")}</option>
+              <option value="month">{tr("This month")}</option>
             </select>
             <button type="button" onClick={downloadSheet} className="text-[12px] font-semibold underline normal-case tracking-normal">
-              Download
+              {tr("Download")}
             </button>
           </span>
         }
       >
         {rows.length === 0 ? (
-          <EmptyNote>No students match these filters.</EmptyNote>
+          <EmptyNote>{tr("No students match these filters.")}</EmptyNote>
         ) : (
           <>
             <p className="text-[12px] text-ink-muted mb-2">
-              Over {periodLabel}, most absences first. Attendance % counts present and late out of the days marked (excused days aren&apos;t counted).
+              {tr("Over {periodLabel}, most absences first. Attendance % counts present and late out of the days marked (excused days aren't counted).", { periodLabel })}
             </p>
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-[13px]" data-section="by-student">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide text-ink-muted">
-                    <th className="text-start font-semibold py-2 px-1">Student</th>
-                    <th className="text-end font-semibold py-2 px-1">Present</th>
-                    <th className="text-end font-semibold py-2 px-1">Late</th>
-                    <th className="text-end font-semibold py-2 px-1">Absent</th>
-                    <th className="text-end font-semibold py-2 px-1">Excused</th>
+                    <th className="text-start font-semibold py-2 px-1">{tr("Student")}</th>
+                    <th className="text-end font-semibold py-2 px-1">{tr("Present")}</th>
+                    <th className="text-end font-semibold py-2 px-1">{tr("Late")}</th>
+                    <th className="text-end font-semibold py-2 px-1">{tr("Absent")}</th>
+                    <th className="text-end font-semibold py-2 px-1">{tr("Excused")}</th>
                     <th className="text-end font-semibold py-2 px-1">%</th>
                   </tr>
                 </thead>
@@ -455,13 +456,13 @@ export default function StudentAttendancePage() {
             </div>
             {rows.length > 25 && (
               <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-3 text-[12px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
-                {showAll ? "Show the first 25" : `Show all ${rows.length}`}
+                {showAll ? tr("Show the first 25") : tr("Show all {count}", { count: rows.length })}
               </button>
             )}
           </>
         )}
       </SectionCard>
-      {isDemo && <p className="text-[11px] text-ink-muted">Sample school data.</p>}
+      {isDemo && <p className="text-[11px] text-ink-muted">{tr("Sample school data.")}</p>}
     </div>
   );
 }

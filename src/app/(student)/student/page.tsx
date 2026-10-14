@@ -60,9 +60,10 @@ import {
 } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
+import { ByLanguage } from "@/components/ByLanguage";
 
 export default function StudentDashboard() {
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const demoUser = useDemoUser();
   const theme = useStudentTheme();
 
@@ -117,7 +118,7 @@ export default function StudentDashboard() {
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
 
         <div className="relative flex items-center gap-3.5">
-          <Link href="/account" aria-label="My account" className="rounded-full active:scale-95 transition-transform">
+          <Link href="/account" aria-label={tr("My account")} className="rounded-full active:scale-95 transition-transform">
             <Avatar name={displayName} />
           </Link>
           <div className="min-w-0 flex-1">
@@ -162,9 +163,15 @@ export default function StudentDashboard() {
           اللَّهُمَّ لَا سَهْلَ إِلَّا مَا جَعَلْتَهُ سَهْلًا
         </p>
         <div className="gold-rule w-20 mx-auto my-4 relative" />
-        <p className="relative font-serif text-[14px] text-white/80 italic" dir="ltr">
-          &ldquo;O Allah, nothing is easy except what You make easy.&rdquo;
-        </p>
+        {/* The English meaning, for readers of the Arabic above who need it. */}
+        <ByLanguage
+          en={
+            <p className="relative font-serif text-[14px] text-white/80 italic" dir="ltr">
+              “O Allah, nothing is easy except what You make easy.”
+            </p>
+          }
+          ar={null}
+        />
       </section>
 
       {/* Up next */}

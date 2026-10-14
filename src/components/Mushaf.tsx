@@ -66,6 +66,7 @@ function ReciterPicker({
   onSelect: (reciter: Reciter) => void;
   onClose: () => void;
 }) {
+  const { tr } = useLanguage();
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -83,7 +84,7 @@ function ReciterPicker({
         dir="ltr"
       >
         <p className="text-xs font-bold text-[#5a4520] dark:text-[#c4a95a] mb-3 text-center">
-          Choose Reciter
+          {tr("Choose Reciter")}
         </p>
         <div className="space-y-1.5">
           {RECITERS.map((r) => (
@@ -100,7 +101,7 @@ function ReciterPicker({
           onClick={onClose}
           className="w-full mt-2 text-[10px] text-[#8b7d56]/60 dark:text-[#c4a95a]/40 hover:text-[#8b7d56] py-1"
         >
-          Cancel
+          {tr("Cancel")}
         </button>
       </div>
     </div>
@@ -116,6 +117,7 @@ function SectionRepeatPanel({
   onPlay: (surahId: number, from: number, to: number) => void;
   onClose: () => void;
 }) {
+  const { tr } = useLanguage();
   const [surahId, setSurahId] = useState(defaultSurahId);
   const [from, setFrom] = useState("1");
   const [to, setTo] = useState("");
@@ -143,13 +145,13 @@ function SectionRepeatPanel({
       className="bg-surface-card border border-surface-border rounded-lg p-2 space-y-2"
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold text-ink">Repeat a section</span>
+        <span className="text-[10px] font-bold text-ink">{tr("Repeat a section")}</span>
         <button
           type="button"
           onClick={onClose}
           className="text-[10px] text-ink-muted hover:text-ink px-1"
         >
-          Close
+          {tr("Close")}
         </button>
       </div>
 
@@ -167,7 +169,7 @@ function SectionRepeatPanel({
 
       <div className="flex items-end gap-2">
         <label className="flex-1 min-w-0">
-          <span className="block text-[9px] text-ink-muted mb-0.5">From ayah</span>
+          <span className="block text-[9px] text-ink-muted mb-0.5">{tr("From ayah")}</span>
           <input
             type="number"
             min={1}
@@ -179,7 +181,7 @@ function SectionRepeatPanel({
           />
         </label>
         <label className="flex-1 min-w-0">
-          <span className="block text-[9px] text-ink-muted mb-0.5">To ayah</span>
+          <span className="block text-[9px] text-ink-muted mb-0.5">{tr("To ayah")}</span>
           <input
             type="number"
             min={1}
@@ -194,11 +196,11 @@ function SectionRepeatPanel({
           type="submit"
           className="flex-shrink-0 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition active:scale-95"
         >
-          Play
+          {tr("Play")}
         </button>
       </div>
       <p className="text-[9px] text-ink-muted">
-        {surah?.englishName} has {maxAyah} ayahs. Leave &quot;to&quot; empty for the whole surah.
+        {tr("{englishName} has {maxAyah} ayahs. Leave \"to\" empty for the whole surah.", { englishName: surah?.englishName, maxAyah })}
       </p>
     </form>
   );
@@ -223,7 +225,7 @@ function MushafPage({
   const surahsHere = getSurahsOnPage(pageNum);
   const juz = getJuzForPage(pageNum);
   const hizb = getHizbForPage(pageNum);
-  const { language } = useLanguage();
+  const { language, tr } = useLanguage();
   const arabic = language === "ar";
   const num = (n: number) => (arabic ? toArabicNumerals(n) : String(n));
 
@@ -269,12 +271,12 @@ function MushafPage({
           className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-2 pb-[2.5%] flex-shrink-0 text-[10px] md:text-[12px] tracking-wide text-[var(--mushaf-muted)]"
         >
           <span className={`truncate ${arabic ? "font-arabic text-[12px] md:text-[14px]" : ""}`}>
-            {arabic ? `الجزء ${num(juz)}، الحزب ${num(hizb)}` : `Juz ${juz}, Hizb ${hizb}`}
+            {arabic ? `الجزء ${num(juz)}، الحزب ${num(hizb)}` : tr("Juz {juz}, Hizb {hizb}", { juz, hizb })}
           </span>
           <button
             onClick={() => onPlayAyahs(pageAyahs)}
             disabled={pageAyahs.length === 0}
-            title={`Play page ${pageNum}`}
+            title={tr("Play page {pageNum}", { pageNum })}
             className={`tabular-nums hover:text-[var(--mushaf-ink)] disabled:opacity-50 transition ${arabic ? "font-arabic text-[12px] md:text-[14px]" : ""}`}
           >
             {num(pageNum)}
@@ -285,7 +287,7 @@ function MushafPage({
                 {i > 0 && <span className="opacity-50"> · </span>}
                 <button
                   onClick={() => onPlaySurah(s.id)}
-                  title={`Play all of ${s.englishName}`}
+                  title={tr("Play all of {englishName}", { englishName: s.englishName })}
                   className="hover:text-[var(--mushaf-ink)] hover:underline decoration-dotted underline-offset-2 transition"
                 >
                   {arabic ? s.name : s.englishName}
@@ -312,6 +314,7 @@ function MushafPage({
 }
 
 export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
+  const { tr } = useLanguage();
   // The exact page asked for, never rounded. Rounding it to an even page to
   // form a book opening is a presentation detail of the two-page spread, so
   // it happens at render time below — storing the rounded value made a jump
@@ -413,7 +416,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     ].filter((i) => i < sources.length);
 
     const fail = () => {
-      setAudioError(`${session.reciter.name}'s audio is unavailable right now`);
+      setAudioError(tr("{name}'s audio is unavailable right now", { name: session.reciter.name }));
       setAudioLoading(false);
       setPlayingAyah(null);
       setProgress(null);
@@ -636,7 +639,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           defaultValue=""
           className="flex-1 min-w-0 bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
         >
-          <option value="">Jump to Surah...</option>
+          <option value="">{tr("Jump to Surah...")}</option>
           {SURAHS.map((s) => (
             <option key={s.id} value={s.id}>
               {s.id}. {s.englishName}
@@ -661,7 +664,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           a chosen section. Picking a qari here means playback never has to
           stop and ask, and switching mid-recitation swaps the voice in place. */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-[10px] font-semibold text-ink-muted">Qari</span>
+        <span className="text-[10px] font-semibold text-ink-muted">{tr("Qari")}</span>
         <select
           value={activeReciter?.id ?? ""}
           onChange={(e) => {
@@ -671,7 +674,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           className="bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
         >
           <option value="" disabled>
-            Choose…
+            {tr("Choose…")}
           </option>
           {RECITERS.map((r) => (
             <option key={r.id} value={r.id}>
@@ -680,14 +683,14 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           ))}
         </select>
 
-        <span className="text-[10px] font-semibold text-ink-muted me-1">Repeat</span>
+        <span className="text-[10px] font-semibold text-ink-muted me-1">{tr("Repeat")}</span>
         <div className="flex items-center gap-0.5">
           {REPEAT_OPTIONS.map((n) => (
             <button
               key={n}
               onClick={() => setRepeatCount(n)}
               aria-pressed={repeatCount === n}
-              title={n === Infinity ? "Repeat until stopped" : `Repeat ${n} times`}
+              title={n === Infinity ? tr("Repeat until stopped") : tr("Repeat {n} times", { n })}
               className={`px-2 py-1 rounded-md text-[11px] font-semibold tabular-nums transition active:scale-95 ${
                 repeatCount === n
                   ? "bg-emerald-600 text-white"
@@ -707,7 +710,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
               : "bg-surface-card border border-surface-border text-ink hover:bg-surface-bg"
           }`}
         >
-          Section…
+          {tr("Section…")}
         </button>
       </div>
 
@@ -790,7 +793,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
                 </span>
               )}
               <span className="text-[11px] text-[#c4a95a] font-semibold truncate">
-                {playingAyah.surahName} — Ayah {playingAyah.ayah}
+                {tr("{surahName} — Ayah {ayah}", { surahName: playingAyah.surahName, ayah: playingAyah.ayah })}
               </span>
               {progress && progress.length > 1 && (
                 <span className="text-[9px] text-[#8b7d56]/60 flex-shrink-0 tabular-nums">
@@ -799,12 +802,12 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
               )}
               {progress && progress.total > 1 && (
                 <span className="text-[9px] text-emerald-400/80 flex-shrink-0 tabular-nums font-semibold">
-                  pass {progress.pass}/{progress.total === Infinity ? "∞" : progress.total}
+                  {tr("pass {pass}/", { pass: progress.pass })}{progress.total === Infinity ? "∞" : progress.total}
                 </span>
               )}
               <button
                 onClick={() => setShowReciterPicker(true)}
-                title="Change reciter"
+                title={tr("Change reciter")}
                 className="text-[9px] text-[#8b7d56]/60 hover:text-[#c4a95a] flex-shrink-0 underline decoration-dotted underline-offset-2 transition"
               >
                 {activeReciter.name}
@@ -838,7 +841,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           className="flex items-center gap-1 px-3 py-2 rounded-lg bg-surface-card border border-surface-border text-xs font-semibold text-ink hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
-          Next
+          {tr("Next")}
         </button>
 
         <span className="text-xs font-bold text-ink tabular-nums">
@@ -850,7 +853,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
           disabled={atStart}
           className="flex items-center gap-1 px-3 py-2 rounded-lg bg-surface-card border border-surface-border text-xs font-semibold text-ink hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
         >
-          Previous
+          {tr("Previous")}
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
         </button>
       </div>

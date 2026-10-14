@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 /**
  * "Delete permanently…" for a teacher's or parent's account, on the office's
@@ -21,6 +23,7 @@ export function DeleteAccount({
   /** What the button says, for a teacher who only leaves this school. */
   action?: string;
 }) {
+  const { tr } = useLanguage();
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,7 +36,7 @@ export function DeleteAccount({
     try {
       await onDelete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That account couldn't be deleted.");
+      setError(err instanceof Error ? tr(err.message) : tr("That account couldn't be deleted."));
       setBusy(false);
     }
   };
@@ -49,20 +52,20 @@ export function DeleteAccount({
         }}
         className="text-[12px] font-semibold text-red-700 dark:text-red-300 hover:underline"
       >
-        {action}…
+        {tr(action)}…
       </button>
     );
   }
   return (
     <div className="space-y-2">
       <p className="text-[12px] text-ink leading-relaxed">
-        {consequences} Type <span className="font-semibold">{name}</span> to confirm.
+        {tr("{consequences} Type", { consequences })}{" "}<span className="font-semibold">{name}</span>{" "}{tr("to confirm.")}
       </p>
       <input
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         placeholder={name}
-        aria-label={`Type ${name} to confirm`}
+        aria-label={tr("Type {name} to confirm", { name })}
         className="w-full bg-surface-card border border-red-300 dark:border-red-800/60 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none"
       />
       <div className="flex items-center gap-2">
@@ -72,14 +75,14 @@ export function DeleteAccount({
           disabled={busy || !matches}
           className="bg-red-700 text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-xl disabled:opacity-40"
         >
-          {busy ? "Working…" : action}
+          {busy ? tr("Working…") : tr(action)}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="text-[12.5px] font-semibold text-ink-muted hover:text-ink px-2"
         >
-          Keep
+          {tr("Keep")}
         </button>
       </div>
       {error && <p className="text-[11.5px] text-red-700 dark:text-red-300">{error}</p>}
@@ -95,7 +98,7 @@ export async function saveAccount(id: string, patch: { full_name?: string; activ
     body: JSON.stringify(patch),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "That didn't save. Please try again.");
+  if (!res.ok) throw new Error(data.error || phrase("That didn't save. Please try again."));
   return data as { id: string; full_name: string; active: boolean };
 }
 
@@ -103,5 +106,5 @@ export async function saveAccount(id: string, patch: { full_name?: string; activ
 export async function deleteAccount(id: string) {
   const res = await fetch(`/api/admin/accounts/${encodeURIComponent(id)}`, { method: "DELETE" });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "That account couldn't be deleted.");
+  if (!res.ok) throw new Error(data.error || phrase("That account couldn't be deleted."));
 }

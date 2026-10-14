@@ -56,7 +56,7 @@ function todayIso() {
 
 export default function TeacherAttendancePage() {
   const supabase = createClient();
-  const { t, language } = useLanguage();
+  const { t, language, tr } = useLanguage();
   const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [today, setToday] = useState(DEMO_TODAY);
@@ -236,7 +236,7 @@ export default function TeacherAttendancePage() {
       });
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("teacher.attendance.saveFailed"));
+      setError(err instanceof Error ? tr(err.message) : t("teacher.attendance.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -367,13 +367,13 @@ export default function TeacherAttendancePage() {
         <PlanAlertBanner
           key={a.student_id}
           level="critical"
-          title={`${a.name} has now been absent ${a.count} school days in a row`}
+          title={tr("{name} has now been absent {count} school days in a row", { name: a.name, count: a.count })}
           detail={
             a.newly_notified
               ? a.parents_notified > 0
-                ? "Their parents and the office have been sent a notice in the portal."
-                : "The office has been sent a notice. No parent account is linked to this student, so please call the family."
-              : "Their parents and the office were already notified about this run of absences."
+                ? tr("Their parents and the office have been sent a notice in the portal.")
+                : tr("The office has been sent a notice. No parent account is linked to this student, so please call the family.")
+              : tr("Their parents and the office were already notified about this run of absences.")
           }
         />
       ))}

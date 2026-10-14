@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 // The office's say over the Friday reports: on or off for the school, and a
 // look at what this coming Friday's will hold before it goes.
@@ -24,9 +26,10 @@ interface Preview {
 const ghost =
   "text-[12.5px] font-semibold px-3.5 py-2 rounded-xl border border-surface-border text-ink hover:bg-surface-bg-warm transition disabled:opacity-40";
 const names = (list: string[], max = 12) =>
-  list.length <= max ? list.join(", ") : `${list.slice(0, max).join(", ")} and ${list.length - max} more`;
+  list.length <= max ? list.join(", ") : phrase("{names} and {count} more", { names: list.slice(0, max).join(", "), count: list.length - max });
 
 export default function WeeklyReportsCard({ schoolId, graded }: { schoolId: string; graded: boolean }) {
+  const { tr } = useLanguage();
   const [on, setOn] = useState<boolean | null>(null);
   const [ready, setReady] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -52,7 +55,7 @@ export default function WeeklyReportsCard({ schoolId, graded }: { schoolId: stri
     setBusy(true);
     setError(null);
     const { data, error } = await createClient().from("schools").update({ weekly_reports: !on }).eq("id", schoolId).select("id");
-    if (error || !data?.length) setError(error?.message ?? "That didn't save. Please try again.");
+    if (error || !data?.length) setError(tr(error?.message ?? "That didn't save. Please try again."));
     else {
       setOn(!on);
       setPreview(null);
@@ -73,7 +76,7 @@ export default function WeeklyReportsCard({ schoolId, graded }: { schoolId: stri
       if (!res.ok) throw new Error(body.error ?? "Couldn't put this week's report together");
       setPreview(body);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't put this week's report together");
+      setError(e instanceof Error ? tr(e.message) : tr("Couldn't put this week's report together"));
     } finally {
       setLoadingPreview(false);
     }
@@ -84,21 +87,21 @@ export default function WeeklyReportsCard({ schoolId, graded }: { schoolId: stri
   const off = preview?.students.filter((s) => s.skipped === "switched_off") ?? [];
 
   return (
-    <section aria-label="Weekly progress reports" className="card-quiet p-4 space-y-3">
+    <section aria-label={tr("Weekly progress reports")} className="card-quiet p-4 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 max-w-2xl">
-          <p className="eyebrow">Weekly progress reports</p>
+          <p className="eyebrow">{tr("Weekly progress reports")}</p>
           <p className="text-[13px] text-ink mt-1 leading-relaxed">
             {!ready
-              ? "Every Friday afternoon, parents can get a report on their child's week. To start, run the weekly reports update in Supabase."
+              ? tr("Every Friday afternoon, parents can get a report on their child's week. To start, run the weekly reports update in Supabase.")
               : on === false
-                ? "Off: no weekly reports go out for this school."
-                : "On: every Friday afternoon, each parent whose child had lessons recorded that week gets a report on it, and you get a summary. A child with only attendance doesn't get one."}
+                ? tr("Off: no weekly reports go out for this school.")
+                : tr("On: every Friday afternoon, each parent whose child had lessons recorded that week gets a report on it, and you get a summary. A child with only attendance doesn't get one.")}
           </p>
           {ready && on !== false && (
             <p className="text-[11.5px] text-ink-muted mt-0.5">
-              To leave a child out, open them below and untick their weekly report
-              {graded ? " — or switch a whole grade off from its heading" : ""}.
+              {tr("To leave a child out, open them below and untick their weekly report")}
+              {graded ? tr(" — or switch a whole grade off from its heading") : ""}.
             </p>
           )}
         </div>
@@ -106,11 +109,11 @@ export default function WeeklyReportsCard({ schoolId, graded }: { schoolId: stri
           <div className="flex flex-wrap gap-2 flex-shrink-0">
             {on && (
               <button type="button" onClick={look} disabled={loadingPreview} aria-expanded={!!preview} className={ghost}>
-                {loadingPreview ? "Putting it together…" : preview ? "Hide the preview" : "See this Friday's"}
+                {loadingPreview ? tr("Putting it together…") : preview ? tr("Hide the preview") : tr("See this Friday's")}
               </button>
             )}
             <button type="button" onClick={toggle} disabled={busy} className={ghost}>
-              {busy ? "Saving…" : on ? "Turn off for the school" : "Turn on"}
+              {busy ? tr("Saving…") : on ? tr("Turn off for the school") : tr("Turn on")}
             </button>
           </div>
         )}
@@ -120,13 +123,10 @@ export default function WeeklyReportsCard({ schoolId, graded }: { schoolId: stri
       {preview && (
         <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
           <p className="text-[13px] text-ink">
-            <strong>Friday&apos;s report, {preview.week}</strong> — so far, {reported.length} student
-            {reported.length === 1 ? "" : "s"} to report on, to {preview.parents} parent{preview.parents === 1 ? "" : "s"}.
+            <strong>{tr("Friday's report, {week}", { week: preview.week })}</strong>{" "}{tr("— so far, {students} to report on, to {parents}.", { students: tr("{count} student|{count} students", { count: reported.length }), parents: tr("{count} parent|{count} parents", { count: preview.parents }) })}
             {preview.lastSent && (
               <span className="text-ink-muted">
-                {" "}
-                Last sent for the week ending {preview.lastSent.weekEnding}, to {preview.lastSent.parents} parent
-                {preview.lastSent.parents === 1 ? "" : "s"}.
+                {" "}{tr("Last sent for the week ending {weekEnding}, to {parents}.", { weekEnding: preview.lastSent.weekEnding, parents: tr("{count} parent|{count} parents", { count: preview.lastSent.parents }) })}
               </span>
             )}
           </p>
@@ -158,17 +158,17 @@ export default function WeeklyReportsCard({ schoolId, graded }: { schoolId: stri
           )}
           {nothing.length > 0 && (
             <p className="text-[12px] text-ink-muted">
-              <strong className="text-ink">No report, nothing recorded beyond attendance ({nothing.length}):</strong>{" "}
+              <strong className="text-ink">{tr("No report, nothing recorded beyond attendance ({count}):", { count: nothing.length })}</strong>{" "}
               {names(nothing.map((s) => s.name))}
             </p>
           )}
           {off.length > 0 && (
             <p className="text-[12px] text-ink-muted">
-              <strong className="text-ink">Switched off ({off.length}):</strong> {names(off.map((s) => s.name))}
+              <strong className="text-ink">{tr("Switched off ({count}):", { count: off.length })}</strong> {names(off.map((s) => s.name))}
             </p>
           )}
           <p className="text-[11.5px] text-ink-muted">
-            Lessons recorded between now and Friday afternoon go in too.
+            {tr("Lessons recorded between now and Friday afternoon go in too.")}
           </p>
         </div>
       )}

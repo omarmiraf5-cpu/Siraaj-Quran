@@ -1,23 +1,26 @@
+import { dateLocale } from "@/lib/i18n/current";
+import { labels, phrase } from "@/lib/i18n/phrases";
+
 // The office's money besides fees: salaries and expenses (schema.sql,
 // "Salaries and expenses"). Shared by the Payments page's two tabs.
 
 export type PayMethod = "cash" | "bank" | "e_transfer" | "cheque" | "card" | "other";
 
-export const PAY_METHOD_LABELS: Record<PayMethod, string> = {
+export const PAY_METHOD_LABELS: Record<PayMethod, string> = labels({
   cash: "Cash",
   bank: "Bank transfer",
   e_transfer: "E-transfer",
   cheque: "Cheque",
   card: "Card",
   other: "Other",
-};
+});
 /** How a salary can be paid; a card is for expenses only. */
 export const SALARY_METHODS: PayMethod[] = ["cash", "bank", "e_transfer", "cheque", "other"];
 export const EXPENSE_METHODS: PayMethod[] = ["cash", "card", "bank", "e_transfer", "cheque", "other"];
 
 export type ExpenseCategory = "rent" | "utilities" | "supplies" | "food" | "transport" | "maintenance" | "events" | "other";
 
-export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = labels({
   rent: "Rent",
   utilities: "Utilities",
   supplies: "Books & supplies",
@@ -26,7 +29,7 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   maintenance: "Maintenance",
   events: "Events",
   other: "Other",
-};
+});
 export const EXPENSE_CATEGORIES = Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[];
 
 export interface SalaryPayment {
@@ -76,13 +79,13 @@ export function monthEnd(month: string): string {
 /** "October 2026". */
 export function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-CA", { month: "long", year: "numeric" });
+  return new Date(y, m - 1, 1).toLocaleDateString(dateLocale("en-CA"), { month: "long", year: "numeric" });
 }
 
 /** "30 Oct". */
 export function shortDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return new Date(y, m - 1, d).toLocaleDateString(dateLocale("en-GB"), { day: "numeric", month: "short" });
 }
 
 export const sum = (xs: number[]) => Math.round(xs.reduce((a, b) => a + b, 0) * 100) / 100;
@@ -98,10 +101,12 @@ export function parseAmount(text: string): number | null {
 export function financeProblem(error: { code?: string; message?: string }, what: "Salaries" | "Expenses"): string {
   const message = error.message ?? "";
   if (["PGRST205", "42P01"].includes(error.code ?? "") || /does not exist|schema cache/i.test(message)) {
-    return `${what} need the salaries and expenses update run in Supabase first (mydiiwaan-update-11.sql).`;
+    return phrase(`${what} need the salaries and expenses update run in Supabase first (mydiiwaan-update-11.sql).`);
   }
   if (error.code === "42501" || /permission denied/i.test(message)) {
     return `${what} can't be read yet: the database hasn't given MyDiiwaan access to its new tables (${message}). Run the access fix in Supabase.`;
   }
-  return `Couldn't load ${what.toLowerCase()}: ${message || "please try again"}.`;
+  return what === "Salaries"
+    ? phrase("Couldn't load salaries: {message}.", { message: message || phrase("please try again") })
+    : phrase("Couldn't load expenses: {message}.", { message: message || phrase("please try again") });
 }

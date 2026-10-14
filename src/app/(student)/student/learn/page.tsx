@@ -5,6 +5,7 @@ import { ARBAEEN } from "@/data/arbaeen";
 import { getAllTajweedRules } from "@/lib/tajweed-rules";
 import { GRAD_CLASS } from "@/components/student-ui";
 import { IconArrow, IconBookOpen, IconPalette, IconStar } from "@/components/icons";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // The three things to study that are not the Mushaf itself. They were going to
 // be three more tabs, which would have made seven along the bottom of a phone;
@@ -17,7 +18,7 @@ const SHELF = [
     title: "Qa'idah",
     arabic: "الْقَاعِدَةُ",
     sub: "Learn to read Arabic from the letters up: Ahsanul Qawaid, the Noorani Qaida or the Baghdadi Qaida.",
-    count: `${QAIDAH_BOOKS.length} books`,
+    count: { text: "{count} book|{count} books", count: QAIDAH_BOOKS.length },
   },
   {
     href: "/student/tajweed",
@@ -26,7 +27,7 @@ const SHELF = [
     title: "Tajweed",
     arabic: "التَّجْوِيدُ",
     sub: "The colours in your Mushaf and what each one means.",
-    count: `${getAllTajweedRules().length} rules`,
+    count: { text: "{count} rule|{count} rules", count: getAllTajweedRules().length },
   },
   {
     href: "/student/hadith",
@@ -35,20 +36,21 @@ const SHELF = [
     title: "Forty Hadith",
     arabic: "الْأَرْبَعُونَ النَّوَوِيَّةُ",
     sub: "Imam an-Nawawi's collection, in Arabic and English.",
-    count: `${ARBAEEN.length} hadith`,
+    count: { text: "{count} hadith|{count} hadith", count: ARBAEEN.length },
   },
 ];
 
 export default function StudentLearnPage() {
+  const { tr, language } = useLanguage();
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
       <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
         <div className="relative">
-          <p className="eyebrow text-white/45">Your books</p>
-          <h1 className="page-title text-white text-[30px] mt-1 leading-tight">Learn</h1>
+          <p className="eyebrow text-white/45">{tr("Your books")}</p>
+          <h1 className="page-title text-white text-[30px] mt-1 leading-tight">{tr("Learn")}</h1>
           <p className="text-[13px] text-white/55 mt-2.5">
-            Everything to study alongside the Mushaf.
+            {tr("Everything to study alongside the Mushaf.")}
           </p>
         </div>
       </header>
@@ -69,19 +71,19 @@ export default function StudentLearnPage() {
 
             <span className="flex-1 min-w-0">
               <span className="flex items-baseline justify-between gap-2">
-                <span className="page-title text-[17px]">{item.title}</span>
-                <span
+                <span className="page-title text-[17px]">{tr(item.title)}</span>
+                {language !== "ar" && <span
                   className="font-arabic text-[15px] text-ink-muted flex-shrink-0 truncate"
                   dir="rtl"
                   lang="ar"
                 >
                   {item.arabic}
-                </span>
+                </span>}
               </span>
               <span className="block text-[12px] text-ink-muted mt-0.5 leading-snug">
-                {item.sub}
+                {tr(item.sub)}
               </span>
-              <span className="eyebrow mt-1.5 block">{item.count}</span>
+              <span className="eyebrow mt-1.5 block">{tr(item.count.text, { count: item.count.count })}</span>
             </span>
 
             <span className="text-ink-muted group-hover:translate-x-0.5 group-hover:text-ink transition-all flex-shrink-0">

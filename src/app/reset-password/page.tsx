@@ -13,7 +13,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 export default function ResetPasswordPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
 
   const [tokenHash, setTokenHash] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -63,7 +63,7 @@ export default function ResetPasswordPage() {
     });
     if (updateError || !data.user) {
       setSaving(false);
-      setError(updateError?.message ?? "That didn't go through. Please try again.");
+      setError(tr(updateError?.message ?? "That didn't go through. Please try again."));
       return;
     }
 

@@ -42,6 +42,7 @@ const MAX_PRIMARY_TABS = 4;
 // A school's own name replaces the platform wordmark wholesale; only the
 // MyDiiwaan default gets the two-tone "My"/"Diiwaan" split.
 function Wordmark({ branding, className }: { branding: SchoolBranding; className: string }) {
+  const { tr } = useLanguage();
   return (
     <span className={className}>
       {branding.isCustom ? (

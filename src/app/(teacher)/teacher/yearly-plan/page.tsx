@@ -47,7 +47,11 @@ import {
   type Milestone,
   type PlanUnit,
   type PlanProgress,
-} from "@/lib/yearlyPlan";
+ translateAlert } from "@/lib/yearlyPlan";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
+
+const PLAN_STATUS_LABEL = { draft: "Draft", active: "Active", completed: "Completed", archived: "Archived" } as const;
 
 /**
  * Teacher side of the yearly plan: build one for a student, break it into
@@ -184,6 +188,7 @@ function AmountButtons({
   value: number;
   onChange: (v: number) => void;
 }) {
+  const { tr } = useLanguage();
   const presets = QUICK_DAILY_AMOUNTS[unit];
   return (
     <div>
@@ -211,7 +216,7 @@ function AmountButtons({
         step="0.25"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        placeholder={presets ? "Or type your own amount" : undefined}
+        placeholder={presets ? tr("Or type your own amount") : undefined}
         className={input}
       />
     </div>
@@ -254,6 +259,7 @@ function ReviewAmountButtons({
 }
 
 export default function TeacherYearlyPlanPage() {
+  const { tr } = useLanguage();
   const { mode, students } = useSchoolRoster();
   // The sample portal has no server to hold plans, so its requests are
   // answered in the browser from the sample school's own plans instead —
@@ -319,14 +325,14 @@ export default function TeacherYearlyPlanPage() {
           setPayload(null);
           return;
         }
-        throw new Error(body.error || "Could not load the plan");
+        throw new Error(body.error || phrase("Could not load the plan"));
       }
       setPayload(body);
     } catch (err) {
       // Surfaced rather than swallowed: an empty plan and a failed request
       // look identical on screen otherwise, and the teacher would go on
       // building a plan that was never going to save.
-      setError(err instanceof Error ? err.message : "Could not load the plan");
+      setError(err instanceof Error ? tr(err.message) : tr("Could not load the plan"));
       setPayload(null);
     } finally {
       setLoading(false);
@@ -563,7 +569,7 @@ export default function TeacherYearlyPlanPage() {
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not create the plan");
+      if (!res.ok) throw new Error(body.error || phrase("Could not create the plan"));
       // Remember the order on the student, so the assignment form offers
       // the same one tomorrow. Best-effort: the plan is already created,
       // and failing to save a preference should not report as a failure
@@ -579,7 +585,7 @@ export default function TeacherYearlyPlanPage() {
       setSelectedPlanId(null);
       await load(studentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the plan");
+      setError(err instanceof Error ? tr(err.message) : tr("Could not create the plan"));
     } finally {
       setSaving(false);
     }
@@ -612,11 +618,11 @@ export default function TeacherYearlyPlanPage() {
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not add the milestone");
+      if (!res.ok) throw new Error(body.error || phrase("Could not add the milestone"));
       setPayload(body);
       setNewMilestone({ title: "", description: "", starts_on: "", due_on: "", target_units: 0 });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add the milestone");
+      setError(err instanceof Error ? tr(err.message) : tr("Could not add the milestone"));
     } finally {
       setSaving(false);
     }
@@ -672,12 +678,12 @@ export default function TeacherYearlyPlanPage() {
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not record the progress");
+      if (!res.ok) throw new Error(body.error || phrase("Could not record the progress"));
       setPayload(body);
       setRecording(null);
       setEntry({ units_after: 0, note: "" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not record the progress");
+      setError(err instanceof Error ? tr(err.message) : tr("Could not record the progress"));
     } finally {
       setSaving(false);
     }
@@ -693,10 +699,10 @@ export default function TeacherYearlyPlanPage() {
         body: JSON.stringify({ id: plan.id, status }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not update the plan");
+      if (!res.ok) throw new Error(body.error || phrase("Could not update the plan"));
       setPayload(body);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update the plan");
+      setError(err instanceof Error ? tr(err.message) : tr("Could not update the plan"));
     } finally {
       setSaving(false);
     }
@@ -785,11 +791,11 @@ export default function TeacherYearlyPlanPage() {
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not update the plan");
+      if (!res.ok) throw new Error(body.error || phrase("Could not update the plan"));
       setPayload(body);
       setEditingPlan(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update the plan");
+      setError(err instanceof Error ? tr(err.message) : tr("Could not update the plan"));
     } finally {
       setSaving(false);
     }
@@ -812,12 +818,12 @@ export default function TeacherYearlyPlanPage() {
         method: "DELETE",
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not delete the plan");
+      if (!res.ok) throw new Error(body.error || phrase("Could not delete the plan"));
       setConfirmingDelete(false);
       setSelectedPlanId(null);
       if (studentId) await load(studentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete the plan");
+      setError(err instanceof Error ? tr(err.message) : tr("Could not delete the plan"));
     } finally {
       setSaving(false);
     }
@@ -828,7 +834,7 @@ export default function TeacherYearlyPlanPage() {
   if (mode === "loading") {
     return (
       <div className="space-y-6 max-w-6xl">
-        <LoadingNote>Loading your roster…</LoadingNote>
+        <LoadingNote>{tr("Loading your roster…")}</LoadingNote>
       </div>
     );
   }
@@ -836,26 +842,26 @@ export default function TeacherYearlyPlanPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       <PortalHero
-        eyebrow="Teacher"
-        title="Yearly plan"
+        eyebrow={tr("Teacher")}
+        title={tr("Yearly plan")}
         meta={[
-          student ? student.name : "No student selected",
-          plan ? plan.academic_year : "No plan yet",
+          student ? student.name : phrase("No student selected"),
+          plan ? plan.academic_year : phrase("No plan yet"),
         ]}
       />
 
-      <SectionCard title="Student" note={`${students.length} in your school`}>
+      <SectionCard title={tr("Student")} note={tr("{count} in your school", { count: students.length })}>
         {students.length === 0 ? (
           <PlanEmptyState
-            title="No students on your roster"
-            body="Add students from the admin portal first — a yearly plan is written for one child at a time."
+            title={tr("No students on your roster")}
+            body={tr("Add students from the admin portal first — a yearly plan is written for one child at a time.")}
           />
         ) : (
           <select
             value={studentId ?? ""}
             onChange={(e) => setStudentId(e.target.value)}
             className={input}
-            aria-label="Choose a student"
+            aria-label={tr("Choose a student")}
           >
             {students.map((s) => (
               <option key={s.id} value={s.id}>
@@ -867,10 +873,10 @@ export default function TeacherYearlyPlanPage() {
       </SectionCard>
 
       {errorCode === "encryption_not_configured" && (
-        <SectionCard title="One setup step left">
+        <SectionCard title={tr("One setup step left")}>
           <PlanEmptyState
-            title="Yearly plans aren't switched on yet"
-            body="Plans are encrypted before they're stored, and this site hasn't been given its encryption key. Ask whoever set the site up to add the plan encryption key to the server settings and redeploy — everything else on this page is ready."
+            title={tr("Yearly plans aren't switched on yet")}
+            body={tr("Plans are encrypted before they're stored, and this site hasn't been given its encryption key. Ask whoever set the site up to add the plan encryption key to the server settings and redeploy — everything else on this page is ready.")}
           />
         </SectionCard>
       )}
@@ -881,11 +887,11 @@ export default function TeacherYearlyPlanPage() {
         </p>
       )}
 
-      {loading && <LoadingNote>Loading the plan…</LoadingNote>}
+      {loading && <LoadingNote>{tr("Loading the plan…")}</LoadingNote>}
 
       {!loading && payload && (!plan || creatingNew) && (
         <SectionCard
-          title={plan ? "New yearly plan" : "Create a yearly plan"}
+          title={plan ? tr("New yearly plan") : tr("Create a yearly plan")}
           note={
             plan ? (
               <button
@@ -893,23 +899,23 @@ export default function TeacherYearlyPlanPage() {
                 onClick={cancelNewPlan}
                 className="text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
               >
-                ← Back to {plan.academic_year}
+                {tr("← Back to {academic_year}", { academic_year: plan.academic_year })}
               </button>
             ) : undefined
           }
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className={label}>Plan title</label>
+              <label className={label}>{tr("Plan title")}</label>
               <input
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                placeholder="e.g. Hifz of Juz' 30 with weekly revision"
+                placeholder={tr("e.g. Hifz of Juz' 30 with weekly revision")}
                 className={input}
               />
             </div>
             <div>
-              <label className={label}>Academic year</label>
+              <label className={label}>{tr("Academic year")}</label>
               <input
                 value={draft.academic_year}
                 onChange={(e) => setDraft({ ...draft, academic_year: e.target.value })}
@@ -917,7 +923,7 @@ export default function TeacherYearlyPlanPage() {
               />
             </div>
             <div>
-              <label className={label}>Counted in</label>
+              <label className={label}>{tr("Counted in")}</label>
               <select
                 value={draft.unit}
                 onChange={(e) => {
@@ -937,7 +943,7 @@ export default function TeacherYearlyPlanPage() {
               </select>
             </div>
             <div>
-              <label className={label}>Starts</label>
+              <label className={label}>{tr("Starts")}</label>
               <input
                 type="date"
                 value={draft.starts_on}
@@ -946,7 +952,7 @@ export default function TeacherYearlyPlanPage() {
               />
             </div>
             <div>
-              <label className={label}>Ends</label>
+              <label className={label}>{tr("Ends")}</label>
               <input
                 type="date"
                 value={draft.ends_on}
@@ -956,7 +962,7 @@ export default function TeacherYearlyPlanPage() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className={label}>How much he does</label>
+              <label className={label}>{tr("How much he does")}</label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -968,7 +974,7 @@ export default function TeacherYearlyPlanPage() {
                       : "border-surface-border text-ink-muted hover:text-ink"
                   }`}
                 >
-                  How much each day
+                  {tr("How much each day")}
                 </button>
                 <button
                   type="button"
@@ -979,7 +985,7 @@ export default function TeacherYearlyPlanPage() {
                       : "border-surface-border text-ink-muted hover:text-ink"
                   }`}
                 >
-                  A total for the year
+                  {tr("A total for the year")}
                 </button>
               </div>
             </div>
@@ -987,7 +993,7 @@ export default function TeacherYearlyPlanPage() {
             {draft.dailyMode ? (
               <>
                 <div className="sm:col-span-2">
-                  <label className={label}>New memorization, each day at school</label>
+                  <label className={label}>{tr("New memorization, each day at school")}</label>
                   <AmountButtons
                     unit={draft.unit}
                     value={draft.dailyNewAmount}
@@ -995,21 +1001,21 @@ export default function TeacherYearlyPlanPage() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className={label}>Review, each day (optional)</label>
+                  <label className={label}>{tr("Review, each day (optional)")}</label>
                   <ReviewAmountButtons
                     value={draft.dailyReviewAmount}
                     unit={draft.dailyReviewUnit}
                     onChange={(v, u) => setDraft({ ...draft, dailyReviewAmount: v, dailyReviewUnit: u })}
                   />
                   <p className="text-[11.5px] text-ink-muted mt-1">
-                    Old ground he goes back over each day he&apos;s at school. Tap again to turn it off.
+                    {tr("Old ground he goes back over each day he's at school. Tap again to turn it off.")}
                   </p>
                 </div>
               </>
             ) : (
               <>
                 <div>
-                  <label className={label}>Total for the year</label>
+                  <label className={label}>{tr("Total for the year")}</label>
                   <input
                     type="number"
                     min={0}
@@ -1020,7 +1026,7 @@ export default function TeacherYearlyPlanPage() {
                   />
                 </div>
                 <div>
-                  <label className={label}>How many check-ins across the year</label>
+                  <label className={label}>{tr("How many check-ins across the year")}</label>
                   <input
                     type="number"
                     min={1}
@@ -1032,19 +1038,19 @@ export default function TeacherYearlyPlanPage() {
                     className={input}
                   />
                   <p className="text-[11.5px] text-ink-muted mt-1">
-                    e.g. 10 means a new goal roughly every month.
+                    {tr("e.g. 10 means a new goal roughly every month.")}
                   </p>
                 </div>
               </>
             )}
 
             <div className="sm:col-span-2">
-              <label className={label}>Notes for the year</label>
+              <label className={label}>{tr("Notes for the year")}</label>
               <textarea
                 value={draft.notes}
                 onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
                 rows={3}
-                placeholder="Anything the parent should know about how this year is set out."
+                placeholder={tr("Anything the parent should know about how this year is set out.")}
                 className={input}
               />
             </div>
@@ -1054,7 +1060,7 @@ export default function TeacherYearlyPlanPage() {
           {draft.unit !== "lesson" && (
             <div className="mt-1 rounded-xl border border-surface-border p-4">
               {draft.dailyMode ? (
-                <p className="text-[14px] font-semibold text-ink">Start from where he already is</p>
+                <p className="text-[14px] font-semibold text-ink">{tr("Start from where he already is")}</p>
               ) : (
                 <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
@@ -1064,7 +1070,7 @@ export default function TeacherYearlyPlanPage() {
                     className="w-4 h-4 accent-emerald-600 flex-shrink-0"
                   />
                   <span className="text-[14px] font-semibold text-ink">
-                    Start from where he already is
+                    {tr("Start from where he already is")}
                   </span>
                 </label>
               )}
@@ -1073,29 +1079,25 @@ export default function TeacherYearlyPlanPage() {
                 <div className="mt-4 space-y-4">
                   {detecting && (
                     <p className="text-[12.5px] text-ink-muted">
-                      Checking their recorded lessons…
+                      {tr("Checking their recorded lessons…")}
                     </p>
                   )}
                   {!detecting && detected && (
                     <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
-                      Their last recorded lesson ends at{" "}
+                      {tr("Their last recorded lesson ends at")}{" "}
                       <span className="font-semibold">
-                        {detected.surah_name} {detected.ayah}
-                      </span>{" "}
-                      — read from {detected.lessons} lesson
-                      {detected.lessons === 1 ? "" : "s"} on file, so the plan starts at the ayah
-                      after it. Change it below if that is not where they actually are.
+                        {getSurahById(detected.surah)?.englishName ?? detected.surah_name} {detected.ayah}
+                      </span>{" "}{tr("— read from {count} lesson on file, so the plan starts at the ayah after it. Change it below if that is not where they actually are.|— read from {count} lessons on file, so the plan starts at the ayah after it. Change it below if that is not where they actually are.", { count: detected.lessons })}
                     </p>
                   )}
                   {!detecting && !detected && (
                     <p className="text-[12.5px] text-ink-muted">
-                      No Qur&apos;an lessons recorded for this student yet, so the plan starts at
-                      the beginning of this direction. Set it by hand if they are further on.
+                      {tr("No Qur'an lessons recorded for this student yet, so the plan starts at the beginning of this direction. Set it by hand if they are further on.")}
                     </p>
                   )}
 
                   <div>
-                    <label className={label}>Which way</label>
+                    <label className={label}>{tr("Which way")}</label>
                     <select
                       value={draft.direction}
                       onChange={(e) =>
@@ -1113,7 +1115,7 @@ export default function TeacherYearlyPlanPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className={label}>Starting surah</label>
+                      <label className={label}>{tr("Starting surah")}</label>
                       <select
                         value={draft.startSurah}
                         onChange={(e) => {
@@ -1131,13 +1133,13 @@ export default function TeacherYearlyPlanPage() {
                       >
                         {SURAHS.map((sr) => (
                           <option key={sr.id} value={sr.id}>
-                            {sr.id}. {sr.englishName} ({sr.ayahs} ayahs)
+                            {tr("{id}. {englishName} ({ayahs} ayahs)", { id: sr.id, englishName: sr.englishName, ayahs: sr.ayahs })}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className={label}>…from ayah</label>
+                      <label className={label}>{tr("…from ayah")}</label>
                       <input
                         type="number"
                         min={1}
@@ -1153,20 +1155,18 @@ export default function TeacherYearlyPlanPage() {
 
                   {startFrom ? (
                     <p className="text-[12.5px] text-ink-muted">
-                      The plan will begin at{" "}
+                      {tr("The plan will begin at")}{" "}
                       <span className="font-semibold text-ink">{formatPosition(startFrom)}</span>.
                     </p>
                   ) : (
                     <p className="text-[12.5px] text-status-error-text">
-                      That position is past the end of the mushaf in this direction — there is
-                      nothing after it to plan.
+                      {tr("That position is past the end of the mushaf in this direction — there is nothing after it to plan.")}
                     </p>
                   )}
 
                   {overshoots && (
                     <p className="text-[12.5px] text-status-error-text bg-status-error-bg rounded-lg px-3 py-2">
-                      {formatUnits(draft.totalUnits, draft.unit)} is more than he has left in this
-                      direction — he&apos;ll finish everything before the year is up.
+                      {tr("{formatUnits} is more than he has left in this direction — he'll finish everything before the year is up.", { formatUnits: formatUnits(draft.totalUnits, draft.unit) })}
                     </p>
                   )}
 
@@ -1176,33 +1176,28 @@ export default function TeacherYearlyPlanPage() {
                       switch to the daily-rate pace just to see this. */}
                   {!draft.dailyMode && !overshoots && canAnchor && startFrom && draft.totalUnits > 0 && (
                     <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
-                      That&apos;s about{" "}
-                      {formatUnits(
+                      {tr("That's about {formatUnits} a day, on the days he's at school, from {starts_on} to {ends_on}. Once saved, the plan page shows exactly what to do each day.", { formatUnits: formatUnits(
                         impliedDailyRate(draft.totalUnits, draft.starts_on, draft.ends_on, schoolCal),
                         draft.unit
-                      )}{" "}
-                      a day, on the days he&apos;s at school, from {draft.starts_on} to {draft.ends_on}.
-                      Once saved, the plan page shows exactly what to do each day.
+                      ), starts_on: draft.starts_on, ends_on: draft.ends_on })}
                     </p>
                   )}
 
                   {draft.dailyMode &&
                     (skeleton.length > 0 ? (
                       <p className="text-[12.5px] text-status-info-text bg-status-info-bg rounded-lg px-3 py-2">
-                        By {draft.ends_on} that&apos;s about{" "}
+                        {tr("By {ends_on} that's about", { ends_on: draft.ends_on })}{" "}
                         {formatUnits(
                           skeleton.reduce((s, m) => s + m.target_units, 0),
                           draft.unit
-                        )}{" "}
-                        in total
+                        )}{" "}{tr("in total")}
                         {draft.dailyReviewAmount > 0 &&
-                          `, plus ${formatUnits(draft.dailyReviewAmount, draft.dailyReviewUnit ?? draft.unit)} of review every day he&apos;s at school`}
-                        . The plan page will show exactly what to do each day.
+                          tr(", plus {formatUnits} of review every day he's at school", { formatUnits: formatUnits(draft.dailyReviewAmount, draft.dailyReviewUnit ?? draft.unit) })}
+                        {tr(". The plan page will show exactly what to do each day.")}
                       </p>
                     ) : (
                       <p className="text-[12.5px] text-status-error-text">
-                        He isn&apos;t at school on any day in these dates — check the start and
-                        end dates, or the school&apos;s calendar under Admin.
+                        {tr("He isn't at school on any day in these dates — check the start and end dates, or the school's calendar under Admin.")}
                       </p>
                     ))}
                 </div>
@@ -1212,32 +1207,26 @@ export default function TeacherYearlyPlanPage() {
 
           {skeleton.length > 0 && (
             <div className="mt-5 rounded-xl border border-surface-border bg-surface-bg-warm px-4 py-3">
-              <p className="eyebrow">What this creates</p>
+              <p className="eyebrow">{tr("What this creates")}</p>
               <p className="text-[13px] text-ink-body mt-1.5 leading-relaxed">
                 {draft.dailyMode ? (
                   <>
-                    {skeleton.length} weekly goals, from {skeleton[0].starts_on} to{" "}
-                    {skeleton[skeleton.length - 1].due_on} — each one sized to how many days he&apos;s
-                    actually at school that week.
+                    {tr("{count} weekly goals, from {starts_on} to {due_on} — each one sized to how many days he's actually at school that week.", { count: skeleton.length, starts_on: skeleton[0].starts_on, due_on: skeleton[skeleton.length - 1].due_on })}
                   </>
                 ) : (
                   <>
-                    {skeleton.length} evenly spaced check-ins of{" "}
+                    {tr("{count} evenly spaced check-ins of", { count: skeleton.length })}{" "}
                     <span className="font-semibold">
                       {formatUnits(skeleton[0].target_units, draft.unit)}
-                    </span>{" "}
-                    each, from {skeleton[0].starts_on} to {skeleton[skeleton.length - 1].due_on}.
+                    </span>{" "}{tr("each, from {starts_on} to {due_on}.", { starts_on: skeleton[0].starts_on, due_on: skeleton[skeleton.length - 1].due_on })}
                   </>
-                )}{" "}
-                Rename, retarget or delete any of them afterwards.
+                )}{" "}{tr("Rename, retarget or delete any of them afterwards.")}
               </p>
               {canAnchor && skeleton.some((m) => m.label) && (
                 <>
                   {draft.dailyMode && (
                     <p className="text-[11.5px] text-ink-muted mt-3">
-                      Each row below is one week, not one day — the days he&apos;s actually at school
-                      that week, added together. For a single day&apos;s page, see &quot;This week&apos;s
-                      work&quot; on the plan page once it&apos;s saved.
+                      {tr("Each row below is one week, not one day — the days he's actually at school that week, added together. For a single day's page, see \"This week's work\" on the plan page once it's saved.")}
                     </p>
                   )}
                   <ol className="mt-3 divide-y divide-surface-border border-t border-surface-border">
@@ -1282,7 +1271,7 @@ export default function TeacherYearlyPlanPage() {
 
           {draft.starts_on >= draft.ends_on && (
             <p className="text-[13px] text-status-error-text mt-4">
-              The end date has to come after the start date.
+              {tr("The end date has to come after the start date.")}
             </p>
           )}
 
@@ -1292,7 +1281,7 @@ export default function TeacherYearlyPlanPage() {
               disabled={saving || !studentId || draft.starts_on >= draft.ends_on}
               className={primary}
             >
-              {saving ? "Creating…" : "Create plan"}
+              {saving ? tr("Creating…") : tr("Create plan")}
             </button>
           </div>
         </SectionCard>
@@ -1306,8 +1295,8 @@ export default function TeacherYearlyPlanPage() {
                 <PlanAlertBanner
                   key={a.id}
                   level={a.level}
-                  title={a.title}
-                  detail={a.detail}
+                  title={translateAlert(a).title}
+                  detail={translateAlert(a).detail}
                   acknowledged={Boolean(a.acknowledged_at)}
                 />
               ))}
@@ -1315,7 +1304,7 @@ export default function TeacherYearlyPlanPage() {
           )}
 
           <SectionCard
-            title={readable(plan.title, "Yearly plan")}
+            title={readable(plan.title, phrase("Yearly plan"))}
             note={
               <span className="inline-flex items-center gap-2">
                 {plan.academic_year}
@@ -1333,12 +1322,12 @@ export default function TeacherYearlyPlanPage() {
                 <div className="flex flex-wrap gap-y-4">
                   <PlanFigure
                     value={formatQuantity(progress.actualUnits)}
-                    label={`${unitLabel(2, plan.unit)} done`}
+                    label={tr("{unitLabel} done", { unitLabel: unitLabel(2, plan.unit) })}
                     tone={paceColor(progress.pace)}
                   />
-                  <PlanFigure value={formatApprox(progress.expectedUnits)} label="expected by today" />
-                  <PlanFigure value={formatQuantity(progress.totalUnits)} label="total for the year" />
-                  <PlanFigure value={progress.daysRemaining} label="days left" />
+                  <PlanFigure value={formatApprox(progress.expectedUnits)} label={tr("expected by today")} />
+                  <PlanFigure value={formatQuantity(progress.totalUnits)} label={tr("total for the year")} />
+                  <PlanFigure value={progress.daysRemaining} label={tr("days left")} />
                 </div>
                 <div className="mt-5">
                   <PaceBar
@@ -1348,11 +1337,8 @@ export default function TeacherYearlyPlanPage() {
                   />
                   <p className="text-[12px] text-ink-muted mt-2.5 leading-relaxed">
                     {progress.varianceUnits >= 0
-                      ? `${formatApprox(progress.varianceUnits)} ${unitLabel(progress.varianceUnits, plan.unit)} ahead of the schedule.`
-                      : `${formatApprox(Math.abs(progress.varianceUnits))} ${unitLabel(progress.varianceUnits, plan.unit)} short of the schedule.`}{" "}
-                    Running at {formatApprox(progress.currentPerWeek)}{" "}
-                    {unitLabel(progress.currentPerWeek, plan.unit)} a week; finishing on time
-                    needs {formatApprox(progress.requiredPerWeek)}.
+                      ? tr("{formatApprox} {unitLabel} ahead of the schedule.", { formatApprox: formatApprox(progress.varianceUnits), unitLabel: unitLabel(progress.varianceUnits, plan.unit) })
+                      : tr("{formatApprox} {unitLabel} short of the schedule.", { formatApprox: formatApprox(Math.abs(progress.varianceUnits)), unitLabel: unitLabel(progress.varianceUnits, plan.unit) })}{" "}{tr("Running at {formatApprox} {unitLabel} a week; finishing on time needs {formatApprox2}.", { formatApprox: formatApprox(progress.currentPerWeek), unitLabel: unitLabel(progress.currentPerWeek, plan.unit), formatApprox2: formatApprox(progress.requiredPerWeek) })}
                   </p>
                 </div>
               </div>
@@ -1369,7 +1355,7 @@ export default function TeacherYearlyPlanPage() {
 
             <div className="gold-rule my-5" />
             <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="eyebrow">Status</span>
+              <span className="eyebrow">{tr("Status")}</span>
               {(["draft", "active", "completed", "archived"] as const).map((s) => (
                 <button
                   key={s}
@@ -1381,14 +1367,14 @@ export default function TeacherYearlyPlanPage() {
                       : "border-surface-border text-ink-muted hover:text-ink hover:border-ink-muted"
                   }`}
                 >
-                  {s}
+                  {tr(PLAN_STATUS_LABEL[s])}
                 </button>
               ))}
             </div>
 
             {payload?.other_years && payload.other_years.length > 0 && (
               <div className="flex items-center gap-2.5 flex-wrap mt-3.5">
-                <span className="eyebrow">Other years</span>
+                <span className="eyebrow">{tr("Other years")}</span>
                 {payload.other_years.map((y) => (
                   <button
                     key={y.id}
@@ -1397,7 +1383,7 @@ export default function TeacherYearlyPlanPage() {
                     disabled={saving}
                     className="text-[12px] font-semibold px-3 py-1.5 rounded-full border border-surface-border text-ink-muted hover:text-ink hover:border-ink-muted transition disabled:opacity-40"
                   >
-                    {y.academic_year} · {y.status}
+                    {y.academic_year} · {tr(PLAN_STATUS_LABEL[y.status])}
                   </button>
                 ))}
               </div>
@@ -1408,7 +1394,7 @@ export default function TeacherYearlyPlanPage() {
               <div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className={label}>Plan title</label>
+                    <label className={label}>{tr("Plan title")}</label>
                     <input
                       value={editDraft.title}
                       onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })}
@@ -1416,7 +1402,7 @@ export default function TeacherYearlyPlanPage() {
                     />
                   </div>
                   <div>
-                    <label className={label}>Academic year</label>
+                    <label className={label}>{tr("Academic year")}</label>
                     <input
                       value={editDraft.academic_year}
                       onChange={(e) => setEditDraft({ ...editDraft, academic_year: e.target.value })}
@@ -1424,7 +1410,7 @@ export default function TeacherYearlyPlanPage() {
                     />
                   </div>
                   <div>
-                    <label className={label}>Counted in</label>
+                    <label className={label}>{tr("Counted in")}</label>
                     <select
                       value={editDraft.unit}
                       onChange={(e) => setEditDraft({ ...editDraft, unit: e.target.value as PlanUnit })}
@@ -1438,7 +1424,7 @@ export default function TeacherYearlyPlanPage() {
                     </select>
                   </div>
                   <div>
-                    <label className={label}>Starts</label>
+                    <label className={label}>{tr("Starts")}</label>
                     <input
                       type="date"
                       value={editDraft.starts_on}
@@ -1447,7 +1433,7 @@ export default function TeacherYearlyPlanPage() {
                     />
                   </div>
                   <div>
-                    <label className={label}>Ends</label>
+                    <label className={label}>{tr("Ends")}</label>
                     <input
                       type="date"
                       value={editDraft.ends_on}
@@ -1458,27 +1444,27 @@ export default function TeacherYearlyPlanPage() {
                   {plan.start_surah != null && (
                     <>
                       <div className="sm:col-span-2">
-                        <label className={label}>New memorization, each day at school</label>
+                        <label className={label}>{tr("New memorization, each day at school")}</label>
                         <AmountButtons
                           unit={editDraft.unit}
                           value={editDraft.dailyNewAmount}
                           onChange={(v) => setEditDraft({ ...editDraft, dailyNewAmount: v })}
                         />
-                        <p className="text-[11.5px] text-ink-muted mt-1">0 turns this off.</p>
+                        <p className="text-[11.5px] text-ink-muted mt-1">{tr("0 turns this off.")}</p>
                       </div>
                       <div className="sm:col-span-2">
-                        <label className={label}>Review, each day</label>
+                        <label className={label}>{tr("Review, each day")}</label>
                         <ReviewAmountButtons
                           value={editDraft.dailyReviewAmount}
                           unit={editDraft.dailyReviewUnit}
                           onChange={(v, u) => setEditDraft({ ...editDraft, dailyReviewAmount: v, dailyReviewUnit: u })}
                         />
-                        <p className="text-[11.5px] text-ink-muted mt-1">Tap the selected one again to turn it off.</p>
+                        <p className="text-[11.5px] text-ink-muted mt-1">{tr("Tap the selected one again to turn it off.")}</p>
                       </div>
                     </>
                   )}
                   <div className="sm:col-span-2">
-                    <label className={label}>Notes for the year</label>
+                    <label className={label}>{tr("Notes for the year")}</label>
                     <textarea
                       value={editDraft.notes}
                       onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })}
@@ -1495,20 +1481,20 @@ export default function TeacherYearlyPlanPage() {
                     }
                     className={primary}
                   >
-                    {saving ? "Saving…" : "Save changes"}
+                    {saving ? tr("Saving…") : tr("Save changes")}
                   </button>
                   <button onClick={cancelEdit} disabled={saving} className={ghost}>
-                    Cancel
+                    {tr("Cancel")}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="flex items-center gap-2.5 flex-wrap">
                 <button onClick={startEdit} className={ghost}>
-                  Edit plan
+                  {tr("Edit plan")}
                 </button>
                 <button onClick={startNewPlan} className={ghost}>
-                  + New plan
+                  {tr("+ New plan")}
                 </button>
                 <button
                   onClick={deletePlan}
@@ -1520,10 +1506,10 @@ export default function TeacherYearlyPlanPage() {
                   }`}
                 >
                   {saving && confirmingDelete
-                    ? "Deleting…"
+                    ? tr("Deleting…")
                     : confirmingDelete
-                      ? "Yes, delete this plan"
-                      : "Delete plan"}
+                      ? tr("Yes, delete this plan")
+                      : tr("Delete plan")}
                 </button>
                 {confirmingDelete && (
                   <button
@@ -1531,7 +1517,7 @@ export default function TeacherYearlyPlanPage() {
                     disabled={saving}
                     className="text-[12px] font-semibold text-ink-muted hover:text-ink transition-colors"
                   >
-                    Cancel
+                    {tr("Cancel")}
                   </button>
                 )}
               </div>
@@ -1546,11 +1532,11 @@ export default function TeacherYearlyPlanPage() {
             onViewFullYear={() => setShowFullYear(true)}
           />
 
-          <SectionCard title="Milestones" note={`${milestones.length} segments`}>
+          <SectionCard title={tr("Milestones")} note={tr("{count} segments", { count: milestones.length })}>
             {milestones.length === 0 ? (
               <PlanEmptyState
-                title="No milestones yet"
-                body="A plan without milestones has no schedule to measure against, so nothing can be marked ahead or behind. Add the first segment below."
+                title={tr("No milestones yet")}
+                body={tr("A plan without milestones has no schedule to measure against, so nothing can be marked ahead or behind. Add the first segment below.")}
               />
             ) : (
               <>
@@ -1578,7 +1564,7 @@ export default function TeacherYearlyPlanPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-3">
                           <div>
                             <label className={label}>
-                              {unitLabel(2, plan.unit)} done in total
+                              {tr("{unitLabel} done in total", { unitLabel: unitLabel(2, plan.unit) })}
                             </label>
                             <input
                               type="number"
@@ -1593,25 +1579,24 @@ export default function TeacherYearlyPlanPage() {
                             />
                           </div>
                           <div>
-                            <label className={label}>Note for the parent (optional)</label>
+                            <label className={label}>{tr("Note for the parent (optional)")}</label>
                             <input
                               value={entry.note}
                               onChange={(e) => setEntry({ ...entry, note: e.target.value })}
-                              placeholder="e.g. Recited to ayah 18 without prompting"
+                              placeholder={tr("e.g. Recited to ayah 18 without prompting")}
                               className={input}
                             />
                           </div>
                         </div>
                         <p className="text-[11.5px] text-ink-muted mt-2.5">
-                          This is the running total for this milestone, not today&apos;s addition —
-                          correcting a figure downwards is fine.
+                          {tr("This is the running total for this milestone, not today's addition — correcting a figure downwards is fine.")}
                         </p>
                         <div className="mt-3.5 flex gap-2.5 justify-end">
                           <button onClick={() => setRecording(null)} className={ghost} disabled={saving}>
-                            Cancel
+                            {tr("Cancel")}
                           </button>
                           <button onClick={submitProgress} className={primary} disabled={saving}>
-                            {saving ? "Saving…" : "Save progress"}
+                            {saving ? tr("Saving…") : tr("Save progress")}
                           </button>
                         </div>
                       </div>
@@ -1623,12 +1608,12 @@ export default function TeacherYearlyPlanPage() {
             )}
 
             <div className="gold-rule my-5" />
-            <p className="eyebrow mb-3">Add a milestone</p>
+            <p className="eyebrow mb-3">{tr("Add a milestone")}</p>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <input
                 value={newMilestone.title}
                 onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })}
-                placeholder="Title"
+                placeholder={tr("Title")}
                 className={`${input} sm:col-span-2`}
               />
               <input
@@ -1636,19 +1621,19 @@ export default function TeacherYearlyPlanPage() {
                 value={newMilestone.starts_on || plan.starts_on}
                 onChange={(e) => setNewMilestone({ ...newMilestone, starts_on: e.target.value })}
                 className={input}
-                aria-label="Milestone start date"
+                aria-label={tr("Milestone start date")}
               />
               <input
                 type="date"
                 value={newMilestone.due_on || addDays(plan.starts_on, 30)}
                 onChange={(e) => setNewMilestone({ ...newMilestone, due_on: e.target.value })}
                 className={input}
-                aria-label="Milestone due date"
+                aria-label={tr("Milestone due date")}
               />
               <input
                 value={newMilestone.description}
                 onChange={(e) => setNewMilestone({ ...newMilestone, description: e.target.value })}
-                placeholder="What this segment covers"
+                placeholder={tr("What this segment covers")}
                 className={`${input} sm:col-span-3`}
               />
               <input
@@ -1659,14 +1644,14 @@ export default function TeacherYearlyPlanPage() {
                 onChange={(e) =>
                   setNewMilestone({ ...newMilestone, target_units: Number(e.target.value) })
                 }
-                placeholder="Target"
+                placeholder={tr("Target")}
                 className={input}
-                aria-label="Target units"
+                aria-label={tr("Target units")}
               />
             </div>
             <div className="mt-3.5 flex justify-end">
               <button onClick={addMilestone} disabled={saving} className={primary}>
-                {saving ? "Adding…" : "Add milestone"}
+                {saving ? tr("Adding…") : tr("Add milestone")}
               </button>
             </div>
           </SectionCard>

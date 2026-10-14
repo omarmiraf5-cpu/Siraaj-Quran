@@ -29,6 +29,8 @@ import { GRADES, gradeLabel } from "@/lib/grades";
 import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
 import { loadRoster } from "@/lib/rosterExport";
 import { download, fileNameFor } from "@/lib/sheetTools";
+import { useLanguage } from "@/components/LanguageProvider";
+import { phrase } from "@/lib/i18n/phrases";
 
 const bigField =
   "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
@@ -36,6 +38,7 @@ const smallField =
   "w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
 
 export default function AdminStudentsPage() {
+  const { tr } = useLanguage();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   // The code students type in the app (the school's slug), and whether the
@@ -298,7 +301,7 @@ export default function AdminStudentsPage() {
     }
 
     if (!schoolId) {
-      setFormError("Your account isn't linked to a school yet — contact support.");
+      setFormError(tr("Your account isn't linked to a school yet — contact support."));
       return;
     }
     setSaving(true);
@@ -330,7 +333,7 @@ export default function AdminStudentsPage() {
       setNewHalaqa("");
       setShowForm(false);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to add student");
+      setFormError(err instanceof Error ? tr(err.message) : tr("Failed to add student"));
     } finally {
       setSaving(false);
     }
@@ -368,12 +371,12 @@ export default function AdminStudentsPage() {
         body: JSON.stringify({ student_id: s.id, pin: draftPin }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || "Failed to set PIN");
-      setPinNote(`PIN ${currentPin ? "changed" : "set"}. ${s.name.split(" ")[0]} now signs in with ${draftPin}.`);
+      if (!res.ok) throw new Error([data.error, data.debug].filter(Boolean).join(" — ") || phrase("Failed to set PIN"));
+      setPinNote(tr(currentPin ? "PIN changed. {name} now signs in with {pin}." : "PIN set. {name} now signs in with {pin}.", { name: s.name.split(" ")[0], pin: draftPin }));
       setCurrentPin(draftPin);
       setDraftPin("");
     } catch (err) {
-      setPinNote(err instanceof Error ? err.message : "Failed to set PIN");
+      setPinNote(err instanceof Error ? tr(err.message) : tr("Failed to set PIN"));
     } finally {
       setPinSaving(false);
     }
@@ -422,7 +425,7 @@ export default function AdminStudentsPage() {
       await loadRealStudents();
       setEditingId(null);
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : "That didn't save. Please try again.");
+      setEditError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     }
   };
 
@@ -432,12 +435,12 @@ export default function AdminStudentsPage() {
     try {
       const res = await fetch(`/api/admin/students/${encodeURIComponent(s.id)}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Couldn't delete the student");
+      if (!res.ok) throw new Error(data.error ?? phrase("Couldn't delete the student"));
       setDeletingId(null);
       setEditingId(null);
       await loadRealStudents();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Couldn't delete the student");
+      setDeleteError(err instanceof Error ? tr(err.message) : tr("Couldn't delete the student"));
     } finally {
       setDeleteBusy(false);
     }
@@ -461,7 +464,7 @@ export default function AdminStudentsPage() {
     if (!schoolId) return;
     setGradeBusy(grade);
     const { error } = await supabase.from("students").update({ weekly_report: on }).eq("school_id", schoolId).eq("grade", grade);
-    if (error) window.alert(error.message);
+    if (error) window.alert(tr(error.message));
     await loadRealStudents();
     setGradeBusy(null);
   };
@@ -532,7 +535,9 @@ export default function AdminStudentsPage() {
     if (studentCampusReady && placedAt) await setCampusFor(ids, placedAt);
     const h = halaqaById(classId);
     const where = target ? target.label : h ? halaqaInGrade(h) : "the halaqa";
-    return `${ids.length} student${ids.length === 1 ? "" : "s"} ${classId === "__none" ? "taken away from their teacher" : `put with ${where}`}.`;
+    return classId === "__none"
+      ? phrase("{count} student taken away from their teacher.|{count} students taken away from their teacher.", { count: ids.length })
+      : phrase("{count} student put with {where}.|{count} students put with {where}.", { count: ids.length, where });
   };
 
   // One student's teacher, chosen on their own row.
@@ -544,7 +549,7 @@ export default function AdminStudentsPage() {
       await loadRealStudents();
       setAssignNote(`${s.name}: ${said.replace(/^1 student /, "")}`);
     } catch (err) {
-      setAssignNote(err instanceof Error ? err.message : "That didn't save. Please try again.");
+      setAssignNote(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
       setAssignBusy(false);
     }
@@ -561,7 +566,7 @@ export default function AdminStudentsPage() {
       setAssignNote(said);
       setPicked(new Set());
     } catch (err) {
-      setAssignNote(err instanceof Error ? err.message : "That didn't save. Please try again.");
+      setAssignNote(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
       setAssignBusy(false);
     }
@@ -618,18 +623,18 @@ export default function AdminStudentsPage() {
               {s.name}
             </p>
             <p className="text-[11px] text-ink-muted truncate">
-              {graded ? (halaqa ? halaqaInGrade(halaqa) : [campusName(s.campusId), "No teacher yet"].filter(Boolean).join(" · ")) : s.halaqa}
-              {s.parentNames && s.parentNames.length > 0 && <> · Parent{s.parentNames.length === 1 ? "" : "s"}: {s.parentNames.join(", ")}</>}
+              {graded ? (halaqa ? halaqaInGrade(halaqa) : [campusName(s.campusId), phrase("No teacher yet")].filter(Boolean).join(" · ")) : s.halaqa}
+              {s.parentNames && s.parentNames.length > 0 && <>{" "}{tr("· Parent: {names}|· Parents: {names}", { n: s.parentNames.length, names: s.parentNames.join(", ") })}</>}
             </p>
           </div>
           {!isDemo && reportsReady && s.weeklyReport === false && !inactive && (
             <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
-              No weekly report
+              {tr("No weekly report")}
             </span>
           )}
           {inactive && (
             <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
-              Inactive
+              {tr("Inactive")}
             </span>
           )}
           <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
@@ -640,13 +645,13 @@ export default function AdminStudentsPage() {
         {isOpen && (
           <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-ink mb-1.5">Full name</label>
+              <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Full name")}</label>
               <input value={draftName} onChange={(e) => setDraftName(e.target.value)} className={smallField} />
             </div>
             <div className={graded ? "grid grid-cols-2 gap-3" : ""}>
               {graded && (
                 <label className="block">
-                  <span className="block text-xs font-semibold text-ink mb-1.5">Grade</span>
+                  <span className="block text-xs font-semibold text-ink mb-1.5">{tr("Grade")}</span>
                   <select
                     value={draftGrade}
                     onChange={(e) => {
@@ -666,7 +671,7 @@ export default function AdminStudentsPage() {
               )}
               {studentCampusReady && campuses.length > 1 && (
                 <label className="block">
-                  <span className="block text-xs font-semibold text-ink mb-1.5">Campus</span>
+                  <span className="block text-xs font-semibold text-ink mb-1.5">{tr("Campus")}</span>
                   <select
                     value={halaqaById(draftHalaqa)?.campusId ?? draftCampus}
                     onChange={(e) => {
@@ -676,7 +681,7 @@ export default function AdminStudentsPage() {
                     }}
                     className={smallField}
                   >
-                    <option value="">Not set</option>
+                    <option value="">{tr("Not set")}</option>
                     {campuses.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -686,9 +691,9 @@ export default function AdminStudentsPage() {
                 </label>
               )}
               <label className="block">
-                <span className="block text-xs font-semibold text-ink mb-1.5">{graded ? "Teacher" : "Halaqa"}</span>
+                <span className="block text-xs font-semibold text-ink mb-1.5">{graded ? tr("Teacher") : tr("Halaqa")}</span>
                 <select value={draftHalaqa} onChange={(e) => setDraftHalaqa(e.target.value)} className={smallField}>
-                  {(graded || !draftHalaqa) && <option value="">{graded ? "No teacher yet" : "Select a halaqa"}</option>}
+                  {(graded || !draftHalaqa) && <option value="">{graded ? tr("No teacher yet") : tr("Select a halaqa")}</option>}
                   {halaqaOptions(draftGrade)}
                 </select>
               </label>
@@ -700,7 +705,7 @@ export default function AdminStudentsPage() {
                 onChange={(e) => setDraftActive(e.target.checked)}
                 className="w-4 h-4 rounded"
               />
-              Active
+              {tr("Active")}
             </label>
             {!isDemo && reportsReady && (
               <label className="flex items-start gap-2 text-sm text-ink">
@@ -711,9 +716,9 @@ export default function AdminStudentsPage() {
                   className="w-4 h-4 rounded mt-0.5"
                 />
                 <span>
-                  Weekly progress report
+                  {tr("Weekly progress report")}
                   <span className="block text-[11px] text-ink-muted">
-                    Their parents get one on Fridays when they&apos;ve had lessons that week. Untick to leave them out.
+                    {tr("Their parents get one on Fridays when they've had lessons that week. Untick to leave them out.")}
                   </span>
                 </span>
               </label>
@@ -725,9 +730,9 @@ export default function AdminStudentsPage() {
             {!isDemo && (
               <div>
                 <label className="block text-xs font-semibold text-ink mb-1.5">
-                  Sign-in PIN
+                  {tr("Sign-in PIN")}
                   <span className="font-normal text-ink-muted">
-                    {" "}· {currentPin ? <>now <span className="font-semibold text-ink tracking-[0.2em]">{currentPin}</span></> : "none yet"}
+                    {" "}· {currentPin ? <>{tr("now")}{" "}<span className="font-semibold text-ink tracking-[0.2em]">{currentPin}</span></> : tr("none yet")}
                   </span>
                 </label>
                 <div className="flex items-center gap-2">
@@ -736,7 +741,7 @@ export default function AdminStudentsPage() {
                     maxLength={4}
                     value={draftPin}
                     onChange={(e) => setDraftPin(e.target.value.replace(/\D/g, ""))}
-                    placeholder={currentPin ? "New 4-digit PIN" : "4 digits"}
+                    placeholder={currentPin ? tr("New 4-digit PIN") : tr("4 digits")}
                     className="flex-1 bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink tracking-[0.4em] focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                   />
                   <button
@@ -745,7 +750,7 @@ export default function AdminStudentsPage() {
                     disabled={draftPin.length !== 4 || pinSaving}
                     className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 disabled:opacity-40 transition-colors"
                   >
-                    {pinSaving ? "Saving…" : currentPin ? "Change PIN" : "Set PIN"}
+                    {pinSaving ? tr("Saving…") : currentPin ? tr("Change PIN") : tr("Set PIN")}
                   </button>
                 </div>
                 {pinNote && <p className="text-[11px] text-ink-muted mt-1">{pinNote}</p>}
@@ -758,14 +763,14 @@ export default function AdminStudentsPage() {
                 onClick={() => saveEdit(s)}
                 className="flex-1 gradient-emerald text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[.98] transition-all"
               >
-                Save
+                {tr("Save")}
               </button>
               <button
                 type="button"
                 onClick={() => setEditingId(null)}
                 className="text-[13px] font-semibold text-ink-muted hover:text-ink px-3 transition-colors"
               >
-                Cancel
+                {tr("Cancel")}
               </button>
             </div>
 
@@ -781,14 +786,13 @@ export default function AdminStudentsPage() {
                     onClick={() => { setDeletingId(s.id); setDeleteText(""); setDeleteError(null); }}
                     className="text-[12px] font-semibold text-red-700 dark:text-red-300 hover:underline"
                   >
-                    Delete permanently…
+                    {tr("Delete permanently…")}
                   </button>
                 ) : (
                   <div className="space-y-2">
                     <p className="text-[12px] text-ink leading-relaxed">
-                      This deletes {s.name.split(" ")[0]}&apos;s record, attendance, lessons, plans, messages and
-                      sign-in for good. To keep their history, untick Active instead. Type{" "}
-                      <span className="font-semibold">{s.name}</span> to confirm.
+                      {tr("This deletes {value}'s record, attendance, lessons, plans, messages and sign-in for good. To keep their history, untick Active instead. Type", { value: s.name.split(" ")[0] })}{" "}
+                      <span className="font-semibold">{s.name}</span>{" "}{tr("to confirm.")}
                     </p>
                     <input
                       value={deleteText}
@@ -803,14 +807,14 @@ export default function AdminStudentsPage() {
                         disabled={deleteBusy || deleteText.trim().toLowerCase() !== s.name.trim().toLowerCase()}
                         className="bg-red-700 text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-xl disabled:opacity-40"
                       >
-                        {deleteBusy ? "Deleting…" : "Delete permanently"}
+                        {deleteBusy ? tr("Deleting…") : tr("Delete permanently")}
                       </button>
                       <button
                         type="button"
                         onClick={() => setDeletingId(null)}
                         className="text-[12.5px] font-semibold text-ink-muted hover:text-ink px-2"
                       >
-                        Keep
+                        {tr("Keep")}
                       </button>
                     </div>
                     {deleteError && <p className="text-[11.5px] text-red-700 dark:text-red-300">{deleteError}</p>}
@@ -827,21 +831,20 @@ export default function AdminStudentsPage() {
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
-        eyebrow="Roster"
-        title="Students"
-        meta={[`${students.length} total`, `${activeCount} active`, `${halaqas.length} halaqas`]}
+        eyebrow={tr("Roster")}
+        title={tr("Students")}
+        meta={[tr("{count} total", { count: students.length }), tr("{count} active", { count: activeCount }), tr("{count} halaqa|{count} halaqas", { count: halaqas.length })]}
       />
 
       {schoolSlug && (
         <div className="card-quiet p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="eyebrow">Student sign-in</p>
+            <p className="eyebrow">{tr("Student sign-in")}</p>
             <p className="text-[13px] text-ink mt-1">
-              School code: <span className="font-mono font-semibold">{schoolSlug}</span>
+              {tr("School code:")}{" "}<span className="font-mono font-semibold">{schoolSlug}</span>
             </p>
             <p className="text-[11.5px] text-ink-muted mt-0.5 leading-relaxed">
-              Students type this code once in the MyDiiwaan app, or open the sign-in link. Then they tap
-              their name and enter their PIN.
+              {tr("Students type this code once in the MyDiiwaan app, or open the sign-in link. Then they tap their name and enter their PIN.")}
             </p>
           </div>
           <button
@@ -855,7 +858,7 @@ export default function AdminStudentsPage() {
             }}
             className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-[12.5px] font-semibold px-3.5 py-2 rounded-xl hover:border-brand-navy/40 transition"
           >
-            {copied ? "Copied" : "Copy sign-in link"}
+            {copied ? tr("Copied") : tr("Copy sign-in link")}
           </button>
         </div>
       )}
@@ -864,7 +867,7 @@ export default function AdminStudentsPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search students or parents…"
+          placeholder={tr("Search students or parents…")}
           className="flex-1 min-w-[180px] bg-surface-card border border-surface-border rounded-2xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
         />
         {!isDemo && (
@@ -874,7 +877,7 @@ export default function AdminStudentsPage() {
             aria-expanded={showImport}
             className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-sm font-semibold px-4 py-2.5 rounded-2xl hover:border-brand-navy/40 transition"
           >
-            Import from a spreadsheet
+            {tr("Import from a spreadsheet")}
           </button>
         )}
         {!isDemo && (
@@ -884,7 +887,7 @@ export default function AdminStudentsPage() {
             disabled={exporting}
             className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-sm font-semibold px-4 py-2.5 rounded-2xl hover:border-brand-navy/40 transition disabled:opacity-50"
           >
-            {exporting ? "Getting them…" : "Download the list"}
+            {exporting ? tr("Getting them…") : tr("Download the list")}
           </button>
         )}
         <button
@@ -892,7 +895,7 @@ export default function AdminStudentsPage() {
           onClick={() => { setShowForm((v) => !v); setShowImport(false); }}
           className="flex-shrink-0 gradient-emerald text-white text-sm font-semibold px-4 py-2.5 rounded-2xl hover:opacity-90 active:scale-[.98] transition-all"
         >
-          {showForm ? "Cancel" : "+ Add student"}
+          {showForm ? tr("Cancel") : tr("+ Add student")}
         </button>
       </div>
 
@@ -901,10 +904,10 @@ export default function AdminStudentsPage() {
           <select
             value={gradeFilter}
             onChange={(e) => setGradeFilter(e.target.value)}
-            aria-label="Grade"
+            aria-label={tr("Grade")}
             className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink"
           >
-            <option value="">Every grade</option>
+            <option value="">{tr("Every grade")}</option>
             {GRADES.map((g) => (
               <option key={g} value={g}>
                 {gradeLabel(g)}
@@ -915,16 +918,16 @@ export default function AdminStudentsPage() {
             <select
               value={campusFilter}
               onChange={(e) => setCampusFilter(e.target.value)}
-              aria-label="Campus"
+              aria-label={tr("Campus")}
               className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink"
             >
-              <option value="">Both campuses</option>
+              <option value="">{tr("Both campuses")}</option>
               {campuses.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
-              <option value="none">{studentCampusReady ? "No campus yet" : "No teacher yet"}</option>
+              <option value="none">{studentCampusReady ? tr("No campus yet") : tr("No teacher yet")}</option>
             </select>
           )}
         </div>
@@ -965,18 +968,18 @@ export default function AdminStudentsPage() {
       {showForm && (
         <form onSubmit={addStudent} className="card-quiet p-5 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-ink mb-2">Full name *</label>
+            <label className="block text-sm font-semibold text-ink mb-2">{tr("Full name *")}</label>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Zainab Ali"
+              placeholder={tr("e.g. Zainab Ali")}
               className={bigField}
             />
           </div>
           <div className={graded ? "grid grid-cols-2 gap-3" : ""}>
             {graded && (
               <label className="block">
-                <span className="block text-sm font-semibold text-ink mb-2">Grade *</span>
+                <span className="block text-sm font-semibold text-ink mb-2">{tr("Grade *")}</span>
                 <select
                   value={newGrade}
                   onChange={(e) => {
@@ -985,7 +988,7 @@ export default function AdminStudentsPage() {
                   }}
                   className={bigField}
                 >
-                  <option value="">Choose…</option>
+                  <option value="">{tr("Choose…")}</option>
                   {GRADES.map((g) => (
                     <option key={g} value={g}>
                       {gradeLabel(g)}
@@ -996,9 +999,9 @@ export default function AdminStudentsPage() {
             )}
             {studentCampusReady && campuses.length > 1 && (
               <label className="block">
-                <span className="block text-sm font-semibold text-ink mb-2">Campus</span>
+                <span className="block text-sm font-semibold text-ink mb-2">{tr("Campus")}</span>
                 <select value={newCampus} onChange={(e) => setNewCampus(e.target.value)} className={bigField}>
-                  <option value="">Not set</option>
+                  <option value="">{tr("Not set")}</option>
                   {campuses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -1008,14 +1011,14 @@ export default function AdminStudentsPage() {
               </label>
             )}
             <label className="block">
-              <span className="block text-sm font-semibold text-ink mb-2">{graded ? "Teacher" : "Halaqa *"}</span>
+              <span className="block text-sm font-semibold text-ink mb-2">{graded ? tr("Teacher") : tr("Halaqa *")}</span>
               <select
                 value={newHalaqa}
                 onChange={(e) => setNewHalaqa(e.target.value)}
                 disabled={graded && newGrade === ""}
                 className={`${bigField} disabled:opacity-50`}
               >
-                <option value="">{graded ? (newGrade === "" ? "Choose the grade first" : "Not yet") : "Select a halaqa"}</option>
+                <option value="">{graded ? (newGrade === "" ? tr("Choose the grade first") : tr("Not yet")) : tr("Select a halaqa")}</option>
                 {halaqaOptions(newGrade)}
               </select>
             </label>
@@ -1026,7 +1029,7 @@ export default function AdminStudentsPage() {
             disabled={!newName.trim() || (graded ? newGrade === "" : !newHalaqa) || saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            {saving ? "Adding…" : "Add student"}
+            {saving ? tr("Adding…") : tr("Add student")}
           </button>
         </form>
       )}
@@ -1037,8 +1040,7 @@ export default function AdminStudentsPage() {
         return (
           <section className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/25 dark:border-amber-800/40 p-4 flex flex-wrap items-center gap-3" data-section="no-campus">
             <p className="text-[13px] text-ink flex-1 min-w-[14rem]">
-              <strong>{noCampus.length}</strong> student{noCampus.length === 1 ? " has" : "s have"} no campus yet. If they&apos;re all at one
-              campus, put them there in one go — or set each one&apos;s campus with <em>Assign to a teacher</em>.
+              {tr("{count} student has no campus yet. If they're all at one campus, put them there in one go — or set each one's campus with|{count} students have no campus yet. If they're all at one campus, put them there in one go — or set each one's campus with", { count: <strong>{noCampus.length}</strong>, n: noCampus.length })}{" "}<em>{tr("Assign to a teacher")}</em>.
             </p>
             <div className="flex flex-wrap gap-2">
               {campuses.map((c) => (
@@ -1047,20 +1049,20 @@ export default function AdminStudentsPage() {
                   type="button"
                   disabled={campusBusy}
                   onClick={async () => {
-                    if (!window.confirm(`Put all ${noCampus.length} students with no campus at ${c.name}?`)) return;
+                    if (!window.confirm(tr("Put all {count} students with no campus at {name}?", { count: noCampus.length, name: c.name }))) return;
                     setCampusBusy(true);
                     try {
                       await setCampusFor(noCampus.map((s) => s.id), c.id);
                       await loadRealStudents();
                     } catch (err) {
-                      window.alert(err instanceof Error ? err.message : "That didn't save. Please try again.");
+                      window.alert(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
                     } finally {
                       setCampusBusy(false);
                     }
                   }}
                   className="text-[13px] font-semibold px-3.5 py-2 rounded-xl bg-brand-navy text-white disabled:opacity-40"
                 >
-                  {campusBusy ? "Saving…" : `All at ${c.name}`}
+                  {campusBusy ? tr("Saving…") : tr("All at {name}", { name: c.name })}
                 </button>
               ))}
             </div>
@@ -1070,7 +1072,7 @@ export default function AdminStudentsPage() {
 
       {graded && ready && gradeSummary.length > 0 && (
         <SectionCard
-          title="Grades"
+          title={tr("Grades")}
           note={`${gradeSummary.reduce((n, g) => n + g.unplaced, 0)} without a teacher`}
         >
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" data-section="grades">
@@ -1088,11 +1090,11 @@ export default function AdminStudentsPage() {
                 >
                   <span className="block text-[13.5px] font-semibold">{gradeLabel(g.grade)}</span>
                   <span className={`block text-[11px] ${on ? "text-white/80" : "text-ink-muted"}`}>
-                    {g.students} student{g.students === 1 ? "" : "s"} · {g.halaqas} teacher{g.halaqas === 1 ? "" : "s"}
+                    {tr("{count} student|{count} students", { count: g.students })}{" · "}{tr("{count} teacher|{count} teachers", { count: g.halaqas })}
                   </span>
                   {g.unplaced > 0 && (
                     <span className={`block text-[11px] font-semibold ${on ? "text-amber-200" : "text-amber-700 dark:text-amber-300"}`}>
-                      {g.unplaced} without a teacher
+                      {tr("{unplaced} without a teacher", { unplaced: g.unplaced })}
                     </span>
                   )}
                 </button>
@@ -1101,19 +1103,19 @@ export default function AdminStudentsPage() {
           </div>
           {gradeFilter !== "" && (
             <button type="button" onClick={() => setGradeFilter("")} className="mt-3 text-[12px] font-semibold text-ink-muted hover:text-ink underline">
-              Show every grade
+              {tr("Show every grade")}
             </button>
           )}
         </SectionCard>
       )}
 
       {!ready ? (
-        <SectionCard title="All students">
+        <SectionCard title={tr("All students")}>
           <LoadingNote />
         </SectionCard>
       ) : filtered.length === 0 ? (
-        <SectionCard title="All students" note="0 shown">
-          <EmptyNote>{students.length === 0 ? "No students yet." : "No students match that search."}</EmptyNote>
+        <SectionCard title={tr("All students")} note={tr("0 shown")}>
+          <EmptyNote>{students.length === 0 ? tr("No students yet.") : tr("No students match that search.")}</EmptyNote>
         </SectionCard>
       ) : byGrade ? (
         byGrade.map(({ grade, students: inGrade }) => (
@@ -1122,13 +1124,13 @@ export default function AdminStudentsPage() {
             title={gradeLabel(grade)}
             note={
               <>
-                {inGrade.length} student{inGrade.length === 1 ? "" : "s"}
+                {tr("{count} student|{count} students", { count: inGrade.length })}
                 {!isDemo && (
                   <>
                     {" · "}
                     {halaqasFor(String(grade)).length === 0 && teachers.length === 0 ? (
                       <Link href="/admin/halaqas" className="underline underline-offset-2 hover:text-ink font-bold italic">
-                        Add teachers for this grade
+                        {tr("Add teachers for this grade")}
                       </Link>
                     ) : (
                       <button
@@ -1136,7 +1138,7 @@ export default function AdminStudentsPage() {
                         onClick={() => startAssigning(assignGrade === grade ? null : grade)}
                         className="underline underline-offset-2 hover:text-ink font-bold italic"
                       >
-                        {assignGrade === grade ? "Done" : "Assign to a teacher"}
+                        {assignGrade === grade ? tr("Done") : tr("Assign to a teacher")}
                       </button>
                     )}
                   </>
@@ -1150,7 +1152,7 @@ export default function AdminStudentsPage() {
                       disabled={gradeBusy !== null}
                       className="underline underline-offset-2 hover:text-ink font-bold italic disabled:opacity-50"
                     >
-                      {gradeBusy === grade ? "Saving…" : gradeAllOn(grade) ? "Weekly reports off for this grade" : "Weekly reports on for this grade"}
+                      {gradeBusy === grade ? tr("Saving…") : gradeAllOn(grade) ? tr("Weekly reports off for this grade") : tr("Weekly reports on for this grade")}
                     </button>
                   </>
                 )}
@@ -1159,17 +1161,64 @@ export default function AdminStudentsPage() {
           >
             {assignGrade === grade ? (
               <div className="space-y-3" data-section="assign">
-                <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-3 space-y-2.5">
+                {/* While students are ticked, a bar stays at the foot of the
+                    screen so one teacher can be given to all of them without
+                    scrolling back up a long grade. */}
+                {picked.size > 0 && (
+                  <div className="fixed inset-x-0 bottom-16 md:bottom-0 z-40 md:start-56 px-3 pb-3 pointer-events-none" data-section="bulk-bar">
+                    <div className="max-w-3xl mx-auto pointer-events-auto rounded-2xl border border-emerald-500/50 bg-surface-card shadow-2xl p-3 flex flex-wrap items-center gap-2">
+                      <span className="text-[12.5px] font-semibold text-ink">
+                        {tr("{count} ticked", { count: picked.size })}
+                      </span>
+                      <select
+                        value={assignTo}
+                        onChange={(e) => setAssignTo(e.target.value)}
+                        aria-label={tr("Teacher for everyone ticked")}
+                        className="flex-1 min-w-[10rem] bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink"
+                      >
+                        <option value="">{tr("Choose a teacher…")}</option>
+                        {teachers.map((t) => (
+                          <option key={t.id} value={`t:${t.id}`}>
+                            {t.name}
+                          </option>
+                        ))}
+                        <option value="__none">{tr("No teacher (take them out)")}</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={assignPicked}
+                        disabled={!assignTo || assignBusy}
+                        className="gradient-emerald text-white text-[13px] font-semibold px-4 py-2 rounded-xl disabled:opacity-40"
+                      >
+                        {assignBusy ? tr("Saving…") : tr("Give the {count} student this teacher|Give all {count} students this teacher", { count: picked.size })}
+                      </button>
+                      <button type="button" onClick={() => setPicked(new Set())} className="text-[12px] font-semibold text-ink-muted underline">
+                        {tr("Clear")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div
+                  className={`rounded-2xl border p-3 space-y-2.5 ${
+                    picked.size > 0 ? "border-emerald-500/50 bg-surface-card" : "border-surface-border bg-surface-bg-warm"
+                  }`}
+                  data-section="bulk-teacher"
+                >
+                  <p className="text-[12.5px] font-semibold text-ink">
+                    {picked.size > 0
+                      ? tr("{count} student ticked — choose one teacher for them:|{count} students ticked — choose one teacher for them all:", { count: picked.size })
+                      : tr("Tick students below to give them one teacher together.")}
+                  </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <select
                       value={assignTo}
                       onChange={(e) => setAssignTo(e.target.value)}
-                      aria-label="Teacher or halaqa to put them with"
+                      aria-label={tr("Teacher or halaqa to put them with")}
                       className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink max-w-full"
                     >
-                      <option value="">Choose a teacher or halaqa…</option>
+                      <option value="">{tr("Choose a teacher or halaqa…")}</option>
                       {teachers.length > 0 && (
-                        <optgroup label="Teachers">
+                        <optgroup label={tr("Teachers")}>
                           {teachers.map((t) => (
                             <option key={t.id} value={`t:${t.id}`}>
                               {t.name}
@@ -1178,7 +1227,7 @@ export default function AdminStudentsPage() {
                         </optgroup>
                       )}
                       {halaqasFor(String(grade)).some((h) => !h.teacherId) && (
-                        <optgroup label={`${gradeLabel(grade)}: halaqas without a teacher`}>
+                        <optgroup label={tr("{gradeLabel}: halaqas without a teacher", { gradeLabel: gradeLabel(grade) })}>
                           {halaqasFor(String(grade)).filter((h) => !h.teacherId).map((h) => (
                             <option key={h.id} value={h.id}>
                               {halaqaInGrade(h)}
@@ -1187,13 +1236,13 @@ export default function AdminStudentsPage() {
                           ))}
                         </optgroup>
                       )}
-                      <option value="__none">No teacher (take them out)</option>
+                      <option value="__none">{tr("No teacher (take them out)")}</option>
                     </select>
                     {assignTo.startsWith("t:") && campuses.length > 1 && (
                       <select
                         value={assignCampus}
                         onChange={(e) => setAssignCampus(e.target.value)}
-                        aria-label="Campus"
+                        aria-label={tr("Campus")}
                         className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink"
                       >
                         {campuses.map((c) => (
@@ -1209,25 +1258,29 @@ export default function AdminStudentsPage() {
                       disabled={picked.size === 0 || !assignTo || assignBusy}
                       className="gradient-emerald text-white text-[13px] font-semibold px-4 py-2 rounded-xl disabled:opacity-40"
                     >
-                      {assignBusy ? "Saving…" : `Assign ${picked.size || ""}`.trim()}
+                      {assignBusy
+                        ? tr("Saving…")
+                        : picked.size > 0
+                          ? tr("Give the {count} student this teacher|Give all {count} students this teacher", { count: picked.size })
+                          : tr("Assign")}
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-3 text-[12px] font-semibold text-ink-muted">
                     <button type="button" onClick={() => setPicked(new Set(inGrade.filter((s) => !studentHalaqa(s)).map((s) => s.id)))} className="hover:text-ink underline">
-                      Select those without a teacher
+                      {tr("Select those without a teacher")}
                     </button>
                     <button type="button" onClick={() => setPicked(new Set(inGrade.map((s) => s.id)))} className="hover:text-ink underline">
-                      Select all
+                      {tr("Select all")}
                     </button>
                     {picked.size > 0 && (
                       <button type="button" onClick={() => setPicked(new Set())} className="hover:text-ink underline">
-                        Clear
+                        {tr("Clear")}
                       </button>
                     )}
                   </div>
                   {studentCampusReady && campuses.length > 1 && (
                     <div className="flex flex-wrap items-center gap-2 text-[12px]">
-                      <span className="text-ink-muted">Or set their campus:</span>
+                      <span className="text-ink-muted">{tr("Or set their campus:")}</span>
                       {campuses.map((c) => (
                         <button
                           key={c.id}
@@ -1239,10 +1292,10 @@ export default function AdminStudentsPage() {
                             try {
                               await setCampusFor([...picked], c.id);
                               await loadRealStudents();
-                              setAssignNote(`${picked.size} student${picked.size === 1 ? "" : "s"} set to ${c.name}.`);
+                              setAssignNote(tr("{count} student set to {name}.|{count} students set to {name}.", { count: picked.size, name: c.name }));
                               setPicked(new Set());
                             } catch (err) {
-                              setAssignNote(err instanceof Error ? err.message : "That didn't save. Please try again.");
+                              setAssignNote(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
                             } finally {
                               setAssignBusy(false);
                             }
@@ -1255,8 +1308,7 @@ export default function AdminStudentsPage() {
                     </div>
                   )}
                   <p className="text-[11.5px] text-ink-muted">
-                    Choose each student&apos;s teacher on their row — or tap several to select them and give them one teacher
-                    together. In this school the teacher is the halaqa: a teacher new to {gradeLabel(grade)} gets one in their name.
+                    {tr("Choose each student's teacher on their row — or tap several to select them and give them one teacher together. In this school the teacher is the halaqa: a teacher new to {gradeLabel} gets one in their name.", { gradeLabel: gradeLabel(grade) })}
                   </p>
                   {assignNote && <p className="text-[12.5px] text-ink">{assignNote}</p>}
                 </div>
@@ -1276,7 +1328,7 @@ export default function AdminStudentsPage() {
                           <span className="flex-1 min-w-0">
                             <span className={`block text-[13px] font-semibold truncate ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
                             <span className={`block text-[11px] ${h ? "text-ink-muted" : "text-amber-700 dark:text-amber-300 font-semibold"}`}>
-                              {h ? halaqaInGrade(h) : [campusName(s.campusId), "No teacher yet"].filter(Boolean).join(" · ")}
+                              {h ? halaqaInGrade(h) : [campusName(s.campusId), phrase("No teacher yet")].filter(Boolean).join(" · ")}
                               {s.parentNames && s.parentNames.length > 0 && <span className="font-normal text-ink-muted"> · {s.parentNames.join(", ")}</span>}
                             </span>
                           </span>
@@ -1286,10 +1338,10 @@ export default function AdminStudentsPage() {
                           value={h ? (h.teacherId ? `t:${h.teacherId}` : h.id) : ""}
                           onChange={(e) => placeOne(s, e.target.value, grade)}
                           disabled={assignBusy}
-                          aria-label={`Teacher for ${s.name}`}
+                          aria-label={tr("Teacher for {name}", { name: s.name })}
                           className="flex-shrink-0 w-40 sm:w-52 bg-surface-card border border-surface-border rounded-lg px-2 py-1.5 text-[12px] text-ink disabled:opacity-50"
                         >
-                          <option value="">No teacher yet</option>
+                          <option value="">{tr("No teacher yet")}</option>
                           {teachers.map((t) => (
                             <option key={t.id} value={`t:${t.id}`}>
                               {t.name}
@@ -1314,7 +1366,7 @@ export default function AdminStudentsPage() {
           </SectionCard>
         ))
       ) : (
-        <SectionCard title="All students" note={`${filtered.length} shown`}>
+        <SectionCard title={tr("All students")} note={tr("{count} shown", { count: filtered.length })}>
           <ul className="divide-y divide-surface-border -my-1">{filtered.map(renderStudent)}</ul>
         </SectionCard>
       )}

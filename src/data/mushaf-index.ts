@@ -2,6 +2,8 @@
 // public/mushaf/, which is the authoritative source for pagination.
 // Generated file; do not edit by hand.
 
+import { currentLanguage } from "@/lib/i18n/current";
+
 export const TOTAL_PAGES = 604;
 
 export interface SurahMeta {
@@ -132,6 +134,18 @@ export const SURAHS: SurahMeta[] = [
 ];
 
 // page -> surah ids appearing on it, in reading order
+// Added by hand, not generated: in Arabic the app shows each surah's Arabic
+// name wherever it would show the English one. Every screen reads
+// `englishName`, so it reads the language as it's used (see lib/i18n/current);
+// on the server it's always the English.
+for (const s of SURAHS) {
+  const english = s.englishName;
+  Object.defineProperty(s, "englishName", {
+    enumerable: true,
+    get: () => (currentLanguage() === "ar" ? s.name : english),
+  });
+}
+
 export const PAGE_SURAHS: Record<number, number[]> = {
   1: [1],
   2: [2],

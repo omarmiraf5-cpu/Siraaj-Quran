@@ -67,7 +67,7 @@ export function LessonRecorder({
   /** Recording the lesson's tiles one by one instead: how far that's got, and the way in. */
   oneByOne?: { recorded: number; total: number; onStart: () => void };
 }) {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const [phase, setPhase] = useState<"idle" | "recording" | "review" | "saving">("idle");
   const [take, setTake] = useState<Take | null>(null);
   const [seconds, setSeconds] = useState(0);
@@ -178,7 +178,7 @@ export function LessonRecorder({
       setTake(null);
       setPhase("idle");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That recording didn't save. Please try again.");
+      setError(err instanceof Error ? tr(err.message) : tr("That recording didn't save. Please try again."));
       setPhase("review");
     }
   };
@@ -190,7 +190,7 @@ export function LessonRecorder({
       setConfirmDelete(false);
       onDeleted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That recording couldn't be removed.");
+      setError(err instanceof Error ? tr(err.message) : tr("That recording couldn't be removed."));
     }
   };
 
@@ -446,7 +446,7 @@ export function TileRecorder({
   onDeleted: (item: string) => void;
   onDone: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const now = usePlayback();
   const [phase, setPhase] = useState<"idle" | "recording">("idle");
   // The tile being recorded: the one chosen when Record was pressed.
@@ -589,7 +589,7 @@ export function TileRecorder({
       setConfirmDelete(false);
       onDeleted(selected);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That recording couldn't be removed.");
+      setError(err instanceof Error ? tr(err.message) : tr("That recording couldn't be removed."));
     }
   };
 
