@@ -35,7 +35,7 @@ import {
   type Subject,
   type SubmissionStatus,
 } from "@/lib/classWork";
-import { phrase } from "@/lib/i18n/phrases";
+import { countLabel, phrase } from "@/lib/i18n/phrases";
 
 /* ── Which portal is this ──────────────────────────────────────────── */
 
@@ -240,8 +240,8 @@ function FilePicker({ label, busy, onFiles }: { label: string; busy: boolean; on
 /* ── Small pieces ──────────────────────────────────────────────────── */
 
 type T = (key: string) => string;
-const pointsText = (n: number, t: T) => `${n} ${n === 1 ? t("cw.point") : t("cw.points")}`;
-const questionsText = (n: number, t: T) => `${n} ${n === 1 ? t("cw.questionOne") : t("cw.questionMany")}`;
+const pointsText = (n: number, t: T) => countLabel("{count} point|{count} points", n, `${n} ${n === 1 ? t("cw.point") : t("cw.points")}`);
+const questionsText = (n: number, t: T) => countLabel("{count} question|{count} questions", n, `${n} ${n === 1 ? t("cw.questionOne") : t("cw.questionMany")}`);
 
 const SUBJECT_COLOUR: Record<Subject, IllumColour> = { islamic_studies: "verdigris", arabic: "lapis" };
 
@@ -451,7 +451,7 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
       <PortalHero
         eyebrow={role === "admin" ? t("role.admin") : t("role.teacher")}
         title={t("cw.title")}
-        meta={data ? [`${data.assignments.length} ${t("nav.assignments").toLowerCase()}`, `${waiting} ${t("cw.status.submitted").toLowerCase()}`] : []}
+        meta={data ? [countLabel("{count} assignment|{count} assignments", data.assignments.length, `${data.assignments.length} ${t("nav.assignments").toLowerCase()}`), countLabel("{count} submitted|{count} submitted", waiting, `${waiting} ${t("cw.status.submitted").toLowerCase()}`)] : []}
         actions={
           <button
             type="button"
@@ -518,10 +518,10 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
                         <span className="bg-amber-500/80" style={{ width: `${total ? (a.counts.submitted / total) * 100 : 0}%` }} />
                       </div>
                       <p className="text-[12px] text-ink-body mt-2">
-                        {handedIn} / {total} {t("cw.handedIn")} · {a.counts.graded} {t("cw.marked")}
+                        {handedIn} / {total} {countLabel("{count} handed in|{count} handed in", handedIn, t("cw.handedIn"))} · {a.counts.graded} {countLabel("{count} corrected|{count} corrected", a.counts.graded, t("cw.marked"))}
                         {a.counts.submitted > 0 && (
                           <span className="ms-2 text-amber-800 dark:text-amber-300 font-semibold">
-                            {a.counts.submitted} {t("cw.status.submitted").toLowerCase()} →
+                            {countLabel("{count} submitted|{count} submitted", a.counts.submitted, `${a.counts.submitted} ${t("cw.status.submitted").toLowerCase()}`)} →
                           </span>
                         )}
                       </p>

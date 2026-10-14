@@ -59,6 +59,7 @@ import {
   IconBookOpen,
 } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 import { ByLanguage } from "@/components/ByLanguage";
 
@@ -292,9 +293,11 @@ export default function StudentDashboard() {
       <div className="space-y-2.5 animate-rise" style={{ animationDelay: "360ms" }}>
         <SectionCard
           title={t("common.yourRegister")}
-          note={[t("common.last"), Math.min(14, attendance.length), t("common.days")]
-            .filter((x) => x !== "")
-            .join(" ")}
+          note={countLabel(
+            "the last {count} day|the last {count} days",
+            Math.min(14, attendance.length),
+            [t("common.last"), Math.min(14, attendance.length), t("common.days")].filter((x) => x !== "").join(" "),
+          )}
         >
           <div className="flex items-center gap-4">
             <ProgressRing value={summary.rate} colour="turquoise" size={64} label={t("common.here")} />
@@ -302,7 +305,7 @@ export default function StudentDashboard() {
               <AttendanceStrip days={attendance} size="lg" />
               <p className="text-[12px] text-ink-muted mt-2.5">
                 {streak > 1
-                  ? `${streak} ${t("common.daysInARowThatIs")} ${streak * 25} XP.`
+                  ? `${countLabel("{count} day in a row — that's|{count} days in a row — that's", streak, `${streak} ${t("common.daysInARowThatIs")}`)} ${streak * 25} XP.`
                   : t("common.everyDayShowUp")}
               </p>
             </div>
@@ -310,9 +313,9 @@ export default function StudentDashboard() {
           <p className="text-[11px] text-ink-muted mt-4 pt-3 border-t border-surface-border">
             {formatDay(mode === "demo" ? DEMO_TODAY : new Date().toLocaleDateString("en-CA"), language)}
             <span className="mx-1.5">·</span>
-            {done.length} {t("common.finished").toLowerCase()}
+            {countLabel("{count} finished|{count} finished", done.length, `${done.length} ${t("common.finished").toLowerCase()}`)}
             <span className="mx-1.5">·</span>
-            {open.length} {t("common.toGo")}
+            {countLabel("{count} to go", open.length, `${open.length} ${t("common.toGo")}`)}
           </p>
         </SectionCard>
       </div>

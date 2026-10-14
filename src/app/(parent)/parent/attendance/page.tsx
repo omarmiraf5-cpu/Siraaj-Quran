@@ -17,6 +17,7 @@ import {
   LoadingNote,
 } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 
 export default function ParentAttendancePage() {
   const { t, language } = useLanguage();
@@ -49,9 +50,11 @@ export default function ParentAttendancePage() {
   }
 
   const firstName = child.name.split(" ")[0];
-  const lastDays = [t("common.last"), String(s.total), t("common.schoolDays")]
-    .filter((x) => x !== "")
-    .join(" ");
+  const lastDays = countLabel(
+    "the last {count} school day|the last {count} school days",
+    s.total,
+    [t("common.last"), String(s.total), t("common.schoolDays")].filter((x) => x !== "").join(" "),
+  );
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 pt-2">
@@ -75,7 +78,7 @@ export default function ParentAttendancePage() {
 
       {!ready && <LoadingNote>{t("common.loadingAttendance")}</LoadingNote>}
 
-      <SectionCard title={t("common.overall")} note={`${s.total} ${t("common.days")}`}>
+      <SectionCard title={t("common.overall")} note={countLabel("{count} day|{count} days", s.total, `${s.total} ${t("common.days")}`)}>
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-[40px] font-bold text-ink tabular-nums leading-none">{s.rate}%</p>
@@ -109,7 +112,7 @@ export default function ParentAttendancePage() {
         ))}
       </div>
 
-      <SectionCard title={t("common.dayByDay")} note={`${s.total} ${t("common.days")}`}>
+      <SectionCard title={t("common.dayByDay")} note={countLabel("{count} day|{count} days", s.total, `${s.total} ${t("common.days")}`)}>
         <ul className="divide-y divide-surface-border -my-1">
           {days.map((d) => (
             <li key={d.date} className="flex items-center justify-between py-2.5">

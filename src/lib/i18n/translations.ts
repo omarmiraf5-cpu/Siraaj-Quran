@@ -1245,7 +1245,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "teacher.messages.eyebrow": "التواصل مع أولياء الأمور",
     "teacher.messages.subtitle": "المخاوف والأسئلة والغياب",
-    "teacher.messages.noStudents": "الاستفسارات والملاحظات والغياب",
+    "teacher.messages.noStudents": "أضف الطلاب في بوابة الإدارة لتبدأ مراسلة أولياء أمورهم.",
     "teacher.messages.loadingMessages": "جارٍ تحميل الرسائل…",
 
     "portion.new": "الدرس الجديد",
@@ -1340,8 +1340,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "parent.payments.owedThisMonth": "المستحق هذا الشهر",
     "parent.payments.outstandingBalance": "الرصيد المستحق",
     "parent.payments.oldPlusMonthly": "السابق + الشهري",
-    "parent.payments.notDueYet": "مستحق لاحقًا، لم يحن موعده",
-    "parent.payments.byChild": "مُفوتَر لاحقًا، ولم يحن موعد استحقاقه",
+    "parent.payments.notDueYet": "مُفوتَر لاحقًا، ولم يحن موعد استحقاقه",
+    "parent.payments.byChild": "حسب الطالب",
     "common.outstanding": "المستحق",
     "common.allPaidUp": "سُدِّد كل شيء",
     "common.billed": "المفوتَر",

@@ -35,6 +35,7 @@ import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { AgreementsBanner } from "@/components/AgreementsBanner";
 
@@ -223,7 +224,11 @@ export default function AdminDashboard() {
         meta={[
           [school.city, school.province].filter(Boolean).join(", "),
           formatDay(today, language),
-          `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
+          countLabel(
+            "{count} open item|{count} open items",
+            reviewItems.length + unassignedHalaqas.length,
+            `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
+          ),
         ]}
       />
 
@@ -234,14 +239,14 @@ export default function AdminDashboard() {
       {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile value={activeStudentCount} label={t("nav.students")} sub={`${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`} />
-        <StatTile value={activeTeachers.length} label={t("nav.teachers")} sub={`${halaqas.length} ${t("nav.halaqas").toLowerCase()}`} />
-        <StatTile value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? `${unassignedHalaqas.length} ${t("common.unassigned")}` : t("common.allAssigned")} />
+        <StatTile value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
+        <StatTile value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
+        <StatTile value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
         <StatTile value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
-        <SectionCard title={t("common.needsReview")} note={`${reviewItems.length} ${t("common.assignmentsCount")}`}>
+        <SectionCard title={t("common.needsReview")} note={countLabel("{count} assignment|{count} assignments", reviewItems.length, `${reviewItems.length} ${t("common.assignmentsCount")}`)}>
           {reviewItems.length === 0 ? (
             <EmptyNote>{t("common.nothingWaitingOnTeacherReview")}</EmptyNote>
           ) : (
@@ -255,7 +260,7 @@ export default function AdminDashboard() {
           )}
         </SectionCard>
 
-        <SectionCard title={t("common.recentAbsences")} note={`${absenceItems.length} ${t("common.reportedCount")}`}>
+        <SectionCard title={t("common.recentAbsences")} note={countLabel("{count} reported|{count} reported", absenceItems.length, `${absenceItems.length} ${t("common.reportedCount")}`)}>
           {absenceItems.length === 0 ? (
             <EmptyNote>{t("common.noAbsencesRecently")}</EmptyNote>
           ) : (
@@ -273,7 +278,7 @@ export default function AdminDashboard() {
         </SectionCard>
       </div>
 
-      <SectionCard title={t("nav.teachers")} note={`${teachers.length} ${t("common.total")}`}>
+      <SectionCard title={t("nav.teachers")} note={countLabel("{count} total", teachers.length, `${teachers.length} ${t("common.total")}`)}>
         <ul className="divide-y divide-surface-border -my-1">
           {teachers.map((teacher) => {
             const theirHalaqas = halaqas.filter((h) => halaqaTeacherIds(h).includes(teacher.id));

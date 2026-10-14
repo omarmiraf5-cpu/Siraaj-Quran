@@ -9,6 +9,7 @@ import { MessageThread } from "@/components/MessageThread";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { phrase } from "@/lib/i18n/phrases";
 
 // Shared with the teacher portal so a message sent here shows up there, and
@@ -251,7 +252,7 @@ export default function ParentMessagesPage() {
       <PortalHero
         eyebrow={t("parent.messages.eyebrow")}
         title={t("nav.messages")}
-        meta={[child.halaqa, teacherLabel, `${messages.length} ${t("common.messagesCount")}`]}
+        meta={[child.halaqa, teacherLabel, countLabel("{count} message|{count} messages", messages.length, `${messages.length} ${t("common.messagesCount")}`)]}
       />
 
       {children.length > 1 && (

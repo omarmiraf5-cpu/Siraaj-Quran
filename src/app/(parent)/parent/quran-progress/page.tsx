@@ -31,6 +31,7 @@ import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 
 const OVERRIDES_KEY = "demo_assignment_overrides";
@@ -126,7 +127,7 @@ export default function ParentQuranProgressPage() {
         title={firstName}
         meta={[
           child.halaqa,
-          `${completed} ${t("common.of")} ${assignments.length} ${t("common.finished").toLowerCase()}`,
+          countLabel("{done} of {count} finished", assignments.length, `${completed} ${t("common.of")} ${assignments.length} ${t("common.finished").toLowerCase()}`, { done: completed }),
           `${avg}% ${t("common.memorised").toLowerCase()}`,
         ]}
       />
@@ -153,7 +154,7 @@ export default function ParentQuranProgressPage() {
         <StatTile
           value={completed}
           label={t("common.finished")}
-          sub={`${assignments.length - completed} ${t("common.stillOpen")}`}
+          sub={countLabel("{count} still open|{count} still open", assignments.length - completed, `${assignments.length - completed} ${t("common.stillOpen")}`)}
         />
         <StatTile value={`${avg}%`} label={t("common.memorised")} sub={t("common.acrossAllSurahs")} />
       </div>

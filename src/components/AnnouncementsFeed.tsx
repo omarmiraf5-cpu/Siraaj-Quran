@@ -13,6 +13,7 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 
 // The same notice board seen from a teacher's, parent's or student's
 // dashboard — each only gets what's addressed to everyone plus what's aimed
@@ -73,7 +74,7 @@ export function AnnouncementsFeed({
   const shown = items.slice(0, limit);
 
   return (
-    <SectionCard title={t("nav.announcements")} note={items.length ? `${items.length} ${t("common.posted")}` : undefined}>
+    <SectionCard title={t("nav.announcements")} note={items.length ? countLabel("{count} posted", items.length, `${items.length} ${t("common.posted")}`) : undefined}>
       {!ready ? (
         <LoadingNote />
       ) : shown.length === 0 ? (

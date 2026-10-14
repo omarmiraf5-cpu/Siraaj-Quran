@@ -24,6 +24,7 @@ import {
 import { readDemoStore } from "@/lib/demoStore";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 
 export function StudentDetailPanel({
@@ -81,7 +82,7 @@ export function StudentDetailPanel({
           <div className="flex items-baseline justify-between">
             <p className="eyebrow">{t("nav.assignments")}</p>
             <span className="text-[11px] text-ink-muted tabular-nums">
-              {assignments.length} {t("common.total")}
+              {countLabel("{count} total", assignments.length, `${assignments.length} ${t("common.total")}`)}
             </span>
           </div>
 

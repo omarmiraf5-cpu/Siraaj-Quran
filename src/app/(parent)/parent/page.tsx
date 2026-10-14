@@ -33,6 +33,7 @@ import { IconBook, IconChart, IconCalendar, IconArrow } from "@/components/icons
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { ByLanguage } from "@/components/ByLanguage";
 
@@ -107,7 +108,11 @@ export default function ParentDashboard() {
           `${child.name.split(" ")[0]} ${t("common.was")} ${
             todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
           } ${t("common.today")}`,
-          active.length === 1 ? t("common.pieceOfWorkOpenOne") : `${active.length} ${t("common.pieceOfWorkOpenOther")}`,
+          countLabel(
+            "{count} piece of work open|{count} pieces of work open",
+            active.length,
+            active.length === 1 ? t("common.pieceOfWorkOpenOne") : `${active.length} ${t("common.pieceOfWorkOpenOther")}`,
+          ),
         ]}
         actions={
           <>
@@ -143,12 +148,21 @@ export default function ParentDashboard() {
         <StatTile
           value={`${summary.rate}%`}
           label={t("common.attendanceStat")}
-          sub={`${summary.present + summary.late} ${t("common.of")} ${summary.total - summary.excused} ${t("common.days")}`}
+          sub={countLabel(
+            "{present} of {count} days",
+            summary.total - summary.excused,
+            `${summary.present + summary.late} ${t("common.of")} ${summary.total - summary.excused} ${t("common.days")}`,
+            { present: summary.present + summary.late },
+          )}
         />
         <StatTile
           value={`${memorisation}%`}
           label={t("common.memorised")}
-          sub={`${t("common.across")} ${assignments.length} ${t("common.surahs")}`}
+          sub={countLabel(
+            "across {count} surah|across {count} surahs",
+            assignments.length,
+            `${t("common.across")} ${assignments.length} ${t("common.surahs")}`,
+          )}
         />
         <StatTile
           value={active.length}
@@ -176,7 +190,7 @@ export default function ParentDashboard() {
         {/* The work itself, not a link to it. */}
         <SectionCard
           title={t("common.currentWork")}
-          note={`${assignments.length} ${t("common.total")}`}
+          note={countLabel("{count} total", assignments.length, `${assignments.length} ${t("common.total")}`)}
         >
           {!ready ? (
             <LoadingNote />
@@ -256,7 +270,11 @@ export default function ParentDashboard() {
         {/* Attendance, summarised the way a parent reads it. */}
         <SectionCard
           title={t("nav.attendance")}
-          note={[t("common.last"), summary.total, t("common.days")].filter((x) => x !== "").join(" ")}
+          note={countLabel(
+            "the last {count} day|the last {count} days",
+            summary.total,
+            [t("common.last"), summary.total, t("common.days")].filter((x) => x !== "").join(" "),
+          )}
         >
           <div className="flex items-end justify-between gap-3">
             <div>
@@ -294,9 +312,11 @@ export default function ParentDashboard() {
 
           {needsReview.length > 0 && (
             <p className="text-[12px] text-ink-body mt-4 pt-4 border-t border-surface-border">
-              {needsReview.length === 1
-                ? t("common.oneWorkNeedsReview")
-                : `${needsReview.length} ${t("common.worksNeedReview")}`}
+              {countLabel(
+                "{count} piece of work is waiting on the teacher's review.|{count} pieces of work are waiting on the teacher's review.",
+                needsReview.length,
+                needsReview.length === 1 ? t("common.oneWorkNeedsReview") : `${needsReview.length} ${t("common.worksNeedReview")}`,
+              )}
             </p>
           )}
 

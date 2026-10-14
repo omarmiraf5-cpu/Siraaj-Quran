@@ -19,6 +19,7 @@ import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/port
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { balanceFor, balancesByStudent } from "@/lib/balances";
 import { monthOf, todayIso } from "@/lib/finance";
 import { myChildIds } from "@/hooks/useMyChildren";
@@ -105,7 +106,7 @@ export default function ParentPaymentsPage() {
         <StatTile value={money(balance.outstanding)} label={t("parent.payments.outstandingBalance")} sub={t("parent.payments.oldPlusMonthly")} />
       </div>
       <p className="text-[12px] text-ink-muted px-1" dir="auto">
-        {money(paid)} {t("common.paid").toLowerCase()} · {money(billed)} {t("common.billed").toLowerCase()} · {fees.length} {t("common.charges")}
+        {money(paid)} {t("common.paid").toLowerCase()} · {money(billed)} {t("common.billed").toLowerCase()} · {countLabel("{count} charge|{count} charges", fees.length, `${fees.length} ${t("common.charges")}`)}
         {balance.upcoming > 0 && ` · ${money(balance.upcoming)} ${t("parent.payments.notDueYet")}`}
       </p>
 
@@ -127,7 +128,7 @@ export default function ParentPaymentsPage() {
         </SectionCard>
       )}
 
-      <SectionCard title={t("common.yourCharges")} note={`${fees.length} ${t("common.total")}`}>
+      <SectionCard title={t("common.yourCharges")} note={countLabel("{count} total", fees.length, `${fees.length} ${t("common.total")}`)}>
         {!ready ? (
           <LoadingNote />
         ) : fees.length === 0 ? (

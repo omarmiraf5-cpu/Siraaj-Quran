@@ -22,6 +22,7 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { ILLUM_CLASS, type IllumColour } from "@/components/student-ui";
 import { IconCheck } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { myHalaqaStudents } from "@/lib/teacherScope";
 
 interface Student {
@@ -218,7 +219,7 @@ export function QaidahAssignPanel({
       }
       setEditing(null);
       setSelected(new Set());
-      const who = e.studentIds.length === 1 ? (nameOf.get(e.studentIds[0]) ?? "") : `${e.studentIds.length} ${t("qaidah.students")}`;
+      const who = e.studentIds.length === 1 ? (nameOf.get(e.studentIds[0]) ?? "") : countLabel("{count} student|{count} students", e.studentIds.length, `${e.studentIds.length} ${t("qaidah.students")}`);
       return `${who}: ${lessonName(e.book, e.lesson)}.`;
     });
 
@@ -250,7 +251,7 @@ export function QaidahAssignPanel({
         who={
           studentIds.length === 1
             ? (nameOf.get(studentIds[0]) ?? "")
-            : `${studentIds.length} ${t("qaidah.students")}`
+            : countLabel("{count} student|{count} students", studentIds.length, `${studentIds.length} ${t("qaidah.students")}`)
         }
       />
     ) : null;
@@ -260,7 +261,7 @@ export function QaidahAssignPanel({
   return (
     <SectionCard
       title={t("qaidah.studentsLessons")}
-      note={mode === "loading" ? undefined : `${students.length} ${t("qaidah.students")}`}
+      note={mode === "loading" ? undefined : countLabel("{count} student|{count} students", students.length, `${students.length} ${t("qaidah.students")}`)}
     >
       {mode === "loading" || !ready ? (
         <LoadingNote />
@@ -287,7 +288,7 @@ export function QaidahAssignPanel({
               {selectedIds.length > 0 && (
                 <div className="rounded-xl bg-surface-bg-warm border border-surface-border px-3 py-2 flex flex-wrap items-center gap-2">
                   <span className="text-[12.5px] font-semibold text-ink">
-                    {selectedIds.length} {t("qaidah.selected")}
+                    {countLabel("{count} selected|{count} selected", selectedIds.length, `${selectedIds.length} ${t("qaidah.selected")}`)}
                   </span>
                   <button
                     type="button"

@@ -18,6 +18,7 @@ import {
 import { getSurahById } from "@/data/mushaf-index";
 import { Modal, ProgressBar, EmptyNote, AttendanceStrip } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 
 export type DrilldownView = "students" | "active" | "review" | "attendance";
@@ -111,7 +112,7 @@ function StudentList({ onSelect }: { onSelect: (id: string) => void }) {
                         ? t("common.nothingOpen")
                         : open === 1
                           ? t("common.oneOpen")
-                          : `${open} ${t("common.openCount")}`}
+                          : countLabel("{count} open|{count} open", open, `${open} ${t("common.openCount")}`)}
                     </span>
                   </span>
                   <span className="text-[12px] font-semibold text-ink-muted tabular-nums flex-shrink-0">
