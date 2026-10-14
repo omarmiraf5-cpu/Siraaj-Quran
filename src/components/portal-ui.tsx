@@ -6,7 +6,9 @@
 // serif one on another, bars in four different heights — which is what made
 // the product read as three products.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { pillSpring } from "@/lib/motion-config";
 import {
   ATTENDANCE_DOT,
   DAILY_RATING_DOT,
@@ -23,6 +25,9 @@ import {
 import { getSurahById } from "@/data/mushaf-index";
 import type { DailyRating } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
+import { SkeletonRows, SkeletonStats } from "@/components/Skeleton";
+import { IconBadge, type IconTone } from "@/components/IconBadge";
+import type { LucideIcon } from "lucide-react";
 import { countLabel } from "@/lib/i18n/phrases";
 
 // DAILY_RATING_LABELS keys are snake_case (very_good); translation keys are
@@ -156,14 +161,24 @@ export function StatTile({
   label,
   sub,
   onClick,
+  icon,
+  tone = "navy",
 }: {
   value: string | number;
   label: string;
   sub?: string;
   onClick?: () => void;
+  /** A badge above the figure, for the headline tiles at the top of a home page. */
+  icon?: LucideIcon;
+  tone?: IconTone;
 }) {
   const body = (
     <>
+      {icon && (
+        <span className="block mb-3">
+          <IconBadge icon={icon} tone={tone} size={34} />
+        </span>
+      )}
       <p className="text-[26px] font-bold text-ink tabular-nums leading-none"><bdi dir="ltr">{value}</bdi></p>
       <p className="eyebrow mt-2">{label}</p>
       {sub && <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
@@ -177,13 +192,13 @@ export function StatTile({
   // out the grid — and with it the page's horizontal scroll — instead
   // of just wrapping to a second line.
   if (!onClick) {
-    return <div className="card-quiet px-4 py-4 min-w-0">{body}</div>;
+    return <div className="card-quiet card-lift px-4 py-4 min-w-0">{body}</div>;
   }
   return (
     <button
       type="button"
       onClick={onClick}
-      className="card-quiet px-4 py-4 min-w-0 text-start cursor-pointer hover:bg-surface-bg-warm hover:-translate-y-0.5 transition-all active:scale-[.98]"
+      className="card-quiet card-lift px-4 py-4 min-w-0 text-start cursor-pointer hover:bg-surface-bg-warm active:scale-[.98]"
     >
       {body}
     </button>
@@ -294,12 +309,14 @@ export function SegmentedSwitch<T extends string>({
   onChange: (v: T) => void;
   label: string;
 }) {
+  const reduce = useReducedMotion();
+  const group = useId();
   if (options.length < 2) return null;
   return (
     <div
       role="tablist"
       aria-label={label}
-      className="inline-flex p-1 gap-1 rounded-full bg-surface-bg-warm border border-surface-border"
+      className="inline-flex flex-wrap p-1 gap-1 rounded-full bg-surface-bg-warm border border-surface-border"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -309,13 +326,19 @@ export function SegmentedSwitch<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all ${
-              active
-                ? "bg-brand-navy text-white shadow-sm"
-                : "text-ink-muted hover:text-ink"
+            className={`relative px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+              active ? "text-white" : "text-ink-muted hover:text-ink"
             }`}
           >
-            {o.label}
+            {/* The navy pill slides to the chosen child. */}
+            {active && (
+              <motion.span
+                layoutId={`switch-${group}`}
+                className="absolute inset-0 rounded-full bg-brand-navy shadow-sm"
+                transition={reduce ? { duration: 0 } : pillSpring}
+              />
+            )}
+            <span className="relative">{o.label}</span>
           </button>
         );
       })}
@@ -335,11 +358,18 @@ export function EmptyNote({ children }: { children: React.ReactNode }) {
    the space while that answer is in flight — the alternative, rendering the
    demo roster first and swapping it out a moment later, briefly shows one
    school somebody else's names. */
-export function LoadingNote({ children = "Loading…" }: { children?: React.ReactNode }) {
+/** While a list or section loads: placeholder rows in its shape, with the
+ *  words for screen readers. */
+export function LoadingNote({ children, rows = 3, stats = false }: { children?: React.ReactNode; rows?: number; stats?: boolean }) {
+  const { tr } = useLanguage();
   return (
-    <p className="text-[13px] text-ink-muted py-2 animate-pulse" aria-live="polite">
-      {children}
-    </p>
+    <div className="py-1 space-y-4" aria-live="polite" aria-busy="true">
+      <span className="sr-only">{children ?? tr("Loading…")}</span>
+      {stats && <SkeletonStats />}
+      <div className="card-quiet p-5">
+        <SkeletonRows count={rows} />
+      </div>
+    </div>
   );
 }
 

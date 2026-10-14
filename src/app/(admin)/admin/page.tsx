@@ -38,6 +38,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { AgreementsBanner } from "@/components/AgreementsBanner";
+import { Users, GraduationCap, BookOpen, CalendarCheck } from "lucide-react";
 
 type ReviewItem = { id: string; halaqaName: string };
 type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: string | null };
@@ -211,7 +212,7 @@ export default function AdminDashboard() {
   if (!school) {
     return (
       <div className="max-w-7xl mx-auto pt-10">
-        <LoadingNote>{t("common.loadingDashboard")}</LoadingNote>
+        <LoadingNote stats rows={5}>{t("common.loadingDashboard")}</LoadingNote>
       </div>
     );
   }
@@ -239,10 +240,10 @@ export default function AdminDashboard() {
       {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
-        <StatTile value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
-        <StatTile value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
-        <StatTile value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
+        <StatTile icon={Users} tone="navy" value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
+        <StatTile icon={GraduationCap} tone="gold" value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
+        <StatTile icon={BookOpen} tone="green" value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
+        <StatTile icon={CalendarCheck} tone="amber" value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">

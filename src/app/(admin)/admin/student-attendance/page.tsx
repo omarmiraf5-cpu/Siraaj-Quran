@@ -302,7 +302,7 @@ export default function StudentAttendancePage() {
       {/* The day */}
       <div className="flex items-center justify-between gap-3">
         <button type="button" onClick={() => setDay(addDays(day, -1))} aria-label={tr("Previous day")} className="w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink">
-          <span className="inline-block rtl:-scale-x-100">‹</span>
+          ‹
         </button>
         <div className="text-center">
           <p className="font-display text-lg font-bold text-ink leading-tight">{formatDay(day, language)}</p>
@@ -321,7 +321,7 @@ export default function StudentAttendancePage() {
           )}
         </div>
         <button type="button" onClick={() => setDay(addDays(day, 1))} disabled={day >= today} aria-label={tr("Next day")} className="w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink disabled:opacity-30">
-          <span className="inline-block rtl:-scale-x-100">›</span>
+          ›
         </button>
       </div>
 

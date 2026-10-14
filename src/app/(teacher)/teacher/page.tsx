@@ -35,6 +35,7 @@ import { countLabel } from "@/lib/i18n/phrases";
 import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
 import { myHalaqas, narrowToMine } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
+import { Users, BookOpen, ClipboardCheck, CalendarCheck } from "lucide-react";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
@@ -197,7 +198,7 @@ export default function TeacherDashboard() {
   if (!ready) {
     return (
       <div className="max-w-6xl mx-auto pt-10">
-        <LoadingNote>{t("common.loadingDashboard")}</LoadingNote>
+        <LoadingNote stats rows={5}>{t("common.loadingDashboard")}</LoadingNote>
       </div>
     );
   }
@@ -241,6 +242,7 @@ export default function TeacherDashboard() {
           the wrong students. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
+          icon={Users}
           value={students.length}
           label={t("nav.students")}
           sub={halaqas
@@ -253,18 +255,24 @@ export default function TeacherDashboard() {
           onClick={isDemo ? () => setDrilldown("students") : undefined}
         />
         <StatTile
+          icon={BookOpen}
+          tone="green"
           value={active.length}
           label={t("common.activeWork")}
           sub={dueThisWeek > 0 ? countLabel("{count} due this week|{count} due this week", dueThisWeek, `${dueThisWeek} ${t("common.dueThisWeek")}`) : t("common.nothingDueThisWeek")}
           onClick={isDemo ? () => setDrilldown("active") : undefined}
         />
         <StatTile
+          icon={ClipboardCheck}
+          tone={review.length > 0 ? "amber" : "green"}
           value={review.length}
           label={t("common.toReview")}
           sub={reviewDue ? `${t("common.oldestDue")} ${formatDay(reviewDue, language)}` : t("common.allClear")}
           onClick={isDemo ? () => setDrilldown("review") : undefined}
         />
         <StatTile
+          icon={CalendarCheck}
+          tone="gold"
           value={`${avgAttendance}%`}
           label={t("common.attendanceStat")}
           sub={countLabel("{inToday} of {count} in today", students.length, `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`, { inToday })}

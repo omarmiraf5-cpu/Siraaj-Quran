@@ -36,6 +36,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { ByLanguage } from "@/components/ByLanguage";
+import { CalendarCheck, BookOpen, ClipboardList, Award } from "lucide-react";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
@@ -146,6 +147,8 @@ export default function ParentDashboard() {
       {/* At a glance, in the parent's terms rather than the school's. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
+          icon={CalendarCheck}
+          tone="gold"
           value={`${summary.rate}%`}
           label={t("common.attendanceStat")}
           sub={countLabel(
@@ -156,6 +159,8 @@ export default function ParentDashboard() {
           )}
         />
         <StatTile
+          icon={BookOpen}
+          tone="green"
           value={`${memorisation}%`}
           label={t("common.memorised")}
           sub={countLabel(
@@ -165,11 +170,14 @@ export default function ParentDashboard() {
           )}
         />
         <StatTile
+          icon={ClipboardList}
           value={active.length}
           label={t("common.openWork")}
           sub={nextDue ? `${t("common.nextDue")} ${formatDay(nextDue, language)}` : t("common.nothingDue")}
         />
         <StatTile
+          icon={Award}
+          tone="gold"
           value={done.length}
           label={t("assignment.completed")}
           sub={done.length ? t("common.wellDone") : t("common.noneYet")}

@@ -25,6 +25,7 @@ import {
 } from "@/lib/finance";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
+import { useToast } from "@/components/Toast";
 
 // The month's spending: what, how much, to whom, by category.
 
@@ -56,6 +57,7 @@ const blankDraft = (): Draft => ({ spentOn: todayIso(), category: "supplies", de
 
 export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; schoolId: string | null; userId: string | null }) {
   const { tr } = useLanguage();
+  const toast = useToast();
   const supabase = createClient();
   const thisMonth = monthOf(todayIso());
   const [month, setMonth] = useState(thisMonth);
@@ -151,6 +153,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
     }
     setBusy(false);
     setDraft(null);
+    toast.success(tr("Expense saved: {amount}.", { amount: money(row.amount) }));
     // To the month it was spent in, so it's there to see.
     if (monthOf(row.spentOn) !== month) setMonth(monthOf(row.spentOn));
     else await load(month);

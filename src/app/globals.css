@@ -589,3 +589,106 @@ body {
 .info-prose ul { list-style: disc; padding-inline-start: 1.25em; }
 .info-prose li + li { margin-top: 0.5em; }
 .info-prose a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Motion pieces: placeholders, toasts, segmented choices ───────────
+   Colours come from the theme tokens, so each reads in light and dark. */
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.skeleton {
+  border-radius: 0.5rem;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--c-ink) 13%, transparent) 0%,
+    color-mix(in srgb, var(--c-ink) 6%, transparent) 45%,
+    color-mix(in srgb, var(--c-ink) 13%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.15s ease-in-out infinite;
+}
+.spin-ring {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+/* A card that lifts a little under the pointer, on screens that have one. */
+.card-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+@media (hover: hover) {
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -14px rgba(14, 35, 71, 0.35);
+  }
+}
+.toast-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--c-ink);
+  background: color-mix(in srgb, var(--c-surface-card) 92%, transparent);
+  border: 1px solid var(--c-surface-border);
+  box-shadow: 0 14px 34px -14px rgba(14, 35, 71, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+.toast-dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.4rem;
+  border-radius: 9999px;
+}
+.toast-ok .toast-dot { background: #10b981; }
+.toast-bad { border-color: rgba(220, 38, 38, 0.35); }
+.toast-bad .toast-dot { background: #dc2626; }
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 1rem;
+  background: var(--c-surface-card);
+  border: 1px solid var(--c-surface-border);
+}
+.segmented-opt {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 0.75rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-ink-muted);
+  transition: color 0.2s ease;
+}
+.segmented-opt:hover { color: var(--c-ink); }
+.segmented-on,
+.segmented-on:hover { color: #fff; }
+.segmented-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.75rem;
+  background: #1e3a6e;
+  box-shadow: 0 6px 16px -8px rgba(14, 35, 71, 0.55);
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .spin-ring { animation: none; }
+  .card-lift,
+  .card-lift:hover { transition: none; transform: none; }
+}

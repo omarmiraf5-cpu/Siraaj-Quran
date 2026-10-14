@@ -31,6 +31,7 @@ import { loadRoster } from "@/lib/rosterExport";
 import { download, fileNameFor } from "@/lib/sheetTools";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
+import { useToast } from "@/components/Toast";
 
 const bigField =
   "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
@@ -39,6 +40,7 @@ const smallField =
 
 export default function AdminStudentsPage() {
   const { tr } = useLanguage();
+  const toast = useToast();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   // The code students type in the app (the school's slug), and whether the
@@ -548,6 +550,7 @@ export default function AdminStudentsPage() {
       const said = await placeStudents([s.id], to || "__none", grade, campusOfStudent(s));
       await loadRealStudents();
       setAssignNote(`${s.name}: ${said.replace(/^1 student /, "")}`);
+      toast.success(`${s.name}: ${said.replace(/^1 student /, "")}`);
     } catch (err) {
       setAssignNote(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
@@ -564,6 +567,7 @@ export default function AdminStudentsPage() {
       const said = await placeStudents(ids, assignTo, assignGrade, assignCampus);
       await loadRealStudents();
       setAssignNote(said);
+      toast.success(said);
       setPicked(new Set());
     } catch (err) {
       setAssignNote(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));

@@ -12,6 +12,8 @@ import { useDemoUser } from "@/hooks/useDemoUser";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
+import { motion, useReducedMotion } from "motion/react";
+import { pillSpring } from "@/lib/motion-config";
 
 interface NavItem {
   href: string;
@@ -88,6 +90,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const demoUser = useDemoUser();
   const branding = useSchoolBranding();
   const { t } = useLanguage();
+  const reduceMotion = useReducedMotion();
   useRecordVisit();
   useSwitchedOffGuard();
   const role = t(roleKey);
@@ -258,12 +261,23 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                aria-current={active ? "page" : undefined}
+                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   active
                     ? "bg-white/15 text-white"
                     : "text-white/60 hover:text-white hover:bg-white/8"
                 }`}
               >
+                {/* A gold bar at the reading edge marks the page you're on,
+                    and slides there when you move. */}
+                {active && (
+                  <motion.span
+                    layoutId="sidebar-accent"
+                    aria-hidden
+                    className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-brand-gold"
+                    transition={reduceMotion ? { duration: 0 } : pillSpring}
+                  />
+                )}
                 <span className="flex-shrink-0 opacity-80">{item.icon}</span>
                 {t(item.labelKey)}
               </Link>

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Newsreader, Amiri, Aref_Ruqaa, Noto_Sans_Arabic } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { ToastProvider } from "@/components/Toast";
 import { NativeBridge } from "@/components/NativeBridge";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -93,7 +94,9 @@ export default function RootLayout({
         <div aria-hidden className="status-bar-strip" />
         <NativeBridge />
         <ThemeProvider>
-          <LanguageProvider>{children}</LanguageProvider>
+          <LanguageProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

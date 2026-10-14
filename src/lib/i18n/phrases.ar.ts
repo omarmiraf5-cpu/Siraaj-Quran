@@ -1849,4 +1849,8 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "{count} marked|{count} marked": { one: "مسجّل", two: "مسجّلان", few: "مسجّلون", many: "مسجّلًا", other: "مسجّل" },
   "{count} on this lesson|{count} on this lesson": { one: "طالب واحد على هذا الدرس", two: "طالبان على هذا الدرس", few: "{count} طلاب على هذا الدرس", many: "{count} طالبًا على هذا الدرس", other: "{count} طالب على هذا الدرس" },
   "{count} selected|{count} selected": { one: "واحد محدد", two: "اثنان محددان", few: "{count} محددون", many: "{count} محددًا", other: "{count} محدد" },
+  "Announcement posted.": "نُشر الإعلان.",
+  "Fee recorded.": "سُجّلت الرسوم.",
+  "Expense saved: {amount}.": "حُفظ المصروف: {amount}.",
+  "Payment saved: {amount} to {name}.": "حُفظت الدفعة: {amount} إلى {name}.",
 };

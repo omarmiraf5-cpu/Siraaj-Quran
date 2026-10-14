@@ -31,6 +31,7 @@ import {
 } from "@/lib/finance";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
+import { useToast } from "@/components/Toast";
 
 // The month's salaries: every admin and teacher with their usual monthly
 // pay, who's been paid and who hasn't, and anyone else the school pays.
@@ -74,6 +75,7 @@ export function demoSalaryPayments(thisMonth: string): SalaryPayment[] {
 
 export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; schoolId: string | null; userId: string | null }) {
   const { tr } = useLanguage();
+  const toast = useToast();
   const supabase = createClient();
   const thisMonth = monthOf(todayIso());
   const [month, setMonth] = useState(thisMonth);
@@ -243,6 +245,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
     }
     await loadPayments(month);
     setBusy(false);
+    toast.success(tr("Payment saved: {amount} to {name}.", { amount: money(row.amount), name: row.payeeName }));
     return true;
   };
 

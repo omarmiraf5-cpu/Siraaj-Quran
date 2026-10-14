@@ -21,7 +21,7 @@ export function MonthBar({ month, onChange, thisMonth }: { month: string; onChan
   return (
     <div className="flex items-center justify-between gap-3">
       <button type="button" onClick={() => onChange(shiftMonth(month, -1))} aria-label={tr("Previous month")} className={arrow}>
-        <span className="inline-block rtl:-scale-x-100">‹</span>
+        ‹
       </button>
       <div className="text-center">
         <p className="font-display text-lg font-bold text-ink leading-tight">{monthLabel(month)}</p>
@@ -39,7 +39,7 @@ export function MonthBar({ month, onChange, thisMonth }: { month: string; onChan
         aria-label={tr("Next month")}
         className={arrow}
       >
-        <span className="inline-block rtl:-scale-x-100">›</span>
+        ›
       </button>
     </div>
   );

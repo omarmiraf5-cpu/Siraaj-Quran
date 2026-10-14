@@ -31,7 +31,9 @@ import { FinanceOverview } from "@/components/FinanceOverview";
 import { balanceFor } from "@/lib/balances";
 import { monthOf, todayIso } from "@/lib/finance";
 import { useLanguage } from "@/components/LanguageProvider";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { phrase } from "@/lib/i18n/phrases";
+import { useToast } from "@/components/Toast";
 
 type Tab = "overview" | "fees" | "salaries" | "expenses";
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -44,6 +46,7 @@ const TAB_KEY = "payments_tab";
 
 export default function AdminPaymentsPage() {
   const { tr } = useLanguage();
+  const toast = useToast();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
@@ -186,6 +189,7 @@ export default function AdminPaymentsPage() {
     }
     await loadRealFees();
     resetForm();
+    toast.success(tr("Fee recorded."));
   };
 
   const resetForm = () => {
@@ -264,22 +268,13 @@ export default function AdminPaymentsPage() {
         }
       />
 
-      <div role="tablist" aria-label={tr("Payments")} className="flex gap-1 p-1 rounded-2xl bg-surface-card border border-surface-border">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => chooseTab(t.id)}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
-              tab === t.id ? "bg-brand-navy text-white" : "text-ink-muted hover:text-ink hover:bg-surface-bg-warm"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        role="tablist"
+        label={tr("Payments")}
+        value={tab}
+        onChange={chooseTab}
+        options={TABS.map((t) => ({ value: t.id, label: t.label }))}
+      />
 
       {tab === "overview" && <FinanceOverview isDemo={isDemo} fees={fees} students={students} feesReady={ready} />}
       {tab === "salaries" && ready && <SalariesPanel isDemo={isDemo} schoolId={schoolId} userId={userId} />}

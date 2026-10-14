@@ -25,6 +25,8 @@ import { countLabel } from "@/lib/i18n/phrases";
 import { demoAttendanceFetch } from "@/lib/demoAttendance";
 import { PlanAlertBanner } from "@/components/yearly-plan-ui";
 import { myHalaqas, narrowToMine, type MyHalaqa } from "@/lib/teacherScope";
+import { useToast } from "@/components/Toast";
+import { PressButton } from "@/components/PressButton";
 
 /** A child whose absences just reached a run long enough to tell home about. */
 interface LongAbsence {
@@ -58,6 +60,7 @@ function todayIso() {
 export default function TeacherAttendancePage() {
   const supabase = createClient();
   const { t, language, tr } = useLanguage();
+  const toast = useToast();
   const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [today, setToday] = useState(DEMO_TODAY);
@@ -236,8 +239,11 @@ export default function TeacherAttendancePage() {
         return { ...next, ...here };
       });
       setSaved(true);
+      toast.success(halaqa && halaqas && halaqas.length > 1 ? `${t("teacher.attendance.saved")} · ${halaqa.label}` : t("teacher.attendance.saved"));
     } catch (err) {
-      setError(err instanceof Error ? tr(err.message) : t("teacher.attendance.saveFailed"));
+      const message = err instanceof Error ? tr(err.message) : t("teacher.attendance.saveFailed");
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -395,10 +401,11 @@ export default function TeacherAttendancePage() {
           it was winning the stacking fight and hiding all but a sliver of
           the button underneath it. */}
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 start-0 end-0 md:start-56 p-3 bg-surface-card border-t border-surface-border z-30">
-        <button
+        <PressButton
           onClick={saveAttendance}
-          disabled={(marked === 0 && !changed) || saving}
-          className="w-full max-w-4xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
+          loading={saving}
+          disabled={marked === 0 && !changed}
+          className="w-full max-w-4xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 transition-opacity"
         >
           {saved && <IconCheck size={16} />}
           {saving
@@ -408,7 +415,7 @@ export default function TeacherAttendancePage() {
               : marked === 0 && !changed
                 ? t("teacher.attendance.markToSave")
                 : `${t("teacher.attendance.saveButton")}${halaqa && halaqas && halaqas.length > 1 ? ` · ${halaqa.label}` : ""} · ${countLabel("{count} present now|{count} present now", count("present"), `${count("present")} ${t("common.present").toLowerCase()}`)}`}
-        </button>
+        </PressButton>
       </div>
     </div>
   );

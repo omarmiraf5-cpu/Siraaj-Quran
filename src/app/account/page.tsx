@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SUPPORT_EMAIL } from "@/lib/site";
 import { StudentPinForm } from "@/components/StudentPinForm";
 import { WeeklyEmailsSwitch } from "@/components/WeeklyEmailsSwitch";
+import { LoadingNote } from "@/components/portal-ui";
 import { labels, phrase } from "@/lib/i18n/phrases";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -129,7 +130,7 @@ export default function AccountPage() {
 
   return (
     <Shell back={role ? `/${role}` : "/login"}>
-      {!info && !demo && !error && <p className="text-[13px] text-ink-muted text-center py-10">{tr("Loading your account…")}</p>}
+      {!info && !demo && !error && <LoadingNote rows={2}>{tr("Loading your account…")}</LoadingNote>}
       {error && !info && !demo && <p className="text-[13px] text-red-700 dark:text-red-300 text-center py-10">{error}</p>}
 
       {(info || demo) && (
@@ -244,7 +245,7 @@ function Row({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} className="flex items-center justify-between px-5 py-3.5 text-[14px] font-semibold text-ink hover:bg-surface-bg-warm transition">
       {label}
-      <span aria-hidden className="text-ink-muted inline-block rtl:-scale-x-100">›</span>
+      <span aria-hidden className="text-ink-muted">›</span>
     </Link>
   );
 }
