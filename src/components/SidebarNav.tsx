@@ -13,13 +13,18 @@ import { useDemoUser } from "@/hooks/useDemoUser";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
-import { IconBadge, IconDots, IconSignOut } from "@/components/icons";
+import type { LucideIcon } from "lucide-react";
+import { LogOut, MoreHorizontal } from "lucide-react";
+import { IconBadge as GoldBadge, IconSignOut } from "@/components/icons";
+import { IconBadge } from "@/components/IconBadge";
 
 interface NavItem {
   href: string;
   /** Key into the translation dictionary, e.g. "nav.dashboard" — not literal text. */
   labelKey: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
+  /** A distinct Lucide glyph. When set, this replaces the gold medallion. */
+  mark?: LucideIcon;
 }
 
 interface SidebarNavProps {
@@ -153,7 +158,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 active ? "dock-pill" : "text-ink-muted hover:text-ink"
               }`}
             >
-              <IconBadge size="sm">{item.icon}</IconBadge>
+              {item.mark ? <IconBadge icon={item.mark} size="sm" active={active} /> : <GoldBadge size="sm">{item.icon}</GoldBadge>}
               {t(item.labelKey)}
             </Link>
           );
@@ -167,7 +172,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
               moreActive || moreOpen ? "dock-pill" : "text-ink-muted hover:text-ink"
             }`}
           >
-            <IconBadge size="sm"><IconDots size={15} /></IconBadge>
+            <IconBadge icon={MoreHorizontal} size="sm" active={moreActive || moreOpen} />
             {t("common.more")}
           </button>
         )}
@@ -194,7 +199,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                     active ? "dock-pill" : "text-ink hover:bg-brand-navy/5"
                   }`}
                 >
-                  <IconBadge size="sm">{item.icon}</IconBadge>
+                  {item.mark ? <IconBadge icon={item.mark} size="sm" active={active} /> : <GoldBadge size="sm">{item.icon}</GoldBadge>}
                   {t(item.labelKey)}
                 </Link>
               );
@@ -277,7 +282,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                   />
                 )}
                 <span className="relative z-10 flex items-center gap-3">
-                  <IconBadge size="md">{item.icon}</IconBadge>
+                  {item.mark ? <IconBadge icon={item.mark} size="md" active={active} /> : <GoldBadge size="md">{item.icon}</GoldBadge>}
                   {t(item.labelKey)}
                 </span>
               </Link>
@@ -290,7 +295,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           onClick={handleSignOut}
           className="flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all mt-2"
         >
-          <IconBadge size="md"><IconSignOut size={17} /></IconBadge>
+          {items.some((item) => item.mark) ? <IconBadge icon={LogOut} size="md" /> : <GoldBadge size="md"><IconSignOut size={17} /></GoldBadge>}
           {t("common.signOut")}
         </button>
 
@@ -303,7 +308,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 href={item.href}
                 className="flex items-center gap-3 px-3 py-2 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all"
               >
-                <IconBadge size="sm">{item.icon}</IconBadge>
+                {item.mark ? <IconBadge icon={item.mark} size="sm" /> : <GoldBadge size="sm">{item.icon}</GoldBadge>}
                 {t(item.labelKey)}
               </Link>
             ))}

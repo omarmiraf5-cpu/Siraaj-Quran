@@ -7,6 +7,10 @@
 // the product read as three products.
 
 import { useEffect, useMemo, useState } from "react";
+import type { LucideIcon } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { StatCardHeader } from "@/components/StatCardHeader";
+import type { IconTone } from "@/components/IconBadge";
 import {
   ATTENDANCE_DOT,
   DAILY_RATING_DOT,
@@ -223,18 +227,39 @@ export function StatTile({
   label,
   sub,
   icon,
+  mark,
+  accent = "navy",
   onClick,
 }: {
   value: string | number;
   label: string;
   sub?: string;
   icon?: React.ReactNode;
+  /** Lucide glyph drawn in a toned badge. Replaces the gold medallion. */
+  mark?: LucideIcon;
+  /** Kept so older call sites that passed a palette index still typecheck. */
   tone?: number;
+  accent?: IconTone;
   onClick?: () => void;
 }) {
+  const reduce = useReducedMotion();
   const display = useCountUp(value);
   const pct = typeof value === "string" && value.endsWith("%") ? Number(value.replace("%", "")) : null;
-  const body = (
+  const figure = (
+    <>
+      <p className="font-display text-[30px] font-semibold text-ink tabular-nums leading-none tracking-tight mt-3"><bdi dir="ltr">{display}</bdi></p>
+      {sub && <p className="text-[12px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
+    </>
+  );
+  const body = mark ? (
+    <div className="min-w-0">
+      <StatCardHeader icon={mark} tone={accent} label={label} />
+      {figure}
+      {pct != null && !Number.isNaN(pct) && (
+        <div className="mt-2 flex justify-end"><MiniRing value={pct} /></div>
+      )}
+    </div>
+  ) : (
     <div className="flex items-start gap-3">
       <span className="icon-badge icon-badge-lg">
         {icon ?? <span className="w-2.5 h-2.5 rounded-full bg-brand-gold" />}
@@ -248,6 +273,7 @@ export function StatTile({
       {pct != null && !Number.isNaN(pct) && <MiniRing value={pct} />}
     </div>
   );
+  const spring = reduce ? { duration: 0 } : { type: "spring" as const, stiffness: 380, damping: 16 };
 
   // min-w-0 matters here: these tiles sit in a CSS grid, where a grid
   // item's default min-width is auto, not 0. A translated label longer
@@ -256,16 +282,22 @@ export function StatTile({
   // out the grid — and with it the page's horizontal scroll — instead
   // of just wrapping to a second line.
   if (!onClick) {
-    return <div className="card-quiet card-lift px-4 py-4 min-w-0 rounded-[22px]">{body}</div>;
+    return (
+      <motion.div whileHover={reduce || !mark ? undefined : { scale: 1.05 }} transition={spring} className="card-quiet card-lift px-4 py-4 min-w-0 rounded-[22px]">
+        {body}
+      </motion.div>
+    );
   }
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className="card-quiet card-lift px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start cursor-pointer hover:bg-surface-bg-warm active:scale-[.98]"
+      whileHover={reduce || !mark ? undefined : { scale: 1.05 }}
+      transition={spring}
+      className="card-quiet card-lift px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start cursor-pointer hover:bg-surface-bg-warm"
     >
       {body}
-    </button>
+    </motion.button>
   );
 }
 

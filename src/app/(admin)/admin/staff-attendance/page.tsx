@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
 import { Segmented, SkeletonRows, SkeletonStats, SpotlightButton, useToast } from "@/components/motion-ui";
+import { Clock3, Flag, UserCheck, UserX } from "lucide-react";
 import { StatusPill, currentPosition, timesLine, useAttendanceApi, statusLabel } from "@/components/attendance-ui";
 import {
   REASON_LABEL,
@@ -183,10 +184,10 @@ export default function StaffAttendancePage() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
-        <StatTile value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
-        <StatTile value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
-        <StatTile value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
+        <StatTile mark={UserCheck} accent="green" value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
+        <StatTile mark={Clock3} accent="amber" value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
+        <StatTile mark={UserX} accent="red" value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
+        <StatTile mark={Flag} accent="navy" value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
       </div>
 
       <SectionCard title={tr("Today")} note={tr("Staff due {formatClock} · {grace_minutes} min grace", { formatClock: formatClock(data.settings.start_time), grace_minutes: data.settings.grace_minutes })}>

@@ -3,100 +3,50 @@
 import { SidebarNav } from "@/components/SidebarNav";
 import { PageFade } from "@/components/motion-ui";
 import {
-  IconBook,
-  IconBookOpen,
-  IconCalendar,
-  IconCalendarBlank,
-  IconCard,
-  IconClock,
-  IconGrid,
-  IconMegaphone,
-  IconNote,
-  IconUser,
-  IconUsers,
-} from "@/components/icons";
+  BookOpen,
+  CalendarCheck,
+  CalendarDays,
+  ClipboardCheck,
+  GraduationCap,
+  Languages,
+  LayoutDashboard,
+  Megaphone,
+  Presentation,
+  UserRound,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
 import { useMyChildren } from "@/hooks/useMyChildren";
 
 const NAV = [
-  {
-    href: "/admin",
-    labelKey: "nav.dashboard",
-    icon: <IconGrid />,
-  },
-  {
-    href: "/admin/students",
-    labelKey: "nav.students",
-    icon: <IconUsers />,
-  },
-  {
-    href: "/admin/teachers",
-    labelKey: "nav.teachers",
-    icon: <IconBook />,
-  },
-  {
-    href: "/admin/student-attendance",
-    labelKey: "nav.studentAttendance",
-    // A register: a calendar page with a tick.
-    icon: <IconCalendar />,
-  },
-  {
-    href: "/admin/staff-attendance",
-    labelKey: "nav.staffAttendance",
-    icon: <IconClock />,
-  },
-  {
-    href: "/admin/parents",
-    labelKey: "nav.parents",
-    icon: <IconUsers />,
-  },
-  {
-    href: "/admin/halaqas",
-    labelKey: "nav.halaqas",
-    icon: <IconBookOpen />,
-  },
-  {
-    href: "/admin/class-work",
-    labelKey: "nav.classWork",
-    // Islamic Studies and Arabic: a worksheet with lines of writing.
-    icon: <IconNote />,
-  },
-  {
-    href: "/admin/payments",
-    labelKey: "nav.payments",
-    icon: <IconCard />,
-  },
-  {
-    href: "/admin/announcements",
-    labelKey: "nav.announcements",
-    icon: <IconMegaphone />,
-  },
-  {
-    href: "/admin/calendar",
-    labelKey: "nav.calendar",
-    icon: <IconCalendarBlank />,
-  },
-  {
-    href: "/account",
-    labelKey: "nav.account",
-    icon: <IconUser />,
-  },
+  { href: "/admin", labelKey: "nav.dashboard", mark: LayoutDashboard },
+  { href: "/admin/students", labelKey: "nav.students", mark: GraduationCap },
+  { href: "/admin/teachers", labelKey: "nav.teachers", mark: Presentation },
+  { href: "/admin/student-attendance", labelKey: "nav.studentAttendance", mark: CalendarCheck },
+  { href: "/admin/staff-attendance", labelKey: "nav.staffAttendance", mark: ClipboardCheck },
+  { href: "/admin/parents", labelKey: "nav.parents", mark: Users },
+  { href: "/admin/halaqas", labelKey: "nav.halaqas", mark: BookOpen },
+  { href: "/admin/class-work", labelKey: "nav.classWork", mark: Languages },
+  { href: "/admin/payments", labelKey: "nav.payments", mark: Wallet },
+  { href: "/admin/announcements", labelKey: "nav.announcements", mark: Megaphone },
+  { href: "/admin/calendar", labelKey: "nav.calendar", mark: CalendarDays },
+  { href: "/account", labelKey: "nav.account", mark: UserRound },
 ];
 
 // For an admin who also teaches a halaqa: their teacher's pages.
 const MY_HALAQA = {
   href: "/teacher",
   labelKey: "nav.myHalaqa",
-  // An open book, as the teacher's Qa'idah has.
-  icon: <IconBookOpen />,
+  mark: BookOpen,
 };
 
 // For an admin who is also a parent of a child here: their children, as a parent.
 const PARENT_MODE = {
   href: "/parent",
   labelKey: "nav.parentMode",
-  icon: <IconUsers />,
+  mark: Users,
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
