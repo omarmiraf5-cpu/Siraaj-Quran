@@ -331,17 +331,19 @@ export default function TeacherAttendancePage() {
         {roster.map((s) => {
           const summary = summariseAttendance(history[s.id] ?? []);
           return (
-            <div key={s.id} className="flex items-center gap-3 px-4 py-3.5">
-              <div className={`w-11 h-11 rounded-full text-white flex items-center justify-center font-bold text-xs flex-shrink-0 ${avatarTone(s.name)}`}>
-                {initials(s.name)}
+            <div key={s.id} className="flex flex-col gap-3 px-4 py-3.5 md:flex-row md:items-center">
+              <div className="flex items-center gap-3 min-w-0 md:flex-1">
+                <div className={`w-11 h-11 rounded-full text-white flex items-center justify-center font-bold text-xs flex-shrink-0 ${avatarTone(s.name)}`}>
+                  {initials(s.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm text-ink leading-snug break-words">{s.name}</p>
+                  <p className="text-[11px] text-ink-muted whitespace-nowrap truncate">
+                    {s.halaqa} · {summary.rate}% {t("common.thisTerm")}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-ink truncate">{s.name}</p>
-                <p className="text-[11px] text-ink-muted">
-                  {s.halaqa} · {summary.rate}% {t("common.thisTerm")}
-                </p>
-              </div>
-              <div className="flex gap-1.5 flex-shrink-0">
+              <div className="grid grid-cols-4 gap-2 md:flex md:w-auto md:shrink-0 md:gap-1.5">
                 {MARKS.map((m) => {
                   const active = records[s.id] === m.status;
                   return (
@@ -350,7 +352,7 @@ export default function TeacherAttendancePage() {
                       onClick={() => mark(s.id, m.status)}
                       aria-label={`${t(`common.${m.status}`)} — ${s.name}`}
                       aria-pressed={active}
-                      className={`w-11 h-11 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
+                      className={`min-h-11 h-11 w-full md:w-11 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
                         active ? m.on : `border-surface-border text-ink-muted ${m.off}`
                       }`}
                     >
