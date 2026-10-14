@@ -1877,4 +1877,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Without a teacher only": "دون معلم فقط",
   "Every student here has a teacher.": "لكل طالب هنا معلم.",
   "Add a teacher": "أضف معلمًا",
+  "Saved {name}.": "حُفظت بيانات {name}.",
 };

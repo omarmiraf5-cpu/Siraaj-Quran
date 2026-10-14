@@ -138,8 +138,15 @@ export default function AdminStudentsPage() {
   // it back down to one halaqa per student, by id as well as name, since a
   // name can repeat across an academic school's grades and campuses.
   const loadRealStudents = async () => {
+    // The students, their halaqas and their parents asked for together, not
+    // one after another: on a phone signal each round trip is felt.
+    const [withCampus, { data: enrollments }, parents] = await Promise.all([
+      supabase.from("students").select("id, full_name, active, grade, weekly_report, campus_id").order("full_name"),
+      supabase.from("class_enrollments").select("student_id, class_id, classes(name)"),
+      // Each student's parents, by name, in the same request as the links.
+      supabase.from("parent_students").select("student_id, profiles(full_name)"),
+    ]);
     // Each newer column asked for only once the database has it.
-    const withCampus = await supabase.from("students").select("id, full_name, active, grade, weekly_report, campus_id").order("full_name");
     setStudentCampusReady(!withCampus.error);
     const first = withCampus.error
       ? await supabase.from("students").select("id, full_name, active, grade, weekly_report").order("full_name")
@@ -148,22 +155,22 @@ export default function AdminStudentsPage() {
     const { data: studentRows } = first.error
       ? await supabase.from("students").select("id, full_name, active, grade").order("full_name")
       : first;
-    const { data: enrollments } = await supabase
-      .from("class_enrollments")
-      .select("student_id, class_id, classes(name)");
-    // Each student's parents, by name.
-    const { data: links } = await supabase.from("parent_students").select("parent_id, student_id");
-    const parentIds = [...new Set((links ?? []).map((l) => l.parent_id as string))];
-    const parentRows: Array<{ id: string; full_name: string }> = [];
-    for (let i = 0; i < parentIds.length; i += 200) {
-      const { data } = await supabase.from("profiles").select("id, full_name").in("id", parentIds.slice(i, i + 200));
-      parentRows.push(...((data ?? []) as Array<{ id: string; full_name: string }>));
+    // A database that won't join the two (it should) gets the old two steps.
+    if (parents.error) {
+      const { data: links } = await supabase.from("parent_students").select("parent_id, student_id");
+      const ids = [...new Set((links ?? []).map((l) => l.parent_id as string))];
+      const pages = await Promise.all(
+        Array.from({ length: Math.ceil(ids.length / 200) }, (_, i) =>
+          supabase.from("profiles").select("id, full_name").in("id", ids.slice(i * 200, i * 200 + 200))
+        )
+      );
+      const name = new Map(pages.flatMap((p) => (p.data ?? []) as Array<{ id: string; full_name: string }>).map((p) => [p.id, p.full_name]));
+      parents.data = (links ?? []).map((l) => ({ student_id: l.student_id, profiles: name.has(l.parent_id) ? { full_name: name.get(l.parent_id)! } : null })) as never;
     }
-    const parentName = new Map(parentRows.map((p) => [p.id, p.full_name]));
     const parentsOf = new Map<string, string[]>();
-    for (const l of links ?? []) {
-      const n = parentName.get(l.parent_id as string);
-      if (n) parentsOf.set(l.student_id as string, [...(parentsOf.get(l.student_id as string) ?? []), n]);
+    for (const l of (parents.data ?? []) as unknown as Array<{ student_id: string; profiles: { full_name: string } | { full_name: string }[] | null }>) {
+      const n = (Array.isArray(l.profiles) ? l.profiles[0] : l.profiles)?.full_name;
+      if (n) parentsOf.set(l.student_id, [...(parentsOf.get(l.student_id) ?? []), n]);
     }
     const halaqaByStudent = new Map<string, { id: string; name: string }>();
     for (const e of enrollments ?? []) {
@@ -187,9 +194,13 @@ export default function AdminStudentsPage() {
 
   useEffect(() => {
     const load = async () => {
+      // Who's signed in, from the session on this device rather than a round
+      // trip to the auth server; every query below is checked by the
+      // database's own policies all the same.
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
 
       if (!user) {
         setIsDemo(true);
@@ -207,28 +218,32 @@ export default function AdminStudentsPage() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("school_id")
-        .eq("id", user.id)
-        .single();
-      setSchoolId(profile?.school_id ?? null);
-      if (profile?.school_id) {
-        supabase
-          .from("schools")
-          .select("slug, name")
-          .eq("id", profile.school_id)
-          .single()
-          .then(({ data }) => {
-            setSchoolSlug(data?.slug ?? null);
-            setSchoolName(data?.name ?? "");
-          });
-      }
+      // The roster starts loading now; only the school's own details wait
+      // for its id.
+      const school = async () => {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("school_id")
+          .eq("id", user.id)
+          .single();
+        setSchoolId(profile?.school_id ?? null);
+        if (profile?.school_id) {
+          supabase
+            .from("schools")
+            .select("slug, name")
+            .eq("id", profile.school_id)
+            .single()
+            .then(({ data }) => {
+              setSchoolSlug(data?.slug ?? null);
+              setSchoolName(data?.name ?? "");
+            });
+        }
+        const shape = await loadSchoolShape(supabase, profile?.school_id ?? null);
+        setGraded(shape.graded);
+        setCampuses(shape.campuses);
+      };
       await Promise.all([
-        loadSchoolShape(supabase, profile?.school_id ?? null).then((shape) => {
-          setGraded(shape.graded);
-          setCampuses(shape.campuses);
-        }),
+        school(),
         loadRealStudents(),
         loadRealHalaqas().then(setHalaqas),
         loadSchoolTeachers(supabase, { everyAdmin: true })
@@ -410,11 +425,12 @@ export default function AdminStudentsPage() {
       // A teacher chosen rather than a halaqa: theirs in this grade, at the
       // student's campus, made now if they have none.
       const chosenCampus = draftCampus || campusOfStudent(s) || null;
-      const halaqaId = draftHalaqa.startsWith("t:")
-        ? (await halaqaForTeacher(draftHalaqa.slice(2), Number(draftGrade), chosenCampus)).id
-        : draftHalaqa;
-      const placedIn = halaqaId === draftHalaqa ? halaqaById(halaqaId) : (await loadRealHalaqas()).find((h) => h.id === halaqaId);
-      const { error } = await supabase
+      const made = draftHalaqa.startsWith("t:") ? await halaqaForTeacher(draftHalaqa.slice(2), Number(draftGrade), chosenCampus) : null;
+      const halaqaId = made ? made.id : draftHalaqa;
+      const placedIn = made ?? halaqaById(halaqaId);
+      const campusId = placedIn?.campusId ?? (draftCampus || null);
+      // The student's details and their halaqa saved side by side.
+      const details = supabase
         .from("students")
         .update({
           full_name: draftName.trim() || s.name,
@@ -422,23 +438,44 @@ export default function AdminStudentsPage() {
           ...(graded ? { grade: Number(draftGrade) } : {}),
           ...(reportsReady ? { weekly_report: draftReport } : {}),
           // A halaqa's campus is its students'; without one, the campus chosen.
-          ...(studentCampusReady && campuses.length > 0 ? { campus_id: placedIn?.campusId ?? (draftCampus || null) } : {}),
+          ...(studentCampusReady && campuses.length > 0 ? { campus_id: campusId } : {}),
         })
         .eq("id", s.id);
-      if (error) throw error;
-
-      if (halaqaId !== (s.halaqaId ?? "")) {
-        await supabase.from("class_enrollments").delete().eq("student_id", s.id);
+      const enrolment = async () => {
+        if (halaqaId === (s.halaqaId ?? "")) return;
+        const { error: outError } = await supabase.from("class_enrollments").delete().eq("student_id", s.id);
+        if (outError) throw outError;
         if (halaqaId) {
           const { error: enrollError } = await supabase
             .from("class_enrollments")
             .insert({ class_id: halaqaId, student_id: s.id });
           if (enrollError) throw enrollError;
         }
-      }
+      };
+      const [{ error }] = await Promise.all([details, enrolment()]);
+      if (error) throw error;
 
-      await loadRealStudents();
+      // Shown as saved straight away; the list is then read again quietly
+      // in the background to pick up anything else that changed.
+      setStudents((now) =>
+        now.map((x) =>
+          x.id === s.id
+            ? {
+                ...x,
+                name: draftName.trim() || s.name,
+                active: draftActive,
+                ...(graded ? { grade: Number(draftGrade) } : {}),
+                ...(reportsReady ? { weeklyReport: draftReport } : {}),
+                ...(studentCampusReady && campuses.length > 0 ? { campusId } : {}),
+                halaqa: placedIn?.name ?? "",
+                halaqaId: halaqaId || undefined,
+              }
+            : x
+        )
+      );
       setEditingId(null);
+      toast.success(tr("Saved {name}.", { name: draftName.trim() || s.name }));
+      void loadRealStudents();
     } catch (err) {
       setEditError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     }
@@ -505,12 +542,16 @@ export default function AdminStudentsPage() {
   const teacherName = (id: string | null | undefined) => teachers.find((t) => t.id === id)?.name;
   // Choosing a teacher: their halaqa in this grade (at the chosen campus),
   // or a new one in their name when they don't have one yet.
-  const halaqaForTeacher = async (teacherId: string, grade: number, atCampus?: string | null): Promise<{ id: string; label: string }> => {
+  const halaqaForTeacher = async (
+    teacherId: string,
+    grade: number,
+    atCampus?: string | null
+  ): Promise<{ id: string; label: string; name: string; campusId: string | null }> => {
     const campusId = campuses.length > 0 ? atCampus || assignCampus || campuses[0].id : null;
     const theirs = halaqasFor(String(grade)).find(
       (h) => h.teacherId === teacherId && (campuses.length === 0 || (h.campusId ?? null) === campusId)
     );
-    if (theirs) return { id: theirs.id, label: halaqaInGrade(theirs) };
+    if (theirs) return { id: theirs.id, label: halaqaInGrade(theirs), name: theirs.name, campusId: theirs.campusId ?? null };
     const name = teacherName(teacherId) ?? "New halaqa";
     const { data, error } = await supabase
       .from("classes")
@@ -526,8 +567,9 @@ export default function AdminStudentsPage() {
       .select("id")
       .single();
     if (error) throw error;
-    setHalaqas(await loadRealHalaqas());
-    return { id: data.id as string, label: [campusName(campusId), name].filter(Boolean).join(" · ") };
+    // Added here as made, rather than every halaqa asked for again.
+    setHalaqas((now) => [...now, { id: data.id as string, name, teacherId, schedule: "", grade, campusId }]);
+    return { id: data.id as string, label: [campusName(campusId), name].filter(Boolean).join(" · "), name, campusId };
   };
 
   // Students into a halaqa, a teacher's ("t:<id>", made if need be at
@@ -550,6 +592,18 @@ export default function AdminStudentsPage() {
         : null;
     if (studentCampusReady && placedAt) await setCampusFor(ids, placedAt);
     const h = halaqaById(classId);
+    // On screen now; the reload that follows only confirms it.
+    const moved = new Set(ids);
+    const placedName = target ? target.name : h?.name ?? "";
+    setStudents((now) =>
+      now.map((x) =>
+        moved.has(x.id)
+          ? classId === "__none"
+            ? { ...x, halaqa: "", halaqaId: undefined }
+            : { ...x, halaqa: placedName, halaqaId: classId, campusId: placedAt ?? x.campusId }
+          : x
+      )
+    );
     const where = target ? target.label : h ? halaqaInGrade(h) : "the halaqa";
     return classId === "__none"
       ? phrase("{count} student taken away from their teacher.|{count} students taken away from their teacher.", { count: ids.length })
@@ -562,7 +616,7 @@ export default function AdminStudentsPage() {
     setAssignNote(null);
     try {
       const said = await placeStudents([s.id], to || "__none", grade, campusOfStudent(s));
-      await loadRealStudents();
+      void loadRealStudents();
       setAssignNote(`${s.name}: ${said.replace(/^1 student /, "")}`);
       toast.success(`${s.name}: ${said.replace(/^1 student /, "")}`);
     } catch (err) {
@@ -579,7 +633,7 @@ export default function AdminStudentsPage() {
     setAssignNote(null);
     try {
       const said = await placeStudents(ids, assignTo, assignGrade, assignCampus);
-      await loadRealStudents();
+      void loadRealStudents();
       setAssignNote(said);
       toast.success(said);
       setPicked(new Set());
