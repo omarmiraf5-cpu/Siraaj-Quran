@@ -16,6 +16,7 @@
     "@capacitor/core": "^8.5.2",
     "@capacitor/geolocation": "^8.2.2",
     "@capacitor/splash-screen": "^8.0.2",
+    "@phosphor-icons/react": "^2.1.10",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.46.1",
     "exceljs": "^4.4.0",

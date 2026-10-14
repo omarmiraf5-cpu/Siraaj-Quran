@@ -1,6 +1,19 @@
 "use client";
 
 import { SidebarNav } from "@/components/SidebarNav";
+import {
+  IconBook,
+  IconBookOpen,
+  IconCalendar,
+  IconCalendarBlank,
+  IconCard,
+  IconClock,
+  IconGrid,
+  IconMegaphone,
+  IconNote,
+  IconUser,
+  IconUsers,
+} from "@/components/icons";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
 import { useMyChildren } from "@/hooks/useMyChildren";
@@ -9,64 +22,64 @@ const NAV = [
   {
     href: "/admin",
     labelKey: "nav.dashboard",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+    icon: <IconGrid />,
   },
   {
     href: "/admin/students",
     labelKey: "nav.students",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    icon: <IconUsers />,
   },
   {
     href: "/admin/teachers",
     labelKey: "nav.teachers",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>,
+    icon: <IconBook />,
   },
   {
     href: "/admin/student-attendance",
     labelKey: "nav.studentAttendance",
     // A register: a calendar page with a tick.
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>,
+    icon: <IconCalendar />,
   },
   {
     href: "/admin/staff-attendance",
     labelKey: "nav.staffAttendance",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>,
+    icon: <IconClock />,
   },
   {
     href: "/admin/parents",
     labelKey: "nav.parents",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    icon: <IconUsers />,
   },
   {
     href: "/admin/halaqas",
     labelKey: "nav.halaqas",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z"/><path d="M12 6.5v13.2"/></svg>,
+    icon: <IconBookOpen />,
   },
   {
     href: "/admin/class-work",
     labelKey: "nav.classWork",
     // Islamic Studies and Arabic: a worksheet with lines of writing.
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 12h7M9 16h5"/></svg>,
+    icon: <IconNote />,
   },
   {
     href: "/admin/payments",
     labelKey: "nav.payments",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>,
+    icon: <IconCard />,
   },
   {
     href: "/admin/announcements",
     labelKey: "nav.announcements",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>,
+    icon: <IconMegaphone />,
   },
   {
     href: "/admin/calendar",
     labelKey: "nav.calendar",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
+    icon: <IconCalendarBlank />,
   },
   {
     href: "/account",
     labelKey: "nav.account",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>,
+    icon: <IconUser />,
   },
 ];
 
@@ -75,14 +88,14 @@ const MY_HALAQA = {
   href: "/teacher",
   labelKey: "nav.myHalaqa",
   // An open book, as the teacher's Qa'idah has.
-  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z"/><path d="M12 6.5v13.2"/></svg>,
+  icon: <IconBookOpen />,
 };
 
 // For an admin who is also a parent of a child here: their children, as a parent.
 const PARENT_MODE = {
   href: "/parent",
   labelKey: "nav.parentMode",
-  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="9.5" r="2.4"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M14.5 20a4.5 4.5 0 0 1 7 0"/></svg>,
+  icon: <IconUsers />,
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

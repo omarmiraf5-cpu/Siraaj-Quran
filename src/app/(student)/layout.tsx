@@ -11,6 +11,7 @@ import {
   IconPen,
   IconPalette,
   IconCalendar,
+  IconBadge,
 } from "@/components/icons";
 
 // The tabs were emoji — 🏠 📖 📝 🎨 ✅ — which rendered as a different picture
@@ -57,13 +58,9 @@ function StudentTabBar() {
               aria-current={active ? "page" : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 min-h-12 py-1 rounded-[20px] transition-all active:scale-95 ${active ? "dock-pill" : ""}`}
             >
-              <span
-                className={`w-8 h-7 rounded-full flex items-center justify-center transition-all ${
-                  active ? "text-[#1c1408]" : "text-ink-muted"
-                }`}
-              >
-                <Icon size={18} />
-              </span>
+              <IconBadge size="sm">
+                <Icon size={15} />
+              </IconBadge>
               <span
                 className={`text-[11px] font-bold leading-none transition-colors ${
                   active ? "text-[#1c1408]" : "text-ink-muted"

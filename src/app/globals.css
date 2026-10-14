@@ -747,19 +747,70 @@ body {
     border-color: #0e2347;
     box-shadow: 0 14px 28px -14px rgba(14, 35, 71, 0.8);
   }
-  .role-ico {
-    width: 36px;
-    height: 36px;
-    border-radius: 12px;
-    display: flex;
+  .role-ico,
+  .icon-badge {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(14, 35, 71, 0.08);
-    color: #0e2347;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: radial-gradient(circle at 35% 28%, #fff 0%, #f4efe3 72%);
+    color: #16325f;
+    box-shadow:
+      0 0 0 1px #d7b56a,
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
+  .role-ico { width: 40px; height: 40px; }
+  .icon-badge-sm { width: 26px; height: 26px; }
+  .icon-badge-md { width: 32px; height: 32px; }
+  .icon-badge-lg { width: 44px; height: 44px; }
+  .role-ico svg,
+  .icon-badge-md svg { width: 17px; height: 17px; }
+  .icon-badge-sm svg { width: 15px; height: 15px; }
+  .icon-badge-lg svg { width: 22px; height: 22px; }
+  .role-ico svg { width: 20px; height: 20px; }
   .role-tile-on .role-ico {
-    background: rgba(230, 205, 138, 0.18);
-    color: #e6cd8a;
+    background: radial-gradient(circle at 35% 28%, #fff 0%, #f7f1e2 72%);
+    color: #16325f;
+    box-shadow: 0 0 0 1px #e6cd8a, inset 0 1px 0 #fff;
+  }
+  .role-ico svg path[opacity],
+  .icon-badge svg path[opacity] {
+    fill: #b8893d;
+    opacity: 1;
+  }
+  .dark .role-ico,
+  .dark .icon-badge {
+    background: radial-gradient(circle at 35% 28%, #2c384c 0%, #1a2230 74%);
+    color: #f6e7c3;
+    box-shadow: 0 0 0 1px rgba(230, 205, 138, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .dark .role-ico svg path[opacity],
+  .dark .icon-badge svg path[opacity] {
+    fill: #e6cd8a;
+  }
+  .icon-badge-on-navy,
+  .dark .icon-badge-on-navy {
+    background: radial-gradient(circle at 35% 28%, #fff 0%, #f3ead6 74%);
+    color: #16325f;
+    box-shadow: 0 0 0 1px #e0c27a, inset 0 1px 0 #fff;
+  }
+  .icon-badge-on-navy svg path[opacity],
+  .dark .icon-badge-on-navy svg path[opacity] {
+    fill: #b8893d;
+    opacity: 1;
+  }
+  .dock-pill .icon-badge {
+    background: #fff;
+    color: #0e2347;
+    box-shadow: 0 0 0 1px #8a6424;
+  }
+  .dock-pill .icon-badge svg path[opacity] {
+    fill: #a67c2d;
+    opacity: 1;
+  }
+  .hero-sheen {
+    background: radial-gradient(85% 75% at 100% 0%, rgba(255, 255, 255, 0.16), transparent 58%);
   }
   .login-card {
     width: 100%;

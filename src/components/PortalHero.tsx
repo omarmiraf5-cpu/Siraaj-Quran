@@ -22,9 +22,7 @@ export function PortalHero({
   const chips = (meta ?? []).filter((m) => m !== "" && m != null);
   return (
     <header className="hero-frame gradient-navy relative overflow-hidden rounded-[24px] px-5 py-5 sm:px-7 sm:py-6 text-white">
-      <div className="geo-fill absolute inset-0 opacity-40 pointer-events-none" />
-      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-gold-light to-transparent" />
-      <div className="pointer-events-none absolute inset-x-10 bottom-0 h-px bg-gradient-to-r from-transparent via-brand-gold/70 to-transparent" />
+      <div className="hero-sheen pointer-events-none absolute inset-0" />
       <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="eyebrow text-brand-gold-light">{eyebrow}</p>

@@ -14,6 +14,7 @@ import type { Role } from "@/lib/types";
 import { homeOf, mayOpen } from "@/lib/portalAccess";
 import { safeNextPath } from "@/lib/safeNextPath";
 import { ByLanguage } from "@/components/ByLanguage";
+import { IconBook, IconBuildings, IconUser, IconUsers } from "@/components/icons";
 
 const ROLES: { key: Role; labelKey: string; portalKey: string }[] = [
   { key: "parent",  labelKey: "role.parent",  portalKey: "login.portal.parent"  },
@@ -419,10 +420,10 @@ export default function LoginPage() {
               className={`role-tile ${role === r.key ? "role-tile-on" : ""}`}
             >
               <span className="role-ico" aria-hidden>
-                {r.key === "parent" && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.2"/><path d="M3 19a6 6 0 0 1 12 0"/><path d="M15 19a4 4 0 0 1 6 0"/></svg>}
-                {r.key === "teacher" && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>}
-                {r.key === "student" && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 19a7 7 0 0 1 14 0"/></svg>}
-                {r.key === "admin" && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 21h18"/><path d="M5 21V9l7-4 7 4v12"/><path d="M10 21v-5h4v5"/></svg>}
+                {r.key === "parent" && <IconUsers size={20} />}
+                {r.key === "teacher" && <IconBook size={20} />}
+                {r.key === "student" && <IconUser size={20} />}
+                {r.key === "admin" && <IconBuildings size={20} />}
               </span>
               {t(r.labelKey)}
             </button>

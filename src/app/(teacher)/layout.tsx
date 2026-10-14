@@ -1,6 +1,22 @@
 "use client";
 
 import { SidebarNav } from "@/components/SidebarNav";
+import {
+  IconBook,
+  IconBookOpen,
+  IconBuildings,
+  IconCalendar,
+  IconChat,
+  IconClipboard,
+  IconClock,
+  IconGrid,
+  IconMedal,
+  IconNote,
+  IconPath,
+  IconStar,
+  IconUser,
+  IconUsers,
+} from "@/components/icons";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useRequirePasswordChange } from "@/hooks/useRequirePasswordChange";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
@@ -14,68 +30,68 @@ const NAV = [
   {
     href: "/teacher",
     labelKey: "nav.dashboard",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+    icon: <IconGrid />,
   },
   {
     href: "/teacher/attendance",
     labelKey: "nav.attendance",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>,
+    icon: <IconCalendar />,
   },
   {
     href: "/teacher/my-attendance",
     labelKey: "nav.signIn",
     // A clock face: signing in and out, and being on time.
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>,
+    icon: <IconClock />,
   },
   {
     href: "/teacher/quran-assignments",
     labelKey: "nav.assignments",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+    icon: <IconClipboard />,
   },
   // The Qa'idah straight under the Qur'an assignments: setting a child's
   // Qa'idah lesson is the same job for the children not reading yet.
   {
     href: "/teacher/qaidah",
     labelKey: "nav.qaidah",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z"/><path d="M12 6.5v13.2"/></svg>,
+    icon: <IconBookOpen />,
   },
   {
     href: "/teacher/class-work",
     labelKey: "nav.classWork",
     // Islamic Studies and Arabic: a worksheet with lines of writing.
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 12h7M9 16h5"/></svg>,
+    icon: <IconNote />,
   },
   {
     href: "/teacher/messages",
     labelKey: "nav.messages",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>,
+    icon: <IconChat />,
   },
   {
     href: "/teacher/yearly-plan",
     labelKey: "nav.yearlyPlan",
     // A milestone track: a rule with three stops. Geometric by
     // construction — the module carries no figurative marks anywhere.
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 12h18"/><circle cx="6.5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="17.5" cy="12" r="2"/></svg>,
+    icon: <IconPath />,
   },
   {
     href: "/teacher/mushaf",
     labelKey: "nav.mushaf",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>,
+    icon: <IconBook />,
   },
   {
     href: "/teacher/hadith",
     labelKey: "nav.hadith",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3.2l2.5 5.2 5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4 5.7-.8Z"/></svg>,
+    icon: <IconStar />,
   },
   {
     href: "/teacher/awards",
     labelKey: "nav.awards",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.2 12.5 7 22l5-2.5L17 22l-1.2-9.5"/></svg>,
+    icon: <IconMedal />,
   },
   {
     href: "/account",
     labelKey: "nav.account",
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>,
+    icon: <IconUser />,
   },
 ];
 
@@ -84,14 +100,14 @@ const SCHOOL_OFFICE = {
   href: "/admin",
   labelKey: "nav.office",
   // A building with a door.
-  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M10 21v-5h4v5"/></svg>,
+  icon: <IconBuildings />,
 };
 
 // For a teacher who is also a parent of a child here: their children, as a parent.
 const PARENT_MODE = {
   href: "/parent",
   labelKey: "nav.parentMode",
-  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="9.5" r="2.4"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M14.5 20a4.5 4.5 0 0 1 7 0"/></svg>,
+  icon: <IconUsers />,
 };
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {

@@ -181,13 +181,6 @@ function useCountUp(value: string | number) {
   return `${shown}${suffix}`;
 }
 
-const TILE_TINT = [
-  "bg-[#0e2347]/10 text-[#0e2347] dark:bg-white/10 dark:text-brand-gold-light",
-  "bg-attend-present-bg text-attend-present-ink",
-  "bg-attend-late-bg text-attend-late-ink",
-  "bg-attend-excused-bg text-attend-excused-ink",
-];
-
 function MiniRing({ value }: { value: number }) {
   const r = 15;
   const c = 2 * Math.PI * r;
@@ -230,7 +223,6 @@ export function StatTile({
   label,
   sub,
   icon,
-  tone = 0,
   onClick,
 }: {
   value: string | number;
@@ -244,8 +236,8 @@ export function StatTile({
   const pct = typeof value === "string" && value.endsWith("%") ? Number(value.replace("%", "")) : null;
   const body = (
     <div className="flex items-start gap-3">
-      <span className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${TILE_TINT[tone % TILE_TINT.length]}`}>
-        {icon ?? <span className="w-2.5 h-2.5 rounded-full bg-current" />}
+      <span className="icon-badge icon-badge-lg">
+        {icon ?? <span className="w-2.5 h-2.5 rounded-full bg-brand-gold" />}
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-display text-[30px] font-semibold text-ink tabular-nums leading-none tracking-tight"><bdi dir="ltr">{display}</bdi></p>

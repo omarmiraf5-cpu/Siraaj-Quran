@@ -12,6 +12,7 @@ import { useDemoUser } from "@/hooks/useDemoUser";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
+import { IconBadge, IconDots, IconSignOut } from "@/components/icons";
 
 interface NavItem {
   href: string;
@@ -149,7 +150,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 active ? "dock-pill" : "text-ink-muted hover:text-ink"
               }`}
             >
-              <span className="flex items-center justify-center">{item.icon}</span>
+              <IconBadge size="sm">{item.icon}</IconBadge>
               {t(item.labelKey)}
             </Link>
           );
@@ -163,13 +164,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
               moreActive || moreOpen ? "dock-pill" : "text-ink-muted hover:text-ink"
             }`}
           >
-            <span className="flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-              </svg>
-            </span>
+            <IconBadge size="sm"><IconDots size={15} /></IconBadge>
             {t("common.more")}
           </button>
         )}
@@ -196,7 +191,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                     active ? "dock-pill" : "text-ink hover:bg-brand-navy/5"
                   }`}
                 >
-                  <span className="flex-shrink-0 opacity-80">{item.icon}</span>
+                  <IconBadge size="sm">{item.icon}</IconBadge>
                   {t(item.labelKey)}
                 </Link>
               );
@@ -261,7 +256,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                     : "text-ink-body hover:text-ink hover:bg-brand-navy/5"
                 }`}
               >
-                <span className="flex-shrink-0">{item.icon}</span>
+                <IconBadge size="md">{item.icon}</IconBadge>
                 {t(item.labelKey)}
               </Link>
             );
@@ -273,11 +268,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           onClick={handleSignOut}
           className="flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all mt-2"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
+          <IconBadge size="md"><IconSignOut size={17} /></IconBadge>
           {t("common.signOut")}
         </button>
 
@@ -290,7 +281,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 href={item.href}
                 className="flex items-center gap-3 px-3 py-2 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all"
               >
-                <span className="flex-shrink-0 opacity-70">{item.icon}</span>
+                <IconBadge size="sm">{item.icon}</IconBadge>
                 {t(item.labelKey)}
               </Link>
             ))}

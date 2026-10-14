@@ -116,8 +116,7 @@ export default function StudentDashboard() {
       <header
         className="gradient-navy hero-frame rounded-[24px] px-5 py-5 relative overflow-hidden animate-rise"
       >
-        <div className="geo-fill absolute inset-0 opacity-50 pointer-events-none" />
-        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-gold-light to-transparent" />
+        <div className="hero-sheen pointer-events-none absolute inset-0" />
 
         <div className="relative flex items-center gap-3.5">
           <Link href="/account" aria-label={tr("My account")} className="rounded-full active:scale-95 transition-transform">
@@ -156,7 +155,7 @@ export default function StudentDashboard() {
         className={`${theme.hero} relative overflow-hidden rounded-[20px] px-5 py-6 text-center animate-rise`}
         style={{ animationDelay: "60ms" }}
       >
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
+        <div className="hero-sheen pointer-events-none absolute inset-0" />
         <p
           className="relative font-calligraphy text-[25px] md:text-[30px] text-white leading-[2.1]"
           dir="rtl"

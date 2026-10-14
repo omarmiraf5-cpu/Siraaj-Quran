@@ -13,6 +13,7 @@ import {
   IconStar,
   IconPlay,
   IconBookOpen,
+  IconBadge,
 } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -256,12 +257,12 @@ export function StreakPill({ days }: { days: number }) {
   if (days < 1) return null;
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-2xl bg-white/12 border border-white/20 px-3 py-2 text-white flex-shrink-0"
+      className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 ps-1 pe-3 py-1 text-white flex-shrink-0"
       title={tr("{days} days in a row", { days })}
     >
-      <span className="text-brand-gold-light">
-        <IconFlame size={16} />
-      </span>
+      <IconBadge size="sm" onNavy>
+        <IconFlame size={15} />
+      </IconBadge>
       <span className="font-bold text-[15px] tabular-nums">{days}</span>
     </span>
   );
