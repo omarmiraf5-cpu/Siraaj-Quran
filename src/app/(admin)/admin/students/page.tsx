@@ -37,6 +37,11 @@ const bigField =
 const smallField =
   "w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
 
+/** A button in a grade's heading, beside its student count. Undoes the
+ *  note's small capitals: these are actions, written as words. */
+const GRADE_ACTION =
+  "inline-flex items-center rounded-full border px-3 py-1 text-[12px] font-semibold normal-case tracking-normal not-italic whitespace-nowrap transition-colors";
+
 export default function AdminStudentsPage() {
   const { tr } = useLanguage();
   const toast = useToast();
@@ -1145,20 +1150,25 @@ export default function AdminStudentsPage() {
             key={grade}
             title={gradeLabel(grade)}
             note={
-              <>
+              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-2">
                 {tr("{count} student|{count} students", { count: inGrade.length })}
+                {/* The grade's actions as buttons, not the note's small capitals. */}
                 {!isDemo && (
                   <>
-                    {" · "}
                     {halaqasFor(String(grade)).length === 0 && teachers.length === 0 ? (
-                      <Link href="/admin/halaqas" className="underline underline-offset-2 hover:text-ink font-bold italic">
+                      <Link href="/admin/halaqas" className={`${GRADE_ACTION} border-brand-navy text-brand-navy dark:border-brand-gold dark:text-brand-gold hover:bg-brand-navy hover:text-white`}>
                         {tr("Add teachers for this grade")}
                       </Link>
                     ) : (
                       <button
                         type="button"
                         onClick={() => startAssigning(assignGrade === grade ? null : grade)}
-                        className="underline underline-offset-2 hover:text-ink font-bold italic"
+                        aria-pressed={assignGrade === grade}
+                        className={`${GRADE_ACTION} ${
+                          assignGrade === grade
+                            ? "border-brand-navy bg-brand-navy text-white"
+                            : "border-brand-navy text-brand-navy dark:border-brand-gold dark:text-brand-gold hover:bg-brand-navy hover:text-white dark:hover:bg-brand-gold dark:hover:text-brand-navy"
+                        }`}
                       >
                         {assignGrade === grade ? tr("Done") : tr("Assign to a teacher")}
                       </button>
@@ -1167,18 +1177,17 @@ export default function AdminStudentsPage() {
                 )}
                 {reportsReady && (
                   <>
-                    {" · "}
                     <button
                       type="button"
                       onClick={() => setGradeReports(grade, !gradeAllOn(grade))}
                       disabled={gradeBusy !== null}
-                      className="underline underline-offset-2 hover:text-ink font-bold italic disabled:opacity-50"
+                      className={`${GRADE_ACTION} border-surface-border text-ink-muted hover:text-ink hover:border-ink-muted disabled:opacity-50`}
                     >
                       {gradeBusy === grade ? tr("Saving…") : gradeAllOn(grade) ? tr("Weekly reports off for this grade") : tr("Weekly reports on for this grade")}
                     </button>
                   </>
                 )}
-              </>
+              </span>
             }
           >
             {assignGrade === grade ? (
