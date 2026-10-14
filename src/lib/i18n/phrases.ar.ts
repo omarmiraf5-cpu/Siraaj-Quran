@@ -1876,4 +1876,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "{count} more notice|{count} more notices": { one: "تنبيه آخر", two: "تنبيهان آخران", few: "{count} تنبيهات أخرى", many: "{count} تنبيهًا آخر", other: "{count} تنبيه آخر" },
   "Without a teacher only": "دون معلم فقط",
   "Every student here has a teacher.": "لكل طالب هنا معلم.",
+  "Add a teacher": "أضف معلمًا",
 };

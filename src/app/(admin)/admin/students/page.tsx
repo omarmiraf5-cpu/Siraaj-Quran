@@ -407,6 +407,13 @@ export default function AdminStudentsPage() {
 
     setEditError(null);
     try {
+      // A teacher chosen rather than a halaqa: theirs in this grade, at the
+      // student's campus, made now if they have none.
+      const chosenCampus = draftCampus || campusOfStudent(s) || null;
+      const halaqaId = draftHalaqa.startsWith("t:")
+        ? (await halaqaForTeacher(draftHalaqa.slice(2), Number(draftGrade), chosenCampus)).id
+        : draftHalaqa;
+      const placedIn = halaqaId === draftHalaqa ? halaqaById(halaqaId) : (await loadRealHalaqas()).find((h) => h.id === halaqaId);
       const { error } = await supabase
         .from("students")
         .update({
@@ -415,17 +422,17 @@ export default function AdminStudentsPage() {
           ...(graded ? { grade: Number(draftGrade) } : {}),
           ...(reportsReady ? { weekly_report: draftReport } : {}),
           // A halaqa's campus is its students'; without one, the campus chosen.
-          ...(studentCampusReady && campuses.length > 0 ? { campus_id: halaqaById(draftHalaqa)?.campusId ?? (draftCampus || null) } : {}),
+          ...(studentCampusReady && campuses.length > 0 ? { campus_id: placedIn?.campusId ?? (draftCampus || null) } : {}),
         })
         .eq("id", s.id);
       if (error) throw error;
 
-      if (draftHalaqa !== (s.halaqaId ?? "")) {
+      if (halaqaId !== (s.halaqaId ?? "")) {
         await supabase.from("class_enrollments").delete().eq("student_id", s.id);
-        if (draftHalaqa) {
+        if (halaqaId) {
           const { error: enrollError } = await supabase
             .from("class_enrollments")
-            .insert({ class_id: draftHalaqa, student_id: s.id });
+            .insert({ class_id: halaqaId, student_id: s.id });
           if (enrollError) throw enrollError;
         }
       }
@@ -601,6 +608,16 @@ export default function AdminStudentsPage() {
       }).filter((x) => x.students > 0 || x.halaqas > 0)
     : [];
 
+  // Teachers to offer on a student's own row: those without a halaqa in the
+  // grade at the student's campus yet (one who has one is listed by it).
+  const draftTeacherChoices = (() => {
+    const editing = students.find((x) => x.id === editingId);
+    if (!editing) return [];
+    const campusId = campuses.length > 0 ? draftCampus || campusOfStudent(editing) || campuses[0].id : null;
+    const inGrade = halaqasFor(draftGrade);
+    return teachers.filter((t) => !inGrade.some((h) => h.teacherId === t.id && (campuses.length === 0 || (h.campusId ?? null) === campusId)));
+  })();
+
   const halaqaOptions = (grade: string) =>
     halaqasFor(grade).map((h) => (
       <option key={h.id} value={h.id}>
@@ -706,7 +723,27 @@ export default function AdminStudentsPage() {
                 <select value={draftHalaqa} onChange={(e) => setDraftHalaqa(e.target.value)} className={smallField}>
                   {(graded || !draftHalaqa) && <option value="">{graded ? tr("No teacher yet") : tr("Select a halaqa")}</option>}
                   {halaqaOptions(draftGrade)}
+                  {/* A grade with no halaqas yet still has teachers to choose:
+                      saving makes the teacher's halaqa for this grade, the way
+                      "Assign to a teacher" does. */}
+                  {graded && !isDemo && draftTeacherChoices.length > 0 && (
+                    <optgroup label={tr("Teachers")}>
+                      {draftTeacherChoices.map((t) => (
+                        <option key={t.id} value={`t:${t.id}`}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+                {graded && !isDemo && teachers.length === 0 && halaqasFor(draftGrade).length === 0 && (
+                  <span className="block text-[12px] text-ink-muted mt-1.5">
+                    {tr("No teachers yet.")}{" "}
+                    <Link href="/admin/teachers" className="font-semibold text-ink underline underline-offset-2">
+                      {tr("Add a teacher")}
+                    </Link>
+                  </span>
+                )}
               </label>
             </div>
             <label className="flex items-center gap-2 text-sm text-ink">
