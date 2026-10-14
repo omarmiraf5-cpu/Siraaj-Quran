@@ -16,7 +16,7 @@ import {
 import type { DemoStudent, DemoHalaqa, DemoTeacher } from "@/data/demo";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote, RowChevron } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote, RowChevron, OPEN_ROW } from "@/components/portal-ui";
 import StudentImport from "@/components/StudentImport";
 import WeeklyReportsCard from "@/components/WeeklyReportsCard";
 import StudentPins from "@/components/StudentPins";
@@ -613,11 +613,13 @@ export default function AdminStudentsPage() {
           type="button"
           onClick={() => startEditing(s)}
           aria-expanded={isOpen}
-          className="group w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+          className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
         >
           <span
             className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
-              inactive
+              isOpen
+                ? "bg-white/15 text-white"
+                : inactive
                 ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500"
                 : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"
             }`}
@@ -625,10 +627,10 @@ export default function AdminStudentsPage() {
             {initials(s.name)}
           </span>
           <div className="flex-1 min-w-0">
-            <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${inactive ? "text-ink-muted" : "text-ink"}`}>
+            <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${isOpen ? "text-white" : inactive ? "text-ink-muted" : "text-ink"}`}>
               {s.name}
             </p>
-            <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
+            <p className={`text-[11px] [overflow-wrap:anywhere] ${isOpen ? "text-white/75" : "text-ink-muted"}`}>
               {graded ? (halaqa ? halaqaInGrade(halaqa) : [campusName(s.campusId), phrase("No teacher yet")].filter(Boolean).join(" · ")) : s.halaqa}
               {s.parentNames && s.parentNames.length > 0 && <>{" "}{tr("· Parent: {names}|· Parents: {names}", { n: s.parentNames.length, names: s.parentNames.join(", ") })}</>}
             </p>

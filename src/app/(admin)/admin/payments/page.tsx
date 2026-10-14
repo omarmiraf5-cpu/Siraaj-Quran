@@ -21,7 +21,7 @@ import {
   type StudentOverride,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote, LoadingNote, RowChevron } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, RowChevron, OPEN_ROW } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { SalariesPanel } from "@/components/SalariesPanel";
@@ -450,20 +450,20 @@ export default function AdminPaymentsPage() {
                           setPayError(null);
                         }}
                         aria-expanded={isOpen}
-                        className="group w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                        className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                       >
-                        <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
+                        <span className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${isOpen ? "bg-white/15 text-white" : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"}`}>
                           {initials(studentName(f.studentId))}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{studentName(f.studentId)}</p>
-                          <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
+                          <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${isOpen ? "text-white" : "text-ink"}`}>{studentName(f.studentId)}</p>
+                          <p className={`text-[11px] [overflow-wrap:anywhere] ${isOpen ? "text-white/75" : "text-ink-muted"}`}>
                             {tr("{description} · due {dueDate}", { description: f.description, dueDate: f.dueDate })}
                           </p>
                         </div>
                         <div className="text-end flex-shrink-0">
-                          <p className="text-[13px] font-semibold text-ink">
-                            {money(f.amountPaid)} <span className="text-ink-muted font-normal">/ {money(f.amountDue)}</span>
+                          <p className={`text-[13px] font-semibold ${isOpen ? "text-white" : "text-ink"}`}>
+                            {money(f.amountPaid)} <span className={`font-normal ${isOpen ? "text-white/75" : "text-ink-muted"}`}>/ {money(f.amountDue)}</span>
                           </p>
                           <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5 ${FEE_STATUS_STYLES[status]}`}>
                             {FEE_STATUS_LABELS[status]}

@@ -361,16 +361,23 @@ export function SegmentedSwitch<T extends string>({
   );
 }
 
+/** A row that opens, while it's open: navy like a chosen card, so it's
+ *  clear which one the panel under it belongs to. */
+export const OPEN_ROW = "bg-brand-navy text-white hover:bg-brand-navy";
+
 /* ── Row chevron ───────────────────────────────────────────────────────
    The arrow at the end of a row that opens: in a soft round frame that
    darkens with the row's hover (the row carries `group`), turning to point
-   down when open — in either reading direction. */
+   down when open — in either reading direction. An open row is navy (see
+   OPEN_ROW), so the open chevron is white. */
 export function RowChevron({ open }: { open: boolean }) {
   return (
     <span
       aria-hidden
-      className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all bg-surface-bg-warm text-ink-muted group-hover:bg-brand-navy/10 group-hover:text-ink dark:group-hover:bg-white/10 ${
-        open ? "rotate-90 rtl:-rotate-90 bg-brand-navy/10 text-ink" : ""
+      className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+        open
+          ? "rotate-90 rtl:-rotate-90 bg-white/15 text-white"
+          : "bg-surface-bg-warm text-ink-muted group-hover:bg-brand-navy/10 group-hover:text-ink dark:group-hover:bg-white/10"
       }`}
     >
       <IconArrow size={13} />
