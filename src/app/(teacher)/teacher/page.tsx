@@ -37,6 +37,20 @@ import { myHalaqas, narrowToMine } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
 import { Users, BookOpen, ClipboardCheck, CalendarCheck } from "lucide-react";
 
+// A child's chip on a halaqa card, by today's mark.
+const CHIP_STYLE: Record<AttendanceStatus, string> = {
+  present: "bg-green-50 border-green-300 text-green-900 hover:border-green-600 dark:bg-green-950/30 dark:border-green-800/60 dark:text-green-200",
+  late: "bg-amber-50 border-amber-300 text-amber-900 hover:border-amber-600 dark:bg-amber-950/30 dark:border-amber-800/60 dark:text-amber-200",
+  absent: "bg-red-50 border-red-300 text-red-900 hover:border-red-600 dark:bg-red-950/30 dark:border-red-800/60 dark:text-red-200",
+  excused: "bg-slate-100 border-slate-300 text-slate-800 hover:border-slate-500 dark:bg-slate-800/40 dark:border-slate-600 dark:text-slate-200",
+};
+const CHIP_DOT: Record<AttendanceStatus, string> = {
+  present: "bg-green-700",
+  late: "bg-amber-600",
+  absent: "bg-red-700",
+  excused: "bg-slate-500",
+};
+
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: "text-green-800 dark:text-green-300",
   late: "text-amber-800 dark:text-amber-300",
@@ -307,35 +321,54 @@ export default function TeacherDashboard() {
                     </div>
                     <Link
                       href={isDemo ? "/teacher/attendance" : `/teacher/attendance?halaqa=${encodeURIComponent(h.id)}`}
-                      className="flex-shrink-0 text-[12px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+                      className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-semibold transition-all active:scale-95 ${
+                        marked === kids.length && kids.length > 0
+                          ? "border border-emerald-600/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                          : "gradient-emerald text-white hover:opacity-90 shadow-sm"
+                      }`}
                     >
-                      {t("teacher.dashboard.takeRegister")}
+                      <IconCalendar size={14} />
+                      {marked === kids.length && kids.length > 0 ? t("teacher.attendance.everyoneMarked") : t("teacher.dashboard.takeRegister")}
                     </Link>
                   </div>
                   {kids.length === 0 ? (
                     <p className="mt-3 text-[12px] text-ink-muted">{t("teacher.dashboard.noChildrenYet")}</p>
                   ) : (
-                    <ul className="mt-3 flex flex-wrap gap-1.5">
-                      {kids.map((k) => {
-                        const st = status(k.id);
-                        return (
-                          <li
-                            key={k.id}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-surface-bg-warm border border-surface-border px-2.5 py-1 text-[12px] text-ink"
-                          >
-                            {st && (
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  st === "present" ? "bg-green-700" : st === "late" ? "bg-amber-600" : st === "absent" ? "bg-red-700" : "bg-slate-500"
+                    <>
+                      {/* Each child a button, tinted by today's mark; it opens
+                          their attendance and work. */}
+                      <ul className="mt-3 flex flex-wrap gap-1.5">
+                        {kids.map((k) => {
+                          const st = status(k.id);
+                          return (
+                            <li key={k.id}>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedStudentId(k.id)}
+                                aria-label={`${k.name}${st ? ` — ${t(`common.${st}`)}` : ""}`}
+                                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/40 ${
+                                  st ? CHIP_STYLE[st] : "bg-surface-card border-surface-border text-ink hover:border-brand-navy hover:bg-surface-bg-warm"
                                 }`}
-                                title={t(`common.${st}`)}
-                              />
-                            )}
-                            {k.name}
-                          </li>
-                        );
-                      })}
-                    </ul>
+                              >
+                                {st && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${CHIP_DOT[st]}`} />}
+                                {k.name}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      {/* What the tints mean, once any child is marked. */}
+                      {marked > 0 && (
+                        <p className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-muted">
+                          {(["present", "late", "absent", "excused"] as const).map((x) => (
+                            <span key={x} className="inline-flex items-center gap-1">
+                              <span className={`w-2 h-2 rounded-full ${CHIP_DOT[x]}`} />
+                              {t(`common.${x}`)}
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               );
@@ -360,34 +393,12 @@ export default function TeacherDashboard() {
             </EmptyNote>
           ) : (
             <ul className="space-y-1">
-              {exceptions.map(({ student, status }) =>
-                isDemo ? (
-                  <li key={student.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStudentId(student.id)}
-                      className="w-full flex items-center gap-3 text-start rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
-                    >
-                      <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
-                        {initials(student.name)}
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
-                          {student.name}
-                        </span>
-                        <span className="block text-[11px] text-ink-muted">{student.halaqa}</span>
-                      </span>
-                      <span
-                        className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}
-                      >
-                        {t(`common.${status}`)}
-                      </span>
-                    </button>
-                  </li>
-                ) : (
-                  <li
-                    key={student.id}
-                    className="w-full flex items-center gap-3 rounded-xl px-2 py-1.5 -mx-2"
+              {exceptions.map(({ student, status }) => (
+                <li key={student.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudentId(student.id)}
+                    className="w-full flex items-center gap-3 text-start rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
                   >
                     <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
                       {initials(student.name)}
@@ -401,9 +412,9 @@ export default function TeacherDashboard() {
                     <span className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}>
                       {t(`common.${status}`)}
                     </span>
-                  </li>
-                )
-              )}
+                  </button>
+                </li>
+              ))}
             </ul>
           )}
 
@@ -555,6 +566,25 @@ export default function TeacherDashboard() {
         <StudentDetailPanel
           studentId={selectedStudentId}
           onClose={() => setSelectedStudentId(null)}
+          real={
+            isDemo
+              ? undefined
+              : (() => {
+                  const st = students.find((x) => x.id === selectedStudentId);
+                  const group = groups.find((g) => g.studentIds.includes(selectedStudentId));
+                  return st
+                    ? {
+                        student: { ...st, halaqa: group?.label ?? st.halaqa },
+                        attendance: attendanceHistory[st.id] ?? [],
+                        assignments,
+                      }
+                    : undefined;
+                })()
+          }
+          registerHref={(() => {
+            const group = groups.find((g) => g.studentIds.includes(selectedStudentId));
+            return !isDemo && group ? `/teacher/attendance?halaqa=${encodeURIComponent(group.id)}` : "/teacher/attendance";
+          })()}
         />
       )}
     </div>
