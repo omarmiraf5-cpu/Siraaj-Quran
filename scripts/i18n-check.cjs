@@ -31,7 +31,7 @@ for (const file of files) {
     if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
       const name = n.expression.text;
       const arg = n.arguments[0];
-      if ((name === "tr" || name === "phrase") && arg) {
+      if ((name === "tr" || name === "phrase" || name === "countLabel") && arg) {
         if (literal(arg)) add(arg.text, file, arg, sf);
         // tr(cond ? "a" : "b", …)
         if (ts.isConditionalExpression(arg)) [arg.whenTrue, arg.whenFalse].forEach((x) => literal(x) && add(x.text, file, x, sf));

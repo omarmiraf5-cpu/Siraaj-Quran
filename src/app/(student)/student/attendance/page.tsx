@@ -12,6 +12,7 @@ import { SectionCard, AttendanceStrip, LoadingNote } from "@/components/portal-u
 import { ProgressRing, StreakBadge, ILLUM_CLASS } from "@/components/student-ui";
 import { IconCheck, IconClock, IconX, IconNote } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 
 // Each mark gets a colour and a face of its own, so the row reads at a
 // glance instead of as four numbers.
@@ -66,7 +67,7 @@ export default function StudentAttendancePage() {
             </div>
           </div>
           <p className="text-[13px] text-white/55 mt-3.5">
-            {[t("common.last"), s.total, t("common.schoolDays")].filter((x) => x !== "").join(" ")}
+            {countLabel("the last {count} school day|the last {count} school days", s.total, [t("common.last"), s.total, t("common.schoolDays")].filter((x) => x !== "").join(" "))}
           </p>
           {streak > 1 && (
             <div className="mt-4">
@@ -95,18 +96,18 @@ export default function StudentAttendancePage() {
       </div>
 
       <div className="animate-rise" style={{ animationDelay: "300ms" }}>
-        <SectionCard title={t("common.atAGlance")} note={`${t("common.last")} ${Math.min(14, days.length)} ${t("common.days")}`}>
+        <SectionCard title={t("common.atAGlance")} note={countLabel("the last {count} day|the last {count} days", Math.min(14, days.length), `${t("common.last")} ${Math.min(14, days.length)} ${t("common.days")}`)}>
           <AttendanceStrip days={days} />
           <p className="text-[12px] text-ink-muted mt-3">
             {streak > 1
-              ? `${streak} ${t("common.daysInARowNoMissing")}`
+              ? countLabel("{count} day in a row, none missed.|{count} days in a row, none missed.", streak, `${streak} ${t("common.daysInARowNoMissing")}`)
               : t("common.everyDayCounts")}
           </p>
         </SectionCard>
       </div>
 
       <div className="animate-rise" style={{ animationDelay: "360ms" }}>
-        <SectionCard title={t("common.dayByDay")} note={`${s.total} ${t("common.days")}`}>
+        <SectionCard title={t("common.dayByDay")} note={countLabel("{count} day|{count} days", s.total, `${s.total} ${t("common.days")}`)}>
           <ul className="divide-y divide-surface-border -my-1">
             {days.map((d) => {
               const mark = MARKS.find((m) => m.status === d.status)!;

@@ -21,6 +21,7 @@ import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { LoadingNote } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { demoAttendanceFetch } from "@/lib/demoAttendance";
 import { PlanAlertBanner } from "@/components/yearly-plan-ui";
 import { myHalaqas, narrowToMine, type MyHalaqa } from "@/lib/teacherScope";
@@ -258,8 +259,8 @@ export default function TeacherAttendancePage() {
         meta={[
           formatDay(today, language),
           ...(halaqa ? [halaqa.label] : []),
-          `${roster.length} ${t("common.students")}`,
-          remaining > 0 ? `${remaining} ${t("teacher.attendance.stillToMark")}` : t("teacher.attendance.everyoneMarked"),
+          countLabel("{count} student|{count} students", roster.length, `${roster.length} ${t("common.students")}`),
+          remaining > 0 ? countLabel("{count} still to mark|{count} still to mark", remaining, `${remaining} ${t("teacher.attendance.stillToMark")}`) : t("teacher.attendance.everyoneMarked"),
         ]}
       />
 
@@ -286,7 +287,7 @@ export default function TeacherAttendancePage() {
                   {pending && <span className={`ms-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle ${on ? "bg-white" : "bg-amber-500"}`} />}
                 </span>
                 <span className={`block text-[11px] tabular-nums ${on ? "text-white/80" : "text-ink-muted"}`}>
-                  {done}/{kids.length} {t("teacher.attendance.marked")}
+                  {done}/{kids.length} {countLabel("{count} marked|{count} marked", done, t("teacher.attendance.marked"))}
                 </span>
               </button>
             );
@@ -311,7 +312,7 @@ export default function TeacherAttendancePage() {
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-ink-muted">
-          {remaining > 0 ? `${remaining} ${t("teacher.attendance.stillToMark")}` : t("teacher.attendance.everyoneMarked")}
+          {remaining > 0 ? countLabel("{count} still to mark|{count} still to mark", remaining, `${remaining} ${t("teacher.attendance.stillToMark")}`) : t("teacher.attendance.everyoneMarked")}
         </p>
         <button
           onClick={markAllPresent}
@@ -404,7 +405,7 @@ export default function TeacherAttendancePage() {
               ? t("teacher.attendance.saved")
               : marked === 0 && !changed
                 ? t("teacher.attendance.markToSave")
-                : `${t("teacher.attendance.saveButton")}${halaqa && halaqas && halaqas.length > 1 ? ` · ${halaqa.label}` : ""} · ${count("present")} ${t("common.present").toLowerCase()}`}
+                : `${t("teacher.attendance.saveButton")}${halaqa && halaqas && halaqas.length > 1 ? ` · ${halaqa.label}` : ""} · ${countLabel("{count} present now|{count} present now", count("present"), `${count("present")} ${t("common.present").toLowerCase()}`)}`}
         </button>
       </div>
     </div>

@@ -31,6 +31,7 @@ import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
 import { myHalaqas, narrowToMine } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
@@ -211,8 +212,8 @@ export default function TeacherDashboard() {
         title={(isDemo ? demoUser?.name : teacherName) ?? t("role.teacher")}
         meta={[
           formatDay(today, language),
-          `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`,
-          `${review.length} ${t("common.toReview")}`,
+          countLabel("{inToday} of {count} in today", students.length, `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`, { inToday }),
+          countLabel("{count} to review|{count} to review", review.length, `${review.length} ${t("common.toReview")}`),
         ]}
         actions={
           <>
@@ -243,14 +244,18 @@ export default function TeacherDashboard() {
           value={students.length}
           label={t("nav.students")}
           sub={halaqas
-            .map((h) => `${students.filter((s) => s.halaqa === h).length} ${t("common.in")} ${h.replace("Halaqa ", "")}`)
+            .map((h) => {
+              const n = students.filter((s) => s.halaqa === h).length;
+              const name = h.replace("Halaqa ", "");
+              return countLabel("{count} in {name}|{count} in {name}", n, `${n} ${t("common.in")} ${name}`, { name });
+            })
             .join(" · ")}
           onClick={isDemo ? () => setDrilldown("students") : undefined}
         />
         <StatTile
           value={active.length}
           label={t("common.activeWork")}
-          sub={dueThisWeek > 0 ? `${dueThisWeek} ${t("common.dueThisWeek")}` : t("common.nothingDueThisWeek")}
+          sub={dueThisWeek > 0 ? countLabel("{count} due this week|{count} due this week", dueThisWeek, `${dueThisWeek} ${t("common.dueThisWeek")}`) : t("common.nothingDueThisWeek")}
           onClick={isDemo ? () => setDrilldown("active") : undefined}
         />
         <StatTile
@@ -262,7 +267,7 @@ export default function TeacherDashboard() {
         <StatTile
           value={`${avgAttendance}%`}
           label={t("common.attendanceStat")}
-          sub={`${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`}
+          sub={countLabel("{inToday} of {count} in today", students.length, `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`, { inToday })}
           onClick={isDemo ? () => setDrilldown("attendance") : undefined}
         />
       </div>
@@ -272,7 +277,7 @@ export default function TeacherDashboard() {
       {groups.length > 0 && (
         <SectionCard
           title={t("teacher.dashboard.myHalaqas")}
-          note={`${groups.length} ${groups.length === 1 ? t("teacher.dashboard.halaqa") : t("teacher.dashboard.halaqas")}`}
+          note={countLabel("{count} halaqa|{count} halaqas", groups.length, `${groups.length} ${groups.length === 1 ? t("teacher.dashboard.halaqa") : t("teacher.dashboard.halaqas")}`)}
         >
           <div className="grid md:grid-cols-2 gap-3">
             {groups.map((h) => {
@@ -288,7 +293,7 @@ export default function TeacherDashboard() {
                     <div className="min-w-0">
                       <p className="font-semibold text-[14px] text-ink truncate">{h.label}</p>
                       <p className="text-[11px] text-ink-muted">
-                        {kids.length} {t("common.students")} · {marked}/{kids.length} {t("teacher.attendance.marked")}{" "}
+                        {countLabel("{count} student|{count} students", kids.length, `${kids.length} ${t("common.students")}`)} · {marked}/{kids.length} {countLabel("{count} marked|{count} marked", marked, t("teacher.attendance.marked"))}{" "}
                         {t("teacher.dashboard.today")}
                       </p>
                     </div>
@@ -406,7 +411,7 @@ export default function TeacherDashboard() {
         </SectionCard>
 
         {/* The review queue itself, not a link to where it lives. */}
-        <SectionCard title={t("common.needsReview")} note={`${review.length} ${t("common.waiting")}`}>
+        <SectionCard title={t("common.needsReview")} note={countLabel("{count} waiting|{count} waiting", review.length, `${review.length} ${t("common.waiting")}`)}>
           {review.length === 0 ? (
             <EmptyNote>{t("common.nothingWaitingOnYou")}</EmptyNote>
           ) : (

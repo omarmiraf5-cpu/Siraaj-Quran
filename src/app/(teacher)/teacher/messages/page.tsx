@@ -14,6 +14,7 @@ import { LoadingNote, EmptyNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
 import { phrase } from "@/lib/i18n/phrases";
 
@@ -216,7 +217,7 @@ export default function TeacherMessagesPage() {
       <PortalHero
         eyebrow={t("teacher.messages.eyebrow")}
         title={t("nav.messages")}
-        meta={[`${students.length} ${t("common.students")}`, t("teacher.messages.subtitle")]}
+        meta={[countLabel("{count} student|{count} students", students.length, `${students.length} ${t("common.students")}`), t("teacher.messages.subtitle")]}
       />
 
       {students.length === 0 ? (

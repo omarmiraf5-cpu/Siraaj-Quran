@@ -23,6 +23,7 @@ import {
 import { getSurahById } from "@/data/mushaf-index";
 import type { DailyRating } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 
 // DAILY_RATING_LABELS keys are snake_case (very_good); translation keys are
 // camelCase (rating.veryGood) to match the rest of the dictionary.
@@ -240,7 +241,11 @@ export function AttendanceStrip({
     <div
       className={`flex ${size === "lg" ? "gap-1.5" : "gap-1"}`}
       role="img"
-      aria-label={`${t("common.attendanceForLastDays")} ${recent.length} ${t("common.days")}`}
+      aria-label={countLabel(
+        "Attendance for the last {count} day|Attendance for the last {count} days",
+        recent.length,
+        `${t("common.attendanceForLastDays")} ${recent.length} ${t("common.days")}`,
+      )}
     >
       {recent.map((d) => (
         <span
@@ -478,9 +483,11 @@ export function RecitationHistory({ entries }: { entries: RecitationLogEntry[] }
               aria-pressed={selected}
               aria-label={
                 dayEntries.length > 0
-                  ? `${formatDay(iso, language)} — ${dayEntries.length} ${
-                      dayEntries.length > 1 ? t("common.sessionsGraded") : t("common.sessionGraded")
-                    }`
+                  ? `${formatDay(iso, language)} — ${countLabel(
+                      "{count} session graded|{count} sessions graded",
+                      dayEntries.length,
+                      `${dayEntries.length} ${dayEntries.length > 1 ? t("common.sessionsGraded") : t("common.sessionGraded")}`,
+                    )}`
                   : formatDay(iso, language)
               }
               className={`flex flex-col items-center justify-center h-8 gap-0.5 rounded-lg transition-colors ${

@@ -24,10 +24,16 @@ const DICTS: Partial<Record<Language, Record<string, string | Plural>>> = { ar: 
 
 const rules = new Map<Language, Intl.PluralRules>();
 function countOf(vars: PhraseVars | undefined): number {
-  // The first number: {count}, then {n}, then any — a bolded count can be
-  // passed as {count} with its number as {n}.
-  const all = [vars?.count, vars?.n, ...Object.values(vars ?? {})];
-  return Number(all.find((v) => typeof v === "number"));
+  // {count}, then {n}, then the first other number. `id` is a label (surah
+  // 2 next to its ayah count) and must not pick the plural form.
+  if (typeof vars?.count === "number") return vars.count;
+  if (typeof vars?.n === "number") return vars.n;
+  if (!vars) return Number.NaN;
+  for (const [key, value] of Object.entries(vars)) {
+    if (key === "id") continue;
+    if (typeof value === "number") return value;
+  }
+  return Number.NaN;
 }
 
 function pluralOf(language: Language, entry: Plural, vars: PhraseVars | undefined): string {
@@ -65,6 +71,16 @@ export function translatePhrase<V extends PhraseVars | undefined>(language: Lang
 /** tr for helpers outside components — see lib/i18n/current. */
 export function phrase<V extends PhraseVars | undefined = undefined>(text: string, vars?: V): Translated<V> {
   return translatePhrase(currentLanguage(), text, vars);
+}
+
+/**
+ * A counted phrase. Arabic selects one / two / few / many / other from the
+ * phrase dictionary. English and Somali keep `fallback`, which the caller
+ * already builds from the keyed dictionary.
+ */
+export function countLabel(phrase: string, count: number, fallback: string, vars?: Record<string, string | number>): string {
+  if (currentLanguage() !== "ar") return fallback;
+  return translatePhrase("ar", phrase, { ...vars, count }) as string;
 }
 
 /**

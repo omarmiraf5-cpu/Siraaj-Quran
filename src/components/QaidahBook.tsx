@@ -17,6 +17,7 @@ import type { Reciter } from "@/lib/recitation";
 import { ILLUM_CLASS, GRAD_CLASS, surahColour } from "@/components/student-ui";
 import { IconArrow, IconCheck, IconSpeaker } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 import {
   AyahButton,
   RecitationBar,
@@ -551,7 +552,7 @@ export function QaidahLessons({
                     )}
                     {count > 0 && (
                       <span className="inline-flex rounded-full bg-surface-bg-warm border border-surface-border px-2 py-0.5 text-[11px] font-semibold text-ink-muted">
-                        {count} {t("qaidah.onThisLesson")}
+                        {countLabel("{count} on this lesson|{count} on this lesson", count, `${count} ${t("qaidah.onThisLesson")}`)}
                       </span>
                     )}
                   </span>
@@ -644,7 +645,7 @@ export function QaidahBookTabs({
               </span>
             )}
             <span className={`block text-[11px] mt-0.5 ${active ? "text-white/60" : "text-ink-muted"}`}>
-              {b.lessons.length} {t("qaidah.lessonsCount")}
+              {countLabel("{count} lessons", b.lessons.length, `${b.lessons.length} ${t("qaidah.lessonsCount")}`)}
             </span>
           </button>
         );

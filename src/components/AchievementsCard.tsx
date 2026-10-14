@@ -21,6 +21,7 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
+import { countLabel } from "@/lib/i18n/phrases";
 
 const BADGE_KEY: Record<BadgeKind, string> = {
   perfect_attendance: "award.badge.perfect_attendance",
@@ -131,10 +132,10 @@ export function AchievementsCard({
   const title = studentFirstName
     ? `${studentFirstName} — ${t("achievements.starsAndBadges")}`
     : t("achievements.myStarsAndBadges");
-  const starWord = (n: number) => t(n === 1 ? "achievements.star" : "achievements.stars");
+  const starWord = (n: number) => countLabel("{count} stars", n, `${n} ${t(n === 1 ? "achievements.star" : "achievements.stars")}`);
 
   return (
-    <SectionCard title={title} note={count ? `${count} ${starWord(count)}` : undefined}>
+    <SectionCard title={title} note={count ? starWord(count) : undefined}>
       {!ready ? (
         <LoadingNote />
       ) : count === 0 && badges.length === 0 ? (
@@ -163,7 +164,7 @@ export function AchievementsCard({
             </div>
             <p className="text-[11px] text-ink-muted mt-1.5">
               {studentFirstName ? `${studentFirstName} — ` : ""}
-              {count} {starWord(count)} {t("achievements.soFar")}
+              {starWord(count)} {t("achievements.soFar")}
             </p>
           </div>
 
