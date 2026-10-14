@@ -21,8 +21,7 @@ import {
   type StudentOverride,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, RowChevron } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { SalariesPanel } from "@/components/SalariesPanel";
@@ -451,7 +450,7 @@ export default function AdminPaymentsPage() {
                           setPayError(null);
                         }}
                         aria-expanded={isOpen}
-                        className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                        className="group w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
                       >
                         <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
                           {initials(studentName(f.studentId))}
@@ -470,9 +469,7 @@ export default function AdminPaymentsPage() {
                             {FEE_STATUS_LABELS[status]}
                           </span>
                         </div>
-                        <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90 rtl:-rotate-90" : ""}`}>
-                          <IconArrow size={14} />
-                        </span>
+                        <RowChevron open={isOpen} />
                       </button>
 
                       {isOpen && (

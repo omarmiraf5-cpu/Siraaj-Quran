@@ -23,6 +23,7 @@ import {
   type RecitationLogEntry,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
+import { IconArrow } from "@/components/icons";
 import type { DailyRating } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 import { SkeletonRows, SkeletonStats } from "@/components/Skeleton";
@@ -357,6 +358,23 @@ export function SegmentedSwitch<T extends string>({
         );
       })}
     </div>
+  );
+}
+
+/* ── Row chevron ───────────────────────────────────────────────────────
+   The arrow at the end of a row that opens: in a soft round frame that
+   darkens with the row's hover (the row carries `group`), turning to point
+   down when open — in either reading direction. */
+export function RowChevron({ open }: { open: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all bg-surface-bg-warm text-ink-muted group-hover:bg-brand-navy/10 group-hover:text-ink dark:group-hover:bg-white/10 ${
+        open ? "rotate-90 rtl:-rotate-90 bg-brand-navy/10 text-ink" : ""
+      }`}
+    >
+      <IconArrow size={13} />
+    </span>
   );
 }
 

@@ -212,8 +212,9 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         </>
       )}
 
-      {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="hidden md:flex flex-col w-56 min-h-screen gradient-navy text-white p-4 gap-2 flex-shrink-0">
+      {/* ── DESKTOP SIDEBAR ── pinned while a long page scrolls under it,
+          scrolling on its own on a short screen. */}
+      <aside className="hidden md:flex flex-col w-56 h-screen h-[100dvh] sticky top-0 self-start overflow-y-auto no-scrollbar gradient-navy text-white p-4 gap-2 flex-shrink-0">
         {/* Logo + branding */}
         <div className="flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
           <Crest

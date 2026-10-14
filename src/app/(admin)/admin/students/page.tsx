@@ -16,8 +16,7 @@ import {
 import type { DemoStudent, DemoHalaqa, DemoTeacher } from "@/data/demo";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { SectionCard, EmptyNote, LoadingNote, RowChevron } from "@/components/portal-ui";
 import StudentImport from "@/components/StudentImport";
 import WeeklyReportsCard from "@/components/WeeklyReportsCard";
 import StudentPins from "@/components/StudentPins";
@@ -68,6 +67,8 @@ export default function AdminStudentsPage() {
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [campusFilter, setCampusFilter] = useState("");
+  // Just the students still waiting for a teacher.
+  const [unplacedOnly, setUnplacedOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -452,7 +453,8 @@ export default function AdminStudentsPage() {
     (s) =>
       [s.name, ...(s.parentNames ?? [])].some((n) => n.toLowerCase().includes(search.trim().toLowerCase())) &&
       (!graded || gradeFilter === "" || (s.grade ?? 0) === Number(gradeFilter)) &&
-      (campusFilter === "" || (campusFilter === "none" ? !campusOfStudent(s) : campusOfStudent(s) === campusFilter))
+      (campusFilter === "" || (campusFilter === "none" ? !campusOfStudent(s) : campusOfStudent(s) === campusFilter)) &&
+      (!unplacedOnly || !studentHalaqa(s))
   );
   const activeCount = students.filter((s) => s.active !== false).length;
   // An academic school's students, by grade.
@@ -611,7 +613,7 @@ export default function AdminStudentsPage() {
           type="button"
           onClick={() => startEditing(s)}
           aria-expanded={isOpen}
-          className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+          className="group w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
         >
           <span
             className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
@@ -641,9 +643,7 @@ export default function AdminStudentsPage() {
               {tr("Inactive")}
             </span>
           )}
-          <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-            <IconArrow size={14} />
-          </span>
+          <RowChevron open={isOpen} />
         </button>
 
         {isOpen && (
@@ -934,6 +934,18 @@ export default function AdminStudentsPage() {
               <option value="none">{studentCampusReady ? tr("No campus yet") : tr("No teacher yet")}</option>
             </select>
           )}
+          <button
+            type="button"
+            aria-pressed={unplacedOnly}
+            onClick={() => setUnplacedOnly((v) => !v)}
+            className={`rounded-xl border px-3 py-2 text-[13px] font-semibold transition-colors ${
+              unplacedOnly
+                ? "border-amber-700 bg-amber-700 text-white"
+                : "border-surface-border bg-surface-card text-ink hover:border-amber-700"
+            }`}
+          >
+            {tr("Without a teacher only")}
+          </button>
         </div>
       )}
 
@@ -1077,9 +1089,9 @@ export default function AdminStudentsPage() {
       {graded && ready && gradeSummary.length > 0 && (
         <SectionCard
           title={tr("Grades")}
-          note={`${gradeSummary.reduce((n, g) => n + g.unplaced, 0)} without a teacher`}
+          note={tr("{unplaced} without a teacher", { unplaced: gradeSummary.reduce((n, g) => n + g.unplaced, 0) })}
         >
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" data-section="grades">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2" data-section="grades">
             {gradeSummary.map((g) => {
               const on = gradeFilter === String(g.grade);
               return (
@@ -1093,8 +1105,12 @@ export default function AdminStudentsPage() {
                   }`}
                 >
                   <span className="block text-[13.5px] font-semibold">{gradeLabel(g.grade)}</span>
-                  <span className={`block text-[11px] ${on ? "text-white/80" : "text-ink-muted"}`}>
-                    {tr("{count} student|{count} students", { count: g.students })}{" · "}{tr("{count} teacher|{count} teachers", { count: g.halaqas })}
+                  {/* One fact to a line: a narrow card never breaks "0 teachers" in two. */}
+                  <span className={`block text-[11px] whitespace-nowrap ${on ? "text-white/80" : "text-ink-muted"}`}>
+                    {tr("{count} student|{count} students", { count: g.students })}
+                  </span>
+                  <span className={`block text-[11px] whitespace-nowrap ${on ? "text-white/80" : "text-ink-muted"}`}>
+                    {tr("{count} teacher|{count} teachers", { count: g.halaqas })}
                   </span>
                   {g.unplaced > 0 && (
                     <span className={`block text-[11px] font-semibold ${on ? "text-amber-200" : "text-amber-700 dark:text-amber-300"}`}>
@@ -1119,7 +1135,7 @@ export default function AdminStudentsPage() {
         </SectionCard>
       ) : filtered.length === 0 ? (
         <SectionCard title={tr("All students")} note={tr("0 shown")}>
-          <EmptyNote>{students.length === 0 ? tr("No students yet.") : tr("No students match that search.")}</EmptyNote>
+          <EmptyNote>{students.length === 0 ? tr("No students yet.") : unplacedOnly && !search.trim() ? tr("Every student here has a teacher.") : tr("No students match that search.")}</EmptyNote>
         </SectionCard>
       ) : byGrade ? (
         byGrade.map(({ grade, students: inGrade }) => (
