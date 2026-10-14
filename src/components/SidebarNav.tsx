@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { motion, useReducedMotion } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -93,6 +94,8 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const role = t(roleKey);
   const displayName = demoUser?.name ?? userName ?? role;
   const [moreOpen, setMoreOpen] = useState(false);
+  const [hoverHref, setHoverHref] = useState<string | null>(null);
+  const reduce = useReducedMotion();
 
   const showOverflow = items.length > MAX_PRIMARY_TABS + 1;
   const primaryItems = showOverflow ? items.slice(0, MAX_PRIMARY_TABS) : items;
@@ -243,21 +246,40 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         </div>
 
         {/* Nav links */}
-        <nav className="space-y-1 border-t border-black/5 dark:border-white/10 pt-3">
+        <nav
+          className="space-y-1 border-t border-black/5 dark:border-white/10 pt-3"
+          onMouseLeave={() => setHoverHref(null)}
+        >
           {items.map((item) => {
             const active = pathname === item.href;
+            const hover = hoverHref === item.href && !active;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-semibold transition-all ${
-                  active
-                    ? "dock-pill"
-                    : "text-ink-body hover:text-ink hover:bg-brand-navy/5"
+                onMouseEnter={() => setHoverHref(item.href)}
+                className={`relative flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-semibold ${
+                  active ? "text-white" : "text-ink-body"
                 }`}
               >
-                <IconBadge size="md">{item.icon}</IconBadge>
-                {t(item.labelKey)}
+                {active && (
+                  <motion.span
+                    layoutId="sidebar-active"
+                    className="absolute inset-0 rounded-2xl bg-[#102A56]"
+                    transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }}
+                  />
+                )}
+                {hover && (
+                  <motion.span
+                    layoutId="sidebar-hover"
+                    className="absolute inset-0 rounded-2xl bg-[#102A56]/[0.06]"
+                    transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-3">
+                  <IconBadge size="md">{item.icon}</IconBadge>
+                  {t(item.labelKey)}
+                </span>
               </Link>
             );
           })}

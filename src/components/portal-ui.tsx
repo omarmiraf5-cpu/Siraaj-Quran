@@ -83,7 +83,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative w-full ${wide ? "max-w-4xl" : "max-w-md"} max-h-[85vh] overflow-y-auto bg-surface-card border border-surface-border rounded-[18px] shadow-2xl animate-slide-up`}
+        className={`modal-elevate relative w-full ${wide ? "max-w-4xl" : "max-w-md"} max-h-[85vh] overflow-y-auto bg-surface-card border border-surface-border rounded-[18px] shadow-2xl animate-slide-up`}
       >
         <div className="gradient-navy rounded-t-[18px] px-6 py-5 relative overflow-hidden sticky top-0 z-10">
           <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
@@ -135,7 +135,7 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={`card-quiet p-5 ${className}`}>
+    <section className={`card-quiet card-lift p-5 ${className}`}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="page-title text-lg">{title}</h2>
         {note && <span className="eyebrow flex-shrink-0">{note}</span>}

@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Newsreader, Amiri, Aref_Ruqaa, Noto_Sans_Arabic } fr
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { NativeBridge } from "@/components/NativeBridge";
+import { ToastProvider } from "@/components/motion-ui";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -73,7 +74,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0e2347",
+  themeColor: "#102A56",
 };
 
 export default function RootLayout({
@@ -107,7 +108,9 @@ export default function RootLayout({
         <div aria-hidden className="status-bar-strip" />
         <NativeBridge />
         <ThemeProvider>
-          <LanguageProvider>{children}</LanguageProvider>
+          <LanguageProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

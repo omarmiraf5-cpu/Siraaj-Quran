@@ -10,10 +10,10 @@
    into a grey admin panel the moment you signed in, which is what made the
    product feel cheaper after the front door. */
 :root {
-  --c-surface-bg: #e6edf6;
-  --c-surface-bg-warm: #f4f7fb;
+  --c-surface-bg: #F9F8F3;
+  --c-surface-bg-warm: #F3F1EA;
   --c-surface-card: #ffffff;
-  --c-surface-border: #e3ddd2;
+  --c-surface-border: #E4E2DC;
   --c-ink: #12161d;
   --c-ink-body: #2a303a;
   /* Muted ink is dark enough for WCAG AA on the paper and on white cards. */
@@ -23,7 +23,7 @@
   --c-gold: #c6a15a;
   --c-gold-soft: rgba(198, 161, 90, 0.32);
   --c-focus: #8a6424;
-  --c-navy: #0e2347;
+  --c-navy: #102A56;
   /* Attendance. Ink is the label colour; the solid is for dots and marks. */
   --attend-present: #0e7a48;
   --attend-present-ink: #0c643c;
@@ -85,7 +85,7 @@
     font-variant-numeric: tabular-nums;
   }
   .gradient-navy {
-    background: linear-gradient(155deg, #1e5aa3 0%, #14386a 42%, #0e2347 78%, #09182f 100%);
+    background: linear-gradient(155deg, #1a3f78 0%, #102A56 58%, #0a1c3a 100%);
   }
   /* Repeating eight-point star. Encoded so it can sit behind a hero or the
      sign-in stage without a second network request. */
@@ -245,6 +245,7 @@
   .page-enter,
   .sheet-in,
   .skeleton,
+  .spot-spin,
   .progress-fill::after,
   .btn-spinner,
   .icon-duo,
@@ -486,7 +487,10 @@ body {
     box-shadow:
       0 1px 2px rgba(14, 35, 71, 0.05),
       0 18px 40px -22px rgba(14, 35, 71, 0.38);
-    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease;
+    transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .card-quiet:focus-within {
+    box-shadow: 0 0 0 4px rgba(16, 42, 86, 0.12), 0 18px 40px -22px rgba(16, 42, 86, 0.32);
   }
   .dark .card-quiet {
     box-shadow:
@@ -681,9 +685,9 @@ body {
     cursor: not-allowed;
   }
   .btn-primary {
-    background: #0e2347;
+    background: #102A56;
     color: #fff;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16) inset, 0 12px 24px -12px rgba(14, 35, 71, 0.85);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16) inset, 0 12px 24px -12px rgba(16, 42, 86, 0.85);
   }
   .btn-primary:hover:not(:disabled) { background: #1a3d72; }
   .btn-accent {
@@ -946,7 +950,7 @@ body {
     animation: shimmer 1.15s ease-in-out infinite;
   }
   .page-enter {
-    animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   .sheet-in {
     animation: sheetUp 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -996,3 +1000,170 @@ body {
 .info-prose ul { list-style: disc; padding-inline-start: 1.25em; }
 .info-prose li + li { margin-top: 0.5em; }
 .info-prose a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Interaction system ─────────────────────────────────────────────── */
+.spot-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.625rem 1.05rem;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.1;
+  isolation: isolate;
+}
+.spot-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.spot-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(16, 42, 86, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.spot-primary {
+  color: #fff;
+  background: #102A56;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), inset 0 -10px 16px rgba(0, 0, 0, 0.18);
+}
+.spot-light {
+  color: #102A56;
+  background: #fff;
+  border: 1px solid #E4E2DC;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(16, 42, 86, 0.06);
+}
+.spot-spin { animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #E4E2DC;
+}
+.segmented-opt {
+  position: relative;
+  min-height: 36px;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-ink-muted);
+}
+.segmented-on { color: #fff; }
+.segmented-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #102A56;
+  z-index: 0;
+}
+
+.nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 0.85rem;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink-body);
+  text-align: start;
+}
+.nav-link-on { color: #fff; }
+.nav-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: #102A56;
+  z-index: 0;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #E4E2DC;
+  background: rgba(16, 42, 86, 0.06);
+  color: #102A56;
+  font-size: 10px;
+  font-weight: 600;
+}
+.dark .status-pill {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e7e2d6;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.status-tip {
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 0;
+  white-space: nowrap;
+  border-radius: 10px;
+  padding: 0.3rem 0.55rem;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--c-ink);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(16, 42, 86, 0.08);
+  box-shadow: 0 10px 24px -16px rgba(16, 42, 86, 0.6);
+  backdrop-filter: blur(12px);
+}
+.dark .status-tip { background: rgba(20, 27, 40, 0.72); }
+
+.danger-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b42318;
+  border: 1px solid rgba(180, 35, 24, 0.35);
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  background: transparent;
+}
+.danger-btn:disabled { opacity: 0.45; }
+
+.row-lift { transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms cubic-bezier(0.16, 1, 0.3, 1); }
+.row-lift:hover { background: rgba(16, 42, 86, 0.045); }
+
+.field-glow {
+  transition: box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1), border-color 200ms ease;
+}
+.field-glow:focus {
+  outline: none;
+  border-color: #102A56;
+  box-shadow: 0 0 0 4px rgba(16, 42, 86, 0.16);
+}
+
+.toast-card {
+  border-radius: 14px;
+  padding: 0.75rem 0.9rem;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(16, 42, 86, 0.08);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--c-ink);
+  box-shadow: 0 16px 40px -20px rgba(16, 42, 86, 0.55);
+  backdrop-filter: blur(16px);
+}
+.toast-ok { box-shadow: inset 3px 0 0 #0e7a48, 0 16px 40px -20px rgba(16, 42, 86, 0.55); }
+.toast-bad { box-shadow: inset 3px 0 0 #b42318, 0 16px 40px -20px rgba(16, 42, 86, 0.55); }
+.modal-elevate {
+  box-shadow: 0 24px 60px -28px rgba(16, 42, 86, 0.45);
+}
+.modal-elevate:focus-within {
+  box-shadow: 0 0 0 4px rgba(16, 42, 86, 0.16), 0 24px 60px -28px rgba(16, 42, 86, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spot-spin { animation: none; }
+  .row-lift, .card-quiet, .field-glow { transition: none; }
+  .row-lift:hover, .card-lift:hover { transform: none; }
+}

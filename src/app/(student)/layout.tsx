@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
+import { PageFade } from "@/components/motion-ui";
 import {
   IconHome,
   IconBook,
@@ -84,7 +85,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   if (blocked) return <div className="min-h-screen bg-surface-bg" />;
   return (
     <div className="min-h-screen bg-surface-bg pb-28">
-      <div className="page-enter max-w-5xl mx-auto">{children}</div>
+      <PageFade><div className="max-w-5xl mx-auto">{children}</div></PageFade>
       <StudentTabBar />
     </div>
   );

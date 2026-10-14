@@ -7,9 +7,9 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          navy: "#16325f",
-          "navy-mid": "#122848",
-          "navy-dark": "#0e2347",
+          navy: "#102A56",
+          "navy-mid": "#0d2348",
+          "navy-dark": "#0a1c3a",
           gold: "#c6a15a",
           "gold-light": "#e6cd8a",
           "gold-dark": "#8a6424",

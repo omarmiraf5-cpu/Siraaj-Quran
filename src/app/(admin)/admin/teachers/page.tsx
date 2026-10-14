@@ -18,7 +18,9 @@ import {
 } from "@/data/demo";
 import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote } from "@/components/portal-ui";
+import { MotionList, MotionRow, SkeletonRows, StatusBadge, useToast } from "@/components/motion-ui";
+import { motion, useReducedMotion } from "motion/react";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
@@ -74,6 +76,8 @@ function HalaqaChips({
 
 export default function AdminTeachersPage() {
   const { tr } = useLanguage();
+  const toast = useToast();
+  const reduce = useReducedMotion();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
@@ -283,6 +287,7 @@ export default function AdminTeachersPage() {
     try {
       await saveMyTeaching(mine, draftName);
       setEditingId(null);
+      toast.success(tr("Done"));
     } catch (err) {
       setSaveError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
@@ -357,6 +362,7 @@ export default function AdminTeachersPage() {
       writeDemoStore(DEMO_TEACHER_OVERRIDES_KEY, next);
       setTeachers(allTeachers(created, next));
       setEditingId(null);
+      toast.success(tr("Done"));
       return;
     }
 
@@ -369,8 +375,11 @@ export default function AdminTeachersPage() {
       await saveAccount(t.id, { full_name: draftName.trim() || t.name, active: draftActive });
       await loadRealTeachers();
       setEditingId(null);
+      toast.success(tr("Done"));
     } catch (err) {
-      setSaveError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
+      const message = err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again.");
+      setSaveError(message);
+      if (typeof message === "string") toast.error(message);
     } finally {
       setSavingEdit(false);
     }
@@ -452,22 +461,25 @@ export default function AdminTeachersPage() {
 
       <SectionCard title={tr("All teachers")} note={tr("{count} total", { count: teachers.length })}>
         {!ready ? (
-          <LoadingNote />
+          <div aria-busy="true">
+            <SkeletonRows />
+          </div>
         ) : teachers.length === 0 ? (
           <EmptyNote>{tr("No teachers yet.")}</EmptyNote>
         ) : (
-          <ul className="divide-y divide-surface-border -my-1">
+          <MotionList className="divide-y divide-surface-border -my-1">
             {teachers.map((t) => {
               const isOpen = editingId === t.id;
               const inactive = t.active === false;
               const theirHalaqas = halaqas.filter((h) => halaqaTeacherIds(h).includes(t.id));
               return (
-                <li key={t.id}>
-                  <button
+                <MotionRow key={t.id} className="list-none">
+                  <motion.button
                     type="button"
                     onClick={() => startEditing(t)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    whileHover={reduce ? undefined : { backgroundColor: "rgba(16,42,86,0.045)" }}
+                    className="w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2"
                   >
                     <span
                       className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
@@ -492,15 +504,15 @@ export default function AdminTeachersPage() {
                         {t.id === me?.id ? tr("You · admin") : tr("Admin")}
                       </span>
                     )}
-                    {inactive && (
-                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
-                        {tr("Inactive")}
-                      </span>
+                    {inactive ? (
+                      <StatusBadge tip={tr("Inactive")}>{tr("Inactive")}</StatusBadge>
+                    ) : (
+                      <StatusBadge tip={tr("Active")}>{tr("Active")}</StatusBadge>
                     )}
                     <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
                       <IconArrow size={14} />
                     </span>
-                  </button>
+                  </motion.button>
 
                   {isOpen && t.admin && (
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
@@ -659,10 +671,10 @@ export default function AdminTeachersPage() {
                       )}
                     </div>
                   )}
-                </li>
+                </MotionRow>
               );
             })}
-          </ul>
+          </MotionList>
         )}
       </SectionCard>
     </div>

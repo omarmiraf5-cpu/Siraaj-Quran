@@ -1,6 +1,7 @@
 "use client";
 
 import { SidebarNav } from "@/components/SidebarNav";
+import { PageFade } from "@/components/motion-ui";
 import {
   IconBook,
   IconBookOpen,
@@ -93,7 +94,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
   return (
     <div className="flex min-h-screen bg-surface-bg">
       <SidebarNav items={items} roleKey={back ? "nav.parentMode" : "role.parent"} />
-      <main className="page-enter flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-24 md:pb-8 overflow-auto">{blocked ? null : children}</main>
+      <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-24 md:pb-8 overflow-auto">{blocked ? null : <PageFade>{children}</PageFade>}</main>
     </div>
   );
 }
