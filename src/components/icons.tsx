@@ -1,5 +1,6 @@
-// Phosphor duotone, drawn in navy with a gold second tone once it sits
-// inside an IconBadge. Callers still pass size the way they always have.
+// Phosphor at a light weight, with a filled twin stacked behind it.
+// A badge paints the light one in a gold gradient. The active tab
+// fades that out and brings the filled gold one forward.
 
 import {
   ArrowRight,
@@ -47,13 +48,12 @@ interface IconProps {
 /** `mirrored` icons point the way the text reads, so they flip in Arabic. */
 function duo(Glyph: Icon, defaultSize = 16, mirrored = false) {
   return function DuoIcon({ size = defaultSize, className }: IconProps) {
+    const flip = mirrored ? "rtl:-scale-x-100" : "";
     return (
-      <Glyph
-        size={size}
-        weight="duotone"
-        className={mirrored ? `rtl:-scale-x-100 ${className ?? ""}` : className}
-        aria-hidden="true"
-      />
+      <span className={`icon-duo ${flip} ${className ?? ""}`}>
+        <Glyph size={size} weight="light" className="icon-duo-off" aria-hidden="true" />
+        <Glyph size={size} weight="fill" className="icon-duo-on" aria-hidden="true" />
+      </span>
     );
   };
 }
