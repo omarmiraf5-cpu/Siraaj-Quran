@@ -12,7 +12,6 @@ import {
   IconPen,
   IconPalette,
   IconCalendar,
-  IconBadge,
 } from "@/components/icons";
 
 // The tabs were emoji — 🏠 📖 📝 🎨 ✅ — which rendered as a different picture
@@ -57,14 +56,12 @@ function StudentTabBar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 min-h-12 py-1 rounded-[20px] transition-all active:scale-95 ${active ? "dock-pill" : ""}`}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 min-h-12 py-1 rounded-[20px] text-[#102A56] ${active ? "bg-[#F4F4F6]" : "hover:bg-slate-100"}`}
             >
-              <IconBadge size="sm">
-                <Icon size={15} />
-              </IconBadge>
+              <Icon size={20} />
               <span
-                className={`text-[11px] font-bold leading-none transition-colors ${
-                  active ? "text-[#1c1408]" : "text-ink-muted"
+                className={`text-[11px] font-bold leading-none ${
+                  active ? "text-[#102A56]" : "text-ink-muted"
                 }`}
               >
                 {t(labelKey)}

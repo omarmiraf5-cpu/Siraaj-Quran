@@ -4,22 +4,19 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { IconBadge } from "@/components/IconBadge";
 import { pillSpring } from "@/lib/motion-config";
 
 export type SidebarLink = {
   href: string;
   label: string;
   mark?: LucideIcon;
-  /** Fallback glyph when a portal has not moved to Lucide yet. */
   glyph?: ReactNode;
 };
 
-/** One left navigation: icon badges and a spring sliding active pill. */
+/** Left navigation. A 3px gold bar slides to the active item. */
 export function Sidebar({
   items,
   activeHref,
-  onHover,
 }: {
   items: SidebarLink[];
   activeHref: string;
@@ -27,34 +24,29 @@ export function Sidebar({
 }) {
   const reduce = useReducedMotion();
   return (
-    <nav className="space-y-1" onMouseLeave={() => onHover?.(null)}>
+    <nav className="space-y-0.5">
       {items.map((item) => {
         const active = item.href === activeHref;
+        const Icon = item.mark;
         return (
           <Link
             key={item.href}
             href={item.href}
-            onMouseEnter={() => onHover?.(item.href)}
             title={item.label}
-            className={`relative flex items-center gap-3 min-h-11 px-2 md:px-3 rounded-2xl text-sm font-semibold ${
-              active ? "text-white" : "text-ink-body"
+            aria-current={active ? "page" : undefined}
+            className={`relative flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-semibold text-[#102A56] ${
+              active ? "bg-[#F4F4F6]" : "hover:bg-slate-100"
             }`}
           >
             {active && (
               <motion.span
-                layoutId="sidebar-active"
-                className="absolute inset-0 rounded-2xl bg-[#102A56]"
+                layoutId="sidebar-accent"
+                className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-[#c6a15a]"
                 transition={reduce ? { duration: 0 } : pillSpring}
               />
             )}
-            <span className="relative z-10 flex items-center gap-3 min-w-0">
-              {item.mark ? (
-                <IconBadge icon={item.mark} size="sm" active={active} />
-              ) : (
-                item.glyph
-              )}
-              <span className="hidden md:inline truncate">{item.label}</span>
-            </span>
+            {Icon ? <Icon size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : item.glyph}
+            <span className="hidden md:inline truncate">{item.label}</span>
           </Link>
         );
       })}

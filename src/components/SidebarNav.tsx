@@ -14,8 +14,7 @@ import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
 import type { LucideIcon } from "lucide-react";
 import { LogOut, MoreHorizontal } from "lucide-react";
-import { IconBadge as GoldBadge, IconSignOut } from "@/components/icons";
-import { IconBadge } from "@/components/IconBadge";
+import { IconSignOut } from "@/components/icons";
 import { Sidebar } from "@/components/Sidebar";
 
 interface NavItem {
@@ -156,7 +155,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 active ? "dock-pill" : "text-ink-muted hover:text-ink"
               }`}
             >
-              {item.mark ? <IconBadge icon={item.mark} size="sm" active={active} /> : <GoldBadge size="sm">{item.icon}</GoldBadge>}
+              {item.mark ? <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]">{item.icon}</span>}
               {t(item.labelKey)}
             </Link>
           );
@@ -170,7 +169,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
               moreActive || moreOpen ? "dock-pill" : "text-ink-muted hover:text-ink"
             }`}
           >
-            <IconBadge icon={MoreHorizontal} size="sm" active={moreActive || moreOpen} />
+            <MoreHorizontal size={20} strokeWidth={1.75} color="#102A56" aria-hidden />
             {t("common.more")}
           </button>
         )}
@@ -197,7 +196,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                     active ? "dock-pill" : "text-ink hover:bg-brand-navy/5"
                   }`}
                 >
-                  {item.mark ? <IconBadge icon={item.mark} size="sm" active={active} /> : <GoldBadge size="sm">{item.icon}</GoldBadge>}
+                  {item.mark ? <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]">{item.icon}</span>}
                   {t(item.labelKey)}
                 </Link>
               );
@@ -207,7 +206,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       )}
 
       {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="flex flex-col w-16 md:w-60 min-h-screen sticky top-0 h-screen overflow-y-auto bg-white/75 dark:bg-[#101722]/90 backdrop-blur-xl text-ink p-2 md:p-3 gap-1 flex-shrink-0 border-e border-black/5 dark:border-white/10">
+      <aside className="flex flex-col w-16 md:w-60 min-h-screen sticky top-0 h-screen overflow-y-auto bg-[#FAFAFA] dark:bg-[#101722] text-ink p-2 md:p-3 gap-1 flex-shrink-0 border-e border-black/5 dark:border-white/10">
         {/* Logo + branding */}
         <div className="hidden md:flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
           <Crest
@@ -257,7 +256,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
               href: item.href,
               label: t(item.labelKey),
               mark: item.mark,
-              glyph: item.mark ? undefined : <GoldBadge size="sm">{item.icon}</GoldBadge>,
+              glyph: item.mark ? undefined : <span className="text-[#102A56]">{item.icon}</span>,
             }))}
           />
         </div>
@@ -265,9 +264,9 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         {/* Sign out */}
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all mt-2"
+          className="flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium text-[#102A56] hover:bg-slate-100 transition-colors mt-2"
         >
-          {items.some((item) => item.mark) ? <IconBadge icon={LogOut} size="md" /> : <GoldBadge size="md"><IconSignOut size={17} /></GoldBadge>}
+          {items.some((item) => item.mark) ? <LogOut size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]"><IconSignOut size={20} /></span>}
           <span className="hidden md:inline">{t("common.signOut")}</span>
         </button>
 
@@ -280,7 +279,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 href={item.href}
                 className="flex items-center gap-3 px-3 py-2 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all"
               >
-                {item.mark ? <IconBadge icon={item.mark} size="sm" /> : <GoldBadge size="sm">{item.icon}</GoldBadge>}
+                {item.mark ? <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]">{item.icon}</span>}
                 {t(item.labelKey)}
               </Link>
             ))}

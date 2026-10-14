@@ -1,40 +1,28 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 
 export type IconTone = "gold" | "green" | "amber" | "red" | "navy";
 export type IconBadgeSize = "sm" | "md" | "lg";
 
-const GLYPH = { sm: 15, md: 18, lg: 20 } as const;
+const STROKE: Record<IconTone, string> = {
+  gold: "#102A56",
+  navy: "#102A56",
+  green: "#0e7a48",
+  amber: "#9a6200",
+  red: "#c45c54",
+};
 
-/**
- * Circular badge for a functional icon. Gold is the default metallic
- * treatment; status tones tint the disc and its glow.
- */
+/** A flat Lucide stroke. No disc, ring, or shadow. */
 export function IconBadge({
   icon: Icon,
-  tone = "gold",
-  size = "md",
-  active = false,
-  hover = true,
+  tone = "navy",
 }: {
   icon: LucideIcon;
   tone?: IconTone;
   size?: IconBadgeSize;
   active?: boolean;
-  /** Turn off when a parent already scales on hover. */
   hover?: boolean;
 }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.span
-      className={`icon-mark icon-mark-${size} icon-mark-${tone}${active ? " icon-mark-active" : ""}`}
-      whileHover={reduce || !hover ? undefined : { scale: 1.05 }}
-      transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 16 }}
-    >
-      {active && <span className="icon-mark-sheen" aria-hidden />}
-      <Icon size={GLYPH[size]} strokeWidth={1.75} aria-hidden />
-    </motion.span>
-  );
+  return <Icon size={20} strokeWidth={1.75} color={STROKE[tone]} aria-hidden />;
 }
