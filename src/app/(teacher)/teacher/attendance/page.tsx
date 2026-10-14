@@ -43,10 +43,10 @@ const MARKS: {
   dot: string;
   num: string;
 }[] = [
-  { status: "present", letterKey: "common.presentLetter", on: "bg-green-700 border-green-700 text-white", off: "hover:border-green-700 hover:text-green-800", dot: "bg-green-700", num: "text-green-800 dark:text-green-300" },
-  { status: "late", letterKey: "common.lateLetter", on: "bg-amber-600 border-amber-600 text-white", off: "hover:border-amber-600 hover:text-amber-700", dot: "bg-amber-600", num: "text-amber-700 dark:text-amber-300" },
-  { status: "absent", letterKey: "common.absentLetter", on: "bg-red-700 border-red-700 text-white", off: "hover:border-red-700 hover:text-red-800", dot: "bg-red-700", num: "text-red-800 dark:text-red-300" },
-  { status: "excused", letterKey: "common.excusedLetter", on: "bg-slate-600 border-slate-600 text-white", off: "hover:border-slate-600 hover:text-slate-700", dot: "bg-slate-500", num: "text-slate-700 dark:text-slate-300" },
+  { status: "present", letterKey: "common.presentLetter", on: "bg-attend-present border-attend-present text-white", off: "hover:border-attend-present hover:text-attend-present-ink", dot: "bg-attend-present", num: "text-attend-present-ink" },
+  { status: "late", letterKey: "common.lateLetter", on: "bg-attend-late border-attend-late text-white", off: "hover:border-attend-late hover:text-attend-late-ink", dot: "bg-attend-late", num: "text-attend-late-ink" },
+  { status: "absent", letterKey: "common.absentLetter", on: "bg-attend-absent border-attend-absent text-white", off: "hover:border-attend-absent hover:text-attend-absent-ink", dot: "bg-attend-absent", num: "text-attend-absent-ink" },
+  { status: "excused", letterKey: "common.excusedLetter", on: "bg-attend-excused border-attend-excused text-white", off: "hover:border-attend-excused hover:text-attend-excused-ink", dot: "bg-attend-excused", num: "text-attend-excused-ink" },
 ];
 
 /** Today on the teacher's own device — not toISOString(), which is the UTC
@@ -278,7 +278,7 @@ export default function TeacherAttendancePage() {
                 role="tab"
                 aria-selected={on}
                 onClick={() => pickHalaqa(h.id)}
-                className={`flex-shrink-0 rounded-2xl border px-3 py-2 text-start transition-colors ${
+                className={`flex-shrink-0 min-h-11 rounded-2xl border px-3.5 py-2 text-start transition-all duration-200 ${
                   on ? "border-emerald-700 bg-emerald-700 text-white" : "border-surface-border bg-surface-card text-ink hover:border-emerald-700"
                 }`}
               >
@@ -316,7 +316,7 @@ export default function TeacherAttendancePage() {
         </p>
         <button
           onClick={markAllPresent}
-          className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+          className="btn btn-ghost min-h-11 px-3 text-xs text-attend-present-ink"
         >
           {t("teacher.attendance.markAllPresent")}
         </button>
@@ -332,7 +332,7 @@ export default function TeacherAttendancePage() {
           const summary = summariseAttendance(history[s.id] ?? []);
           return (
             <div key={s.id} className="flex items-center gap-3 px-3 py-3">
-              <div className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-xs flex-shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-xs flex-shrink-0">
                 {initials(s.name)}
               </div>
               <div className="flex-1 min-w-0">
@@ -350,7 +350,7 @@ export default function TeacherAttendancePage() {
                       onClick={() => mark(s.id, m.status)}
                       aria-label={`${t(`common.${m.status}`)} — ${s.name}`}
                       aria-pressed={active}
-                      className={`w-9 h-9 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
+                      className={`w-11 h-11 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
                         active ? m.on : `border-surface-border text-ink-muted ${m.off}`
                       }`}
                     >
@@ -396,7 +396,7 @@ export default function TeacherAttendancePage() {
         <button
           onClick={saveAttendance}
           disabled={(marked === 0 && !changed) || saving}
-          className="w-full max-w-4xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-[.98] transition-all"
+          className="btn btn-primary w-full max-w-4xl mx-auto rounded-2xl disabled:opacity-40"
         >
           {saved && <IconCheck size={16} />}
           {saving

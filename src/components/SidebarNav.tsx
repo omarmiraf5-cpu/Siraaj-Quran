@@ -109,7 +109,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   return (
     <>
       {/* ── MOBILE TOP BAR ── */}
-      <header className="md:hidden fixed top-[env(safe-area-inset-top)] start-0 end-0 z-50 gradient-navy flex items-center justify-between px-4 h-14 shadow-dark">
+      <header className="md:hidden fixed top-[env(safe-area-inset-top)] start-0 end-0 z-50 gradient-navy flex items-center justify-between px-3 h-14 shadow-dark border-b border-white/10">
         <div className="flex items-center gap-2.5 min-w-0">
           <Crest
             branding={branding}
@@ -121,11 +121,11 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         </div>
         <div className="flex items-center gap-1.5">
           <SchoolSwitcher variant="topbar" enabled={!demoUser} />
-          <LanguageToggle variant="icon" className="bg-white/10 text-white/70 hover:bg-white/20" />
-          <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
+          <LanguageToggle variant="icon" className="min-w-11 min-h-11 bg-white/10 text-white/80 hover:bg-white/20" />
+          <ThemeToggle variant="pill" className="min-h-11 bg-white/10 text-white/85 hover:bg-white/20" />
           <button
             onClick={handleSignOut}
-            className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 transition"
+            className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white/80 hover:bg-white/20 transition active:scale-95"
             aria-label={t("common.signOut")}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -138,18 +138,18 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       </header>
 
       {/* ── MOBILE BOTTOM TAB BAR ── */}
-      <nav className="md:hidden fixed bottom-0 start-0 end-0 z-50 bg-brand-navy border-t border-white/10 flex safe-area-bottom">
+      <nav className="md:hidden fixed bottom-0 start-0 end-0 z-50 bg-brand-navy-dark/95 backdrop-blur-xl border-t border-white/10 flex safe-area-bottom">
         {primaryItems.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors ${
-                active ? "text-brand-gold" : "text-white/45 hover:text-white/80"
+              className={`flex-1 flex flex-col items-center justify-center min-h-14 py-1.5 gap-1 text-[11px] font-semibold transition-colors ${
+                active ? "text-brand-gold-light" : "text-white/75 hover:text-white"
               }`}
             >
-              <span className={active ? "text-brand-gold" : ""}>{item.icon}</span>
+              <span className={`flex items-center justify-center w-8 h-6 rounded-full transition-all ${active ? "bg-brand-gold/20 text-brand-gold-light" : ""}`}>{item.icon}</span>
               {t(item.labelKey)}
             </Link>
           );
@@ -159,11 +159,11 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
-            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors ${
-              moreActive || moreOpen ? "text-brand-gold" : "text-white/45 hover:text-white/80"
+            className={`flex-1 flex flex-col items-center justify-center min-h-14 py-1.5 gap-1 text-[11px] font-semibold transition-colors ${
+              moreActive || moreOpen ? "text-brand-gold-light" : "text-white/75 hover:text-white"
             }`}
           >
-            <span className={moreActive || moreOpen ? "text-brand-gold" : ""}>
+            <span className={`flex items-center justify-center w-8 h-6 rounded-full ${moreActive || moreOpen ? "bg-brand-gold/20 text-brand-gold-light" : ""}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
                 <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
@@ -183,7 +183,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             onClick={() => setMoreOpen(false)}
             aria-hidden="true"
           />
-          <div className="md:hidden fixed bottom-14 start-0 end-0 z-50 bg-brand-navy border-t border-white/10 rounded-t-2xl shadow-dark p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+          <div className="sheet-in md:hidden fixed bottom-14 start-0 end-0 z-50 bg-brand-navy-dark border-t border-white/10 rounded-t-[22px] shadow-dark p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
             {moreItems.map((item) => {
               const active = pathname === item.href;
               return (
@@ -191,8 +191,8 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                   key={item.href}
                   href={item.href}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                    active ? "bg-white/15 text-brand-gold" : "text-white/70 hover:bg-white/8 hover:text-white"
+                  className={`flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium transition-colors active:scale-[.99] ${
+                    active ? "bg-white/15 text-brand-gold-light" : "text-white/80 hover:bg-white/8 hover:text-white"
                   }`}
                 >
                   <span className="flex-shrink-0 opacity-80">{item.icon}</span>
@@ -205,7 +205,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       )}
 
       {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="hidden md:flex flex-col w-56 min-h-screen gradient-navy text-white p-4 gap-2 flex-shrink-0">
+      <aside className="hidden md:flex flex-col w-56 min-h-screen sticky top-0 h-screen overflow-y-auto gradient-navy text-white p-4 gap-1 flex-shrink-0 border-e border-white/10">
         {/* Logo + branding */}
         <div className="flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
           <Crest
@@ -253,13 +253,13 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium transition-all ${
                   active
-                    ? "bg-white/15 text-white"
-                    : "text-white/60 hover:text-white hover:bg-white/8"
+                    ? "bg-white/12 text-white border-s-[3px] border-brand-gold-light"
+                    : "text-white/70 hover:text-white hover:bg-white/8"
                 }`}
               >
-                <span className="flex-shrink-0 opacity-80">{item.icon}</span>
+                <span className={`flex-shrink-0 ${active ? "text-brand-gold-light" : "opacity-80"}`}>{item.icon}</span>
                 {t(item.labelKey)}
               </Link>
             );
@@ -269,7 +269,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         {/* Sign out */}
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/8 transition-all border-t border-white/10 mt-2 pt-3"
+          className="flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/8 transition-all border-t border-white/10 mt-2"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

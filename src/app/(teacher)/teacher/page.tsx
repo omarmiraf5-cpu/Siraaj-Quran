@@ -37,10 +37,10 @@ import { myHalaqas, narrowToMine } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
-  present: "text-green-800 dark:text-green-300",
-  late: "text-amber-800 dark:text-amber-300",
-  absent: "text-red-800 dark:text-red-300",
-  excused: "text-slate-600 dark:text-slate-300",
+  present: "text-attend-present-ink",
+  late: "text-attend-late-ink",
+  absent: "text-attend-absent-ink",
+  excused: "text-attend-excused-ink",
 };
 
 interface RosterStudent {
@@ -318,7 +318,7 @@ export default function TeacherDashboard() {
                             {st && (
                               <span
                                 className={`w-1.5 h-1.5 rounded-full ${
-                                  st === "present" ? "bg-green-700" : st === "late" ? "bg-amber-600" : st === "absent" ? "bg-red-700" : "bg-slate-500"
+                                  st === "present" ? "bg-attend-present" : st === "late" ? "bg-attend-late" : st === "absent" ? "bg-attend-absent" : "bg-attend-excused"
                                 }`}
                                 title={t(`common.${st}`)}
                               />

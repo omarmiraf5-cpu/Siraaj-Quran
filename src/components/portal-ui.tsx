@@ -97,13 +97,13 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label={t("common.close")}
-            className="absolute top-4 end-4 z-20 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition"
+            className="absolute top-3 end-3 z-20 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition active:scale-95"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
-          <div className="relative flex items-center gap-3.5 pe-8">
+          <div className="relative flex items-center gap-3.5 pe-12">
             {badge && (
               <span className="w-12 h-12 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-[15px] font-bold text-white flex-shrink-0">
                 {badge}
@@ -149,6 +149,38 @@ export function SectionCard({
 /* ── Stat tile ─────────────────────────────────────────────────────────
    A number that carries the context making it mean something. Renders as a
    button when given an onClick, so a stat can lead somewhere. */
+function useCountUp(value: string | number) {
+  const raw = String(value);
+  const match = raw.match(/^(\d+)(.*)$/);
+  const target = match ? Number(match[1]) : null;
+  const suffix = match ? match[2] : "";
+  const [shown, setShown] = useState(target ?? 0);
+
+  useEffect(() => {
+    if (target == null) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || target === 0) {
+      setShown(target);
+      return;
+    }
+    const start = performance.now();
+    const from = 0;
+    const dur = 680;
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setShown(Math.round(from + (target - from) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+
+  if (target == null) return raw;
+  return `${shown}${suffix}`;
+}
+
 export function StatTile({
   value,
   label,
@@ -160,11 +192,12 @@ export function StatTile({
   sub?: string;
   onClick?: () => void;
 }) {
+  const display = useCountUp(value);
   const body = (
     <>
-      <p className="text-[26px] font-bold text-ink tabular-nums leading-none"><bdi dir="ltr">{value}</bdi></p>
+      <p className="font-display text-[28px] font-semibold text-ink tabular-nums leading-none tracking-tight"><bdi dir="ltr">{display}</bdi></p>
       <p className="eyebrow mt-2">{label}</p>
-      {sub && <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
+      {sub && <p className="text-[12px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
     </>
   );
 
@@ -175,13 +208,13 @@ export function StatTile({
   // out the grid — and with it the page's horizontal scroll — instead
   // of just wrapping to a second line.
   if (!onClick) {
-    return <div className="card-quiet px-4 py-4 min-w-0">{body}</div>;
+    return <div className="card-quiet card-lift px-4 py-4 min-w-0">{body}</div>;
   }
   return (
     <button
       type="button"
       onClick={onClick}
-      className="card-quiet px-4 py-4 min-w-0 text-start cursor-pointer hover:bg-surface-bg-warm hover:-translate-y-0.5 transition-all active:scale-[.98]"
+      className="card-quiet card-lift px-4 py-4 min-w-0 min-h-11 text-start cursor-pointer hover:bg-surface-bg-warm active:scale-[.98]"
     >
       {body}
     </button>
@@ -204,17 +237,17 @@ export function ProgressBar({
       : tone === "emerald"
         ? "bg-brand-emerald"
         : value >= 95
-          ? "bg-green-600"
+          ? "bg-attend-present"
           : value >= 70
             ? "bg-brand-emerald"
             : value >= 40
-              ? "bg-amber-500"
-              : "bg-red-600";
+              ? "bg-attend-late"
+              : "bg-attend-absent";
 
   return (
-    <div className="h-1.5 bg-surface-bg rounded-full overflow-hidden">
+    <div className="h-2 bg-surface-bg rounded-full overflow-hidden">
       <div
-        className={`h-full rounded-full transition-[width] duration-700 ease-out ${fill}`}
+        className={`progress-fill h-full rounded-full transition-[width] duration-700 ease-out ${fill}`}
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>
@@ -307,9 +340,9 @@ export function SegmentedSwitch<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all ${
+            className={`min-h-11 px-4 rounded-full text-[13px] font-semibold transition-all duration-200 ease-out ${
               active
-                ? "bg-brand-navy text-white shadow-sm"
+                ? "bg-brand-navy-dark text-white shadow-e1"
                 : "text-ink-muted hover:text-ink"
             }`}
           >
@@ -324,7 +357,11 @@ export function SegmentedSwitch<T extends string>({
 /* ── Empty state ───────────────────────────────────────────────────────
    Quiet rather than an alert box; nothing here is a problem. */
 export function EmptyNote({ children }: { children: React.ReactNode }) {
-  return <p className="text-[13px] text-ink-muted py-2">{children}</p>;
+  return (
+    <p className="text-[13px] text-ink-muted text-center leading-relaxed py-6 px-3 rounded-xl border border-dashed border-surface-border bg-surface-bg-warm/70">
+      {children}
+    </p>
+  );
 }
 
 /* ── Loading state ─────────────────────────────────────────────────────
@@ -335,9 +372,12 @@ export function EmptyNote({ children }: { children: React.ReactNode }) {
    school somebody else's names. */
 export function LoadingNote({ children = "Loading…" }: { children?: React.ReactNode }) {
   return (
-    <p className="text-[13px] text-ink-muted py-2 animate-pulse" aria-live="polite">
-      {children}
-    </p>
+    <div aria-live="polite" className="py-2 space-y-2.5">
+      <div className="skeleton w-2/3" />
+      <div className="skeleton w-full" />
+      <div className="skeleton w-5/6" />
+      <p className="text-[13px] text-ink-muted pt-1">{children}</p>
+    </div>
   );
 }
 

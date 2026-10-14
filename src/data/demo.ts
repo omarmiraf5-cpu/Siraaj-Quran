@@ -249,18 +249,18 @@ export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
 
 // Solid fills for dots and the day strip, where a tinted chip would disappear.
 export const ATTENDANCE_DOT: Record<AttendanceStatus, string> = {
-  present: "bg-green-700",
-  late: "bg-amber-600",
-  absent: "bg-red-700",
-  excused: "bg-slate-500",
+  present: "bg-attend-present",
+  late: "bg-attend-late",
+  absent: "bg-attend-absent",
+  excused: "bg-attend-excused",
 };
 
 // Tailwind classes per status, shared so the three portals agree on colour.
 export const ATTENDANCE_STYLES: Record<AttendanceStatus, string> = {
-  present: "bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300",
-  late: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300",
-  absent: "bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300",
-  excused: "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300",
+  present: "bg-attend-present-bg text-attend-present-ink",
+  late: "bg-attend-late-bg text-attend-late-ink",
+  absent: "bg-attend-absent-bg text-attend-absent-ink",
+  excused: "bg-attend-excused-bg text-attend-excused-ink",
 };
 
 // Assignments shaped exactly like the ones the API returns, so a screen can

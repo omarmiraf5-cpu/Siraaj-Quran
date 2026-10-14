@@ -42,8 +42,8 @@ function StudentTabBar() {
   const { t } = useLanguage();
 
   return (
-    <nav className="fixed bottom-0 start-0 end-0 z-50 bg-surface-card/90 backdrop-blur-xl border-t border-surface-border safe-area-bottom">
-      <div className="max-w-5xl mx-auto flex px-2 py-1.5">
+    <nav className="fixed bottom-0 start-0 end-0 z-50 bg-surface-card/92 backdrop-blur-xl border-t border-surface-border shadow-e2 safe-area-bottom">
+      <div className="max-w-5xl mx-auto flex px-1.5 py-1">
         {TABS.map(({ href, labelKey, Icon, colour }) => {
           const active =
             href === "/student/learn"
@@ -56,10 +56,10 @@ function StudentTabBar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-2xl transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-90"
+              className="flex-1 flex flex-col items-center justify-center gap-1 min-h-14 py-1 rounded-2xl transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95"
             >
               <span
-                className={`w-10 h-8 rounded-full flex items-center justify-center transition-all ${
+                className={`w-11 h-8 rounded-full flex items-center justify-center transition-all ${
                   active
                     ? `${ILLUM_CLASS[colour]} scale-105`
                     : "text-ink-muted border border-transparent"
@@ -90,7 +90,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   if (blocked) return <div className="min-h-screen bg-surface-bg" />;
   return (
     <div className="min-h-screen bg-surface-bg pb-28">
-      <div className="max-w-5xl mx-auto">{children}</div>
+      <div className="page-enter max-w-5xl mx-auto">{children}</div>
       <StudentTabBar />
     </div>
   );

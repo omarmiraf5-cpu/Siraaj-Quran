@@ -100,10 +100,8 @@ interface CampusPlace {
 const RADII = [100, 150, 250, 500];
 const input =
   "w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition";
-const primary =
-  "bg-brand-navy text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl hover:bg-brand-navy-mid disabled:opacity-40 active:scale-[.98] transition-all";
-const ghost =
-  "text-[13px] font-semibold py-2.5 px-5 rounded-xl border border-surface-border text-ink hover:bg-surface-bg-warm disabled:opacity-40 transition";
+const primary = "btn btn-primary disabled:opacity-40";
+const ghost = "btn btn-secondary disabled:opacity-40";
 
 export default function StaffAttendancePage() {
   const { language, tr } = useLanguage();

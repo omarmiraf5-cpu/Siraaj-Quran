@@ -18,14 +18,14 @@ export function PortalHero({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="gradient-navy rounded-[18px] px-7 py-6 relative overflow-hidden">
-      <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <header className="hero-frame gradient-navy rounded-[20px] px-5 py-5 sm:px-7 sm:py-6 relative overflow-hidden">
+      <div className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="eyebrow text-white/45">{eyebrow}</p>
-          <h1 className="page-title text-white text-3xl mt-1.5">{title}</h1>
+          <p className="eyebrow text-white/70">{eyebrow}</p>
+          <h1 className="page-title text-white text-[1.65rem] sm:text-3xl mt-1.5 leading-tight">{title}</h1>
           {meta && meta.length > 0 && (
-            <p className="text-[13px] text-white/55 mt-2.5">
+            <p className="text-[13px] text-white/75 mt-2.5">
               {meta.map((m, i) => (
                 <span key={i}>
                   {i > 0 && <span className="text-white/25 mx-2">·</span>}
@@ -55,7 +55,7 @@ export function HeroButtonPrimary({
   return (
     <a
       href={href}
-      className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition"
+      className="btn btn-accent rounded-full px-4 text-[13px]"
     >
       {icon}
       {children}
@@ -76,7 +76,7 @@ export function HeroButtonGhost({
   return (
     <a
       href={href}
-      className="inline-flex items-center gap-2 rounded-full border border-white/25 px-4 py-2.5 text-[13px] font-semibold text-white/85 hover:bg-white/10 active:scale-[.98] transition"
+      className="btn rounded-full border-white/30 bg-white/10 px-4 text-[13px] text-white hover:bg-white/16"
     >
       {icon}
       {children}

@@ -316,7 +316,7 @@ export default function LoginPage() {
   }, [pin, roster, studentId]);
 
   return (
-    <div className="relative min-h-screen gradient-navy flex items-center justify-center overflow-hidden">
+    <div className="page-enter relative min-h-screen gradient-navy flex items-center justify-center overflow-x-hidden">
       {/* Ambient texture */}
       <div className="absolute inset-0 pattern-lattice pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/25 pointer-events-none" />
@@ -325,8 +325,8 @@ export default function LoginPage() {
           with the reading direction rather than colliding with the role
           switcher's mirrored position under Arabic) */}
       <div className="fixed top-3 end-3 z-50 flex items-center gap-1.5">
-        <LanguageToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
-        <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
+        <LanguageToggle variant="pill" className="min-h-11 bg-white/10 text-white/85 hover:bg-white/20" />
+        <ThemeToggle variant="pill" className="min-h-11 bg-white/10 text-white/85 hover:bg-white/20" />
       </div>
 
       <div className="relative w-full max-w-6xl flex flex-col md:flex-row items-center md:items-stretch gap-4 md:gap-0 px-6 py-10 md:py-14">
@@ -399,7 +399,7 @@ export default function LoginPage() {
       <div className="flex flex-col items-center justify-center w-full md:w-1/2 px-2 md:ps-10 py-4">
 
         {/* Mobile-only compact header */}
-        <div className="flex md:hidden flex-col items-center mb-6">
+        <div className="flex md:hidden flex-col items-center mb-4">
           <div className="w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark mb-2">
             <Image src="/crest.jpg" alt="MyDiiwaan" width={80} height={80} className="object-cover w-full h-full" />
           </div>
@@ -414,12 +414,12 @@ export default function LoginPage() {
         {(() => {
           const r = DAILY_REFLECTIONS[new Date().getDay()];
           return (
-            <div className="w-full max-w-sm mb-6 text-center space-y-2">
+            <div className="w-full max-w-sm mb-4 text-center space-y-1.5">
               <p className="font-display text-emerald-400 text-sm uppercase tracking-[0.2em] font-bold">
                 {t("login.dailyReflection")}
               </p>
               <p
-                className="font-calligraphy text-[30px] text-brand-gold-light leading-[2.1]"
+                className="font-calligraphy text-[26px] text-brand-gold-light leading-[1.9]"
                 dir="rtl" lang="ar"
               >
                 {r.arabic}
@@ -438,15 +438,15 @@ export default function LoginPage() {
         })()}
 
         {/* Role switcher */}
-        <div className="flex rounded-pill backdrop-blur-md bg-white/10 border border-white/10 p-1 mb-5 gap-1 shadow-dark">
+        <div className="flex w-full max-w-sm rounded-pill backdrop-blur-md bg-white/10 border border-white/15 p-1 mb-5 gap-1 shadow-dark">
           {ROLES.map((r) => (
             <button
               key={r.key}
               onClick={() => { setRole(r.key); setPin(""); setError(null); }}
-              className={`px-4 py-2 rounded-pill text-sm font-semibold transition-all ${
+              className={`flex-1 min-h-11 px-2 rounded-pill text-[13px] font-semibold transition-all duration-200 ease-out active:scale-[.98] ${
                 role === r.key
                   ? "bg-surface-card text-ink shadow-card"
-                  : "text-white/70 hover:text-white"
+                  : "text-white/75 hover:text-white"
               }`}
             >
               {t(r.labelKey)}
@@ -524,7 +524,7 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       disabled={!schoolCode.trim() || schoolLookup === "loading"}
-                      className="rounded-card bg-brand-gold text-brand-navy font-semibold px-4 disabled:opacity-50 active:scale-95 transition-all"
+                      className="btn btn-accent rounded-card px-4 disabled:opacity-50"
                     >
                       {schoolLookup === "loading" ? "…" : t("login.findSchool")}
                     </button>
@@ -568,7 +568,7 @@ export default function LoginPage() {
                       <button
                         key={d}
                         onClick={() => handlePin(String(d))}
-                        className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl font-semibold hover:bg-white/20 active:scale-95 transition-all"
+                        className="h-14 min-h-11 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl font-semibold hover:bg-white/20 active:scale-95 transition-all"
                       >
                         {d}
                       </button>
@@ -576,13 +576,13 @@ export default function LoginPage() {
                     <div />
                     <button
                       onClick={() => handlePin("0")}
-                      className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl font-semibold hover:bg-white/20 active:scale-95 transition-all"
+                      className="h-14 min-h-11 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl font-semibold hover:bg-white/20 active:scale-95 transition-all"
                     >
                       0
                     </button>
                     <button
                       onClick={() => setPin((p) => p.slice(0, -1))}
-                      className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center"
+                      className="h-14 min-h-11 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center"
                     >
                       ⌫
                     </button>
@@ -600,7 +600,7 @@ export default function LoginPage() {
                   type="email" required placeholder={t("login.emailAddress")}
                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
+                  className="w-full min-h-12 backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 text-white placeholder-white/55 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/35 focus:bg-white/[0.12] transition-all"
                 />
               </div>
               <div className="relative">
@@ -610,7 +610,7 @@ export default function LoginPage() {
                 <input
                   type="password" required placeholder="••••••••"
                   value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
+                  className="w-full min-h-12 backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 text-white placeholder-white/55 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/35 focus:bg-white/[0.12] transition-all"
                 />
               </div>
 
@@ -622,8 +622,9 @@ export default function LoginPage() {
 
               <button
                 type="submit" disabled={loading}
-                className="relative w-full overflow-hidden gradient-emerald text-white font-semibold py-3.5 rounded-card shadow-dark hover:opacity-95 hover:shadow-lg active:scale-[.98] transition-all disabled:opacity-60"
+                className="btn btn-accent relative w-full rounded-card shadow-dark disabled:opacity-60"
               >
+                {loading && <span className="btn-spinner" aria-hidden="true" />}
                 {loading ? t("login.signingIn") : `${t("login.signInTo")} ${t(ROLES.find((r) => r.key === role)?.portalKey ?? "")}`}
               </button>
 

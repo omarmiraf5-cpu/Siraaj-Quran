@@ -10,17 +10,33 @@
    into a grey admin panel the moment you signed in, which is what made the
    product feel cheaper after the front door. */
 :root {
-  --c-surface-bg: #f5f2ea;
-  --c-surface-bg-warm: #faf8f3;
-  --c-surface-card: #fffefb;
-  --c-surface-border: #e4ddcd;
-  --c-ink: #191510;
-  --c-ink-body: #2a241c;
-  --c-ink-muted: #8d8477;
-  --c-ink-muted-2: #9d9487;
+  --c-surface-bg: #f4f2ec;
+  --c-surface-bg-warm: #fbfaf6;
+  --c-surface-card: #ffffff;
+  --c-surface-border: #e3ddd2;
+  --c-ink: #12161d;
+  --c-ink-body: #2a303a;
+  /* Muted ink is dark enough for WCAG AA on the paper and on white cards. */
+  --c-ink-muted: #5c6370;
+  --c-ink-muted-2: #6a7180;
   /* Gold, for hairlines and accents drawn from the wordmark. */
-  --c-gold: #c6a253;
-  --c-gold-soft: rgba(198, 162, 83, 0.28);
+  --c-gold: #c6a15a;
+  --c-gold-soft: rgba(198, 161, 90, 0.32);
+  --c-focus: #8a6424;
+  --c-navy: #0e2347;
+  /* Attendance. Ink is the label colour; the solid is for dots and marks. */
+  --attend-present: #0e7a48;
+  --attend-present-ink: #0c643c;
+  --attend-present-bg: #e5f6ee;
+  --attend-late: #9a6200;
+  --attend-late-ink: #7a4e00;
+  --attend-late-bg: #fff4dc;
+  --attend-absent: #b42318;
+  --attend-absent-ink: #912018;
+  --attend-absent-bg: #fdeceb;
+  --attend-excused: #3e5278;
+  --attend-excused-ink: #334466;
+  --attend-excused-bg: #eef2f7;
 }
 
 /* --font-jakarta, --font-newsreader, --font-amiri and --font-ruqaa are set by
@@ -30,16 +46,29 @@
 
 /* ── Dark mode tokens ── */
 .dark {
-  --c-surface-bg: #100e0b;
-  --c-surface-bg-warm: #16130f;
-  --c-surface-card: #1a1712;
-  --c-surface-border: #2c2720;
-  --c-ink: #f2ece0;
-  --c-ink-body: #ccc3b4;
-  --c-ink-muted: #6f665a;
-  --c-ink-muted-2: #5f574d;
-  --c-gold: #c6a253;
-  --c-gold-soft: rgba(198, 162, 83, 0.22);
+  --c-surface-bg: #0c1018;
+  --c-surface-bg-warm: #121826;
+  --c-surface-card: #161d2b;
+  --c-surface-border: #2a3344;
+  --c-ink: #f4f1ea;
+  --c-ink-body: #d5d0c6;
+  --c-ink-muted: #b7c0cc;
+  --c-ink-muted-2: #8e99a8;
+  --c-gold: #e6cd8a;
+  --c-gold-soft: rgba(230, 205, 138, 0.28);
+  --c-focus: #e6cd8a;
+  --attend-present: #3dbe7a;
+  --attend-present-ink: #8ed7b0;
+  --attend-present-bg: rgba(14, 122, 72, 0.22);
+  --attend-late: #e0a23a;
+  --attend-late-ink: #f0cb7a;
+  --attend-late-bg: rgba(154, 98, 0, 0.22);
+  --attend-absent: #f07167;
+  --attend-absent-ink: #f5b4ae;
+  --attend-absent-bg: rgba(180, 35, 24, 0.22);
+  --attend-excused: #9bb0d0;
+  --attend-excused-ink: #c5d2e6;
+  --attend-excused-bg: rgba(62, 82, 120, 0.28);
 }
 
 @layer base {
@@ -56,7 +85,7 @@
     font-variant-numeric: tabular-nums;
   }
   .gradient-navy {
-    background: linear-gradient(160deg, #1e3f7a 0%, #15305f 50%, #0e2347 100%);
+    background: linear-gradient(165deg, #1c4a82 0%, #14325c 46%, #0e2347 100%);
   }
   .gradient-emerald {
     background: linear-gradient(135deg, #26a06c, #1f8a5b);
@@ -206,10 +235,17 @@
   .animate-gentle-spin,
   .animate-gentle-wobble,
   .animate-drift,
-  .animate-pulse-soft {
+  .animate-pulse-soft,
+  .page-enter,
+  .sheet-in,
+  .skeleton,
+  .progress-fill::after,
+  .btn-spinner {
     animation: none;
   }
-  .animate-rise {
+  .animate-rise,
+  .page-enter,
+  .sheet-in {
     opacity: 1;
     transform: none;
   }
@@ -266,6 +302,26 @@
 @keyframes pulseSoft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@keyframes sheetUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Keyboard focus for controls that don't already draw their own ring. */
+button:focus-visible,
+a:focus-visible,
+[role="tab"]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
 }
 
 /* ── Mushaf spread ──────────────────────────────────────────────────
@@ -329,9 +385,9 @@
    threshold where it competes with a dense table. */
 body {
   background-image:
-    linear-gradient(45deg, rgba(198, 162, 83, 0.035) 1px, transparent 1px),
-    linear-gradient(-45deg, rgba(198, 162, 83, 0.035) 1px, transparent 1px);
-  background-size: 34px 34px;
+    linear-gradient(45deg, rgba(14, 35, 71, 0.018) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(198, 161, 90, 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
   background-attachment: fixed;
 }
 .dark body {
@@ -371,9 +427,9 @@ body {
   /* Page title: serif, because everything being one bold sans is most of
      why the portals read as a template. */
   .page-title {
-    font-family: var(--font-newsreader), Georgia, serif;
+    font-family: var(--font-newsreader), var(--font-amiri), var(--font-noto-arabic), Georgia, serif;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
     color: var(--c-ink);
   }
 
@@ -394,16 +450,22 @@ body {
   .card-quiet {
     background: var(--c-surface-card);
     border: 1px solid var(--c-surface-border);
-    border-radius: 18px;
+    border-radius: 16px;
     box-shadow:
-      0 1px 2px rgba(60, 48, 28, 0.05),
-      0 2px 6px -2px rgba(60, 48, 28, 0.07),
-      0 12px 28px -18px rgba(60, 48, 28, 0.24);
+      0 1px 2px rgba(14, 35, 71, 0.04),
+      0 10px 28px -18px rgba(14, 35, 71, 0.16);
+    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease;
   }
   .dark .card-quiet {
     box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.3),
-      0 12px 28px -18px rgba(0, 0, 0, 0.5);
+      0 1px 2px rgba(0, 0, 0, 0.35),
+      0 14px 32px -18px rgba(0, 0, 0, 0.55);
+  }
+  @media (hover: hover) {
+    .card-lift:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 32px -16px rgba(14, 35, 71, 0.22);
+    }
   }
 
   /* Feature card: the same, plus a gold hairline along the top edge. */
@@ -552,8 +614,121 @@ body {
     color: #6f5518;
   }
   .dark .icon-tile {
-    background: linear-gradient(140deg, rgba(198, 162, 83, 0.20), rgba(198, 162, 83, 0.08));
+    background: linear-gradient(140deg, rgba(198, 161, 90, 0.22), rgba(198, 161, 90, 0.08));
     color: var(--c-gold);
+  }
+
+  /* ── Buttons ──────────────────────────────────────────────────────────
+     One control language: primary (navy), accent (gold), secondary,
+     ghost, destructive. 44px tall, a focus ring, a slight press, and a
+     spinner when the button itself is marked loading. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.625rem 1.05rem;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 0;
+    transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease, color 150ms ease;
+  }
+  .btn:focus-visible {
+    outline: 2px solid var(--c-focus);
+    outline-offset: 2px;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--c-navy);
+    color: #fff;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 8px 18px -12px rgba(14, 35, 71, 0.7);
+  }
+  .btn-primary:hover:not(:disabled) { background: #16325f; }
+  .btn-accent {
+    background: linear-gradient(180deg, #e6cd8a 0%, #c6a15a 100%);
+    color: #1c1408;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 8px 18px -12px rgba(90, 60, 10, 0.55);
+  }
+  .btn-accent:hover:not(:disabled) { filter: brightness(1.05); }
+  .btn-secondary {
+    background: var(--c-surface-card);
+    color: var(--c-ink);
+    border-color: var(--c-surface-border);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    border-color: rgba(14, 35, 71, 0.35);
+    background: var(--c-surface-bg-warm);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--c-ink);
+  }
+  .btn-ghost:hover:not(:disabled) { background: rgba(14, 35, 71, 0.06); }
+  .btn-destructive {
+    background: var(--attend-absent);
+    color: #fff;
+  }
+  .btn-destructive:hover:not(:disabled) { filter: brightness(1.06); }
+  .btn-spinner {
+    width: 15px;
+    height: 15px;
+    border-radius: 999px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: btn-spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  .hero-frame {
+    border: 1px solid rgba(230, 205, 138, 0.32);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 18px 40px -24px rgba(8, 16, 36, 0.55);
+  }
+
+  .skeleton {
+    height: 12px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, var(--c-surface-border) 0%, var(--c-surface-bg-warm) 45%, var(--c-surface-border) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.15s ease-in-out infinite;
+  }
+  .page-enter {
+    animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .sheet-in {
+    animation: sheetUp 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .progress-fill { position: relative; overflow: hidden; }
+  .progress-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+    transform: translateX(-120%);
+    animation: sweep 2.8s ease-in-out infinite;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 0.55rem;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
   }
 }
 

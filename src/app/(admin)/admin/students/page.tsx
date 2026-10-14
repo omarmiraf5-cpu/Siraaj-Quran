@@ -33,9 +33,9 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
 
 const bigField =
-  "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
+  "w-full min-h-11 bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/35 transition";
 const smallField =
-  "w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
+  "w-full min-h-11 bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/35 transition";
 
 export default function AdminStudentsPage() {
   const { tr } = useLanguage();
@@ -610,7 +610,7 @@ export default function AdminStudentsPage() {
           className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
         >
           <span
-            className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
+            className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
               inactive
                 ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500"
                 : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"
@@ -805,7 +805,7 @@ export default function AdminStudentsPage() {
                         type="button"
                         onClick={() => deleteStudent(s)}
                         disabled={deleteBusy || deleteText.trim().toLowerCase() !== s.name.trim().toLowerCase()}
-                        className="bg-red-700 text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-xl disabled:opacity-40"
+                        className="btn btn-destructive text-[12.5px] disabled:opacity-40"
                       >
                         {deleteBusy ? tr("Deleting…") : tr("Delete permanently")}
                       </button>
@@ -856,7 +856,7 @@ export default function AdminStudentsPage() {
                 setTimeout(() => setCopied(false), 2000);
               }).catch(() => {});
             }}
-            className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-[12.5px] font-semibold px-3.5 py-2 rounded-xl hover:border-brand-navy/40 transition"
+            className="btn btn-secondary flex-shrink-0 text-[12.5px]"
           >
             {copied ? tr("Copied") : tr("Copy sign-in link")}
           </button>
@@ -868,14 +868,14 @@ export default function AdminStudentsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={tr("Search students or parents…")}
-          className="flex-1 min-w-[180px] bg-surface-card border border-surface-border rounded-2xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+          className="flex-1 min-w-[180px] min-h-11 bg-surface-card border border-surface-border rounded-2xl px-4 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/40 transition"
         />
         {!isDemo && (
           <button
             type="button"
             onClick={() => { setShowImport((v) => !v); setShowForm(false); }}
             aria-expanded={showImport}
-            className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-sm font-semibold px-4 py-2.5 rounded-2xl hover:border-brand-navy/40 transition"
+            className="btn btn-secondary flex-shrink-0"
           >
             {tr("Import from a spreadsheet")}
           </button>
@@ -885,7 +885,7 @@ export default function AdminStudentsPage() {
             type="button"
             onClick={downloadList}
             disabled={exporting}
-            className="flex-shrink-0 bg-surface-card border border-surface-border text-ink text-sm font-semibold px-4 py-2.5 rounded-2xl hover:border-brand-navy/40 transition disabled:opacity-50"
+            className="btn btn-secondary flex-shrink-0 disabled:opacity-50"
           >
             {exporting ? tr("Getting them…") : tr("Download the list")}
           </button>
@@ -893,7 +893,7 @@ export default function AdminStudentsPage() {
         <button
           type="button"
           onClick={() => { setShowForm((v) => !v); setShowImport(false); }}
-          className="flex-shrink-0 gradient-emerald text-white text-sm font-semibold px-4 py-2.5 rounded-2xl hover:opacity-90 active:scale-[.98] transition-all"
+          className="btn btn-primary flex-shrink-0"
         >
           {showForm ? tr("Cancel") : tr("+ Add student")}
         </button>
@@ -1027,7 +1027,7 @@ export default function AdminStudentsPage() {
           <button
             type="submit"
             disabled={!newName.trim() || (graded ? newGrade === "" : !newHalaqa) || saving}
-            className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
+            className="btn btn-primary w-full rounded-2xl disabled:opacity-40"
           >
             {saving ? tr("Adding…") : tr("Add student")}
           </button>

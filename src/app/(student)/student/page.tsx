@@ -114,7 +114,7 @@ export default function StudentDashboard() {
       {/* Hero — who you are, what you have earned, and how far to the next
           level, in the order a child reads it. */}
       <header
-        className={`${theme.hero} rounded-[22px] px-5 py-5 relative overflow-hidden animate-rise`}
+        className={`${theme.hero} hero-frame rounded-[22px] px-5 py-5 relative overflow-hidden animate-rise`}
       >
         <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
 

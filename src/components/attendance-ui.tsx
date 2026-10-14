@@ -99,11 +99,11 @@ async function nativePosition(): Promise<Fix> {
 /* ── A day's status ────────────────────────────────────────────────── */
 
 const STATUS_STYLE: Record<StaffDay["status"], string> = {
-  present: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  late: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-  absent: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  present: "bg-attend-present-bg text-attend-present-ink",
+  late: "bg-attend-late-bg text-attend-late-ink",
+  absent: "bg-attend-absent-bg text-attend-absent-ink",
   reported: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300",
-  excused: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300",
+  excused: "bg-attend-excused-bg text-attend-excused-ink",
   pending: "bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300",
   off: "bg-transparent text-ink-muted",
 };
@@ -243,7 +243,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
               type="button"
               onClick={() => act("sign_in")}
               disabled={busy !== ""}
-              className="gradient-emerald text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-50 active:scale-[.98] transition-all"
+              className="btn btn-accent"
             >
               {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Signing in…") : tr("Sign in")}
             </button>
@@ -253,7 +253,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
               type="button"
               onClick={() => act("sign_out")}
               disabled={busy !== ""}
-              className="bg-brand-navy text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-50 active:scale-[.98] transition-all"
+              className="btn btn-primary"
             >
               {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Signing out…") : tr("Sign out")}
             </button>
