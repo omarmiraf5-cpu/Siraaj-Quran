@@ -1,20 +1,51 @@
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: React.ReactNode;
-  tint?: string;
-}
+"use client";
 
-export function StatCard({ label, value, sub, icon, tint = "bg-brand-navy/10 text-brand-navy" }: StatCardProps) {
-  return (
-    <div className="bg-surface-card rounded-card-lg p-5 shadow-card border border-surface-border">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 ${tint}`}>
-        {icon}
+import type { LucideIcon } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import type { IconTone } from "@/components/IconBadge";
+import { StatCardHeader } from "@/components/StatCardHeader";
+import { hoverSpring } from "@/lib/motion-config";
+
+/** Four-up metric: badge, status pill, bold figure, muted label. */
+export function StatCard({
+  icon,
+  tone = "navy",
+  value,
+  label,
+  pill,
+  loading = false,
+}: {
+  icon?: LucideIcon;
+  tone?: IconTone;
+  value?: string | number;
+  label: string;
+  pill?: string;
+  loading?: boolean;
+}) {
+  const reduce = useReducedMotion();
+  if (loading || !icon) {
+    return (
+      <div className="card-quiet px-4 py-4 min-w-0 rounded-[22px] space-y-3" aria-hidden>
+        <div className="flex items-center justify-between">
+          <div className="skeleton h-9 w-9 rounded-full" />
+          <div className="skeleton h-5 w-16 rounded-full" />
+        </div>
+        <div className="skeleton h-8 w-16" />
+        <div className="skeleton h-3 w-24" />
       </div>
-      <p className="tabular-nums text-3xl font-bold text-ink leading-none">{value}</p>
-      <p className="font-semibold text-ink-body mt-2 text-sm">{label}</p>
-      {sub && <p className="text-ink-muted text-xs mt-0.5">{sub}</p>}
-    </div>
+    );
+  }
+  return (
+    <motion.div
+      whileHover={reduce ? undefined : { scale: 1.05 }}
+      transition={reduce ? { duration: 0 } : hoverSpring}
+      className="card-quiet card-lift px-4 py-4 min-w-0 rounded-[22px]"
+    >
+      <StatCardHeader icon={icon} tone={tone} pill={pill} />
+      <p className="font-display text-[30px] font-semibold text-ink tabular-nums leading-none tracking-tight mt-3">
+        <bdi dir="ltr">{value}</bdi>
+      </p>
+      <p className="text-[12px] text-ink-muted mt-1.5 leading-snug">{label}</p>
+    </motion.div>
   );
 }

@@ -64,7 +64,7 @@ export function SpotlightButton({
         }
         onClick?.(e);
       }}
-      whileTap={reduce || off ? undefined : { scale: 0.97 }}
+      whileTap={reduce || off ? undefined : { scale: 0.95 }}
       transition={tapSpring}
       className={`spot-btn ${variant === "primary" ? "spot-primary" : "spot-light"} ${className}`}
     >
@@ -368,17 +368,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ success: (text) => push("success", text), error: (text) => push("error", text) }}>
       {children}
-      <div className="pointer-events-none fixed bottom-24 md:bottom-6 end-4 z-[80] flex w-[min(100%-2rem,22rem)] flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-6 right-6 z-50 flex w-[min(100%-3rem,22rem)] flex-col gap-2">
         <AnimatePresence>
           {toasts.map((t) => (
             <motion.div
               key={t.id}
               role="status"
-              initial={reduce ? false : { opacity: 0, y: 16, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={reduce ? undefined : { opacity: 0, y: 10, scale: 0.98 }}
+              initial={reduce ? false : { opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={reduce ? undefined : { opacity: 0, x: 16 }}
               transition={reduce ? { duration: 0 } : enterSpring}
-              className={`pointer-events-auto toast-card ${t.kind === "success" ? "toast-ok" : "toast-bad"}`}
+              className={`pointer-events-auto toast-card backdrop-blur-md ${t.kind === "success" ? "toast-ok" : "toast-bad"}`}
             >
               {t.text}
             </motion.div>

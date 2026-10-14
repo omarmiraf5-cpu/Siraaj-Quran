@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { StatCardHeader } from "@/components/StatCardHeader";
+import { StatCard } from "@/components/StatCard";
 import type { IconTone } from "@/components/IconBadge";
 import {
   ATTENDANCE_DOT,
@@ -244,22 +244,11 @@ export function StatTile({
 }) {
   const reduce = useReducedMotion();
   const display = useCountUp(value);
+  if (mark) {
+    return <StatCard icon={mark} tone={accent} value={display} label={label} pill={sub} />;
+  }
   const pct = typeof value === "string" && value.endsWith("%") ? Number(value.replace("%", "")) : null;
-  const figure = (
-    <>
-      <p className="font-display text-[30px] font-semibold text-ink tabular-nums leading-none tracking-tight mt-3"><bdi dir="ltr">{display}</bdi></p>
-      {sub && <p className="text-[12px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
-    </>
-  );
-  const body = mark ? (
-    <div className="min-w-0">
-      <StatCardHeader icon={mark} tone={accent} label={label} />
-      {figure}
-      {pct != null && !Number.isNaN(pct) && (
-        <div className="mt-2 flex justify-end"><MiniRing value={pct} /></div>
-      )}
-    </div>
-  ) : (
+  const body = (
     <div className="flex items-start gap-3">
       <span className="icon-badge icon-badge-lg">
         {icon ?? <span className="w-2.5 h-2.5 rounded-full bg-brand-gold" />}

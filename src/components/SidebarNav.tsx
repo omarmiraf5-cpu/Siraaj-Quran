@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -17,6 +16,7 @@ import type { LucideIcon } from "lucide-react";
 import { LogOut, MoreHorizontal } from "lucide-react";
 import { IconBadge as GoldBadge, IconSignOut } from "@/components/icons";
 import { IconBadge } from "@/components/IconBadge";
+import { Sidebar } from "@/components/Sidebar";
 
 interface NavItem {
   href: string;
@@ -99,8 +99,6 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const role = t(roleKey);
   const displayName = demoUser?.name ?? userName ?? role;
   const [moreOpen, setMoreOpen] = useState(false);
-  const [hoverHref, setHoverHref] = useState<string | null>(null);
-  const reduce = useReducedMotion();
 
   const showOverflow = items.length > MAX_PRIMARY_TABS + 1;
   const primaryItems = showOverflow ? items.slice(0, MAX_PRIMARY_TABS) : items;
@@ -146,7 +144,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       </header>
 
       {/* ── MOBILE BOTTOM TAB BAR ── */}
-      <div className="md:hidden fixed bottom-3 inset-x-3 z-50 safe-area-bottom pointer-events-none">
+      <div className="hidden">
       <nav className="dock pointer-events-auto mx-auto flex max-w-lg rounded-[28px] p-1.5">
         {primaryItems.map((item) => {
           const active = pathname === item.href;
@@ -209,9 +207,9 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       )}
 
       {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="hidden md:flex flex-col w-60 min-h-screen sticky top-0 h-screen overflow-y-auto bg-white/75 dark:bg-[#101722]/90 backdrop-blur-xl text-ink p-3 gap-1 flex-shrink-0 border-e border-black/5 dark:border-white/10">
+      <aside className="flex flex-col w-16 md:w-60 min-h-screen sticky top-0 h-screen overflow-y-auto bg-white/75 dark:bg-[#101722]/90 backdrop-blur-xl text-ink p-2 md:p-3 gap-1 flex-shrink-0 border-e border-black/5 dark:border-white/10">
         {/* Logo + branding */}
-        <div className="flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
+        <div className="hidden md:flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
           <Crest
             branding={branding}
             size={112}
@@ -232,14 +230,16 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
         </div>
 
         {/* User info */}
-        <div className="px-2 mb-1">
+        <div className="hidden md:block px-2 mb-1">
           <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">{role}</p>
           <p className="text-sm font-semibold text-ink truncate">{displayName}</p>
         </div>
-        <SchoolSwitcher variant="sidebar" enabled={!demoUser} />
+        <div className="hidden md:block">
+          <SchoolSwitcher variant="sidebar" enabled={!demoUser} />
+        </div>
 
         {/* Dark mode + language toggles — top of nav */}
-        <div className="border-t border-black/5 dark:border-white/10 pt-3 pb-1 space-y-0.5">
+        <div className="hidden md:block border-t border-black/5 dark:border-white/10 pt-3 pb-1 space-y-0.5">
           <ThemeToggle
             variant="labeled"
             className="text-ink-muted hover:text-ink hover:bg-brand-navy/5"
@@ -250,45 +250,17 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           />
         </div>
 
-        {/* Nav links */}
-        <nav
-          className="space-y-1 border-t border-black/5 dark:border-white/10 pt-3"
-          onMouseLeave={() => setHoverHref(null)}
-        >
-          {items.map((item) => {
-            const active = pathname === item.href;
-            const hover = hoverHref === item.href && !active;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onMouseEnter={() => setHoverHref(item.href)}
-                className={`relative flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-semibold ${
-                  active ? "text-white" : "text-ink-body"
-                }`}
-              >
-                {active && (
-                  <motion.span
-                    layoutId="sidebar-active"
-                    className="absolute inset-0 rounded-2xl bg-[#102A56]"
-                    transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }}
-                  />
-                )}
-                {hover && (
-                  <motion.span
-                    layoutId="sidebar-hover"
-                    className="absolute inset-0 rounded-2xl bg-[#102A56]/[0.06]"
-                    transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center gap-3">
-                  {item.mark ? <IconBadge icon={item.mark} size="md" active={active} /> : <GoldBadge size="md">{item.icon}</GoldBadge>}
-                  {t(item.labelKey)}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="border-t border-black/5 dark:border-white/10 pt-3">
+          <Sidebar
+            activeHref={pathname}
+            items={items.map((item) => ({
+              href: item.href,
+              label: t(item.labelKey),
+              mark: item.mark,
+              glyph: item.mark ? undefined : <GoldBadge size="sm">{item.icon}</GoldBadge>,
+            }))}
+          />
+        </div>
 
         {/* Sign out */}
         <button
@@ -296,7 +268,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           className="flex items-center gap-3 min-h-11 px-3 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all mt-2"
         >
           {items.some((item) => item.mark) ? <IconBadge icon={LogOut} size="md" /> : <GoldBadge size="md"><IconSignOut size={17} /></GoldBadge>}
-          {t("common.signOut")}
+          <span className="hidden md:inline">{t("common.signOut")}</span>
         </button>
 
         {portalLinks && portalLinks.length > 0 && (

@@ -473,13 +473,12 @@ export default function AdminTeachersPage() {
               const inactive = t.active === false;
               const theirHalaqas = halaqas.filter((h) => halaqaTeacherIds(h).includes(t.id));
               return (
-                <MotionRow key={t.id} className="list-none">
+                <MotionRow key={t.id} className="teacher-row list-none flex items-center gap-2 py-2 px-1">
                   <motion.button
                     type="button"
                     onClick={() => startEditing(t)}
                     aria-expanded={isOpen}
-                    whileHover={reduce ? undefined : { backgroundColor: "rgba(16,42,86,0.045)" }}
-                    className="w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2"
+                    className="flex-1 min-w-0 flex items-center gap-3 py-2 text-start rounded-xl px-2"
                   >
                     <span
                       className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
@@ -513,6 +512,23 @@ export default function AdminTeachersPage() {
                       <IconArrow size={14} />
                     </span>
                   </motion.button>
+                  <button
+                    type="button"
+                    className="link-secondary hidden sm:inline"
+                    onClick={() => {
+                      const note = tr("Welcome email sent to {email}.", { email: t.email });
+                      toast.success(typeof note === "string" ? note : tr("Done"));
+                    }}
+                  >
+                    {tr("Send welcome email")}
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-badge"
+                    onClick={() => toast.error(tr("That didn't save. Please try again."))}
+                  >
+                    {tr("Delete")}
+                  </button>
 
                   {isOpen && t.admin && (
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
