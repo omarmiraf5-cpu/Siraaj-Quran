@@ -394,7 +394,7 @@ export default function TeacherAttendancePage() {
           tab bar renders after this one in the DOM with a higher z-index,
           it was winning the stacking fight and hiding all but a sliver of
           the button underneath it. */}
-      <div className="fixed bottom-20 md:bottom-0 start-0 end-0 md:start-56 p-3 bg-surface-card border-t border-surface-border z-30">
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 start-0 end-0 md:start-56 p-3 bg-surface-card border-t border-surface-border z-30">
         <button
           onClick={saveAttendance}
           disabled={(marked === 0 && !changed) || saving}

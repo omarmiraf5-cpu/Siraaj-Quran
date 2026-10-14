@@ -150,7 +150,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 min-w-0 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] leading-tight text-center font-semibold transition-colors ${
+              className={`flex-1 min-w-0 h-16 px-0.5 flex flex-col items-center justify-center gap-1 text-[10px] leading-tight text-center font-semibold transition-colors ${
                 active ? "text-brand-gold" : "text-white/45 hover:text-white/80"
               }`}
             >
@@ -164,7 +164,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
-            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] leading-tight text-center font-semibold transition-colors ${
+            className={`flex-1 min-w-0 h-16 px-0.5 flex flex-col items-center justify-center gap-1 text-[10px] leading-tight text-center font-semibold transition-colors ${
               moreActive || moreOpen ? "text-brand-gold" : "text-white/45 hover:text-white/80"
             }`}
           >
@@ -188,7 +188,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             onClick={() => setMoreOpen(false)}
             aria-hidden="true"
           />
-          <div className="md:hidden fixed bottom-14 start-0 end-0 z-50 bg-brand-navy border-t border-white/10 rounded-t-2xl shadow-dark p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+          <div className="md:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] start-0 end-0 z-50 bg-brand-navy border-t border-white/10 rounded-t-2xl shadow-dark p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
             {moreItems.map((item) => {
               const active = pathname === item.href;
               return (

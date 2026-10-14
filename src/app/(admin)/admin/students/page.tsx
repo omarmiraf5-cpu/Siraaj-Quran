@@ -1165,7 +1165,7 @@ export default function AdminStudentsPage() {
                     screen so one teacher can be given to all of them without
                     scrolling back up a long grade. */}
                 {picked.size > 0 && (
-                  <div className="fixed inset-x-0 bottom-16 md:bottom-0 z-40 md:start-56 px-3 pb-3 pointer-events-none" data-section="bulk-bar">
+                  <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 z-40 md:start-56 px-3 pb-3 pointer-events-none" data-section="bulk-bar">
                     <div className="max-w-3xl mx-auto pointer-events-auto rounded-2xl border border-emerald-500/50 bg-surface-card shadow-2xl p-3 flex flex-wrap items-center gap-2">
                       <span className="text-[12.5px] font-semibold text-ink">
                         {tr("{count} ticked", { count: picked.size })}

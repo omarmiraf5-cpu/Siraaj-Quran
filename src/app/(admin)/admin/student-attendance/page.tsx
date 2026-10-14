@@ -349,7 +349,7 @@ export default function StudentAttendancePage() {
                     type="button"
                     onClick={() => setOpenHalaqa(isOpen ? null : g.key)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className="w-full flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{g.label}</p>
@@ -358,7 +358,8 @@ export default function StudentAttendancePage() {
                         {tr("{count} students", { count: g.kids.length })}
                       </p>
                     </div>
-                    <div className="text-end flex-shrink-0 text-[12px]">
+                    {/* Under the halaqa's name on a phone, beside it on wider screens. */}
+                    <div className="order-last sm:order-none basis-full sm:basis-auto text-start sm:text-end sm:flex-shrink-0 text-[12px]">
                       {done === 0 ? (
                         <span className="font-semibold text-amber-700 dark:text-amber-300">{tr("Not taken")}</span>
                       ) : (

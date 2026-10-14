@@ -361,6 +361,16 @@ body {
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+/* iPhone Safari zooms the whole page in when a text box under 16px is
+   tapped, and doesn't zoom back out. On touch screens every box reads at
+   16px, so typing a name or a PIN leaves the page where it was. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
 /* Full-height screens (sign-in, set-up) start below the status bar, so they
    are that much shorter — otherwise they scroll by the height of the bar. */
 .min-h-screen {

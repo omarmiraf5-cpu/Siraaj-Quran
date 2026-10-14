@@ -443,7 +443,7 @@ export default function LoginPage() {
             <button
               key={r.key}
               onClick={() => { setRole(r.key); setPin(""); setError(null); }}
-              className={`px-4 py-2 rounded-pill text-sm font-semibold transition-all ${
+              className={`px-3 min-[380px]:px-4 py-2 rounded-pill text-[13px] min-[380px]:text-sm font-semibold transition-all ${
                 role === r.key
                   ? "bg-surface-card text-ink shadow-card"
                   : "text-white/70 hover:text-white"

@@ -1160,10 +1160,19 @@ export default function QuranAssignmentsPage() {
                       {rangeLabel}
                       {a.due_date ? tr(" · due {formatDay}", { formatDay: formatDay(a.due_date, language) }) : ""}
                     </p>
+                    {/* On the narrowest phones the rating sits under the
+                        details, leaving them the row's width. */}
+                    {a.daily_rating && (
+                      <span className="inline-block mt-1 min-[400px]:hidden">
+                        <RatingPill rating={a.daily_rating} />
+                      </span>
+                    )}
                   </div>
 
                   {a.daily_rating ? (
-                    <RatingPill rating={a.daily_rating} />
+                    <span className="hidden min-[400px]:inline-flex flex-shrink-0">
+                      <RatingPill rating={a.daily_rating} />
+                    </span>
                   ) : (
                     <div className="w-16 flex-shrink-0 hidden sm:block">
                       <ProgressBar value={a.memorization_level} />

@@ -89,7 +89,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   const { blocked } = useSignInGuard();
   if (blocked) return <div className="min-h-screen bg-surface-bg" />;
   return (
-    <div className="min-h-screen bg-surface-bg pb-28">
+    <div className="min-h-screen bg-surface-bg pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <div className="max-w-5xl mx-auto">{children}</div>
       <StudentTabBar />
     </div>

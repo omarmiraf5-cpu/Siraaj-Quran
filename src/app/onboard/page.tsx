@@ -489,10 +489,10 @@ export default function OnboardPage() {
       </header>
 
       {step !== "complete" && (
-        <div className="max-w-4xl mx-auto px-6 pt-6">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6">
           <div className="flex justify-between">
             {steps.map((s, i) => (
-              <div key={s} className="flex flex-col items-center flex-1">
+              <div key={s} className="flex flex-col items-center flex-1 min-w-0">
                 <div
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1.5 transition-colors ${
                     s === step
@@ -504,7 +504,9 @@ export default function OnboardPage() {
                 >
                   {steps.indexOf(step) > i ? "✓" : i + 1}
                 </div>
-                <span className="text-[10px] text-center text-ink-muted">{STEP_LABELS[s]}</span>
+                {/* The numbered dots are enough on the narrowest phones;
+                    the names come in once there's room for all eight. */}
+                <span className="hidden min-[400px]:block text-[10px] text-center text-ink-muted leading-tight">{STEP_LABELS[s]}</span>
               </div>
             ))}
           </div>
