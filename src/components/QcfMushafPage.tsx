@@ -16,6 +16,29 @@ const KIND_BISMILLAH = 3;
 
 const cache = new Map<number, PageLayout>();
 
+// Words the Mushaf writes as one that the QCF4 data draws as two glyphs:
+// لَّوۡمَا (al-Ḥijr 15:7), مَالِيَ (an-Naml 27:20) and وَمَالِيَ (Yā-Sīn 36:22),
+// as the King Fahd Complex's Hafs text has them. The first glyph of each,
+// by page, is kept in one piece with the next, so stretching a line edge
+// to edge never opens a gap inside the word. (لَّوۡ is cut to touch مَا:
+// its ink runs past its own edge.)
+const JOINED: Record<number, number> = { 262: 0xf641, 378: 0xf7b0, 441: 0xf633 };
+
+/** A word segment's glyphs as the units the line spreads between: one
+ *  glyph each, or the two halves of a joined word together. */
+function glyphUnits(chars: string, page: number): string[][] {
+  const glyphs = Array.from(chars);
+  const join = JOINED[page];
+  const units: string[][] = [];
+  for (let i = 0; i < glyphs.length; i++) {
+    if (join !== undefined && glyphs[i].codePointAt(0) === join && i + 1 < glyphs.length) {
+      units.push([glyphs[i], glyphs[i + 1]]);
+      i++;
+    } else units.push([glyphs[i]]);
+  }
+  return units;
+}
+
 /** Whether a line ends with the last ayah of its surah. */
 function endsSurah(line: Segment[]): boolean {
   const last = line[line.length - 1];
@@ -439,7 +462,7 @@ export function QcfMushafPage({
               // flex row can stretch the line edge to edge like the print.
               // None may shrink below its own width: squeezed, a word would
               // draw over its neighbour.
-              return Array.from(chars).map((ch, ci) => (
+              return (kind === KIND_WORD ? glyphUnits(chars, pageNum) : Array.from(chars).map((c) => [c])).map((unit, ci) => (
                 <span
                   key={`${si}-${ci}`}
                   data-glyph=""
@@ -475,10 +498,20 @@ export function QcfMushafPage({
                     <>
                       <RosetteColour />
                       {/* Positioned after the colour, so it paints on top of it. */}
-                      <span className="relative">{ch}</span>
+                      <span className="relative">{unit[0]}</span>
                     </>
+                  ) : unit.length === 1 ? (
+                    unit[0]
                   ) : (
-                    ch
+                    // The glyphs are Private Use characters, which run left to
+                    // right inside one piece of text — so the two halves of a
+                    // joined word are laid side by side in the line's own
+                    // right-to-left order instead.
+                    <span className="inline-flex">
+                      {unit.map((g, gi) => (
+                        <span key={gi}>{g}</span>
+                      ))}
+                    </span>
                   )}
                 </span>
               ));
