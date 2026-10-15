@@ -416,11 +416,13 @@ export default function TeacherAttendancePage() {
                 role="tab"
                 aria-selected={on}
                 onClick={() => pickHalaqa(h.id)}
-                className={`flex-shrink-0 rounded-2xl border px-3 py-2 text-start transition-colors ${
+                className={`flex-shrink-0 max-w-[85%] sm:max-w-sm rounded-2xl border px-3 py-2 text-start transition-colors ${
                   on ? "border-emerald-700 bg-emerald-700 text-white" : "border-surface-border bg-surface-card text-ink hover:border-emerald-700"
                 }`}
               >
-                <span className="block text-sm font-semibold whitespace-nowrap">
+                {/* A long name (grade · campus · teacher) wraps rather than
+                    running past the edge of a phone. */}
+                <span className="block text-sm font-semibold [overflow-wrap:anywhere]">
                   {h.label}
                   {pending && <span className={`ms-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle ${on ? "bg-white" : "bg-amber-500"}`} />}
                 </span>
@@ -456,11 +458,13 @@ export default function TeacherAttendancePage() {
       {/* Today's tally */}
       <div className="grid grid-cols-4 gap-2">
         {MARKS.map((m) => (
-          <div key={m.status} className="card-quiet px-3 py-3">
+          <div key={m.status} className="card-quiet px-2 sm:px-3 py-3 min-w-0">
             <p className={`text-2xl font-bold tabular-nums leading-none ${m.num}`}>
               {count(m.status)}
             </p>
-            <p className="eyebrow mt-2 flex items-center gap-1.5">
+            {/* Spaced capitals don't fit a quarter of a phone in Somali
+                (MAQNAA, LA FASAXAY): plain small words there. */}
+            <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold leading-tight text-ink-muted [overflow-wrap:anywhere] sm:text-[10px] sm:font-bold sm:uppercase sm:tracking-[0.14em]">
               <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
               {t(`common.${m.status}`)}
             </p>
@@ -576,7 +580,16 @@ export default function TeacherAttendancePage() {
               ? t("teacher.attendance.saved")
               : marked === 0 && !changed
                 ? t("teacher.attendance.markToSave")
-                : `${t("teacher.attendance.saveButton")}${halaqa && halaqas && halaqas.length > 1 ? ` · ${halaqa.label}` : ""} · ${countLabel("{count} present now|{count} present now", count("present"), `${count("present")} ${t("common.present").toLowerCase()}`)}`}
+                : (
+                  <span>
+                    {t("teacher.attendance.saveButton")}
+                    {/* The halaqa is named in its tab just above; on a phone
+                        it would wrap the button onto three lines. */}
+                    {halaqa && halaqas && halaqas.length > 1 && <span className="hidden sm:inline"> · {halaqa.label}</span>}
+                    {" · "}
+                    {countLabel("{count} present now|{count} present now", count("present"), `${count("present")} ${t("common.present").toLowerCase()}`)}
+                  </span>
+                )}
         </PressButton>
       </div>
     </div>
