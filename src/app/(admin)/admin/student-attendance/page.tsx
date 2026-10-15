@@ -14,6 +14,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { GRADES, gradeLabel } from "@/lib/grades";
 import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
@@ -84,9 +85,7 @@ export default function StudentAttendancePage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user) {
         // The sample school.
         setIsDemo(true);

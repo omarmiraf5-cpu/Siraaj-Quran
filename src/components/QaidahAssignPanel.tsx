@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import {
   QAIDAH_BOOKS,
   isQaidahBookId,
@@ -45,9 +46,7 @@ export function useQaidahClassroom() {
   useEffect(() => {
     const supabase = createClient();
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user) {
         setStudents(
           demoSchoolRoster()

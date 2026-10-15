@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { demoAttendanceFetch, type DemoRole } from "@/lib/demoAttendance";
 import { formatClock, type StaffDay } from "@/lib/attendanceRules";
 import { PlanAlertBanner } from "@/components/yearly-plan-ui";
@@ -24,9 +25,8 @@ export type Api = (input: string, init?: RequestInit) => Promise<Response>;
 export function useAttendanceApi(role: DemoRole): { mode: "loading" | "demo" | "real"; api: Api } {
   const [mode, setMode] = useState<"loading" | "demo" | "real">("loading");
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data: { user } }) => setMode(user ? "real" : "demo"))
+    sessionUser(createClient())
+      .then((user) => setMode(user ? "real" : "demo"))
       .catch(() => setMode("demo"));
   }, []);
   const api = useCallback<Api>(

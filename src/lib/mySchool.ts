@@ -1,4 +1,5 @@
 import type { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 
 type Db = ReturnType<typeof createClient>;
 
@@ -8,9 +9,7 @@ type Db = ReturnType<typeof createClient>;
  * works at, and then that question has no single answer.
  */
 export async function mySchool<T = Record<string, unknown>>(supabase: Db, columns: string): Promise<T | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await sessionUser(supabase);
   if (!user) return null;
   const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
   if (!me?.school_id) return null;

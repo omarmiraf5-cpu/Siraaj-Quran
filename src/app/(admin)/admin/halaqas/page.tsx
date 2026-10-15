@@ -24,6 +24,7 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { loadSchoolTeachers, saveOtherTeachers, splitTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
 import { GRADES, gradeLabel } from "@/lib/grades";
 import { loadCampuses, loadSchoolShape, type Campus } from "@/lib/schoolStructure";
@@ -229,9 +230,7 @@ export default function AdminHalaqasPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);

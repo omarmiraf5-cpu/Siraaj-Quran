@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { SUPPORT_EMAIL } from "@/lib/site";
 import { StudentPinForm } from "@/components/StudentPinForm";
 import { WeeklyEmailsSwitch } from "@/components/WeeklyEmailsSwitch";
@@ -49,9 +50,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user) {
         // The sample portal signs people in without a real account.
         try {

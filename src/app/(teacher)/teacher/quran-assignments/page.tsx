@@ -29,6 +29,7 @@ import type { DemoStudent } from "@/data/demo";
 import type { HifzPortion, QuranicAssignment, DailyRating } from "@/hooks/useQuranicAssignments";
 import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote } from "@/components/portal-ui";
 import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
@@ -171,7 +172,7 @@ export default function QuranAssignmentsPage() {
   useEffect(() => {
     const loadStudents = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await sessionUser(supabase);
 
         if (!user) {
           // Demo mode or no auth: use the sample roster, and remember that

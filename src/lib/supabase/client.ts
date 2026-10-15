@@ -12,8 +12,8 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholde
 const steadied = new WeakSet<object>();
 
 /**
- * Every page asks auth.getUser() who is signed in, and takes "nobody" to
- * mean the sample school. But that question goes to Supabase, and a blip —
+ * The sign-in check (verifiedUser) asks auth.getUser() who is signed in,
+ * and "nobody" would mean the sample school. But that question goes to Supabase, and a blip —
  * a dropped connection, a login being renewed at that moment — answers
  * "nobody" for someone who is signed in, who then sees sample data. So
  * when this device holds a login and the answer was a failure rather than

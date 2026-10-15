@@ -2,9 +2,10 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { translations, RTL_LANGUAGES, type Language } from "@/lib/i18n/translations";
+import { verifiedUser } from "@/lib/supabase/sessionUser";
+import { translations, loadTranslations, LANGUAGES, RTL_LANGUAGES, type Language } from "@/lib/i18n/translations";
 import { setCurrentLanguage } from "@/lib/i18n/current";
-import { translatePhrase, type PhraseVars, type Translated } from "@/lib/i18n/phrases";
+import { translatePhrase, loadPhrases, type PhraseVars, type Translated } from "@/lib/i18n/phrases";
 
 const STORAGE_KEY = "language";
 
@@ -18,6 +19,11 @@ interface LanguageContextValue {
 }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+const known = (lang: string | null | undefined): lang is Language => LANGUAGES.some((l) => l.code === lang);
+
+/** A language's text, fetched the first time it's chosen. */
+const ready = (lang: Language) => Promise.all([loadTranslations(lang), loadPhrases(lang)]);
 
 function applyToDocument(lang: Language) {
   const dir = RTL_LANGUAGES.includes(lang) ? "rtl" : "ltr";
@@ -36,23 +42,32 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
-    if (stored && translations[stored]) {
-      setLanguageState(stored);
-      applyToDocument(stored);
-    }
+    // Switched to once its text has arrived, so it never shows half English.
+    const switchTo = (lang: Language) =>
+      ready(lang)
+        .then(() => {
+          if (cancelled) return;
+          setLanguageState(lang);
+          applyToDocument(lang);
+        })
+        .catch(() => {});
+
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (known(stored) && stored !== "en") switchTo(stored);
 
     // A signed-in account's own saved choice wins over whatever this
     // particular browser has locally — it's the one that should follow
     // them between devices.
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    verifiedUser(supabase).then(({ data: { user } }) => {
       if (cancelled) return;
-      const remote = user?.user_metadata?.language as Language | undefined;
-      if (remote && translations[remote]) {
-        setLanguageState(remote);
-        applyToDocument(remote);
+      const remote = user?.user_metadata?.language as string | undefined;
+      if (known(remote) && remote !== stored) {
         localStorage.setItem(STORAGE_KEY, remote);
+        if (remote === "en") {
+          setLanguageState("en");
+          applyToDocument("en");
+        } else switchTo(remote);
       }
     });
 
@@ -62,8 +77,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
-    applyToDocument(lang);
+    ready(lang)
+      .then(() => {
+        setLanguageState(lang);
+        applyToDocument(lang);
+      })
+      .catch(() => {});
     try {
       localStorage.setItem(STORAGE_KEY, lang);
     } catch {

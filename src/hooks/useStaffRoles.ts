@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { STAFF_ROLES_CHANGED } from "@/lib/schoolTeachers";
 
 /**
@@ -18,9 +19,7 @@ export function useStaffRoles(): { admin: boolean; teaches: boolean } {
     const check = () =>
       (async () => {
         const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await sessionUser(supabase);
         if (!user) return;
         const [{ data: profile }, { data: leads }, { data: shares }] = await Promise.all([
           supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),

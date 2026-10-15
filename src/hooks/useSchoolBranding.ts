@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 
 export type SchoolBranding = {
   name: string;
@@ -36,9 +37,7 @@ export function useSchoolBranding(): SchoolBranding {
     const supabase = createClient();
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user) return;
 
       // Their school by its id: someone who can see more than one school

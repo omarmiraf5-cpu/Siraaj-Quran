@@ -24,6 +24,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote, LoadingNote, RowChevron, OPEN_ROW } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { SalariesPanel } from "@/components/SalariesPanel";
 import { ExpensesPanel } from "@/components/ExpensesPanel";
 import { FinanceOverview } from "@/components/FinanceOverview";
@@ -120,9 +121,7 @@ export default function AdminPaymentsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);

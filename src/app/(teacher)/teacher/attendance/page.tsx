@@ -19,6 +19,8 @@ import { PortalHero } from "@/components/PortalHero";
 import { IconCheck } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
+import { fetchAll, daysAgoIso, ATTENDANCE_WINDOW_DAYS } from "@/lib/supabase/fetchAll";
 import { LoadingNote } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
@@ -134,9 +136,7 @@ export default function TeacherAttendancePage() {
   // student shows up on today's register without a page reload elsewhere.
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);
@@ -158,7 +158,19 @@ export default function TeacherAttendancePage() {
         // What this teacher recorded, and any marks for the children of a
         // halaqa they teach, whoever took them: the attendance policy
         // decides, so teachers sharing a halaqa see one register.
-        supabase.from("attendance").select("student_id, class_date, status"),
+        // About a term of marks, every page of them: today's register and
+        // each child's rate, without every mark since the school began.
+        fetchAll<{ student_id: string; class_date: string; status: string }>((from, to) =>
+          supabase
+            .from("attendance")
+            .select("student_id, class_date, status")
+            .gte("class_date", daysAgoIso(ATTENDANCE_WINDOW_DAYS))
+            .order("class_date", { ascending: false })
+            .order("student_id")
+            .range(from, to)
+        )
+          .then((data) => ({ data }))
+          .catch(() => ({ data: [] as { student_id: string; class_date: string; status: string }[] })),
         // Their own halaqas, each with its children.
         myHalaqas(supabase),
       ]);

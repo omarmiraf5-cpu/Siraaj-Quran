@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { demoClassWorkFetch, type ClassWorkRole } from "@/lib/demoClassWork";
 import { DEMO_TODAY, formatDay } from "@/data/demo";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -47,9 +48,8 @@ type Mode = "loading" | "demo" | "real";
 export function useClassWorkApi(role: ClassWorkRole): { mode: Mode; api: Api } {
   const [mode, setMode] = useState<Mode>("loading");
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data: { user } }) => setMode(user ? "real" : "demo"))
+    sessionUser(createClient())
+      .then((user) => setMode(user ? "real" : "demo"))
       .catch(() => setMode("demo"));
   }, []);
   const api = useCallback<Api>(

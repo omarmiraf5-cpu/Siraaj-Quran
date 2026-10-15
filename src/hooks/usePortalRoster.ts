@@ -18,6 +18,7 @@ import {
 import type { QuranicAssignment, HifzPortion, DailyRating } from "@/hooks/useQuranicAssignments";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
 import { myChildIds } from "@/hooks/useMyChildren";
 
@@ -39,9 +40,7 @@ export function usePortalRoster(demoFallback: DemoStudent[] = DEMO_CHILDREN, { m
     const supabase = createClient();
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setStudents(demoFallback);

@@ -8,6 +8,7 @@ import { SectionCard, SegmentedSwitch, EmptyNote, LoadingNote } from "@/componen
 import { MessageThread } from "@/components/MessageThread";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { phrase } from "@/lib/i18n/phrases";
@@ -51,9 +52,7 @@ export default function ParentMessagesPage() {
     }
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user || children.length === 0) return;
 
       const { data: profile } = await supabase

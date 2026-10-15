@@ -29,6 +29,8 @@ import {
 import { IconBook, IconCalendar, IconClock, IconPen, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
+import { fetchAll, daysAgoIso, ATTENDANCE_WINDOW_DAYS } from "@/lib/supabase/fetchAll";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
@@ -64,8 +66,10 @@ interface RosterStudent {
   halaqa: string;
 }
 
+/** Today on the teacher's own device — toISOString() is the UTC date,
+ *  which turns an evening in Edmonton into tomorrow. */
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString("en-CA");
 }
 
 // daysFromToday (from @/data/demo) measures against the fixed demo
@@ -103,9 +107,7 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);
@@ -132,7 +134,19 @@ export default function TeacherDashboard() {
           // Theirs, and those for the children of any halaqa they teach
           // (with others, too): the policies on both tables decide.
           supabase.from("quranic_assignments").select("*"),
-          supabase.from("attendance").select("student_id, class_date, status"),
+          // About a term of marks, every page of them — not every mark
+          // since the school began, cut off unseen at 1,000 rows.
+          fetchAll<{ student_id: string; class_date: string; status: string }>((from, to) =>
+            supabase
+              .from("attendance")
+              .select("student_id, class_date, status")
+              .gte("class_date", daysAgoIso(ATTENDANCE_WINDOW_DAYS))
+              .order("class_date", { ascending: false })
+              .order("student_id")
+              .range(from, to)
+          )
+            .then((data) => ({ data }))
+            .catch(() => ({ data: [] as { student_id: string; class_date: string; status: string }[] })),
           // Their own halaqas, each with its children.
           myHalaqas(supabase),
         ]);

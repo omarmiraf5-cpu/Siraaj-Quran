@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
@@ -110,9 +111,7 @@ export default function AdminCalendarPage() {
       setLoading(true);
       setError(null);
       try {
-        const {
-          data: { user },
-        } = await createClient().auth.getUser();
+        const user = await sessionUser(createClient());
         demo.current = !user;
         const res = await api("/api/school-calendar");
         const payload = await res.json();

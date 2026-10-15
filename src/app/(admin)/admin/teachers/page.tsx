@@ -22,6 +22,7 @@ import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { welcomeNote } from "@/lib/welcomeNote";
 import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
 import { loadSchoolTeachers, saveHalaqaTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
@@ -130,9 +131,7 @@ export default function AdminTeachersPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);

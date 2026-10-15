@@ -1,4 +1,5 @@
 import type { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { gradeLabel } from "@/lib/grades";
 import { loadCampuses } from "@/lib/schoolStructure";
 
@@ -32,9 +33,7 @@ export interface MyHalaqa {
  * time. Empty for a teacher with no halaqa yet; null when nobody is signed in.
  */
 export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await sessionUser(supabase);
   if (!user) return null;
   const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
   if (!me?.school_id) return null;

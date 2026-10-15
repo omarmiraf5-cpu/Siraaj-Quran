@@ -13,6 +13,7 @@ import { MessageThread } from "@/components/MessageThread";
 import { LoadingNote, EmptyNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
@@ -52,9 +53,7 @@ export default function TeacherMessagesPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);

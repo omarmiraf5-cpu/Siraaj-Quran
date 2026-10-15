@@ -33,6 +33,7 @@ import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/port
 import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
@@ -118,18 +119,21 @@ export default function AdminDashboard() {
     }));
   };
 
+  // Counted by the database rather than every mark downloaded and counted
+  // here: two numbers come back instead of thousands of rows (which were
+  // also cut off at 1,000, so a big school's rate was off).
   const loadRealAttendanceRate = async (): Promise<number | null> => {
-    const { data } = await supabase.from("attendance").select("status");
-    if (!data || data.length === 0) return null;
-    const present = data.filter((a) => a.status === "present" || a.status === "late").length;
-    return Math.round((present / data.length) * 100);
+    const [all, present] = await Promise.all([
+      supabase.from("attendance").select("student_id", { count: "exact", head: true }),
+      supabase.from("attendance").select("student_id", { count: "exact", head: true }).in("status", ["present", "late"]),
+    ]);
+    if (!all.count) return null;
+    return Math.round(((present.count ?? 0) / all.count) * 100);
   };
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setSchool({ name: DEMO_SCHOOL.name, city: DEMO_SCHOOL.city, province: DEMO_SCHOOL.province });
