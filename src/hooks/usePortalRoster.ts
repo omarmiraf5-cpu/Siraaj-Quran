@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
 import { myChildIds } from "@/hooks/useMyChildren";
+import { readCache, writeCache } from "@/lib/pageCache";
 
 export type PortalMode = "loading" | "demo" | "real";
 
@@ -33,8 +34,12 @@ export type PortalMode = "loading" | "demo" | "real";
  * policy that actually enforces it.
  */
 export function usePortalRoster(demoFallback: DemoStudent[] = DEMO_CHILDREN, { mineOnly = false, myChildren = false } = {}) {
-  const [mode, setMode] = useState<PortalMode>("loading");
-  const [students, setStudents] = useState<DemoStudent[]>([]);
+  // Last time's roster straight away, if there is one; the load below
+  // refreshes it.
+  const key = `roster:${mineOnly}:${myChildren}`;
+  const seen = readCache<{ mode: PortalMode; students: DemoStudent[] }>(key);
+  const [mode, setMode] = useState<PortalMode>(seen?.mode ?? "loading");
+  const [students, setStudents] = useState<DemoStudent[]>(seen?.students ?? []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -57,8 +62,10 @@ export function usePortalRoster(demoFallback: DemoStudent[] = DEMO_CHILDREN, { m
         myChildren ? myChildIds(supabase) : Promise.resolve(null),
       ]);
       const rows = children ? (data ?? []).filter((s) => children.includes(s.id)) : data ?? [];
-      setStudents(narrowToMine(rows.map((s) => ({ id: s.id, name: s.full_name, halaqa: "" })), mine));
+      const roster = narrowToMine(rows.map((s) => ({ id: s.id, name: s.full_name, halaqa: "" })), mine);
+      setStudents(roster);
       setMode("real");
+      writeCache(key, { mode: "real", students: roster });
     };
 
     load().catch(() => {
@@ -99,7 +106,14 @@ export function useStudentRecord(studentId: string | null, mode: PortalMode): St
 
   useEffect(() => {
     if (mode === "loading" || !studentId) return;
-    setReady(false);
+    // This child as last seen, if they have been, while it's refreshed.
+    const key = `record:${studentId}`;
+    const seen = mode === "real" ? readCache<{ attendance: AttendanceDay[]; assignments: QuranicAssignment[] }>(key) : undefined;
+    if (seen) {
+      setAttendance(seen.attendance);
+      setAssignments(seen.assignments);
+      setReady(true);
+    } else setReady(false);
 
     if (mode === "demo") {
       setAttendance(DEMO_ATTENDANCE[studentId] ?? []);
@@ -126,33 +140,32 @@ export function useStudentRecord(studentId: string | null, mode: PortalMode): St
           .order("assigned_at", { ascending: false }),
       ]);
 
-      setAttendance(
-        (attendanceRows ?? []).map((a) => ({
-          date: a.class_date,
-          status: a.status as AttendanceStatus,
-        }))
-      );
-      setAssignments(
-        (assignmentRows ?? []).map((a) => ({
-          id: a.id,
-          student_id: a.student_id,
-          teacher_id: a.teacher_id,
-          surah: a.surah,
-          ayah_start: a.ayah_start,
-          surah_end: a.surah_end ?? a.surah,
-          ayah_end: a.ayah_end,
-          portion: (a.portion ?? "new") as HifzPortion,
-          assigned_at: a.assigned_at,
-          due_date: a.due_date,
-          status: a.status,
-          memorization_level: a.memorization_level ?? 0,
-          daily_rating: (a.daily_rating ?? null) as DailyRating | null,
-          teacher_notes: a.teacher_notes,
-          student_notes: a.student_notes,
-          created_at: a.created_at,
-          updated_at: a.updated_at,
-        }))
-      );
+      const days: AttendanceDay[] = (attendanceRows ?? []).map((a) => ({
+        date: a.class_date,
+        status: a.status as AttendanceStatus,
+      }));
+      const work: QuranicAssignment[] = (assignmentRows ?? []).map((a) => ({
+        id: a.id,
+        student_id: a.student_id,
+        teacher_id: a.teacher_id,
+        surah: a.surah,
+        ayah_start: a.ayah_start,
+        surah_end: a.surah_end ?? a.surah,
+        ayah_end: a.ayah_end,
+        portion: (a.portion ?? "new") as HifzPortion,
+        assigned_at: a.assigned_at,
+        due_date: a.due_date,
+        status: a.status,
+        memorization_level: a.memorization_level ?? 0,
+        daily_rating: (a.daily_rating ?? null) as DailyRating | null,
+        teacher_notes: a.teacher_notes,
+        student_notes: a.student_notes,
+        created_at: a.created_at,
+        updated_at: a.updated_at,
+      }));
+      setAttendance(days);
+      setAssignments(work);
+      writeCache(key, { attendance: days, assignments: work });
     };
 
     load().finally(() => setReady(true));

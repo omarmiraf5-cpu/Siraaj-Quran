@@ -34,6 +34,7 @@ import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
+import { readCache, writeCache } from "@/lib/pageCache";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
@@ -44,24 +45,51 @@ import { Users, GraduationCap, BookOpen, CalendarCheck } from "lucide-react";
 type ReviewItem = { id: string; halaqaName: string };
 type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: string | null };
 
+const SNAPSHOT_KEY = "admin-dashboard";
+interface AdminSnapshot {
+  today: string;
+  school: { name: string; city: string | null; province: string | null };
+  studentCount: number;
+  activeStudentCount: number;
+  teachers: DemoTeacher[];
+  halaqas: DemoHalaqa[];
+  reviewItems: ReviewItem[];
+  absenceItems: AbsenceItem[];
+  attendanceRate: number | null;
+}
+
 export default function AdminDashboard() {
   const supabase = createClient();
   const { t, language } = useLanguage();
   const { mode: noticeMode, api: noticeApi } = useAttendanceApi("admin");
-  const [ready, setReady] = useState(false);
+  // Last visit's dashboard, shown at once while it's read again.
+  const seen = readCache<AdminSnapshot>(SNAPSHOT_KEY);
+  const [ready, setReady] = useState(Boolean(seen));
 
   // Unknown until it's loaded: starting from the sample school's name put
   // "Siraaj Academy" on a real school's dashboard for the moment that took.
-  const [school, setSchool] = useState<{ name: string; city: string | null; province: string | null } | null>(null);
-  const [today, setToday] = useState(DEMO_TODAY);
-  const [isDemoSchool, setIsDemoSchool] = useState(true);
-  const [studentCount, setStudentCount] = useState(0);
-  const [activeStudentCount, setActiveStudentCount] = useState(0);
-  const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
-  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
-  const [attendanceRate, setAttendanceRate] = useState<number | null>(null);
-  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
-  const [absenceItems, setAbsenceItems] = useState<AbsenceItem[]>([]);
+  const [school, setSchool] = useState<{ name: string; city: string | null; province: string | null } | null>(seen?.school ?? null);
+  const [today, setToday] = useState(seen?.today ?? DEMO_TODAY);
+  const [isDemoSchool, setIsDemoSchool] = useState(!seen);
+  const [studentCount, setStudentCount] = useState(seen?.studentCount ?? 0);
+  const [activeStudentCount, setActiveStudentCount] = useState(seen?.activeStudentCount ?? 0);
+  const [teachers, setTeachers] = useState<DemoTeacher[]>(seen?.teachers ?? []);
+  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(seen?.halaqas ?? []);
+  const [attendanceRate, setAttendanceRate] = useState<number | null>(seen?.attendanceRate ?? null);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>(seen?.reviewItems ?? []);
+  const [absenceItems, setAbsenceItems] = useState<AbsenceItem[]>(seen?.absenceItems ?? []);
+
+  const showSnapshot = (x: AdminSnapshot) => {
+    setToday(x.today);
+    setSchool(x.school);
+    setStudentCount(x.studentCount);
+    setActiveStudentCount(x.activeStudentCount);
+    setTeachers(x.teachers);
+    setHalaqas(x.halaqas);
+    setReviewItems(x.reviewItems);
+    setAbsenceItems(x.absenceItems);
+    setAttendanceRate(x.attendanceRate);
+  };
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
     const [{ data }, { data: others }] = await Promise.all([
@@ -178,34 +206,43 @@ export default function AdminDashboard() {
         return;
       }
 
-      setToday(new Date().toLocaleDateString("en-CA"));
       setIsDemoSchool(false);
       // The school they're signed in to, by its id: an admin can see more
       // than one school (a teacher's other school), so "the one school I
       // can see" isn't a question with one answer.
-      const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
-      const { data: schoolRow } = me?.school_id
-        ? await supabase.from("schools").select("name, city, province").eq("id", me.school_id).maybeSingle()
-        : { data: null };
-      setSchool(schoolRow ?? { name: "", city: null, province: null });
-
-      const { data: studentRows } = await supabase.from("students").select("active");
-      setStudentCount(studentRows?.length ?? 0);
-      setActiveStudentCount((studentRows ?? []).filter((s) => s.active !== false).length);
-
-      const [realTeachers, realHalaqas, realReview, realAbsences, realAttendance] =
+      // Everything at once: only the school's name waits for its id. The
+      // students are counted by the database, not downloaded to be counted.
+      const schoolDetails = async () => {
+        const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
+        const { data } = me?.school_id
+          ? await supabase.from("schools").select("name, city, province").eq("id", me.school_id).maybeSingle()
+          : { data: null };
+        return data ?? { name: "", city: null, province: null };
+      };
+      const [schoolRow, allCount, activeCount, realTeachers, realHalaqas, realReview, realAbsences, realAttendance] =
         await Promise.all([
+          schoolDetails(),
+          supabase.from("students").select("id", { count: "exact", head: true }),
+          supabase.from("students").select("id", { count: "exact", head: true }).neq("active", false),
           loadSchoolTeachers(supabase),
           loadRealHalaqas(),
           loadRealReviewItems(),
           loadRealAbsences(),
           loadRealAttendanceRate(),
         ]);
-      setTeachers(realTeachers);
-      setHalaqas(realHalaqas);
-      setReviewItems(realReview);
-      setAbsenceItems(realAbsences);
-      setAttendanceRate(realAttendance);
+      const snapshot: AdminSnapshot = {
+        today: new Date().toLocaleDateString("en-CA"),
+        school: schoolRow,
+        studentCount: allCount.count ?? 0,
+        activeStudentCount: activeCount.count ?? 0,
+        teachers: realTeachers,
+        halaqas: realHalaqas,
+        reviewItems: realReview,
+        absenceItems: realAbsences,
+        attendanceRate: realAttendance,
+      };
+      showSnapshot(snapshot);
+      writeCache(SNAPSHOT_KEY, snapshot);
     };
     load().finally(() => setReady(true));
   }, []);

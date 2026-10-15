@@ -31,6 +31,7 @@ import { download, fileNameFor } from "@/lib/sheetTools";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
 import { useToast } from "@/components/Toast";
+import { readCache, patchCache } from "@/lib/pageCache";
 
 const bigField =
   "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition";
@@ -42,15 +43,31 @@ const smallField =
 const GRADE_ACTION =
   "inline-flex items-center rounded-full border px-3 py-1 text-[12px] font-semibold normal-case tracking-normal not-italic whitespace-nowrap transition-colors";
 
+const SNAPSHOT_KEY = "admin-students";
+interface Snapshot {
+  students: DemoStudent[];
+  halaqas: DemoHalaqa[];
+  teachers: DemoTeacher[];
+  graded: boolean;
+  campuses: Campus[];
+  schoolId: string | null;
+  schoolSlug: string | null;
+  schoolName: string;
+  reportsReady: boolean;
+  studentCampusReady: boolean;
+}
+
 export default function AdminStudentsPage() {
   const { tr } = useLanguage();
   const toast = useToast();
   const supabase = createClient();
+  // Last visit's list, shown at once while it's read again.
+  const seen = readCache<Partial<Snapshot>>(SNAPSHOT_KEY);
   const [isDemo, setIsDemo] = useState(false);
   // The code students type in the app (the school's slug), and whether the
   // sign-in link was just copied.
-  const [schoolSlug, setSchoolSlug] = useState<string | null>(null);
-  const [schoolName, setSchoolName] = useState("");
+  const [schoolSlug, setSchoolSlug] = useState<string | null>(seen?.schoolSlug ?? null);
+  const [schoolName, setSchoolName] = useState(seen?.schoolName ?? "");
   const [copied, setCopied] = useState(false);
   // Permanent deletion: which student's confirm box is open, what's been
   // typed into it, and any error from the attempt.
@@ -58,14 +75,14 @@ export default function AdminStudentsPage() {
   const [deleteText, setDeleteText] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [schoolId, setSchoolId] = useState<string | null>(null);
+  const [ready, setReady] = useState(Boolean(seen?.students));
+  const [schoolId, setSchoolId] = useState<string | null>(seen?.schoolId ?? null);
   // An academic school keeps its students in grades, and may have campuses.
-  const [graded, setGraded] = useState(false);
-  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [graded, setGraded] = useState(seen?.graded ?? false);
+  const [campuses, setCampuses] = useState<Campus[]>(seen?.campuses ?? []);
 
-  const [students, setStudents] = useState<DemoStudent[]>([]);
-  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
+  const [students, setStudents] = useState<DemoStudent[]>(seen?.students ?? []);
+  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(seen?.halaqas ?? []);
   const [created, setCreated] = useState<DemoStudent[]>([]);
   const [overrides, setOverrides] = useState<Record<string, StudentOverride>>({});
 
@@ -91,7 +108,7 @@ export default function AdminStudentsPage() {
   const [draftActive, setDraftActive] = useState(true);
   const [draftReport, setDraftReport] = useState(true);
   // Whether the weekly reports update has been run, so each child has a switch.
-  const [reportsReady, setReportsReady] = useState(false);
+  const [reportsReady, setReportsReady] = useState(seen?.reportsReady ?? false);
   const [gradeBusy, setGradeBusy] = useState<number | null>(null);
   const [draftPin, setDraftPin] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
@@ -108,11 +125,11 @@ export default function AdminStudentsPage() {
   const [assignNote, setAssignNote] = useState<string | null>(null);
   // The school's teachers: students can be put with one straight from here,
   // and the campus of the halaqa made for them if they have none yet.
-  const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
+  const [teachers, setTeachers] = useState<DemoTeacher[]>(seen?.teachers ?? []);
   const [assignCampus, setAssignCampus] = useState("");
   // Whether students have a campus of their own (update 14), and a campus
   // for a new or edited student.
-  const [studentCampusReady, setStudentCampusReady] = useState(false);
+  const [studentCampusReady, setStudentCampusReady] = useState(seen?.studentCampusReady ?? false);
   const [newCampus, setNewCampus] = useState("");
   const [draftCampus, setDraftCampus] = useState("");
   const [campusBusy, setCampusBusy] = useState(false);
@@ -177,8 +194,9 @@ export default function AdminStudentsPage() {
       const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
       if (className) halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
     }
-    setStudents(
-      ((studentRows ?? []) as Array<{ id: string; full_name: string; active: boolean; grade: number; weekly_report?: boolean; campus_id?: string | null }>).map((s) => ({
+    const list: DemoStudent[] = (
+      (studentRows ?? []) as Array<{ id: string; full_name: string; active: boolean; grade: number; weekly_report?: boolean; campus_id?: string | null }>
+    ).map((s) => ({
         id: s.id,
         name: s.full_name,
         halaqa: halaqaByStudent.get(s.id)?.name ?? "",
@@ -188,8 +206,9 @@ export default function AdminStudentsPage() {
         weeklyReport: s.weekly_report !== false,
         parentNames: parentsOf.get(s.id) ?? [],
         campusId: s.campus_id ?? null,
-      }))
-    );
+      }));
+    setStudents(list);
+    patchCache<Snapshot>(SNAPSHOT_KEY, { students: list, reportsReady: !first.error, studentCampusReady: !withCampus.error });
   };
 
   useEffect(() => {
@@ -227,6 +246,7 @@ export default function AdminStudentsPage() {
           .eq("id", user.id)
           .single();
         setSchoolId(profile?.school_id ?? null);
+        patchCache<Snapshot>(SNAPSHOT_KEY, { schoolId: profile?.school_id ?? null });
         if (profile?.school_id) {
           supabase
             .from("schools")
@@ -236,18 +256,27 @@ export default function AdminStudentsPage() {
             .then(({ data }) => {
               setSchoolSlug(data?.slug ?? null);
               setSchoolName(data?.name ?? "");
+              patchCache<Snapshot>(SNAPSHOT_KEY, { schoolSlug: data?.slug ?? null, schoolName: data?.name ?? "" });
             });
         }
         const shape = await loadSchoolShape(supabase, profile?.school_id ?? null);
         setGraded(shape.graded);
         setCampuses(shape.campuses);
+        patchCache<Snapshot>(SNAPSHOT_KEY, { graded: shape.graded, campuses: shape.campuses });
       };
       await Promise.all([
         school(),
         loadRealStudents(),
-        loadRealHalaqas().then(setHalaqas),
+        loadRealHalaqas().then((h) => {
+          setHalaqas(h);
+          patchCache<Snapshot>(SNAPSHOT_KEY, { halaqas: h });
+        }),
         loadSchoolTeachers(supabase, { everyAdmin: true })
-          .then((t) => setTeachers(t.filter((x) => x.active !== false)))
+          .then((t) => {
+            const active = t.filter((x) => x.active !== false);
+            setTeachers(active);
+            patchCache<Snapshot>(SNAPSHOT_KEY, { teachers: active });
+          })
           .catch(() => {}),
       ]);
     };

@@ -34,6 +34,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { phrase } from "@/lib/i18n/phrases";
 import { useToast } from "@/components/Toast";
+import { readCache, patchCache } from "@/lib/pageCache";
 
 type Tab = "overview" | "fees" | "salaries" | "expenses";
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -44,14 +45,24 @@ const TABS: Array<{ id: Tab; label: string }> = [
 ];
 const TAB_KEY = "payments_tab";
 
+const SNAPSHOT_KEY = "admin-payments";
+interface PaymentsSnapshot {
+  fees: DemoFee[];
+  students: DemoStudent[];
+  schoolId: string | null;
+  userId: string | null;
+}
+
 export default function AdminPaymentsPage() {
   const { tr } = useLanguage();
   const toast = useToast();
   const supabase = createClient();
+  // Last visit's fees, shown at once while they're read again.
+  const seen = readCache<Partial<PaymentsSnapshot>>(SNAPSHOT_KEY);
   const [isDemo, setIsDemo] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [schoolId, setSchoolId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [ready, setReady] = useState(Boolean(seen?.fees && seen.students));
+  const [schoolId, setSchoolId] = useState<string | null>(seen?.schoolId ?? null);
+  const [userId, setUserId] = useState<string | null>(seen?.userId ?? null);
   // The tab the office was last on, on this device.
   const [tab, setTab] = useState<Tab>("overview");
   useEffect(() => {
@@ -71,8 +82,8 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const [fees, setFees] = useState<DemoFee[]>([]);
-  const [students, setStudents] = useState<DemoStudent[]>([]);
+  const [fees, setFees] = useState<DemoFee[]>(seen?.fees ?? []);
+  const [students, setStudents] = useState<DemoStudent[]>(seen?.students ?? []);
   const [created, setCreated] = useState<DemoFee[]>([]);
   const [overrides, setOverrides] = useState<Record<string, FeeOverride>>({});
 
@@ -106,17 +117,17 @@ export default function AdminPaymentsPage() {
       .from("fees")
       .select("id, student_id, description, amount_due, amount_paid, due_date, term")
       .order("due_date");
-    setFees(
-      (data ?? []).map((f) => ({
-        id: f.id,
-        studentId: f.student_id,
-        description: f.description,
-        amountDue: Number(f.amount_due),
-        amountPaid: Number(f.amount_paid),
-        dueDate: f.due_date,
-        term: f.term,
-      }))
-    );
+    const list = (data ?? []).map((f) => ({
+      id: f.id,
+      studentId: f.student_id,
+      description: f.description,
+      amountDue: Number(f.amount_due),
+      amountPaid: Number(f.amount_paid),
+      dueDate: f.due_date,
+      term: f.term,
+    }));
+    setFees(list);
+    patchCache<PaymentsSnapshot>(SNAPSHOT_KEY, { fees: list });
   };
 
   useEffect(() => {
@@ -140,13 +151,21 @@ export default function AdminPaymentsPage() {
       }
 
       setUserId(user.id);
+      patchCache<PaymentsSnapshot>(SNAPSHOT_KEY, { userId: user.id });
       const { data: profile } = await supabase
         .from("profiles")
         .select("school_id")
         .eq("id", user.id)
         .single();
       setSchoolId(profile?.school_id ?? null);
-      await Promise.all([loadRealFees(), loadRealStudents().then(setStudents)]);
+      patchCache<PaymentsSnapshot>(SNAPSHOT_KEY, { schoolId: profile?.school_id ?? null });
+      await Promise.all([
+        loadRealFees(),
+        loadRealStudents().then((list) => {
+          setStudents(list);
+          patchCache<PaymentsSnapshot>(SNAPSHOT_KEY, { students: list });
+        }),
+      ]);
     };
     load().finally(() => setReady(true));
   }, []);

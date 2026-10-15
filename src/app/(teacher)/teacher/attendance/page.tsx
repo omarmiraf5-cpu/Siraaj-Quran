@@ -21,6 +21,7 @@ import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { fetchAll, daysAgoIso, ATTENDANCE_WINDOW_DAYS } from "@/lib/supabase/fetchAll";
+import { readCache, writeCache, patchCache } from "@/lib/pageCache";
 import { LoadingNote } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
@@ -84,6 +85,24 @@ function writeDraft(who: string, date: string, marks: Draft["marks"]) {
   } catch {}
 }
 
+const SNAPSHOT_KEY = "teacher-register";
+interface RegisterSnapshot {
+  today: string;
+  students: DemoStudent[];
+  history: Record<string, AttendanceDay[]>;
+  savedMarks: Record<string, AttendanceStatus>;
+  halaqas: MyHalaqa[] | null;
+}
+
+/** The halaqa to open: the one the dashboard linked to, else the last used here. */
+function openingHalaqa(shown: MyHalaqa[] | null): string | null {
+  let remembered: string | null = new URLSearchParams(window.location.search).get("halaqa");
+  try {
+    remembered ??= localStorage.getItem("attendance_halaqa");
+  } catch {}
+  return shown?.find((h) => h.id === remembered)?.id ?? shown?.[0]?.id ?? null;
+}
+
 /** Whether the browser thinks there's a connection. */
 function useOnline() {
   const [online, setOnline] = useState(true);
@@ -104,29 +123,37 @@ export default function TeacherAttendancePage() {
   const supabase = createClient();
   const { t, language, tr } = useLanguage();
   const toast = useToast();
-  const [ready, setReady] = useState(false);
+  // Today's register as last seen, shown at once while it's read again.
+  // Marking waits for the fresh copy (`fresh`) — a fraction of a second —
+  // so no tap is ever made against marks another teacher has since changed.
+  const seen = (() => {
+    const x = readCache<RegisterSnapshot>(SNAPSHOT_KEY);
+    return x && x.today === todayIso() ? x : undefined;
+  })();
+  const [ready, setReady] = useState(Boolean(seen));
+  const [fresh, setFresh] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
-  const [today, setToday] = useState(DEMO_TODAY);
+  const [today, setToday] = useState(seen?.today ?? DEMO_TODAY);
   // Starts empty rather than seeded with the demo roster: this page can
   // load into either a real teacher's session or the demo, and showing the
   // sample students first — then swapping to the real ones a moment later
   // — briefly puts one school's roster on screen inside another's session.
   // Nothing renders below until `ready`, once we actually know which one
   // this is.
-  const [students, setStudents] = useState<DemoStudent[]>([]);
-  const [history, setHistory] = useState<Record<string, AttendanceDay[]>>({});
-  const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
+  const [students, setStudents] = useState<DemoStudent[]>(seen?.students ?? []);
+  const [history, setHistory] = useState<Record<string, AttendanceDay[]>>(seen?.history ?? {});
+  const [records, setRecords] = useState<Record<string, AttendanceStatus>>(seen?.savedMarks ?? {});
   // Today's marks as they stand in the database: what a save changes is
   // worked out against these.
-  const [savedMarks, setSavedMarks] = useState<Record<string, AttendanceStatus>>({});
+  const [savedMarks, setSavedMarks] = useState<Record<string, AttendanceStatus>>(seen?.savedMarks ?? {});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [longAbsences, setLongAbsences] = useState<LongAbsence[]>([]);
   // Each halaqa has its own register: one at a time on screen, its own
   // tally, "mark all present" and save. Null in the sample school.
-  const [halaqas, setHalaqas] = useState<MyHalaqa[] | null>(null);
-  const [halaqaId, setHalaqaId] = useState<string | null>(null);
+  const [halaqas, setHalaqas] = useState<MyHalaqa[] | null>(seen?.halaqas ?? null);
+  const [halaqaId, setHalaqaId] = useState<string | null>(() => (seen ? openingHalaqa(seen.halaqas) : null));
   // Whose register the draft on this device belongs to.
   const [who, setWho] = useState<string | null>(null);
   const [restored, setRestored] = useState(0);
@@ -178,24 +205,18 @@ export default function TeacherAttendancePage() {
       const present = new Set((studentRows ?? []).map((s) => s.id as string));
       const shown = groups?.filter((h) => h.studentIds.some((id) => present.has(id))) ?? null;
       setHalaqas(shown);
-      // Opened from a halaqa on the dashboard, that one; otherwise the last one used here.
-      let remembered: string | null = new URLSearchParams(window.location.search).get("halaqa");
-      try {
-        remembered ??= localStorage.getItem("attendance_halaqa");
-      } catch {}
-      setHalaqaId(shown?.find((h) => h.id === remembered)?.id ?? shown?.[0]?.id ?? null);
+      setHalaqaId(openingHalaqa(shown));
 
-      setStudents(
-        narrowToMine(
-          (studentRows ?? []).map((s) => ({
-            id: s.id,
-            name: s.full_name,
-            halaqa: `Grade ${s.grade}`,
-            active: s.active,
-          })),
-          mine
-        )
+      const roster = narrowToMine(
+        (studentRows ?? []).map((s) => ({
+          id: s.id,
+          name: s.full_name,
+          halaqa: `Grade ${s.grade}`,
+          active: s.active,
+        })),
+        mine
       );
+      setStudents(roster);
 
       const byStudent: Record<string, AttendanceDay[]> = {};
       const todayRecords: Record<string, AttendanceStatus> = {};
@@ -207,6 +228,7 @@ export default function TeacherAttendancePage() {
       setHistory(byStudent);
       setSavedMarks(todayRecords);
       restoreDraft(user.id, todayStr, todayRecords);
+      writeCache<RegisterSnapshot>(SNAPSHOT_KEY, { today: todayStr, students: roster, history: byStudent, savedMarks: todayRecords, halaqas: shown });
     };
 
     // Unsaved marks from earlier today go back on the register over what
@@ -225,7 +247,10 @@ export default function TeacherAttendancePage() {
       setWho(owner);
     };
 
-    load().finally(() => setReady(true));
+    load().finally(() => {
+      setReady(true);
+      setFresh(true);
+    });
   }, []);
 
   // Every change not yet saved, as it stands — kept on the device.
@@ -251,6 +276,7 @@ export default function TeacherAttendancePage() {
   }, [pendingCount]);
 
   const mark = (id: string, status: AttendanceStatus) => {
+    if (!fresh) return;
     setSaved(false);
     setRecords((r) => {
       const next = { ...r };
@@ -283,6 +309,7 @@ export default function TeacherAttendancePage() {
   };
 
   const markAllPresent = () => {
+    if (!fresh) return;
     setSaved(false);
     setRecords((r) => ({ ...r, ...Object.fromEntries(roster.map((s) => [s.id, "present" as const])) }));
   };
@@ -331,10 +358,10 @@ export default function TeacherAttendancePage() {
         }
         return next;
       });
-      setSavedMarks((m) => {
-        const next = Object.fromEntries(Object.entries(m).filter(([id]) => !inRoster.has(id)));
-        return { ...next, ...here };
-      });
+      const nextSaved = { ...Object.fromEntries(Object.entries(savedMarks).filter(([id]) => !inRoster.has(id))), ...here };
+      setSavedMarks(nextSaved);
+      // The next visit opens on what was just saved.
+      patchCache<RegisterSnapshot>(SNAPSHOT_KEY, { savedMarks: nextSaved });
       setSaved(true);
       setRestored(0);
       toast.success(halaqa && halaqas && halaqas.length > 1 ? `${t("teacher.attendance.saved")} · ${halaqa.label}` : t("teacher.attendance.saved"));
@@ -537,7 +564,7 @@ export default function TeacherAttendancePage() {
         <PressButton
           onClick={saveAttendance}
           loading={saving}
-          disabled={(marked === 0 && !changed) || !online}
+          disabled={(marked === 0 && !changed) || !online || !fresh}
           className="w-full max-w-4xl mx-auto flex items-center justify-center gap-2 gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 transition-opacity"
         >
           {saved && <IconCheck size={16} />}

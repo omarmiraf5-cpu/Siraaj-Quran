@@ -31,6 +31,7 @@ import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { fetchAll, daysAgoIso, ATTENDANCE_WINDOW_DAYS } from "@/lib/supabase/fetchAll";
+import { readCache, writeCache } from "@/lib/pageCache";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
@@ -60,6 +61,17 @@ const STATUS_TEXT: Record<AttendanceStatus, string> = {
   excused: "text-slate-600 dark:text-slate-300",
 };
 
+const SNAPSHOT_KEY = "teacher-dashboard";
+interface DashboardSnapshot {
+  today: string;
+  teacherName: string | null;
+  students: RosterStudent[];
+  assignments: QuranicAssignment[];
+  history: Record<string, AttendanceDay[]>;
+  todayMarks: Record<string, AttendanceStatus>;
+  groups: Array<{ id: string; label: string; studentIds: string[] }>;
+}
+
 interface RosterStudent {
   id: string;
   name: string;
@@ -88,22 +100,24 @@ export default function TeacherDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [drilldown, setDrilldown] = useState<DrilldownView | null>(null);
 
-  const [ready, setReady] = useState(false);
+  // Last visit's dashboard, shown at once while it's read again.
+  const seen = readCache<DashboardSnapshot>(SNAPSHOT_KEY);
+  const [ready, setReady] = useState(Boolean(seen));
   const [isDemo, setIsDemo] = useState(false);
-  const [today, setToday] = useState(DEMO_TODAY);
-  const [teacherName, setTeacherName] = useState<string | null>(null);
+  const [today, setToday] = useState(seen?.today ?? DEMO_TODAY);
+  const [teacherName, setTeacherName] = useState<string | null>(seen?.teacherName ?? null);
   // Start empty rather than seeded with the demo roster: this dashboard can
   // load into either a real teacher's session or the demo, and showing the
   // sample class first — then swapping to the real one a moment later —
   // briefly puts one school's data on screen inside another's session.
   // Nothing renders below until `ready`, once we actually know which one
   // this is.
-  const [students, setStudents] = useState<RosterStudent[]>([]);
-  const [assignments, setAssignments] = useState<QuranicAssignment[]>([]);
-  const [attendanceHistory, setAttendanceHistory] = useState<Record<string, AttendanceDay[]>>({});
-  const [todayStatus, setTodayStatus] = useState<Record<string, AttendanceStatus> | null>(null);
+  const [students, setStudents] = useState<RosterStudent[]>(seen?.students ?? []);
+  const [assignments, setAssignments] = useState<QuranicAssignment[]>(seen?.assignments ?? []);
+  const [attendanceHistory, setAttendanceHistory] = useState<Record<string, AttendanceDay[]>>(seen?.history ?? {});
+  const [todayStatus, setTodayStatus] = useState<Record<string, AttendanceStatus> | null>(seen?.todayMarks ?? null);
   // The halaqas they teach, each with its children (just the ones on the roster).
-  const [groups, setGroups] = useState<Array<{ id: string; label: string; studentIds: string[] }>>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; label: string; studentIds: string[] }>>(seen?.groups ?? []);
 
   useEffect(() => {
     const load = async () => {
@@ -152,15 +166,18 @@ export default function TeacherDashboard() {
         ]);
       const mine = halaqaRows && new Map(halaqaRows.flatMap((h) => h.studentIds.map((id) => [id, h.label] as const)));
 
-      setTeacherName(profile?.full_name ?? null);
+      const name = profile?.full_name ?? null;
+      setTeacherName(name);
       const roster = narrowToMine(
         (studentRows ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: `Grade ${s.grade}` })),
         mine
       );
       const theirs = new Set(roster.map((s) => s.id));
       setStudents(roster);
-      setGroups((halaqaRows ?? []).map((h) => ({ ...h, studentIds: h.studentIds.filter((id) => theirs.has(id)) })));
-      setAssignments(((assignmentRows ?? []) as QuranicAssignment[]).filter((a) => !mine || theirs.has(a.student_id)));
+      const groupList = (halaqaRows ?? []).map((h) => ({ ...h, studentIds: h.studentIds.filter((id) => theirs.has(id)) }));
+      const work = ((assignmentRows ?? []) as QuranicAssignment[]).filter((a) => !mine || theirs.has(a.student_id));
+      setGroups(groupList);
+      setAssignments(work);
 
       const history: Record<string, AttendanceDay[]> = {};
       const todayMarks: Record<string, AttendanceStatus> = {};
@@ -172,6 +189,15 @@ export default function TeacherDashboard() {
       }
       setAttendanceHistory(history);
       setTodayStatus(todayMarks);
+      writeCache<DashboardSnapshot>(SNAPSHOT_KEY, {
+        today: todayStr,
+        teacherName: name,
+        students: roster,
+        assignments: work,
+        history,
+        todayMarks,
+        groups: groupList,
+      });
     };
 
     load().finally(() => setReady(true));
