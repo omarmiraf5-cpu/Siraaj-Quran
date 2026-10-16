@@ -12,6 +12,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
 import { translateNotice } from "@/lib/noticeText";
 import { useToast } from "@/components/Toast";
+import { readCache, writeCache } from "@/lib/pageCache";
 
 /* ── Which portal is this ──────────────────────────────────────────── */
 
@@ -152,9 +153,16 @@ interface MyDay {
  * The location is read from the phone only when they tap, and sent to the
  * server, which makes the actual on-the-premises decision.
  */
+const SIGN_IN_KEY = "staff-sign-in";
+
 export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void }) {
   const { tr } = useLanguage();
-  const [data, setData] = useState<MyDay | null>(null);
+  // Today's answer from the last visit, shown at once while it's asked
+  // again — rather than a line of "Checking…" every time the page opens.
+  const [data, setData] = useState<MyDay | null>(() => {
+    const seen = readCache<MyDay>(SIGN_IN_KEY);
+    return seen && seen.today === new Date().toLocaleDateString("en-CA") ? seen : null;
+  });
   const [busy, setBusy] = useState<"" | "locating" | "saving">("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -162,8 +170,10 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
   const load = useCallback(async () => {
     const res = await api("/api/staff-attendance");
     const body = await res.json();
-    if (res.ok) setData(body);
-    else setError(tr(body.error ?? "Could not load today's sign-in"));
+    if (res.ok) {
+      setData(body);
+      writeCache(SIGN_IN_KEY, body);
+    } else setError(tr(body.error ?? "Could not load today's sign-in"));
   }, [api]);
 
   useEffect(() => {
@@ -198,9 +208,19 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
   };
 
   if (!data) {
+    // The first time it's asked: the card's own shape, quietly, so nothing
+    // jumps when the answer comes.
     return (
-      <section className="card-quiet p-5">
-        <p className="text-[13px] text-ink-muted">{error ?? tr("Checking today's sign-in…")}</p>
+      <section className="card-quiet p-5" aria-busy={!error}>
+        {error ? (
+          <p className="text-[13px] text-ink-muted">{error}</p>
+        ) : (
+          <div className="space-y-2.5" aria-label={tr("Checking today's sign-in…")}>
+            <div className="skeleton h-3 w-36 rounded-full" />
+            <div className="skeleton h-5 w-56 max-w-full rounded-full" />
+            <div className="skeleton h-3 w-80 max-w-full rounded-full" />
+          </div>
+        )}
       </section>
     );
   }

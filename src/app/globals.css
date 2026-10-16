@@ -43,6 +43,21 @@
 }
 
 @layer base {
+  /* Safari on iPad and iPhone gives a date or time box a width of its own
+     that ignores the column it's in, so it spilled past its card. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    min-width: 0;
+    max-width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    text-align: start;
+  }
+
   body {
     font-family: var(--font-jakarta), system-ui, sans-serif;
     background-color: var(--c-surface-bg);

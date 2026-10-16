@@ -112,7 +112,7 @@ export default function MyAttendancePage() {
 
       <SectionCard title={tr("Report an absence")} note={tr("The office is told straight away")}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="block">
+          <label className="block min-w-0">
             <span className="eyebrow block mb-1.5">{tr("First day away")}</span>
             <input
               type="date"
@@ -122,7 +122,7 @@ export default function MyAttendancePage() {
               className={input}
             />
           </label>
-          <label className="block">
+          <label className="block min-w-0">
             <span className="eyebrow block mb-1.5">{tr("Last day away")}</span>
             <input
               type="date"
