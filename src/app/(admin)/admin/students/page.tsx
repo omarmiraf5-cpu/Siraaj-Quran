@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEMO_CREATED_STUDENTS_KEY,
   DEMO_STUDENT_OVERRIDES_KEY,
@@ -14,7 +14,7 @@ import {
   type HalaqaOverride,
 } from "@/data/demo";
 import type { DemoStudent, DemoHalaqa, DemoTeacher } from "@/data/demo";
-import { loadSchoolTeachers } from "@/lib/schoolTeachers";
+import { loadSchoolTeachers, saveOtherTeachers } from "@/lib/schoolTeachers";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote, RowChevron, OPEN_ROW } from "@/components/portal-ui";
 import StudentImport from "@/components/StudentImport";
@@ -104,6 +104,9 @@ export default function AdminStudentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftHalaqa, setDraftHalaqa] = useState("");
+  // In a school kept in grades: the teachers ticked on a student's own row —
+  // one, or two or more to share a halaqa.
+  const [draftTeachers, setDraftTeachers] = useState<string[]>([]);
   const [draftGrade, setDraftGrade] = useState("");
   const [draftActive, setDraftActive] = useState(true);
   const [draftReport, setDraftReport] = useState(true);
@@ -140,10 +143,18 @@ export default function AdminStudentsPage() {
     const { data } = first.error
       ? await supabase.from("classes").select("id, name, teacher_id, schedule, grade").order("name")
       : first;
+    // Each halaqa's other teachers, so one shared by two can be found by
+    // who teaches it. (A database without them answers with an error.)
+    const { data: shares } = await supabase.from("class_teachers").select("class_id, teacher_id");
+    const others = new Map<string, string[]>();
+    for (const r of (shares ?? []) as Array<{ class_id: string; teacher_id: string }>) {
+      others.set(r.class_id, [...(others.get(r.class_id) ?? []), r.teacher_id]);
+    }
     return ((data ?? []) as Array<{ id: string; name: string; teacher_id: string | null; schedule: string | null; grade: number; campus_id?: string | null }>).map((c) => ({
       id: c.id,
       name: c.name,
       teacherId: c.teacher_id,
+      coTeacherIds: others.get(c.id) ?? [],
       schedule: c.schedule ?? "",
       grade: c.grade,
       campusId: c.campus_id ?? null,
@@ -395,6 +406,7 @@ export default function AdminStudentsPage() {
     setEditingId(s.id === editingId ? null : s.id);
     setDraftName(s.name);
     setDraftHalaqa(studentHalaqa(s)?.id ?? "");
+    setDraftTeachers(teachersOf(studentHalaqa(s)));
     setDraftGrade(String(s.grade ?? 0));
     setDraftCampus(campusOfStudent(s) ?? "");
     setDraftActive(s.active !== false);
@@ -454,8 +466,13 @@ export default function AdminStudentsPage() {
       // A teacher chosen rather than a halaqa: theirs in this grade, at the
       // student's campus, made now if they have none.
       const chosenCampus = draftCampus || campusOfStudent(s) || null;
-      const made = draftHalaqa.startsWith("t:") ? await halaqaForTeacher(draftHalaqa.slice(2), Number(draftGrade), chosenCampus) : null;
-      const halaqaId = made ? made.id : draftHalaqa;
+      const byTeachers = graded && !isDemo;
+      const made = byTeachers
+        ? await halaqaForTeachers(draftTeachers, Number(draftGrade), chosenCampus, studentHalaqa(s))
+        : draftHalaqa.startsWith("t:")
+          ? await halaqaForTeacher(draftHalaqa.slice(2), Number(draftGrade), chosenCampus)
+          : null;
+      const halaqaId = byTeachers ? made?.id ?? "" : made ? made.id : draftHalaqa;
       const placedIn = made ?? halaqaById(halaqaId);
       const campusId = placedIn?.campusId ?? (draftCampus || null);
       // The student's details and their halaqa saved side by side.
@@ -577,28 +594,112 @@ export default function AdminStudentsPage() {
     atCampus?: string | null
   ): Promise<{ id: string; label: string; name: string; campusId: string | null }> => {
     const campusId = campuses.length > 0 ? atCampus || assignCampus || campuses[0].id : null;
-    const theirs = halaqasFor(String(grade)).find(
-      (h) => h.teacherId === teacherId && (campuses.length === 0 || (h.campusId ?? null) === campusId)
-    );
-    if (theirs) return { id: theirs.id, label: halaqaInGrade(theirs), name: theirs.name, campusId: theirs.campusId ?? null };
-    const name = teacherName(teacherId) ?? "New halaqa";
-    const { data, error } = await supabase
-      .from("classes")
-      .insert({
-        name,
-        subject: "Qur'an & Hifz",
-        grade,
-        schedule: "",
-        teacher_id: teacherId,
-        school_id: schoolId,
-        ...(campusId ? { campus_id: campusId } : {}),
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    // Added here as made, rather than every halaqa asked for again.
-    setHalaqas((now) => [...now, { id: data.id as string, name, teacherId, schedule: "", grade, campusId }]);
-    return { id: data.id as string, label: [campusName(campusId), name].filter(Boolean).join(" · "), name, campusId };
+    return once(`${teacherId}|${grade}|${campusId}`, async () => {
+      const theirs = halaqasFor(String(grade)).find(
+        (h) => h.teacherId === teacherId && (campuses.length === 0 || (h.campusId ?? null) === campusId)
+      );
+      if (theirs) return { id: theirs.id, label: halaqaInGrade(theirs), name: theirs.name, campusId: theirs.campusId ?? null };
+      // The list on screen can be behind — another pick a moment ago may have
+      // just made it — so the database is asked before a new one is made.
+      let ask = supabase
+        .from("classes")
+        .select("id, name, campus_id")
+        .eq("school_id", schoolId as string)
+        .eq("teacher_id", teacherId)
+        .eq("grade", grade);
+      ask = campuses.length === 0 ? ask : campusId ? ask.eq("campus_id", campusId) : ask.is("campus_id", null);
+      const { data: existing } = await ask.order("created_at").limit(1);
+      if (existing && existing[0]) {
+        const h = existing[0] as { id: string; name: string; campus_id: string | null };
+        return { id: h.id, label: [campusName(h.campus_id), h.name].filter(Boolean).join(" · "), name: h.name, campusId: h.campus_id ?? null };
+      }
+      const name = teacherName(teacherId) ?? "New halaqa";
+      const { data, error } = await supabase
+        .from("classes")
+        .insert({
+          name,
+          subject: "Qur'an & Hifz",
+          grade,
+          schedule: "",
+          teacher_id: teacherId,
+          school_id: schoolId,
+          ...(campusId ? { campus_id: campusId } : {}),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      // Added here as made, rather than every halaqa asked for again.
+      setHalaqas((now) => [...now, { id: data.id as string, name, teacherId, schedule: "", grade, campusId }]);
+      return { id: data.id as string, label: [campusName(campusId), name].filter(Boolean).join(" · "), name, campusId };
+    });
+  };
+
+  // A halaqa being found or made, by teacher(s), grade and campus: picks made
+  // in quick succession share the one answer instead of each making another.
+  const pending = useRef(new Map<string, Promise<unknown>>());
+  const once = <T,>(key: string, make: () => Promise<T>): Promise<T> => {
+    const now = pending.current.get(key) as Promise<T> | undefined;
+    if (now) return now;
+    const p = make().finally(() => setTimeout(() => pending.current.delete(key), 3000));
+    pending.current.set(key, p);
+    return p;
+  };
+
+  /** Who teaches a halaqa: its lead first, then the rest. */
+  const teachersOf = (h: DemoHalaqa | undefined | null): string[] =>
+    h ? [...new Set([h.teacherId, ...(h.coTeacherIds ?? [])].filter((x): x is string => Boolean(x)))] : [];
+  const sameTeachers = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
+
+  // The halaqa for exactly these teachers in a grade (at the campus): the
+  // student's own if it already is, else one they share, else one made now —
+  // in the first one's name with the rest alongside, named after them all.
+  const halaqaForTeachers = async (
+    ids: string[],
+    grade: number,
+    atCampus: string | null,
+    current: DemoHalaqa | undefined
+  ): Promise<{ id: string; name: string; campusId: string | null } | null> => {
+    if (ids.length === 0) return null;
+    const campusId = campuses.length > 0 ? atCampus || campuses[0].id : null;
+    const atHere = (h: DemoHalaqa) => campuses.length === 0 || (h.campusId ?? null) === campusId;
+    if (current && (current.grade ?? 0) === grade && atHere(current) && sameTeachers(teachersOf(current), ids)) {
+      return { id: current.id, name: current.name, campusId: current.campusId ?? null };
+    }
+    const shared = halaqasFor(String(grade)).find((h) => atHere(h) && sameTeachers(teachersOf(h), ids));
+    if (shared) return { id: shared.id, name: shared.name, campusId: shared.campusId ?? null };
+    if (ids.length === 1) return halaqaForTeacher(ids[0], grade, campusId);
+    return once(`${[...ids].sort().join("+")}|${grade}|${campusId}`, async () => {
+      // As for one teacher: the database is asked before a new one is made.
+      let ask = supabase.from("classes").select("id, name, campus_id, teacher_id").eq("school_id", schoolId as string).eq("grade", grade).in("teacher_id", ids);
+      ask = campuses.length === 0 ? ask : campusId ? ask.eq("campus_id", campusId) : ask.is("campus_id", null);
+      const { data: leads } = await ask.order("created_at");
+      if (leads && leads.length > 0) {
+        const { data: rest } = await supabase.from("class_teachers").select("class_id, teacher_id").in("class_id", leads.map((l) => l.id as string));
+        const match = (leads as Array<{ id: string; name: string; campus_id: string | null; teacher_id: string }>).find((l) =>
+          sameTeachers([l.teacher_id, ...((rest ?? []) as Array<{ class_id: string; teacher_id: string }>).filter((r) => r.class_id === l.id).map((r) => r.teacher_id)], ids)
+        );
+        if (match) return { id: match.id, name: match.name, campusId: match.campus_id ?? null };
+      }
+      const name = ids.map((id) => teacherName(id) ?? "").filter(Boolean).join(" & ") || "New halaqa";
+      const { data, error } = await supabase
+        .from("classes")
+        .insert({
+          name,
+          subject: "Qur'an & Hifz",
+          grade,
+          schedule: "",
+          teacher_id: ids[0],
+          school_id: schoolId,
+          ...(campusId ? { campus_id: campusId } : {}),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      // The others through the office's server route: one may be an admin who teaches.
+      await saveOtherTeachers(data.id as string, ids.slice(1));
+      setHalaqas((now) => [...now, { id: data.id as string, name, teacherId: ids[0], coTeacherIds: ids.slice(1), schedule: "", grade, campusId }]);
+      return { id: data.id as string, name, campusId };
+    });
   };
 
   // Students into a halaqa, a teacher's ("t:<id>", made if need be at
@@ -801,6 +902,50 @@ export default function AdminStudentsPage() {
                   </select>
                 </label>
               )}
+              {graded && !isDemo ? (
+                <fieldset className="block">
+                  <legend className="block text-xs font-semibold text-ink mb-1.5">{tr("Teachers")}</legend>
+                  {teachers.length === 0 ? (
+                    <span className="block text-[12px] text-ink-muted">
+                      {tr("No teachers yet.")}{" "}
+                      <Link href="/admin/teachers" className="font-semibold text-ink underline underline-offset-2">
+                        {tr("Add a teacher")}
+                      </Link>
+                    </span>
+                  ) : (
+                    <>
+                      {/* One teacher, or two or more to share a halaqa: saving
+                          puts the student in the halaqa they teach together
+                          in this grade, made if there isn't one. */}
+                      <div className="max-h-56 overflow-y-auto rounded-xl border border-surface-border bg-surface-card divide-y divide-surface-border">
+                        {teachers.map((t) => {
+                          const on = draftTeachers.includes(t.id);
+                          return (
+                            <label key={t.id} className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-ink cursor-pointer hover:bg-surface-bg-warm">
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                onChange={() =>
+                                  setDraftTeachers((now) => (on ? now.filter((x) => x !== t.id) : [...now, t.id]))
+                                }
+                                className="w-4 h-4 flex-shrink-0"
+                              />
+                              <span className="[overflow-wrap:anywhere]">{t.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <span className="block text-[11.5px] text-ink-muted mt-1.5">
+                        {draftTeachers.length === 0
+                          ? tr("No teacher yet. Tick one, or two to share a halaqa.")
+                          : draftTeachers.length === 1
+                            ? tr("Tick another teacher to share the halaqa.")
+                            : tr("They'll share one halaqa in this grade.")}
+                      </span>
+                    </>
+                  )}
+                </fieldset>
+              ) : (
               <label className="block">
                 <span className="block text-xs font-semibold text-ink mb-1.5">{graded ? tr("Teacher") : tr("Halaqa")}</span>
                 <select value={draftHalaqa} onChange={(e) => setDraftHalaqa(e.target.value)} className={smallField}>
@@ -828,6 +973,7 @@ export default function AdminStudentsPage() {
                   </span>
                 )}
               </label>
+              )}
             </div>
             <label className="flex items-center gap-2 text-sm text-ink">
               <input

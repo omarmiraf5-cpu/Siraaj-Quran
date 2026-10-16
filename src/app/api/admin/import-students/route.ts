@@ -75,14 +75,14 @@ export async function POST(req: NextRequest) {
         admin.from("schools").select("name").eq("id", schoolId).maybeSingle(),
         admin.from("schools").select("organised_by_grade").eq("id", schoolId).maybeSingle(),
         admin.from("campuses").select("id, name").eq("school_id", schoolId),
-        admin.from("classes").select("id, name, grade, campus_id").eq("school_id", schoolId),
+        admin.from("classes").select("id, name, grade, campus_id, teacher_id").eq("school_id", schoolId),
         admin.from("students").select("id, full_name, grade").eq("school_id", schoolId),
       ]);
     if (studentsError) throw studentsError;
     const byGrade = graded?.organised_by_grade === true;
     const campusesReady = !campusList.error;
     const campuses = (campusList.data ?? []) as Array<{ id: string; name: string }>;
-    const halaqas = ((halaqaList.data ?? []) as Array<{ id: string; name: string; grade: number; campus_id?: string | null }>).map((h) => ({
+    const halaqas = ((halaqaList.data ?? []) as Array<{ id: string; name: string; grade: number; campus_id?: string | null; teacher_id?: string | null }>).map((h) => ({
       ...h,
       campus_id: h.campus_id ?? null,
     }));
@@ -129,7 +129,14 @@ export async function POST(req: NextRequest) {
           (campuses.length === 0 || h.campus_id === campusId)
       );
       if (found) return found;
+      // A teacher's own halaqa in that grade, at that campus, whatever it's
+      // called now — so a renamed one isn't made again beside it.
       const teacher = teacherCalled(name);
+      const theirs =
+        byGrade && teacher
+          ? halaqas.find((h) => h.teacher_id === teacher.id && h.grade === grade && (campuses.length === 0 || h.campus_id === campusId))
+          : undefined;
+      if (theirs) return theirs;
       const { data, error } = await admin
         .from("classes")
         .insert({
@@ -144,7 +151,7 @@ export async function POST(req: NextRequest) {
         .select("id, name, grade")
         .single();
       if (error) throw error;
-      const made = { ...data, campus_id: campusId };
+      const made = { ...data, campus_id: campusId, teacher_id: teacher?.id ?? null };
       halaqas.push(made);
       return made;
     };

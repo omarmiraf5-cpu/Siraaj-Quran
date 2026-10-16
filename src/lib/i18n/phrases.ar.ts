@@ -1878,4 +1878,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Every student here has a teacher.": "لكل طالب هنا معلم.",
   "Add a teacher": "أضف معلمًا",
   "Saved {name}.": "حُفظت بيانات {name}.",
+  "No teacher yet. Tick one, or two to share a halaqa.": "لا معلم بعد. اختر معلمًا واحدًا، أو اثنين ليشتركا في حلقة.",
+  "Tick another teacher to share the halaqa.": "اختر معلمًا آخر ليشارك في الحلقة.",
+  "They'll share one halaqa in this grade.": "سيشتركان في حلقة واحدة في هذا الصف.",
 };
