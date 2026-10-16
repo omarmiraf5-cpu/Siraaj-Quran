@@ -45,6 +45,8 @@ import {
 import { statusForRating } from "@/lib/planLessons";
 import { useLanguage } from "@/components/LanguageProvider";
 import { myHalaqaStudents } from "@/lib/teacherScope";
+import { loadSchoolShape } from "@/lib/schoolStructure";
+import { gradeLabel } from "@/lib/grades";
 import {
   DIRECTION_HINT,
   DIRECTION_LABEL,
@@ -60,6 +62,8 @@ import { translateAlert } from "@/lib/yearlyPlan";
 interface Student {
   id: string;
   full_name: string;
+  /** In a school kept in grades; null otherwise. */
+  grade?: number | null;
 }
 
 // Mirrors AutoAssignSummary in @/lib/autoAssignments — duplicated rather
@@ -114,6 +118,11 @@ export default function QuranAssignmentsPage() {
   // in the assignments list below — the dropdown above only needs id/name.
   const [roster, setRoster] = useState<DemoStudent[]>([]);
   const [selectedStudent, setSelectedStudent] = useState("");
+  // In a school kept in grades, the student list is narrowed to one grade
+  // at a time ("" is every grade), so a teacher with several grades isn't
+  // scrolling one long list of names.
+  const [graded, setGraded] = useState(false);
+  const [gradeFilter, setGradeFilter] = useState("");
   const [portion, setPortion] = useState<HifzPortion>("new");
   const [selectedSurah, setSelectedSurah] = useState("");
   const [ayahStart, setAyahStart] = useState("");
@@ -188,8 +197,11 @@ export default function QuranAssignmentsPage() {
           );
           setRoster(fullRoster);
           setStudents(
-            fullRoster.filter((s) => s.active !== false).map((s) => ({ id: s.id, full_name: s.name }))
+            fullRoster
+              .filter((s) => s.active !== false)
+              .map((s) => ({ id: s.id, full_name: s.name, grade: s.grade ?? null }))
           );
+          setGraded(fullRoster.some((s) => s.grade !== undefined));
           setDemoCreated(loadDemoCreated());
           setOverrides(readDemoStore(OVERRIDES_KEY, {}));
           setLog(readDemoStore(LOG_KEY, []));
@@ -200,13 +212,20 @@ export default function QuranAssignmentsPage() {
         }
 
         const [{ data: allStudentData, error: studentError }, mine] = await Promise.all([
-          supabase.from("students").select("id, full_name").order("full_name"),
+          supabase.from("students").select("id, full_name, grade").order("full_name"),
           // Just the children of their own halaqas:
           // every one of a school's hundreds is synced below otherwise.
           myHalaqaStudents(supabase),
         ]);
         if (studentError) throw studentError;
         const studentData = mine ? (allStudentData ?? []).filter((s) => mine.has(s.id)) : allStudentData;
+
+        // Whether this school is kept in grades — a Qur'an school's students
+        // carry an age grade too, which means nothing there.
+        Promise.resolve(supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle())
+          .then(({ data }) => loadSchoolShape(supabase, data?.school_id ?? null))
+          .then((shape) => setGraded(shape.graded))
+          .catch(() => {});
 
         if (studentData) {
           setStudents(studentData);
@@ -658,6 +677,12 @@ export default function QuranAssignmentsPage() {
     }
   };
 
+  // The grades among this teacher's students, lowest first — the chips
+  // above the student list, shown only when there's more than one.
+  const grades = graded
+    ? [...new Set(students.map((s) => s.grade).filter(isGradeNum))].sort((x, y) => x - y)
+    : [];
+
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
@@ -725,17 +750,63 @@ export default function QuranAssignmentsPage() {
             <label className="block text-sm font-semibold text-ink mb-2">
               {tr("Student *")}
             </label>
+            {grades.length > 1 && (
+              <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label={tr("Grade")}>
+                {[{ key: "", label: tr("All"), count: students.length }, ...grades.map((g) => ({
+                  key: String(g),
+                  label: gradeLabel(g),
+                  count: students.filter((s) => s.grade === g).length,
+                }))].map((chip) => {
+                  const on = gradeFilter === chip.key;
+                  return (
+                    <button
+                      key={chip.key || "all"}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        setGradeFilter(chip.key);
+                        const picked = students.find((s) => s.id === selectedStudent);
+                        if (chip.key && picked && String(picked.grade) !== chip.key) setSelectedStudent("");
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold border transition ${
+                        on
+                          ? "bg-brand-navy text-white border-brand-navy dark:bg-brand-gold dark:text-[#20180a] dark:border-brand-gold"
+                          : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                      }`}
+                    >
+                      {chip.label}
+                      <span className={on ? "opacity-70" : "text-ink-muted"}>{chip.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <select
               value={selectedStudent}
               onChange={(e) => setSelectedStudent(e.target.value)}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
               <option value="">{tr("Select a student")}</option>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name}
-                </option>
-              ))}
+              {grades.length > 1 && !gradeFilter
+                ? [...grades, null].map((g) => {
+                    const inGrade = students.filter((s) => (g === null ? !isGradeNum(s.grade) : s.grade === g));
+                    return inGrade.length === 0 ? null : (
+                      <optgroup key={g ?? "none"} label={g === null ? tr("No grade") : gradeLabel(g)}>
+                        {inGrade.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.full_name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })
+                : students
+                    .filter((s) => !gradeFilter || String(s.grade) === gradeFilter)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.full_name}
+                      </option>
+                    ))}
             </select>
           </div>
 
@@ -1270,4 +1341,8 @@ export default function QuranAssignmentsPage() {
       </SectionCard>
     </div>
   );
+}
+
+function isGradeNum(g: number | null | undefined): g is number {
+  return typeof g === "number";
 }

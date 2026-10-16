@@ -1881,4 +1881,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "No teacher yet. Tick one, or two to share a halaqa.": "لا معلم بعد. اختر معلمًا واحدًا، أو اثنين ليشتركا في حلقة.",
   "Tick another teacher to share the halaqa.": "اختر معلمًا آخر ليشارك في الحلقة.",
   "They'll share one halaqa in this grade.": "سيشتركان في حلقة واحدة في هذا الصف.",
+  "Grades {list}": "الصفوف {list}",
+  "Switched off": "موقوف",
+  "No grade": "بلا صف",
 };
