@@ -47,6 +47,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { myHalaqaStudents } from "@/lib/teacherScope";
 import { loadSchoolShape } from "@/lib/schoolStructure";
 import { gradeLabel } from "@/lib/grades";
+import { readCache, writeCache } from "@/lib/pageCache";
 import {
   DIRECTION_HINT,
   DIRECTION_LABEL,
@@ -58,6 +59,10 @@ import {
 } from "@/lib/mushafPlan";
 import { phrase } from "@/lib/i18n/phrases";
 import { translateAlert } from "@/lib/yearlyPlan";
+
+// Whether this school is kept in grades, from the last visit: the grade
+// buttons show at once rather than after the school is asked again.
+const GRADED_KEY = "assignments-graded";
 
 interface Student {
   id: string;
@@ -121,7 +126,7 @@ export default function QuranAssignmentsPage() {
   // In a school kept in grades, the student list is narrowed to one grade
   // at a time ("" is every grade), so a teacher with several grades isn't
   // scrolling one long list of names.
-  const [graded, setGraded] = useState(false);
+  const [graded, setGraded] = useState(() => readCache<boolean>(GRADED_KEY) ?? false);
   const [gradeFilter, setGradeFilter] = useState("");
   const [portion, setPortion] = useState<HifzPortion>("new");
   const [selectedSurah, setSelectedSurah] = useState("");
@@ -178,6 +183,26 @@ export default function QuranAssignmentsPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [log, setLog] = useState<RecitationLogEntry[]>([]);
 
+  const isGradedSchool = async (userId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("school_id, schools!profiles_school_id_fkey(organised_by_grade)")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!error) {
+        const row = data as { schools: { organised_by_grade?: boolean } | { organised_by_grade?: boolean }[] | null } | null;
+        const school = Array.isArray(row?.schools) ? row?.schools[0] : row?.schools;
+        return school?.organised_by_grade === true;
+      }
+      // A database from before the grades update can't answer in one go.
+      const { data: me } = await supabase.from("profiles").select("school_id").eq("id", userId).maybeSingle();
+      return (await loadSchoolShape(supabase, me?.school_id ?? null)).graded;
+    } catch {
+      return false;
+    }
+  };
+
   useEffect(() => {
     const loadStudents = async () => {
       try {
@@ -211,21 +236,21 @@ export default function QuranAssignmentsPage() {
           return;
         }
 
-        const [{ data: allStudentData, error: studentError }, mine] = await Promise.all([
+        const [{ data: allStudentData, error: studentError }, mine, schoolGraded] = await Promise.all([
           supabase.from("students").select("id, full_name, grade").order("full_name"),
           // Just the children of their own halaqas:
           // every one of a school's hundreds is synced below otherwise.
           myHalaqaStudents(supabase),
+          // Whether this school is kept in grades — a Qur'an school's
+          // students carry an age grade too, which means nothing there.
+          // Asked alongside the students, so the grade buttons arrive
+          // with the list rather than a few seconds after it.
+          isGradedSchool(user.id),
         ]);
+        setGraded(schoolGraded);
+        writeCache(GRADED_KEY, schoolGraded);
         if (studentError) throw studentError;
         const studentData = mine ? (allStudentData ?? []).filter((s) => mine.has(s.id)) : allStudentData;
-
-        // Whether this school is kept in grades — a Qur'an school's students
-        // carry an age grade too, which means nothing there.
-        Promise.resolve(supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle())
-          .then(({ data }) => loadSchoolShape(supabase, data?.school_id ?? null))
-          .then((shape) => setGraded(shape.graded))
-          .catch(() => {});
 
         if (studentData) {
           setStudents(studentData);

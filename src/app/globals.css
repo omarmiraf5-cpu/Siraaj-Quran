@@ -53,9 +53,13 @@
     -webkit-appearance: none;
     appearance: none;
   }
+  /* …and without its own look, an empty one has no line to stand on and
+     shrinks to a sliver: keep a line's height in it. */
   input[type="date"]::-webkit-date-and-time-value,
-  input[type="time"]::-webkit-date-and-time-value {
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value {
     text-align: start;
+    min-height: 1.5em;
   }
 
   body {
