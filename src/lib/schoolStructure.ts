@@ -56,3 +56,28 @@ export function halaqaTitle(
   const campus = campuses.find((c) => c.id === h.campusId)?.name;
   return [campus, gradeLabel(h.grade ?? 0), h.name].filter(Boolean).join(" · ");
 }
+
+/**
+ * From this grade up, a teacher has one halaqa per grade, whichever campus
+ * its children attend: it's kept at the school's main campus. Below it,
+ * each campus has its own.
+ */
+export const ONE_HALAQA_FROM_GRADE = 3;
+
+/** The main campus: the one called North, else the first by name. */
+export function mainCampusId(campuses: Array<{ id: string; name: string }>): string | null {
+  if (campuses.length === 0) return null;
+  const north = campuses.find((c) => /^north\b/i.test(c.name.trim()));
+  return (north ?? [...campuses].sort((a, b) => a.name.localeCompare(b.name))[0]).id;
+}
+
+/** The campus a teacher's halaqa in `grade` is kept at, for a child at `childCampusId`. */
+export function halaqaCampusId(
+  grade: number,
+  childCampusId: string | null | undefined,
+  campuses: Array<{ id: string; name: string }>
+): string | null {
+  if (campuses.length === 0) return null;
+  if (grade >= ONE_HALAQA_FROM_GRADE) return mainCampusId(campuses);
+  return childCampusId || null;
+}

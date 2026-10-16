@@ -25,7 +25,7 @@ import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
 import { GRADES, gradeLabel } from "@/lib/grades";
-import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
+import { loadSchoolShape, halaqaCampusId, ONE_HALAQA_FROM_GRADE, type Campus } from "@/lib/schoolStructure";
 import { loadRoster } from "@/lib/rosterExport";
 import { download, fileNameFor } from "@/lib/sheetTools";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -474,7 +474,10 @@ export default function AdminStudentsPage() {
           : null;
       const halaqaId = byTeachers ? made?.id ?? "" : made ? made.id : draftHalaqa;
       const placedIn = made ?? halaqaById(halaqaId);
-      const campusId = placedIn?.campusId ?? (draftCampus || null);
+      // The student's own campus: from Grade 3 up their halaqa may be at
+      // another (the main) campus, and they stay at theirs.
+      const campusId =
+        Number(draftGrade) >= ONE_HALAQA_FROM_GRADE ? draftCampus || s.campusId || null : placedIn?.campusId ?? (draftCampus || null);
       // The student's details and their halaqa saved side by side.
       const details = supabase
         .from("students")
@@ -593,7 +596,8 @@ export default function AdminStudentsPage() {
     grade: number,
     atCampus?: string | null
   ): Promise<{ id: string; label: string; name: string; campusId: string | null }> => {
-    const campusId = campuses.length > 0 ? atCampus || assignCampus || campuses[0].id : null;
+    // From Grade 3 up, one halaqa per teacher and grade, at the main campus.
+    const campusId = campuses.length > 0 ? halaqaCampusId(grade, atCampus || assignCampus || campuses[0].id, campuses) : null;
     return once(`${teacherId}|${grade}|${campusId}`, async () => {
       const theirs = halaqasFor(String(grade)).find(
         (h) => h.teacherId === teacherId && (campuses.length === 0 || (h.campusId ?? null) === campusId)
@@ -660,7 +664,7 @@ export default function AdminStudentsPage() {
     current: DemoHalaqa | undefined
   ): Promise<{ id: string; name: string; campusId: string | null } | null> => {
     if (ids.length === 0) return null;
-    const campusId = campuses.length > 0 ? atCampus || campuses[0].id : null;
+    const campusId = campuses.length > 0 ? halaqaCampusId(grade, atCampus || campuses[0].id, campuses) : null;
     const atHere = (h: DemoHalaqa) => campuses.length === 0 || (h.campusId ?? null) === campusId;
     if (current && (current.grade ?? 0) === grade && atHere(current) && sameTeachers(teachersOf(current), ids)) {
       return { id: current.id, name: current.name, campusId: current.campusId ?? null };
@@ -715,9 +719,10 @@ export default function AdminStudentsPage() {
         .insert(ids.map((student_id) => ({ class_id: classId, student_id })));
       if (inError) throw inError;
     }
-    // They attend their teacher's campus.
+    // Below Grade 3 they attend their halaqa's campus; from Grade 3 up the
+    // halaqa is at the main campus and each child keeps their own.
     const placedAt =
-      classId !== "__none"
+      classId !== "__none" && grade < ONE_HALAQA_FROM_GRADE
         ? halaqas.find((h) => h.id === classId)?.campusId ?? (target && campuses.length > 0 ? atCampus || assignCampus || campuses[0].id : null)
         : null;
     if (studentCampusReady && placedAt) await setCampusFor(ids, placedAt);

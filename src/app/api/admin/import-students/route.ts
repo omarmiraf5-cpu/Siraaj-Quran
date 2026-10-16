@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { halaqaCampusId, ONE_HALAQA_FROM_GRADE } from "@/lib/schoolStructure";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse, after } from "next/server";
 import { randomBytes } from "crypto";
@@ -181,7 +182,10 @@ export async function POST(req: NextRequest) {
           results.push({ status: "failed", name, reason: "Which campus? The school has more than one — fill in the Campus column" });
           continue;
         }
-        const halaqa = halaqaName ? await halaqaFor(halaqaName, grade as number, campus?.id ?? null) : null;
+        // From Grade 3 up a teacher's halaqa is one per grade, at the main
+        // campus, whatever campus the child is at.
+        const halaqaCampus = byGrade ? halaqaCampusId(grade as number, campus?.id, campuses) : campus?.id ?? null;
+        const halaqa = halaqaName ? await halaqaFor(halaqaName, grade as number, halaqaCampus) : null;
         const place = [campus?.name && campuses.length > 0 ? campus.name : null, byGrade ? gradeLabel(grade as number) : null, halaqa?.name]
           .filter(Boolean)
           .join(" · ");
@@ -206,7 +210,7 @@ export async function POST(req: NextRequest) {
         // database without the column yet takes them without it.
         let { data: student, error: studentError } = await admin
           .from("students")
-          .insert({ ...studentRow, ...(campus ? { campus_id: halaqa?.campus_id ?? campus.id } : {}) })
+          .insert({ ...studentRow, ...(campus ? { campus_id: byGrade && (grade as number) >= ONE_HALAQA_FROM_GRADE ? campus.id : halaqa?.campus_id ?? campus.id } : {}) })
           .select("id")
           .single();
         if (studentError && campus && /campus_id/.test(studentError.message ?? "")) {
