@@ -379,9 +379,12 @@ export default function TeacherDashboard() {
               const marked = kids.filter((k) => status(k.id)).length;
               return (
                 <div key={h.id} className="rounded-2xl border border-surface-border p-4" data-halaqa={h.label}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-[14px] text-ink [overflow-wrap:anywhere]">{h.label}</p>
+                  {/* The name keeps at least 12rem; when the button can't
+                      fit beside that, it drops underneath rather than
+                      squeezing the name a letter or two to a line. */}
+                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5">
+                    <div className="min-w-0 flex-1 basis-48">
+                      <p className="font-semibold text-[14px] text-ink break-words">{h.label}</p>
                       <p className="text-[11px] text-ink-muted">
                         {countLabel("{count} student|{count} students", kids.length, `${kids.length} ${t("common.students")}`)} · {marked}/{kids.length} {countLabel("{count} marked|{count} marked", marked, t("teacher.attendance.marked"))}{" "}
                         {t("teacher.dashboard.today")}

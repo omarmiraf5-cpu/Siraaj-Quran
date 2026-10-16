@@ -112,7 +112,7 @@ export function MetricCard({
       </span>
       <span className="eyebrow block mt-2">{label}</span>
       {pill && (
-        <span className="mt-2 max-w-full self-start rounded-[11px] bg-surface-bg px-2.5 py-1 text-[11px] font-medium leading-snug text-ink-muted line-clamp-2">
+        <span className="mt-2 max-w-full self-start rounded-[11px] bg-surface-bg px-2.5 py-1 text-[11px] font-medium leading-snug text-ink-muted">
           {pill}
         </span>
       )}
