@@ -180,7 +180,7 @@ export const translations: Partial<Record<Language, Record<string, string>>> & {
     "teacher.dashboard.halaqa": "halaqa",
     "teacher.dashboard.halaqas": "halaqas",
     "teacher.dashboard.today": "today",
-    "teacher.dashboard.takeRegister": "Take register",
+    "teacher.dashboard.takeRegister": "Take attendance",
     "teacher.dashboard.noChildrenYet": "No students in this halaqa yet.",
     "teacher.attendance.noHalaqa": "You're not on a halaqa yet. Once the office adds you to one under Halaqas, its children show here.",
     "teacher.attendance.signedOut": "You've been signed out — sign in again to save attendance.",

@@ -47,7 +47,7 @@ export function StudentDetailPanel({
     attendance: AttendanceDay[];
     assignments: QuranicAssignment[];
   };
-  /** Where "Take register" goes — their halaqa's register. */
+  /** Where "Take attendance" goes — their halaqa's register. */
   registerHref?: string;
 }) {
   const { t, language, tr } = useLanguage();

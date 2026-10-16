@@ -51,7 +51,7 @@ export function accountWelcomeEmail(args: {
   const added = `${school} has added you to MyDiiwaan as a ${args.role}.`;
   const what =
     args.role === "teacher"
-      ? "MyDiiwaan is where you'll take the register, set each child's Qur'an lessons, follow their progress and message their parents."
+      ? "MyDiiwaan is where you'll take attendance, set each child's Qur'an lessons, follow their progress and message their parents."
       : `MyDiiwaan is where you'll follow ${childrensPossessive(children)} Qur'an lessons, attendance and progress, and message their teacher.`;
   const signIn = `You'll sign in with ${args.email}. The link works once, for ${WELCOME_LINK_DAYS} days. After that, tap "Forgot your password?" on the sign-in page, or ask your school for your temporary password.`;
   const questions = args.repliesToSchool
