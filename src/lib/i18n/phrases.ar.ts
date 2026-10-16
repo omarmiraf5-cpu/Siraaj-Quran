@@ -1884,4 +1884,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Grades {list}": "الصفوف {list}",
   "Switched off": "موقوف",
   "No grade": "بلا صف",
+  "{count} grade|{count} grades": { one: "صف واحد", two: "صفّان", few: "{count} صفوف", many: "{count} صفًا", other: "{count} صف" },
+  "All caught up": "لا شيء متأخر",
+  "Nothing due this week": "لا شيء مستحق هذا الأسبوع",
 };

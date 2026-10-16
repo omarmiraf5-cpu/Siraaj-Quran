@@ -25,6 +25,9 @@ export interface MyHalaqa {
   id: string;
   label: string;
   studentIds: string[];
+  /** In a school kept in grades: the grade it's for, and its campus's name. */
+  grade?: number | null;
+  campus?: string | null;
 }
 
 /**
@@ -64,7 +67,13 @@ export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
     const label = graded
       ? [gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
       : h.name;
-    groups.set(h.id, { id: h.id, label, studentIds: [...new Set((h.class_enrollments ?? []).map((e) => e.student_id))] });
+    groups.set(h.id, {
+      id: h.id,
+      label,
+      studentIds: [...new Set((h.class_enrollments ?? []).map((e) => e.student_id))],
+      grade: graded ? h.grade ?? null : null,
+      campus: graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null,
+    });
   }
   return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
 }
@@ -93,18 +102,18 @@ async function myHalaqasStepByStep(supabase: Db, userId: string): Promise<MyHala
     supabase.from("class_enrollments").select("class_id, student_id").in("class_id", ids),
     graded ? loadCampuses(supabase) : Promise.resolve([]),
   ]);
-  const where = new Map(
-    ((halaqas ?? []) as Array<{ id: string; name: string; grade?: number; campus_id?: string | null; school_id: string }>)
-      .filter((h) => h.school_id === me.school_id)
-      .map((h) => [
-        h.id,
-        graded
-          ? [gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
-          : h.name,
-      ])
-  );
   const groups = new Map<string, MyHalaqa>();
-  for (const [id, label] of where) groups.set(id, { id, label, studentIds: [] });
+  for (const h of (halaqas ?? []) as Array<{ id: string; name: string; grade?: number; campus_id?: string | null; school_id: string }>) {
+    if (h.school_id !== me.school_id) continue;
+    const campus = graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null;
+    groups.set(h.id, {
+      id: h.id,
+      label: graded ? [gradeLabel(h.grade as number), campus, h.name].filter(Boolean).join(" · ") : h.name,
+      studentIds: [],
+      grade: graded ? h.grade ?? null : null,
+      campus,
+    });
+  }
   for (const e of enrolments ?? []) {
     const g = groups.get(e.class_id as string);
     if (g && !g.studentIds.includes(e.student_id as string)) g.studentIds.push(e.student_id as string);

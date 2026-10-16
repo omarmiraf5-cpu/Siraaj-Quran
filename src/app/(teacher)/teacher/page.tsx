@@ -21,7 +21,6 @@ import { TeacherDrilldown, type DrilldownView } from "@/components/TeacherDrilld
 import { PortalHero, HeroButtonPrimary, HeroButtonGhost } from "@/components/PortalHero";
 import {
   SectionCard,
-  StatTile,
   AttendanceLegend,
   EmptyNote,
   LoadingNote,
@@ -36,8 +35,10 @@ import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
-import { myHalaqas, narrowToMine } from "@/lib/teacherScope";
+import { myHalaqas, narrowToMine, type MyHalaqa } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
+import { MetricCard } from "@/components/MetricCard";
+import { gradeLabel } from "@/lib/grades";
 import { Users, BookOpen, ClipboardCheck, CalendarCheck } from "lucide-react";
 
 // A child's chip on a halaqa card, by today's mark.
@@ -69,7 +70,7 @@ interface DashboardSnapshot {
   assignments: QuranicAssignment[];
   history: Record<string, AttendanceDay[]>;
   todayMarks: Record<string, AttendanceStatus>;
-  groups: Array<{ id: string; label: string; studentIds: string[] }>;
+  groups: MyHalaqa[];
 }
 
 interface RosterStudent {
@@ -117,7 +118,7 @@ export default function TeacherDashboard() {
   const [attendanceHistory, setAttendanceHistory] = useState<Record<string, AttendanceDay[]>>(seen?.history ?? {});
   const [todayStatus, setTodayStatus] = useState<Record<string, AttendanceStatus> | null>(seen?.todayMarks ?? null);
   // The halaqas they teach, each with its children (just the ones on the roster).
-  const [groups, setGroups] = useState<Array<{ id: string; label: string; studentIds: string[] }>>(seen?.groups ?? []);
+  const [groups, setGroups] = useState<MyHalaqa[]>(seen?.groups ?? []);
 
   useEffect(() => {
     const load = async () => {
@@ -247,7 +248,28 @@ export default function TeacherDashboard() {
         )
       : 0;
 
-  const halaqas = [...new Set(students.map((s) => s.halaqa))];
+  // The students card's one-line summary: "4 grades • North Campus" in a
+  // school kept in grades, else how many halaqas (or the one's name). The
+  // card opens the full list.
+  const groupGrades = [...new Set(groups.map((h) => h.grade).filter((g): g is number => typeof g === "number"))];
+  const groupCampuses = [...new Set(groups.map((h) => h.campus).filter((c): c is string => Boolean(c)))];
+  const studentsPill =
+    groups.length === 0
+      ? undefined
+      : groupGrades.length > 0
+        ? [
+            groupGrades.length === 1 ? gradeLabel(groupGrades[0]) : tr("{count} grade|{count} grades", { count: groupGrades.length }),
+            groupCampuses.length === 1 ? groupCampuses[0] : groupCampuses.length > 1 ? tr("{count} campus|{count} campuses", { count: groupCampuses.length }) : null,
+          ]
+            .filter(Boolean)
+            .join(" • ")
+        : groups.length === 1
+          ? groups[0].label
+          : tr("{count} halaqa|{count} halaqas", { count: groups.length });
+  const inTodayText = countLabel("{inToday} of {count} in today", students.length, `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`, { inToday });
+  // Where a card leads: its page, or in the sample school the panel that
+  // lists the sample students it counts.
+  const lead = (view: DrilldownView, href: string) => (isDemo ? { onClick: () => setDrilldown(view) } : { href });
 
   if (!ready) {
     return (
@@ -267,7 +289,7 @@ export default function TeacherDashboard() {
         title={(isDemo ? demoUser?.name : teacherName) ?? t("role.teacher")}
         meta={[
           formatDay(today, language),
-          countLabel("{inToday} of {count} in today", students.length, `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`, { inToday }),
+          inTodayText,
           countLabel("{count} to review|{count} to review", review.length, `${review.length} ${t("common.toReview")}`),
         ]}
         actions={
@@ -295,42 +317,48 @@ export default function TeacherDashboard() {
           read from the sample dataset, so a real teacher's tap would show
           the wrong students. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile
+        <MetricCard
           icon={Users}
           value={students.length}
+          muted={students.length === 0}
           label={t("nav.students")}
-          sub={halaqas
-            .map((h) => {
-              const n = students.filter((s) => s.halaqa === h).length;
-              const name = h.replace("Halaqa ", "");
-              return countLabel("{count} in {name}|{count} in {name}", n, `${n} ${t("common.in")} ${name}`, { name });
-            })
-            .join(" · ")}
-          onClick={isDemo ? () => setDrilldown("students") : undefined}
+          pill={studentsPill}
+          sub={groups.length === 0 ? tr("No halaqa yet") : undefined}
+          detailsTitle={tr("Your halaqas")}
+          details={groups.map((h) => ({
+            key: h.id,
+            label: h.label,
+            value: h.studentIds.length,
+            href: isDemo ? "/teacher/attendance" : `/teacher/attendance?halaqa=${encodeURIComponent(h.id)}`,
+          }))}
         />
-        <StatTile
+        <MetricCard
           icon={BookOpen}
           tone="green"
           value={active.length}
+          muted={active.length === 0}
           label={t("common.activeWork")}
-          sub={dueThisWeek > 0 ? countLabel("{count} due this week|{count} due this week", dueThisWeek, `${dueThisWeek} ${t("common.dueThisWeek")}`) : t("common.nothingDueThisWeek")}
-          onClick={isDemo ? () => setDrilldown("active") : undefined}
+          sub={dueThisWeek > 0 ? countLabel("{count} due this week|{count} due this week", dueThisWeek, `${dueThisWeek} ${t("common.dueThisWeek")}`) : tr("Nothing due this week")}
+          {...lead("active", "/teacher/quran-assignments")}
         />
-        <StatTile
+        <MetricCard
           icon={ClipboardCheck}
           tone={review.length > 0 ? "amber" : "green"}
           value={review.length}
+          muted={review.length === 0}
           label={t("common.toReview")}
-          sub={reviewDue ? `${t("common.oldestDue")} ${formatDay(reviewDue, language)}` : t("common.allClear")}
-          onClick={isDemo ? () => setDrilldown("review") : undefined}
+          sub={reviewDue ? `${t("common.oldestDue")} ${formatDay(reviewDue, language)}` : review.length > 0 ? undefined : tr("All caught up")}
+          {...lead("review", "/teacher/quran-assignments")}
         />
-        <StatTile
+        <MetricCard
           icon={CalendarCheck}
           tone="gold"
           value={`${avgAttendance}%`}
+          muted={avgAttendance === 0}
           label={t("common.attendanceStat")}
-          sub={countLabel("{inToday} of {count} in today", students.length, `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`, { inToday })}
-          onClick={isDemo ? () => setDrilldown("attendance") : undefined}
+          sub={inTodayText}
+          meter={{ value: students.length > 0 ? (inToday / students.length) * 100 : 0, label: inTodayText }}
+          {...lead("attendance", "/teacher/attendance")}
         />
       </div>
 
