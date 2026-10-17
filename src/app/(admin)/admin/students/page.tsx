@@ -26,6 +26,7 @@ import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
 import { GRADES, gradeLabel } from "@/lib/grades";
 import { loadSchoolShape, halaqaCampusId, ONE_HALAQA_FROM_GRADE, type Campus } from "@/lib/schoolStructure";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
 import { loadRoster } from "@/lib/rosterExport";
 import { download, fileNameFor } from "@/lib/sheetTools";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -200,10 +201,14 @@ export default function AdminStudentsPage() {
       const n = (Array.isArray(l.profiles) ? l.profiles[0] : l.profiles)?.full_name;
       if (n) parentsOf.set(l.student_id, [...(parentsOf.get(l.student_id) ?? []), n]);
     }
+    // Their own halaqa, and any program (a Hifd program) beside it.
     const halaqaByStudent = new Map<string, { id: string; name: string }>();
+    const programsOf = new Map<string, Array<{ id: string; name: string }>>();
     for (const e of enrollments ?? []) {
       const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
-      if (className) halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
+      if (!className) continue;
+      if (isProgramHalaqa(className)) programsOf.set(e.student_id, [...(programsOf.get(e.student_id) ?? []), { id: e.class_id, name: className }]);
+      else halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
     }
     const list: DemoStudent[] = (
       (studentRows ?? []) as Array<{ id: string; full_name: string; active: boolean; grade: number; weekly_report?: boolean; campus_id?: string | null }>
@@ -212,6 +217,7 @@ export default function AdminStudentsPage() {
         name: s.full_name,
         halaqa: halaqaByStudent.get(s.id)?.name ?? "",
         halaqaId: halaqaByStudent.get(s.id)?.id,
+        programs: programsOf.get(s.id),
         grade: s.grade,
         active: s.active,
         weeklyReport: s.weekly_report !== false,
@@ -299,14 +305,21 @@ export default function AdminStudentsPage() {
   // A halaqa as it reads in a grade's list: "North · Halaqa A".
   const halaqaInGrade = (h: DemoHalaqa) => [campusName(h.campusId), h.name].filter(Boolean).join(" · ");
   // The halaqas a student of this grade can be in: campus by campus.
+  // Never a program (a Hifd program): that's beside a student's halaqa, not it.
   const halaqasFor = (grade: string) =>
     graded
       ? grade === ""
         ? []
         : halaqas
-            .filter((h) => (h.grade ?? 0) === Number(grade))
+            .filter((h) => (h.grade ?? 0) === Number(grade) && !isProgramHalaqa(h.name))
             .sort((a, b) => (campusName(a.campusId) ?? "").localeCompare(campusName(b.campusId) ?? "") || a.name.localeCompare(b.name))
-      : halaqas;
+      : halaqas.filter((h) => !isProgramHalaqa(h.name));
+  // Out of whatever halaqa these students are in — but not a program.
+  const leaveHalaqas = (ids: string[]) => {
+    const programIds = halaqas.filter((h) => isProgramHalaqa(h.name)).map((h) => h.id);
+    const q = supabase.from("class_enrollments").delete().in("student_id", ids);
+    return programIds.length > 0 ? q.not("class_id", "in", `(${programIds.join(",")})`) : q;
+  };
   const studentHalaqa = (s: DemoStudent) =>
     isDemo ? halaqas.find((h) => h.name === s.halaqa) : s.halaqaId ? halaqaById(s.halaqaId) : undefined;
   // The campus a student attends: their own, or else their halaqa's.
@@ -492,7 +505,7 @@ export default function AdminStudentsPage() {
         .eq("id", s.id);
       const enrolment = async () => {
         if (halaqaId === (s.halaqaId ?? "")) return;
-        const { error: outError } = await supabase.from("class_enrollments").delete().eq("student_id", s.id);
+        const { error: outError } = await leaveHalaqas([s.id]);
         if (outError) throw outError;
         if (halaqaId) {
           const { error: enrollError } = await supabase
@@ -612,9 +625,10 @@ export default function AdminStudentsPage() {
         .eq("teacher_id", teacherId)
         .eq("grade", grade);
       ask = campuses.length === 0 ? ask : campusId ? ask.eq("campus_id", campusId) : ask.is("campus_id", null);
-      const { data: existing } = await ask.order("created_at").limit(1);
-      if (existing && existing[0]) {
-        const h = existing[0] as { id: string; name: string; campus_id: string | null };
+      const { data: found } = await ask.order("created_at");
+      const existing = ((found ?? []) as Array<{ id: string; name: string; campus_id: string | null }>).filter((h) => !isProgramHalaqa(h.name));
+      if (existing[0]) {
+        const h = existing[0];
         return { id: h.id, label: [campusName(h.campus_id), h.name].filter(Boolean).join(" · "), name: h.name, campusId: h.campus_id ?? null };
       }
       const name = teacherName(teacherId) ?? "New halaqa";
@@ -676,8 +690,9 @@ export default function AdminStudentsPage() {
       // As for one teacher: the database is asked before a new one is made.
       let ask = supabase.from("classes").select("id, name, campus_id, teacher_id").eq("school_id", schoolId as string).eq("grade", grade).in("teacher_id", ids);
       ask = campuses.length === 0 ? ask : campusId ? ask.eq("campus_id", campusId) : ask.is("campus_id", null);
-      const { data: leads } = await ask.order("created_at");
-      if (leads && leads.length > 0) {
+      const { data: found } = await ask.order("created_at");
+      const leads = ((found ?? []) as Array<{ id: string; name: string; campus_id: string | null; teacher_id: string }>).filter((h) => !isProgramHalaqa(h.name));
+      if (leads.length > 0) {
         const { data: rest } = await supabase.from("class_teachers").select("class_id, teacher_id").in("class_id", leads.map((l) => l.id as string));
         const match = (leads as Array<{ id: string; name: string; campus_id: string | null; teacher_id: string }>).find((l) =>
           sameTeachers([l.teacher_id, ...((rest ?? []) as Array<{ class_id: string; teacher_id: string }>).filter((r) => r.class_id === l.id).map((r) => r.teacher_id)], ids)
@@ -711,7 +726,7 @@ export default function AdminStudentsPage() {
   const placeStudents = async (ids: string[], to: string, grade: number, atCampus?: string | null): Promise<string> => {
     const target = to.startsWith("t:") ? await halaqaForTeacher(to.slice(2), grade, atCampus) : null;
     const classId = target ? target.id : to;
-    const { error: outError } = await supabase.from("class_enrollments").delete().in("student_id", ids);
+    const { error: outError } = await leaveHalaqas(ids);
     if (outError) throw outError;
     if (classId !== "__none") {
       const { error: inError } = await supabase
@@ -833,6 +848,7 @@ export default function AdminStudentsPage() {
             </p>
             <p className={`text-[11px] [overflow-wrap:anywhere] ${isOpen ? "text-white/75" : "text-ink-muted"}`}>
               {graded ? (halaqa ? halaqaInGrade(halaqa) : [campusName(s.campusId), phrase("No teacher yet")].filter(Boolean).join(" · ")) : s.halaqa}
+              {s.programs?.map((p) => ` · ${p.name}`).join("")}
               {s.parentNames && s.parentNames.length > 0 && <>{" "}{tr("· Parent: {names}|· Parents: {names}", { n: s.parentNames.length, names: s.parentNames.join(", ") })}</>}
             </p>
           </div>

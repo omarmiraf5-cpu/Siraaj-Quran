@@ -21,6 +21,7 @@ import {
 import type { DemoHalaqa, DemoTeacher, DemoStudent } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -213,16 +214,21 @@ export default function AdminHalaqasPage() {
     const { data: enrollments } = await supabase
       .from("class_enrollments")
       .select("student_id, class_id, classes(name)");
+    // Their own halaqa, and any program (a Hifd program) beside it.
     const halaqaByStudent = new Map<string, { id: string; name: string }>();
+    const programsOf = new Map<string, Array<{ id: string; name: string }>>();
     for (const e of enrollments ?? []) {
       const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
-      if (className) halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
+      if (!className) continue;
+      if (isProgramHalaqa(className)) programsOf.set(e.student_id, [...(programsOf.get(e.student_id) ?? []), { id: e.class_id, name: className }]);
+      else halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
     }
     return (studentRows ?? []).map((s) => ({
       id: s.id,
       name: s.full_name,
       halaqa: halaqaByStudent.get(s.id)?.name ?? "",
       halaqaId: halaqaByStudent.get(s.id)?.id,
+      programs: programsOf.get(s.id),
       active: s.active,
     }));
   };
@@ -441,7 +447,7 @@ export default function AdminHalaqasPage() {
   // grades and campuses; by name in the sample school, which has no ids.
   // A halaqa's students, by name.
   const studentsOf = (h: DemoHalaqa) =>
-    (isDemo ? studentsInHalaqa(h.name, students) : students.filter((s) => s.halaqaId === h.id)).sort((a, b) => a.name.localeCompare(b.name));
+    (isDemo ? studentsInHalaqa(h.name, students) : students.filter((s) => s.halaqaId === h.id || s.programs?.some((p) => p.id === h.id))).sort((a, b) => a.name.localeCompare(b.name));
   const countOf = (h: DemoHalaqa) => studentsOf(h).length;
   const placed = isDemo ? students.length : students.filter((s) => s.halaqaId).length;
 

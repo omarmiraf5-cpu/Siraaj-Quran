@@ -21,6 +21,9 @@ export interface DemoStudent {
   /** In a real school: the halaqa's own id, where its name may repeat
       across a school's grades and campuses. */
   halaqaId?: string;
+  /** In a real school: the program halaqas (a Hifd program) they're in as
+      well as their own halaqa — see programHalaqa.ts. */
+  programs?: Array<{ id: string; name: string }>;
   /** In a school kept in grades: the grade they're in (0 is Kindergarten). */
   grade?: number;
   /** Whether their parents get the Friday report; false when the office has switched it off. */
