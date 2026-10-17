@@ -13,8 +13,7 @@ import {
   type TeacherOverride,
 } from "@/data/demo";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
-import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { MonthBar, field, label, primary, ghost } from "@/components/financeUi";
 import {
   PAY_METHOD_LABELS,
@@ -356,7 +355,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                     type="button"
                     onClick={() => open(s)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
                       {initials(s.name)}
@@ -384,9 +383,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                         </span>
                       )}
                     </div>
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
-                    </span>
+                    <RowChevron open={isOpen} />
                   </button>
 
                   {isOpen && (

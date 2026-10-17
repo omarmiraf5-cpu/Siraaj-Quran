@@ -6,18 +6,16 @@ import {
   DEMO_CREATED_STUDENTS_KEY,
   DEMO_STUDENT_OVERRIDES_KEY,
   allStudents,
-  initials,
   type DemoStudent,
   type StudentOverride,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote, Avatar, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { welcomeNote } from "@/lib/welcomeNote";
 import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
-import { IconArrow } from "@/components/icons";
 import ParentImport from "@/components/ParentImport";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
@@ -395,17 +393,9 @@ export default function AdminParentsPage() {
                     type="button"
                     onClick={() => toggleOpen(p)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
-                    <span
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
-                        inactive
-                          ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500"
-                          : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"
-                      }`}
-                    >
-                      {initials(p.name)}
-                    </span>
+                    <Avatar name={p.name} muted={inactive} />
                     <div className="flex-1 min-w-0">
                       <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${inactive ? "text-ink-muted" : "text-ink"}`}>{p.name}</p>
                       <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
@@ -420,9 +410,7 @@ export default function AdminParentsPage() {
                         {tr("Inactive")}
                       </span>
                     )}
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
-                    </span>
+                    <RowChevron open={isOpen} />
                   </button>
 
                   {isOpen && p.staffRole && (

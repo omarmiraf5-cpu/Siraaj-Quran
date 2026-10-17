@@ -31,9 +31,9 @@ import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
-import { IconBook, IconArrow } from "@/components/icons";
+import { IconBook } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import {
   demoConfirmSurah,
@@ -1239,7 +1239,7 @@ export default function QuranAssignmentsPage() {
                   type="button"
                   onClick={() => startEditing(a)}
                   aria-expanded={isOpen}
-                  className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                  className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                 >
                   <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
                     {initials(name)}
@@ -1285,11 +1285,7 @@ export default function QuranAssignmentsPage() {
                     {ASSIGNMENT_LABELS[a.status]}
                   </span>
 
-                  <span
-                    className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}
-                  >
-                    <IconArrow size={14} />
-                  </span>
+                  <RowChevron open={isOpen} />
                 </button>
 
                 {isOpen && (

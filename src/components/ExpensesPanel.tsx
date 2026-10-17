@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/data/demo";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
-import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { MonthBar, field, label, primary, ghost } from "@/components/financeUi";
 import {
   EXPENSE_CATEGORIES,
@@ -282,7 +282,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                     type="button"
                     onClick={() => setOpenId(isOpen ? null : e.id)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <span className="w-12 text-center flex-shrink-0 text-[11px] font-semibold text-ink-muted">{shortDate(e.spentOn)}</span>
                     <div className="flex-1 min-w-0">
@@ -293,6 +293,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                       </p>
                     </div>
                     <p className="text-[13px] font-semibold text-ink flex-shrink-0">{money(e.amount)}</p>
+                    <RowChevron open={isOpen} />
                   </button>
                   {isOpen && (
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-3 flex items-center justify-between gap-3">

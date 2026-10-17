@@ -27,8 +27,9 @@ import {
   TeacherNote,
   RatingPill,
   RecitationHistory,
+  OPEN_ROW,
+  RowChevron,
 } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -182,7 +183,7 @@ export default function ParentQuranProgressPage() {
                     type="button"
                     onClick={() => setExpanded(isOpen ? null : a.id)}
                     aria-expanded={isOpen}
-                    className="w-full text-start rounded-xl px-2 py-3 -mx-2 hover:bg-surface-bg-warm transition-colors"
+                    className={`group w-full text-start rounded-xl px-2 py-3 -mx-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -215,7 +216,7 @@ export default function ParentQuranProgressPage() {
                               <span className="mx-1.5">·</span>
                               <span
                                 className={
-                                  due.urgent ? "text-red-700 dark:text-red-300 font-semibold" : ""
+                                  due.urgent ? (isOpen ? "font-semibold" : "text-red-700 dark:text-red-300 font-semibold") : ""
                                 }
                               >
                                 {due.text}
@@ -230,11 +231,7 @@ export default function ParentQuranProgressPage() {
                         >
                           {t(ASSIGNMENT_STATUS_KEY[a.status])}
                         </span>
-                        <span
-                          className={`text-ink-muted transition-transform ${isOpen ? "rotate-90" : ""}`}
-                        >
-                          <IconArrow size={14} />
-                        </span>
+                        <RowChevron open={isOpen} />
                       </div>
                     </div>
 

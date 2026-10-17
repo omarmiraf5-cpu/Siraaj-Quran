@@ -12,14 +12,14 @@ import {
   allTeachers,
   allHalaqas,
   halaqaTeacherIds,
-  initials,
   type TeacherOverride,
   type HalaqaOverride,
 } from "@/data/demo";
 import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
-import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { PortalHero, HERO_GOLD } from "@/components/PortalHero";
+import { SectionCard, EmptyNote, LoadingNote, Avatar, StatusPill, RowChevron, OPEN_ROW } from "@/components/portal-ui";
+import { loadSchoolShape } from "@/lib/schoolStructure";
+import { gradeLabel } from "@/lib/grades";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -74,7 +74,7 @@ function HalaqaChips({
 }
 
 export default function AdminTeachersPage() {
-  const { tr } = useLanguage();
+  const { tr, language } = useLanguage();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
@@ -99,6 +99,10 @@ export default function AdminTeachersPage() {
   const myHalaqaIds = (list: DemoHalaqa[]) => (me ? list.filter((h) => halaqaTeacherIds(h).includes(me.id)).map((h) => h.id) : []);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Each halaqa's children, and whether the school keeps grades: for the
+  // line under each teacher's name.
+  const [kidsOf, setKidsOf] = useState<Map<string, string[]>>(new Map());
+  const [graded, setGraded] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftEmail, setDraftEmail] = useState("");
   const [draftActive, setDraftActive] = useState(true);
@@ -110,18 +114,24 @@ export default function AdminTeachersPage() {
   // Real halaqas, for showing each teacher's assignment(s) — kept as a
   // separate loader so the demo path can reuse it unchanged.
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
-    const [{ data }, { data: others }] = await Promise.all([
-      supabase.from("classes").select("id, name, teacher_id, schedule").order("name"),
+    const [{ data }, { data: others }, { data: enrolled }] = await Promise.all([
+      supabase.from("classes").select("id, name, teacher_id, schedule, grade").order("name"),
       supabase.from("class_teachers").select("class_id, teacher_id"),
+      // Who's in each, to say how many children a teacher has.
+      supabase.from("class_enrollments").select("class_id, student_id"),
     ]);
     const othersOf = new Map<string, string[]>();
     for (const o of others ?? []) othersOf.set(o.class_id, [...(othersOf.get(o.class_id) ?? []), o.teacher_id]);
+    const kids = new Map<string, string[]>();
+    for (const e of (enrolled ?? []) as Array<{ class_id: string; student_id: string }>) kids.set(e.class_id, [...(kids.get(e.class_id) ?? []), e.student_id]);
+    setKidsOf(kids);
     return (data ?? []).map((c) => ({
       id: c.id,
       name: c.name,
       teacherId: c.teacher_id,
       coTeacherIds: othersOf.get(c.id) ?? [],
       schedule: c.schedule ?? "",
+      grade: c.grade,
     }));
   };
 
@@ -149,9 +159,13 @@ export default function AdminTeachersPage() {
         return;
       }
 
-      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+      const { data: profile } = await supabase.from("profiles").select("full_name, school_id").eq("id", user.id).maybeSingle();
       setMe({ id: user.id, email: user.email ?? "", name: profile?.full_name ?? "" });
-      await Promise.all([loadRealTeachers(), loadRealHalaqas().then(setHalaqas)]);
+      await Promise.all([
+        loadRealTeachers(),
+        loadRealHalaqas().then(setHalaqas),
+        loadSchoolShape(supabase, profile?.school_id ?? null).then((shape) => setGraded(shape.graded)),
+      ]);
     };
     load().finally(() => setReady(true));
   }, []);
@@ -377,18 +391,33 @@ export default function AdminTeachersPage() {
 
   const activeCount = teachers.filter((t) => t.active !== false).length;
 
+  /** "Grades 5, 7 · 23 students", or "Halaqa A, Halaqa B · 14 students". */
+  const teachingSummary = (theirs: DemoHalaqa[]): string => {
+    if (theirs.length === 0) return tr("No halaqa yet");
+    const comma = language === "ar" ? "، " : ", ";
+    const grades = [...new Set(theirs.map((h) => h.grade).filter((g): g is number => typeof g === "number"))].sort((a, b) => a - b);
+    const what =
+      graded && grades.length > 0
+        ? grades.length === 1
+          ? gradeLabel(grades[0])
+          : tr("Grades {list}", { list: grades.map((g) => (g <= 0 ? gradeLabel(g) : String(g))).join(comma) })
+        : [...new Set(theirs.map((h) => h.name))].join(comma);
+    const children = new Set(theirs.flatMap((h) => kidsOf.get(h.id) ?? [])).size;
+    return isDemo ? what : `${what} · ${tr("{count} student|{count} students", { count: children })}`;
+  };
+
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow={tr("Staff")}
         title={tr("Teachers")}
-        meta={[tr("{count} total", { count: teachers.length }), tr("{count} active", { count: activeCount })]}
+        stats={[
+          { value: teachers.length, label: tr("Teachers") },
+          { value: activeCount, label: tr("Active") },
+          { value: halaqas.length, label: tr("Halaqas") },
+        ]}
         actions={
-          <button
-            type="button"
-            onClick={() => setShowForm((v) => !v)}
-            className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
-          >
+          <button type="button" onClick={() => setShowForm((v) => !v)} className={HERO_GOLD}>
             {showForm ? tr("Cancel") : tr("+ Add teacher")}
           </button>
         }
@@ -466,24 +495,17 @@ export default function AdminTeachersPage() {
                     type="button"
                     onClick={() => startEditing(t)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
-                    <span
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
-                        inactive
-                          ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500"
-                          : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"
-                      }`}
-                    >
-                      {initials(t.name)}
-                    </span>
+                    <Avatar name={t.name} muted={inactive} onDark={isOpen} />
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${inactive ? "text-ink-muted" : "text-ink"}`}>
+                      <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${isOpen ? "text-white" : inactive ? "text-ink-muted" : "text-ink"}`}>
                         {t.name}
                       </p>
-                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
-                        {t.email}
-                        {theirHalaqas.length > 0 && ` · ${theirHalaqas.map((h) => h.name).join(", ")}`}
+                      {/* What they teach in a few words — grades, or their
+                          halaqas' names once each — and how many children. */}
+                      <p className={`text-[11px] [overflow-wrap:anywhere] ${isOpen ? "text-white/75" : "text-ink-muted"}`}>
+                        {[t.email, teachingSummary(theirHalaqas)].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     {t.admin && (
@@ -491,14 +513,15 @@ export default function AdminTeachersPage() {
                         {t.id === me?.id ? tr("You · admin") : tr("Admin")}
                       </span>
                     )}
+                    <span className="hidden sm:inline-flex">
+                      <StatusPill on={!inactive} onLabel={tr("Active")} offLabel={tr("Switched off")} />
+                    </span>
                     {inactive && (
-                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 flex-shrink-0">
-                        {tr("Inactive")}
+                      <span className="sm:hidden">
+                        <StatusPill on={false} onLabel={tr("Active")} offLabel={tr("Switched off")} />
                       </span>
                     )}
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
-                    </span>
+                    <RowChevron open={isOpen} />
                   </button>
 
                   {isOpen && t.admin && (

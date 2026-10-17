@@ -16,7 +16,7 @@ import {
 import type { DemoStudent, DemoHalaqa, DemoTeacher } from "@/data/demo";
 import { loadSchoolTeachers, saveOtherTeachers } from "@/lib/schoolTeachers";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote, RowChevron, OPEN_ROW } from "@/components/portal-ui";
+import { SectionCard, EmptyNote, LoadingNote, RowChevron, OPEN_ROW, Avatar } from "@/components/portal-ui";
 import StudentImport from "@/components/StudentImport";
 import WeeklyReportsCard from "@/components/WeeklyReportsCard";
 import StudentPins from "@/components/StudentPins";
@@ -826,17 +826,7 @@ export default function AdminStudentsPage() {
           aria-expanded={isOpen}
           className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
         >
-          <span
-            className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
-              isOpen
-                ? "bg-white/15 text-white"
-                : inactive
-                ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500"
-                : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"
-            }`}
-          >
-            {initials(s.name)}
-          </span>
+          <Avatar name={s.name} muted={inactive} onDark={isOpen} />
           <div className="flex-1 min-w-0">
             <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${isOpen ? "text-white" : inactive ? "text-ink-muted" : "text-ink"}`}>
               {s.name}

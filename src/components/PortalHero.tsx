@@ -7,6 +7,7 @@ export function PortalHero({
   eyebrow,
   title,
   meta,
+  stats,
   actions,
   children,
 }: {
@@ -14,6 +15,8 @@ export function PortalHero({
   title: string;
   /** Short facts under the title, joined with gold separators. */
   meta?: React.ReactNode[];
+  /** Key numbers, large in gold under the title: "7 total · 7 active". */
+  stats?: Array<{ value: React.ReactNode; label: string }>;
   actions?: React.ReactNode;
   children?: React.ReactNode;
 }) {
@@ -34,6 +37,17 @@ export function PortalHero({
               ))}
             </p>
           )}
+          {stats && stats.length > 0 && (
+            <dl className="flex flex-wrap gap-x-7 gap-y-3 mt-4">
+              {stats.map((x) => (
+                <div key={x.label}>
+                  <dt className="sr-only">{x.label}</dt>
+                  <dd className="text-[26px] font-bold leading-none tabular-nums text-brand-gold">{x.value}</dd>
+                  <dd className="text-[11.5px] text-white/60 mt-1">{x.label}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
         {actions && <div className="flex flex-wrap gap-2.5 flex-shrink-0">{actions}</div>}
       </div>
@@ -41,6 +55,10 @@ export function PortalHero({
     </header>
   );
 }
+
+/** The gold pill's look, for a hero action that's a button rather than a link. */
+export const HERO_GOLD =
+  "inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition";
 
 /** Gold pill — the primary action in a hero. */
 export function HeroButtonPrimary({

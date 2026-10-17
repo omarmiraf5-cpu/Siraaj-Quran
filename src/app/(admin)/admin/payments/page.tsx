@@ -12,7 +12,6 @@ import {
   allStudents,
   feeStatus,
   money,
-  initials,
   FEE_STATUS_LABELS,
   FEE_STATUS_STYLES,
   type DemoFee,
@@ -21,7 +20,7 @@ import {
   type StudentOverride,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote, LoadingNote, RowChevron, OPEN_ROW } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, RowChevron, OPEN_ROW, Avatar } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -470,9 +469,7 @@ export default function AdminPaymentsPage() {
                         aria-expanded={isOpen}
                         className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                       >
-                        <span className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${isOpen ? "bg-white/15 text-white" : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"}`}>
-                          {initials(studentName(f.studentId))}
-                        </span>
+                        <Avatar name={studentName(f.studentId)} onDark={isOpen} />
                         <div className="flex-1 min-w-0">
                           <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${isOpen ? "text-white" : "text-ink"}`}>{studentName(f.studentId)}</p>
                           <p className={`text-[11px] [overflow-wrap:anywhere] ${isOpen ? "text-white/75" : "text-ink-muted"}`}>

@@ -11,8 +11,7 @@ import {
   type AttendanceStatus,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -348,7 +347,7 @@ export default function StudentAttendancePage() {
                     type="button"
                     onClick={() => setOpenHalaqa(isOpen ? null : g.key)}
                     aria-expanded={isOpen}
-                    className="w-full flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className={`group w-full flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{g.label}</p>
@@ -358,7 +357,7 @@ export default function StudentAttendancePage() {
                       </p>
                     </div>
                     {/* Under the halaqa's name on a phone, beside it on wider screens. */}
-                    <div className="order-last sm:order-none basis-full sm:basis-auto text-start sm:text-end sm:flex-shrink-0 text-[12px]">
+                    <div className={`order-last sm:order-none basis-full sm:basis-auto text-start sm:text-end sm:flex-shrink-0 text-[12px] ${isOpen ? "[&_span]:!text-white/90" : ""}`}>
                       {done === 0 ? (
                         <span className="font-semibold text-amber-700 dark:text-amber-300">{tr("Not taken")}</span>
                       ) : (
@@ -371,9 +370,7 @@ export default function StudentAttendancePage() {
                         </span>
                       )}
                     </div>
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
-                    </span>
+                    <RowChevron open={isOpen} />
                   </button>
                   {isOpen && (
                     <ul className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm px-3 py-1 divide-y divide-surface-border">

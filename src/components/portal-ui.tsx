@@ -363,7 +363,7 @@ export function SegmentedSwitch<T extends string>({
 
 /** A row that opens, while it's open: navy like a chosen card, so it's
  *  clear which one the panel under it belongs to. */
-export const OPEN_ROW = "bg-brand-navy text-white hover:bg-brand-navy";
+export const OPEN_ROW = "row-open bg-brand-navy text-white hover:bg-brand-navy";
 
 /* ── Row chevron ───────────────────────────────────────────────────────
    The arrow at the end of a row that opens: in a soft round frame that
@@ -381,6 +381,55 @@ export function RowChevron({ open }: { open: boolean }) {
       }`}
     >
       <IconArrow size={13} />
+    </span>
+  );
+}
+
+/* ── Avatar ────────────────────────────────────────────────────────────
+   A person's initials on a soft colour of their own, the same colour every
+   time (worked out from the name), so a long list can be scanned by eye.
+   Tinted backgrounds with dark text of the same hue: white text on a light
+   pastel is too faint to read. */
+const AVATAR_TONES = [
+  "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200",
+  "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200",
+  "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200",
+  "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200",
+  "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200",
+  "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200",
+  "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
+  "bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-200",
+];
+function toneFor(name: string): string {
+  let h = 0;
+  for (const ch of name.trim().toLowerCase()) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
+  return AVATAR_TONES[h % AVATAR_TONES.length];
+}
+function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return words.map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+}
+export function Avatar({ name, muted, onDark }: { name: string; muted?: boolean; onDark?: boolean }) {
+  const tone = onDark ? "bg-white/15 text-white" : muted ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500" : toneFor(name);
+  return (
+    <span aria-hidden className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${tone}`}>
+      {initialsOf(name)}
+    </span>
+  );
+}
+
+/* ── Status pill ─────────────────────────────────────────────────────── */
+export function StatusPill({ on, onLabel, offLabel }: { on: boolean; onLabel: string; offLabel: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${
+        on
+          ? "bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300"
+          : "bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300"
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-green-600" : "bg-slate-400"}`} />
+      {on ? onLabel : offLabel}
     </span>
   );
 }

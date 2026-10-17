@@ -715,3 +715,12 @@ body {
 /* A row that scrolls sideways without a scrollbar under it. */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* The open row of a list (OPEN_ROW): navy, so what's inside it reads in
+   white — its name, its details, a count badge — wherever the list put
+   its own ink colours. Pills with a colour of their own keep it. */
+.row-open .text-ink,
+.row-open .text-ink-body { color: #fff; }
+.row-open .text-ink-muted,
+.row-open .eyebrow { color: rgb(255 255 255 / 0.75); }
+.row-open .bg-brand-navy\/10 { background-color: rgb(255 255 255 / 0.15); color: #fff; }
