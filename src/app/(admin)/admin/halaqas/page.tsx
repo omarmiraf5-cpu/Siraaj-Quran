@@ -483,7 +483,7 @@ export default function AdminHalaqasPage() {
           aria-expanded={isOpen}
           className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
         >
-          <ColorTile name="mosque" size={38} />
+          <ColorTile name="rehal" size={38} />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{h.name}</p>
             <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">

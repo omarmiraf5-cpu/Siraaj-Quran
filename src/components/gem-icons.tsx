@@ -32,7 +32,8 @@ export type ArtName =
   | "document"
   | "building"
   | "board"
-  | "letters";
+  | "letters"
+  | "rehal";
 
 type Palette = { sky: [string, string, string]; hue: string };
 
@@ -63,6 +64,7 @@ const PALETTES: Record<ArtName, Palette> = {
   building: { sky: ["#141d2c", "#273750", "#43597a"], hue: "#c9d6ea" },
   board: { sky: ["#052a1c", "#0b5a3a", "#1b8f5c"], hue: "#a6f3c6" },
   letters: { sky: ["#06263a", "#0c4f6a", "#178a9c"], hue: "#9fe8f2" },
+  rehal: { sky: ["#04261a", "#0a5236", "#168458"], hue: "#a6f3c6" },
 };
 
 /** Saturated sky stop used as the soft panel glow for that illustration. */
@@ -377,6 +379,27 @@ export function Art({ name, id }: { name: ArtName; id: string }): ReactNode {
           <path d="M6.4 8.4h6.4M6.4 11.4h9" stroke="#e9fff4" strokeWidth={1.2} strokeLinecap="round" />
           <path d="M8 17v4.2M16 17v4.2" stroke="#b9792a" strokeWidth={1.6} strokeLinecap="round" />
           <rect x="14.6" y="12.9" width="3.4" height="1.3" rx="0.6" fill="#ffd36b" />
+        </g>
+      );
+    case "rehal":
+      return (
+        <g>
+          <defs>
+            {lg(`${id}w`, ["#d99a4e", "#8a4a12"], 4, 12, 20, 22)}
+            {lg(`${id}c`, ["#2fb27a", "#0f6a43"], 0, 6, 0, 17)}
+          </defs>
+          {/* The wooden stand: two crossed boards under the book. */}
+          <path d="M5.6 21.8L16.6 12.8" stroke="#6b3a12" strokeWidth={3.4} strokeLinecap="round" />
+          <path d="M18.4 21.8L7.4 12.8" stroke="#6b3a12" strokeWidth={3.4} strokeLinecap="round" />
+          <path d="M5.6 21.8L16.6 12.8" stroke={u("w")} strokeWidth={2.2} strokeLinecap="round" />
+          <path d="M18.4 21.8L7.4 12.8" stroke={u("w")} strokeWidth={2.2} strokeLinecap="round" />
+          {/* The mushaf, open on it: green covers, two cream pages. */}
+          <path d="M1.4 6.4V15.6C5.2 14.4 8.8 14.7 12 16.6C15.2 14.7 18.8 14.4 22.6 15.6V6.4Z" fill={u("c")} />
+          <path d="M12 6.4C9.2 4.6 5.6 4.2 2.6 5.2V14C5.6 13 9.2 13.4 12 15.2Z" fill="#fff6e4" />
+          <path d="M12 6.4C14.8 4.6 18.4 4.2 21.4 5.2V14C18.4 13 14.8 13.4 12 15.2Z" fill="#f3dcb2" />
+          <path d="M4.8 8C6.4 7.6 8 7.7 9.6 8.4M4.8 10.4C6.4 10 8 10.1 9.6 10.8M14.4 8.4C16 7.7 17.6 7.6 19.2 8M14.4 10.8C16 10.1 17.6 10 19.2 10.4" stroke="#c98a3c" strokeWidth={1.1} strokeLinecap="round" fill="none" />
+          <circle cx="7.2" cy="12.6" r="0.9" fill="#d9a43a" />
+          <circle cx="16.8" cy="12.6" r="0.9" fill="#d9a43a" />
         </g>
       );
     case "letters":

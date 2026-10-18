@@ -393,7 +393,7 @@ export default function TeacherDashboard() {
                       squeezing the name a letter or two to a line. */}
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5">
                     <div className="min-w-0 flex-1 basis-48 flex items-start gap-3">
-                      <ColorTile name="mosque" size={36} />
+                      <ColorTile name="rehal" size={36} />
                       <div className="min-w-0">
                       <p className="text-[14px]"><HalaqaTitle label={h.label} /></p>
                       <p className="text-[11px] text-ink-muted">
