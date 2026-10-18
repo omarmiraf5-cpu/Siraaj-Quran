@@ -1887,4 +1887,8 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "{count} grade|{count} grades": { one: "صف واحد", two: "صفّان", few: "{count} صفوف", many: "{count} صفًا", other: "{count} صف" },
   "All caught up": "لا شيء متأخر",
   "Nothing due this week": "لا شيء مستحق هذا الأسبوع",
+  "Search a teacher…": "ابحث عن معلّم…",
+  "can sign in": "يمكنهم تسجيل الدخول",
+  "can't sign in": "لا يمكنهم تسجيل الدخول",
+  "{count} with no teacher": "{count} بلا معلّم",
 };

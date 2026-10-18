@@ -1,5 +1,6 @@
 "use client";
 
+import { GraduationCap, Users, BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -17,7 +18,7 @@ import {
 } from "@/data/demo";
 import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
 import { PortalHero, HERO_GOLD } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote, Avatar, StatusPill, RowChevron, OPEN_ROW } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, Avatar, StatusPill, RowChevron, OPEN_ROW } from "@/components/portal-ui";
 import { loadSchoolShape } from "@/lib/schoolStructure";
 import { gradeLabel } from "@/lib/grades";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
@@ -80,6 +81,7 @@ export default function AdminTeachersPage() {
   const [ready, setReady] = useState(false);
 
   const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
+  const [search, setSearch] = useState("");
   const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
   const [created, setCreated] = useState<DemoTeacher[]>([]);
   const [overrides, setOverrides] = useState<Record<string, TeacherOverride>>({});
@@ -411,10 +413,10 @@ export default function AdminTeachersPage() {
       <PortalHero
         eyebrow={tr("Staff")}
         title={tr("Teachers")}
-        stats={[
-          { value: teachers.length, label: tr("Teachers") },
-          { value: activeCount, label: tr("Active") },
-          { value: halaqas.length, label: tr("Halaqas") },
+        meta={[
+          tr("{count} total", { count: teachers.length }),
+          { text: tr("{count} active", { count: activeCount }), tone: "green" as const },
+          tr("{count} halaqa|{count} halaqas", { count: halaqas.length }),
         ]}
         actions={
           <button type="button" onClick={() => setShowForm((v) => !v)} className={HERO_GOLD}>
@@ -478,6 +480,21 @@ export default function AdminTeachersPage() {
         </div>
       )}
 
+      {/* The same shape as Student attendance: figures first, then a search. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatTile icon={GraduationCap} art="board" tone="gold" value={teachers.length} label={tr("Teachers")} sub={tr("{count} total", { count: teachers.length })} />
+        <StatTile icon={Users} art="check" tone="green" status="present" value={activeCount} label={tr("Active")} sub={tr("can sign in")} />
+        <StatTile icon={Users} art="lock" tone="navy" status="excused" value={teachers.length - activeCount} label={tr("Switched off")} sub={tr("can't sign in")} />
+        <StatTile icon={BookOpen} art="rehal" tone="green" value={halaqas.length} label={tr("Halaqas")} sub={tr("{count} with no teacher", { count: halaqas.filter((h) => halaqaTeacherIds(h).length === 0).length })} />
+      </div>
+
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={tr("Search a teacher…")}
+        className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[13px] text-ink"
+      />
+
       <SectionCard title={tr("All teachers")} note={tr("{count} total", { count: teachers.length })}>
         {!ready ? (
           <LoadingNote />
@@ -485,7 +502,7 @@ export default function AdminTeachersPage() {
           <EmptyNote>{tr("No teachers yet.")}</EmptyNote>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
-            {teachers.map((t) => {
+            {teachers.filter((t) => !search.trim() || `${t.name} ${t.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())).map((t) => {
               const isOpen = editingId === t.id;
               const inactive = t.active === false;
               const theirHalaqas = halaqas.filter((h) => halaqaTeacherIds(h).includes(t.id));
