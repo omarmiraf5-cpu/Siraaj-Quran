@@ -25,7 +25,7 @@ import {
   EmptyNote,
   LoadingNote,
 } from "@/components/portal-ui";
-import { IconBook, IconCalendar, IconClock, IconPen, IconArrow } from "@/components/icons";
+import { IconBook, IconCalendar, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -38,7 +38,7 @@ import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
 import { myHalaqas, narrowToMine, type MyHalaqa } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
 import { MetricCard } from "@/components/MetricCard";
-import { ColorTile } from "@/components/gem-icons";
+import { ColorTile, ColorGlyph } from "@/components/gem-icons";
 import { gradeLabel } from "@/lib/grades";
 import { Users, BookOpen, ClipboardCheck, CalendarCheck } from "lucide-react";
 
@@ -295,13 +295,13 @@ export default function TeacherDashboard() {
         ]}
         actions={
           <>
-            <HeroButtonPrimary href="/teacher/attendance" icon={<IconCalendar />}>
+            <HeroButtonPrimary href="/teacher/attendance" icon={<ColorGlyph name="calendarCheck" size={22} />}>
               {t("common.register")}
             </HeroButtonPrimary>
-            <HeroButtonGhost href="/teacher/quran-assignments" icon={<IconPen />}>
+            <HeroButtonGhost href="/teacher/quran-assignments" icon={<ColorGlyph name="pen" size={22} />}>
               {t("common.assign")}
             </HeroButtonGhost>
-            <HeroButtonGhost href="/teacher/my-attendance" icon={<IconClock />}>
+            <HeroButtonGhost href="/teacher/my-attendance" icon={<ColorGlyph name="clock" size={22} />}>
               {t("nav.signIn")}
             </HeroButtonGhost>
           </>

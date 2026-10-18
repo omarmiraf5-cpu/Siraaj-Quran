@@ -276,7 +276,7 @@ export const SO: Record<string, string> = {
   "common.loadingDashboard": "Bogga guud waa la soo raraya…",
   "common.inToday": "ayaa maanta jooga",
   "common.toReview": "U Baahan Dib u Eegis",
-  "common.register": "Diiwaangeli",
+  "common.register": "Qaado xaadirinta",
   "common.assign": "Xilsaar",
   "common.in": "ku jira fasalka",
   "common.activeWork": "Casharada socda",

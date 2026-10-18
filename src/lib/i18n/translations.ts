@@ -312,7 +312,7 @@ export const translations: Partial<Record<Language, Record<string, string>>> & {
     "common.loadingDashboard": "Loading your dashboard…",
     "common.inToday": "in today",
     "common.toReview": "to review",
-    "common.register": "Register",
+    "common.register": "Take attendance",
     "common.assign": "Assign",
     "common.in": "in",
     "common.activeWork": "Active work",

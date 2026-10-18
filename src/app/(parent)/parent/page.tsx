@@ -1,5 +1,6 @@
 "use client";
 
+import { ColorGlyph } from "@/components/gem-icons";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
@@ -29,7 +30,7 @@ import {
   LoadingNote,
   TeacherNote,
 } from "@/components/portal-ui";
-import { IconBook, IconChart, IconCalendar, IconArrow } from "@/components/icons";
+import { IconBook, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -110,10 +111,10 @@ export default function ParentDashboard() {
         ]}
         actions={
           <>
-            <HeroButtonPrimary href="/parent/quran-progress" icon={<IconChart />}>
+            <HeroButtonPrimary href="/parent/quran-progress" icon={<ColorGlyph name="check" size={22} />}>
               {t("nav.progress")}
             </HeroButtonPrimary>
-            <HeroButtonGhost href="/parent/attendance" icon={<IconCalendar />}>
+            <HeroButtonGhost href="/parent/attendance" icon={<ColorGlyph name="calendarCheck" size={22} />}>
               {t("nav.attendance")}
             </HeroButtonGhost>
           </>
