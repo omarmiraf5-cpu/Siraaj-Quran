@@ -33,7 +33,6 @@ import { sessionUser } from "@/lib/supabase/sessionUser";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
-import { IconBook } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import {
   demoConfirmSurah,
@@ -48,6 +47,7 @@ import { myHalaqaStudents } from "@/lib/teacherScope";
 import { loadSchoolShape } from "@/lib/schoolStructure";
 import { gradeLabel } from "@/lib/grades";
 import { readCache, writeCache } from "@/lib/pageCache";
+import { ColorTile } from "@/components/gem-icons";
 import {
   DIRECTION_HINT,
   DIRECTION_LABEL,
@@ -1195,8 +1195,8 @@ export default function QuranAssignmentsPage() {
             </div>
           ) : (
             <div className="card-quiet card-feature p-8 text-center">
-              <span className="icon-tile mx-auto mb-4">
-                <IconBook size={19} />
+              <span className="mx-auto mb-4 inline-flex">
+                <ColorTile name="rehal" size={48} />
               </span>
               <h3 className="page-title text-lg mb-2">{tr("Mushaf preview")}</h3>
               <p className="text-[13px] text-ink-muted leading-relaxed max-w-xs mx-auto">

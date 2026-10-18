@@ -26,7 +26,7 @@ import {
   LoadingNote,
   HalaqaTitle,
 } from "@/components/portal-ui";
-import { IconBook, IconCalendar, IconArrow } from "@/components/icons";
+import { IconCalendar, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -588,9 +588,7 @@ export default function TeacherDashboard() {
         href="/teacher/mushaf"
         className="card-quiet card-feature group flex items-center gap-3.5 px-5 py-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
       >
-        <span className="icon-tile flex-shrink-0">
-          <IconBook size={19} />
-        </span>
+        <ColorTile name="rehal" size={42} />
         <span className="flex-1 min-w-0">
           <span className="block page-title text-[15px]">{t("nav.mushaf")}</span>
           <span className="block text-[12px] text-ink-muted">

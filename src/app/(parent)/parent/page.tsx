@@ -1,6 +1,6 @@
 "use client";
 
-import { ColorGlyph } from "@/components/gem-icons";
+import { ColorGlyph, ColorTile } from "@/components/gem-icons";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
@@ -30,7 +30,7 @@ import {
   LoadingNote,
   TeacherNote,
 } from "@/components/portal-ui";
-import { IconBook, IconArrow } from "@/components/icons";
+import { IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -161,7 +161,7 @@ export default function ParentDashboard() {
         />
         <StatTile
           icon={BookOpen}
-          art="book"
+          art="rehal"
           tone="green"
           value={`${memorisation}%`}
           label={t("common.memorised")}
@@ -349,9 +349,7 @@ export default function ParentDashboard() {
         href="/parent/mushaf"
         className="card-quiet card-feature group flex items-center gap-3.5 px-5 py-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
       >
-        <span className="icon-tile flex-shrink-0">
-          <IconBook size={19} />
-        </span>
+        <ColorTile name="rehal" size={42} />
         <span className="flex-1 min-w-0">
           <span className="block page-title text-[15px]">{t("nav.mushaf")}</span>
           <span className="block text-[12px] text-ink-muted">
