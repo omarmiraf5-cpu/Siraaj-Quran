@@ -472,6 +472,7 @@ export default function AdminHalaqasPage() {
       }));
   })();
 
+  const campusName = (id: string | null | undefined) => campuses.find((c) => c.id === id)?.name;
   const renderHalaqa = (h: DemoHalaqa) => {
     const isOpen = editingId === h.id;
     const count = countOf(h);
@@ -486,8 +487,22 @@ export default function AdminHalaqasPage() {
           <ColorTile name="rehal" size={38} />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{h.name}</p>
-            <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
-              {[halaqaTeacherNames(h, teachers), h.schedule, tr("{count} student|{count} students", { count })].filter(Boolean).join(" · ")}
+            {/* A halaqa named for its teacher doesn't say the name twice: the
+                teacher shows only when it's someone else, then the campus,
+                the students and the schedule as chips. */}
+            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
+              {halaqaTeacherNames(h, teachers) && halaqaTeacherNames(h, teachers) !== h.name && (
+                <span className={isOpen ? "text-white/80" : "text-ink-muted"}>{halaqaTeacherNames(h, teachers)}</span>
+              )}
+              {graded && campusName(h.campusId) && (
+                <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200"}`}>{campusName(h.campusId)}</span>
+              )}
+              <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"}`}>
+                {tr("{count} student|{count} students", { count })}
+              </span>
+              {h.schedule && (
+                <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"}`}>{h.schedule}</span>
+              )}
             </p>
           </div>
           {halaqaTeacherIds(h).length === 0 && (
