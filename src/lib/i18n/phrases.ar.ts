@@ -1894,4 +1894,8 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "View record": "عرض السجل",
   "Opening the record…": "جارٍ فتح السجل…",
   "Couldn't load this record. Try again.": "تعذّر تحميل هذا السجل. حاول مرة أخرى.",
+  "Office admin, not a teacher": "مسؤول إداري، لا يُدرّس",
+  "They run the school (students, teachers, payments, announcements) and don't teach a halaqa.": "يديرون المدرسة (الطلاب والمعلمون والمدفوعات والإعلانات) ولا يُدرّسون حلقة.",
+  "Create admin login": "إنشاء حساب مسؤول",
+  "Office admins": "المسؤولون الإداريون",
 };

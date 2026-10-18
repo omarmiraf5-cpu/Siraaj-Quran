@@ -89,6 +89,9 @@ export default function AdminTeachersPage() {
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  // An office admin who doesn't teach: a login to run the school, not a teacher's.
+  const [asAdmin, setAsAdmin] = useState(false);
+  const [officeAdmins, setOfficeAdmins] = useState<Array<{ id: string; name: string; email: string; active: boolean }>>([]);
   const [inviting, setInviting] = useState(false);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
 
@@ -138,7 +141,16 @@ export default function AdminTeachersPage() {
   };
 
   const loadRealTeachers = async () => {
-    setTeachers(await loadSchoolTeachers(supabase));
+    const list = await loadSchoolTeachers(supabase);
+    setTeachers(list);
+    // The school's admins who don't teach, so a new one is seen to be there.
+    const { data: admins } = await supabase.from("profiles").select("id, full_name, email, active").eq("role", "admin").order("full_name");
+    const listed = new Set(list.map((t) => t.id));
+    setOfficeAdmins(
+      ((admins ?? []) as Array<{ id: string; full_name: string; email: string | null; active: boolean }>)
+        .filter((a) => !listed.has(a.id))
+        .map((a) => ({ id: a.id, name: a.full_name, email: a.email ?? "", active: a.active !== false }))
+    );
   };
 
   useEffect(() => {
@@ -254,7 +266,7 @@ export default function AdminTeachersPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          role: "teacher",
+          role: asAdmin ? "admin" : "teacher",
           full_name: newName.trim(),
           email: newEmail.trim(),
         }),
@@ -264,6 +276,7 @@ export default function AdminTeachersPage() {
       await loadRealTeachers();
       setNewName("");
       setNewEmail("");
+      setAsAdmin(false);
       setShowForm(false);
       setInviteNote(
         data.joined
@@ -456,7 +469,16 @@ export default function AdminTeachersPage() {
               <HalaqaChips halaqas={halaqas} selected={mine} onChange={setMine} />
               {teachError && <p className="text-xs text-red-600 dark:text-red-400">{teachError}</p>}
             </div>
-          ) : (
+          ) : isDemo ? null : (
+            <label className="flex items-start gap-2.5 rounded-2xl border border-surface-border bg-surface-bg-warm p-3 cursor-pointer">
+              <input type="checkbox" checked={asAdmin} onChange={(e) => setAsAdmin(e.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-700" />
+              <span className="text-sm text-ink leading-snug">
+                <span className="font-semibold">{tr("Office admin, not a teacher")}</span>
+                <span className="block text-xs text-ink-muted mt-0.5">{tr("They run the school (students, teachers, payments, announcements) and don't teach a halaqa.")}</span>
+              </span>
+            </label>
+          )}
+          {!isSelf && (
             <p className="text-xs text-ink-muted">
               {isDemo
                 ? tr("New teachers start without a halaqa — assign one from the Halaqas page.")
@@ -469,7 +491,7 @@ export default function AdminTeachersPage() {
             disabled={isSelf ? inviting || halaqas.length === 0 : !newName.trim() || !newEmail.trim() || inviting}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            {isSelf ? (inviting ? tr("Saving…") : tr("Teach with my login")) : isDemo ? tr("Add teacher") : inviting ? tr("Creating…") : tr("Create login")}
+            {isSelf ? (inviting ? tr("Saving…") : tr("Teach with my login")) : isDemo ? tr("Add teacher") : inviting ? tr("Creating…") : asAdmin ? tr("Create admin login") : tr("Create login")}
           </button>
         </form>
       )}
@@ -704,6 +726,23 @@ export default function AdminTeachersPage() {
           </ul>
         )}
       </SectionCard>
+
+      {!isDemo && officeAdmins.length > 0 && (
+        <SectionCard title={tr("Office admins")} note={tr("{count} total", { count: officeAdmins.length })}>
+          <ul className="divide-y divide-surface-border -my-1">
+            {officeAdmins.map((a) => (
+              <li key={a.id} className="flex items-center gap-3 py-3">
+                <Avatar name={a.name} muted={!a.active} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{a.name}</p>
+                  <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">{a.email}</p>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex-shrink-0">{a.id === me?.id ? tr("You · admin") : tr("Admin")}</span>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
     </div>
   );
 }

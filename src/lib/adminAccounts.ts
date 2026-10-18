@@ -9,7 +9,7 @@ type SessionDb = Awaited<ReturnType<typeof createClient>>;
 type ServiceDb = ReturnType<typeof createAdminClient>;
 
 /** The accounts the office manages from its Teachers and Parents pages. */
-export const ACCOUNT_ROLES = ["teacher", "parent"] as const;
+export const ACCOUNT_ROLES = ["teacher", "parent", "admin"] as const;
 export type AccountRole = (typeof ACCOUNT_ROLES)[number];
 
 // Every office account route starts the same way: prove there's a session,

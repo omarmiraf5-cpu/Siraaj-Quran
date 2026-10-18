@@ -43,7 +43,9 @@ async function loginInTheWay(
   if (holder.id === callerId) {
     return role === "teacher"
       ? "That's your own login, and you can teach with it — there's no second login to make. Tick yourself as a teacher on your halaqa, under Halaqas."
-      : "That's your own login, which runs the school. A parent needs a login of their own — use another email.";
+      : role === "admin"
+        ? "That's your own login, which already runs the school."
+        : "That's your own login, which runs the school. A parent needs a login of their own — use another email.";
   }
   if (holder.role === role) {
     return `${name} is already one of your ${role}s.`;
@@ -51,7 +53,7 @@ async function loginInTheWay(
   if (holder.role === "admin") {
     return role === "teacher"
       ? `${name} is an admin here and can teach with that same login — tick them as a teacher on the halaqa, under Halaqas.`
-      : `${email} is ${name}'s admin login here. A parent needs a login of their own — use another email.`;
+      : `${email} is ${name}'s admin login here. A ${role} needs a login of their own — use another email.`;
   }
   return `${email} is ${name}'s ${holder.role} login here. One login can't be both, so use another email for this ${role}.`;
 }
