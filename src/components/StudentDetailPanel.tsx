@@ -39,6 +39,7 @@ export function StudentDetailPanel({
   onClose,
   real,
   registerHref,
+  readOnly = false,
 }: {
   studentId: string;
   onClose: () => void;
@@ -49,6 +50,8 @@ export function StudentDetailPanel({
   };
   /** Where "Take attendance" goes — their halaqa's register. */
   registerHref?: string;
+  /** Without the teacher's shortcuts (take attendance, assign): the office just reads the record. */
+  readOnly?: boolean;
 }) {
   const { t, language, tr } = useLanguage();
   const student = real ? real.student : DEMO_STUDENTS.find((s) => s.id === studentId);
@@ -90,7 +93,7 @@ export function StudentDetailPanel({
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {!readOnly && <div className="flex flex-wrap gap-2">
           <Link
             href={registerHref ?? "/teacher/attendance"}
             className="inline-flex items-center rounded-full gradient-emerald text-white text-[12.5px] font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
@@ -103,7 +106,7 @@ export function StudentDetailPanel({
           >
             {t("common.assign")}
           </Link>
-        </div>
+        </div>}
 
         {/* Attendance */}
         <div>

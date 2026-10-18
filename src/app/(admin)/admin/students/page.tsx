@@ -27,6 +27,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GRADES, gradeLabel } from "@/lib/grades";
 import { loadSchoolShape, halaqaCampusId, ONE_HALAQA_FROM_GRADE, type Campus } from "@/lib/schoolStructure";
 import { isProgramHalaqa } from "@/lib/programHalaqa";
+import { StudentRecord } from "@/components/StudentRecord";
 import { loadRoster } from "@/lib/rosterExport";
 import { download, fileNameFor } from "@/lib/sheetTools";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -87,6 +88,7 @@ export default function AdminStudentsPage() {
   const [created, setCreated] = useState<DemoStudent[]>([]);
   const [overrides, setOverrides] = useState<Record<string, StudentOverride>>({});
 
+  const [record, setRecord] = useState<{ id: string; name: string; place: string } | null>(null);
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [campusFilter, setCampusFilter] = useState("");
@@ -867,6 +869,13 @@ export default function AdminStudentsPage() {
 
         {isOpen && (
           <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+            <button
+              type="button"
+              onClick={() => setRecord({ id: s.id, name: s.name, place: s.halaqa })}
+              className="inline-flex items-center gap-2 rounded-full border border-brand-navy/30 text-brand-navy dark:text-brand-gold dark:border-brand-gold/40 text-[12.5px] font-semibold px-3.5 py-1.5 hover:bg-brand-navy/5 transition-colors"
+            >
+              {tr("View record")}
+            </button>
             <div>
               <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Full name")}</label>
               <input value={draftName} onChange={(e) => setDraftName(e.target.value)} className={smallField} />
@@ -1678,6 +1687,7 @@ export default function AdminStudentsPage() {
           <ul className="divide-y divide-surface-border -my-1">{filtered.map(renderStudent)}</ul>
         </SectionCard>
       )}
+      {record && <StudentRecord studentId={record.id} name={record.name} halaqa={record.place} onClose={() => setRecord(null)} />}
     </div>
   );
 }

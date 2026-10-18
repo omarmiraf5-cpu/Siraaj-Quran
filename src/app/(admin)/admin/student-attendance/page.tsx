@@ -11,6 +11,7 @@ import {
   type AttendanceStatus,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
+import { StudentRecord } from "@/components/StudentRecord";
 import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron, HalaqaTitle } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -80,6 +81,7 @@ export default function StudentAttendancePage() {
   const [halaqaFilter, setHalaqaFilter] = useState("");
   const [search, setSearch] = useState("");
   const [openHalaqa, setOpenHalaqa] = useState<string | null>(null);
+  const [record, setRecord] = useState<{ id: string; name: string; place: string } | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
@@ -378,7 +380,7 @@ export default function StudentAttendancePage() {
                         const st = markOn.get(`${k.id}|${day}`);
                         return (
                           <li key={k.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
-                            <span className="text-ink [overflow-wrap:anywhere]">{k.name}</span>
+                            <button type="button" onClick={() => setRecord({ id: k.id, name: k.name, place: g.label })} className="text-start text-ink font-medium hover:underline [overflow-wrap:anywhere]">{k.name}</button>
                             <span className={`font-semibold flex-shrink-0 ${STATUS_TEXT[st ?? "none"]}`}>{st ? t(`common.${st}`) : tr("Not marked")}</span>
                           </li>
                         );
@@ -436,7 +438,7 @@ export default function StudentAttendancePage() {
                             {initials(s.name)}
                           </span>
                           <span className="min-w-0">
-                            <span className="block font-semibold text-ink [overflow-wrap:anywhere]">{s.name}</span>
+                            <button type="button" onClick={() => setRecord({ id: s.id, name: s.name, place: placeOf(s) })} className="block text-start font-semibold text-ink hover:underline [overflow-wrap:anywhere]">{s.name}</button>
                             <span className="block text-[11px] text-ink-muted [overflow-wrap:anywhere]">{placeOf(s)}</span>
                           </span>
                         </span>
@@ -460,6 +462,7 @@ export default function StudentAttendancePage() {
         )}
       </SectionCard>
       {isDemo && <p className="text-[11px] text-ink-muted">{tr("Sample school data.")}</p>}
+      {record && <StudentRecord studentId={record.id} name={record.name} halaqa={record.place} onClose={() => setRecord(null)} />}
     </div>
   );
 }

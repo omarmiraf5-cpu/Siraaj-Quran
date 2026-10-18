@@ -1891,4 +1891,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "can sign in": "يمكنهم تسجيل الدخول",
   "can't sign in": "لا يمكنهم تسجيل الدخول",
   "{count} with no teacher": "{count} بلا معلّم",
+  "View record": "عرض السجل",
+  "Opening the record…": "جارٍ فتح السجل…",
+  "Couldn't load this record. Try again.": "تعذّر تحميل هذا السجل. حاول مرة أخرى.",
 };
