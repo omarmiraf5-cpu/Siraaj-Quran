@@ -11,7 +11,7 @@ import {
   type AttendanceStatus,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron, HalaqaTitle } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -324,10 +324,10 @@ export default function StudentAttendancePage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3" data-section="day-tally">
-        <StatTile value={dayTally.present} label={t("common.present")} sub={tr("on time")} />
-        <StatTile value={dayTally.late} label={t("common.late")} sub={tr("came late")} />
-        <StatTile value={dayTally.absent} label={t("common.absent")} sub={tr("not in")} />
-        <StatTile value={dayTally.excused} label={t("common.excused")} sub={tr("with a reason")} />
+        <StatTile status="present" value={dayTally.present} label={t("common.present")} sub={tr("on time")} />
+        <StatTile status="late" value={dayTally.late} label={t("common.late")} sub={tr("came late")} />
+        <StatTile status="absent" value={dayTally.absent} label={t("common.absent")} sub={tr("not in")} />
+        <StatTile status="excused" value={dayTally.excused} label={t("common.excused")} sub={tr("with a reason")} />
         <StatTile value={unmarked} label={tr("Not marked")} sub={tr("no register yet")} />
       </div>
 
@@ -350,7 +350,7 @@ export default function StudentAttendancePage() {
                     className={`group w-full flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{g.label}</p>
+                      <p className="text-[13px]"><HalaqaTitle label={g.label} onDark={isOpen} /></p>
                       <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                         {g.teacher && g.teacher !== g.label.split(" · ").pop() ? `${g.teacher} · ` : ""}
                         {tr("{count} students", { count: g.kids.length })}

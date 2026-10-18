@@ -155,6 +155,19 @@ export function SectionCard({
   );
 }
 
+const STATUS_VALUE = {
+  present: "text-green-700 dark:text-green-300",
+  late: "text-amber-600 dark:text-amber-300",
+  absent: "text-red-700 dark:text-red-300",
+  excused: "text-slate-500 dark:text-slate-300",
+};
+const STATUS_DOT = {
+  present: "bg-green-600",
+  late: "bg-amber-500",
+  absent: "bg-red-600",
+  excused: "bg-slate-400",
+};
+
 /* ── Stat tile ─────────────────────────────────────────────────────────
    A number that carries the context making it mean something. Renders as a
    button when given an onClick, so a stat can lead somewhere. */
@@ -166,11 +179,14 @@ export function StatTile({
   icon,
   art,
   tone = "navy",
+  status,
 }: {
   value: string | number;
   label: string;
   sub?: string;
   onClick?: () => void;
+  /** An attendance figure's colour, the same as its marks elsewhere: green present, amber late, red absent, grey excused. */
+  status?: "present" | "late" | "absent" | "excused";
   /** A badge above the figure, for the headline tiles at the top of a home page. */
   icon?: LucideIcon;
   /** The tile's picture, drawn as a gem; the plain `icon` stands in without one. */
@@ -184,8 +200,17 @@ export function StatTile({
           {art ? <ColorTile name={art} size={40} /> : <IconBadge icon={icon} tone={tone} size={34} />}
         </span>
       )}
-      <p className="text-[26px] font-bold text-ink tabular-nums leading-none"><bdi dir="ltr">{value}</bdi></p>
-      <p className="eyebrow mt-2">{label}</p>
+      <p
+        className={`text-[26px] font-bold tabular-nums leading-none ${
+          status ? (Number(value) === 0 ? "text-slate-400 dark:text-slate-500" : STATUS_VALUE[status]) : "text-ink"
+        }`}
+      >
+        <bdi dir="ltr">{value}</bdi>
+      </p>
+      <p className="eyebrow mt-2 flex items-center gap-1.5">
+        {status && <span aria-hidden className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[status]}`} />}
+        {label}
+      </p>
       {sub && <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
     </>
   );
@@ -704,5 +729,34 @@ export function TeacherNote({ children }: { children: React.ReactNode }) {
       <p className="eyebrow mb-1">{t("common.teachersNote")}</p>
       <p className="text-[13px] text-ink-body font-serif italic leading-snug">{children}</p>
     </div>
+  );
+}
+
+/* ── Halaqa title ──────────────────────────────────────────────────────
+   "Grade 5 · North Campus · Hifd program - Shaykh Ismail" as it's read: the
+   grade, the campus and the halaqa each their own colour instead of one
+   grey-black run, with a Hifd program marked. On a navy (open) row the
+   colours give way to white. */
+export function HalaqaTitle({ label, onDark = false, className = "" }: { label: string; onDark?: boolean; className?: string }) {
+  const parts = label.split(" · ");
+  const name = parts[parts.length - 1];
+  const gradeFirst = parts.length > 1 && /\d|Pre-K|Kindergarten|الصف|تمهيدي|روضة/i.test(parts[0]);
+  const grade = gradeFirst ? parts[0] : null;
+  const campus = parts.length >= (gradeFirst ? 3 : 2) ? parts[gradeFirst ? 1 : 0] : null;
+  const pill = "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-tight whitespace-nowrap";
+  const program = /\bhif(?:d|z|dh)\b/i.test(name);
+  return (
+    <span className={`inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 ${className}`}>
+      {grade && (
+        <span className={`${pill} ${onDark ? "bg-white/20 text-white" : "bg-brand-navy/10 text-brand-navy dark:bg-brand-gold/15 dark:text-brand-gold"}`}>{grade}</span>
+      )}
+      {campus && (
+        <span className={`${pill} ${onDark ? "bg-white/15 text-white" : "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200"}`}>{campus}</span>
+      )}
+      {program && (
+        <span className={`${pill} ${onDark ? "bg-amber-300/30 text-amber-100" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"}`}>Hifd</span>
+      )}
+      <span className={`font-semibold [overflow-wrap:anywhere] ${onDark ? "text-white" : "text-ink"}`}>{name}</span>
+    </span>
   );
 }

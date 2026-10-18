@@ -24,6 +24,7 @@ import {
   AttendanceLegend,
   EmptyNote,
   LoadingNote,
+  HalaqaTitle,
 } from "@/components/portal-ui";
 import { IconBook, IconCalendar, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
@@ -391,7 +392,7 @@ export default function TeacherDashboard() {
                     <div className="min-w-0 flex-1 basis-48 flex items-start gap-3">
                       <ColorTile name="mosque" size={36} />
                       <div className="min-w-0">
-                      <p className="font-semibold text-[14px] text-ink break-words">{h.label}</p>
+                      <p className="text-[14px]"><HalaqaTitle label={h.label} /></p>
                       <p className="text-[11px] text-ink-muted">
                         {countLabel("{count} student|{count} students", kids.length, `${kids.length} ${t("common.students")}`)} · {marked}/{kids.length} {countLabel("{count} marked|{count} marked", marked, t("teacher.attendance.marked"))}{" "}
                         {t("teacher.dashboard.today")}

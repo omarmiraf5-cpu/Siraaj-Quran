@@ -22,7 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { fetchAll, daysAgoIso, ATTENDANCE_WINDOW_DAYS } from "@/lib/supabase/fetchAll";
 import { readCache, writeCache, patchCache } from "@/lib/pageCache";
-import { LoadingNote } from "@/components/portal-ui";
+import { LoadingNote, HalaqaTitle } from "@/components/portal-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { demoAttendanceFetch } from "@/lib/demoAttendance";
@@ -422,8 +422,8 @@ export default function TeacherAttendancePage() {
               >
                 {/* A long name (grade · campus · teacher) wraps rather than
                     running past the edge of a phone. */}
-                <span className="block text-sm font-semibold [overflow-wrap:anywhere]">
-                  {h.label}
+                <span className="block text-sm">
+                  <HalaqaTitle label={h.label} onDark={on} />
                   {pending && <span className={`ms-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle ${on ? "bg-white" : "bg-amber-500"}`} />}
                 </span>
                 <span className={`block text-[11px] tabular-nums ${on ? "text-white/80" : "text-ink-muted"}`}>

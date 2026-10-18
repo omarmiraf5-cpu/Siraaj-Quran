@@ -184,9 +184,9 @@ export default function StaffAttendancePage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
-        <StatTile value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
-        <StatTile value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
-        <StatTile value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
+        <StatTile status="late" value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
+        <StatTile status="absent" value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
+        <StatTile status="excused" value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
       </div>
 
       <SectionCard title={tr("Today")} note={tr("Staff due {formatClock} · {grace_minutes} min grace", { formatClock: formatClock(data.settings.start_time), grace_minutes: data.settings.grace_minutes })}>

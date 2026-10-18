@@ -103,10 +103,10 @@ export default function MyAttendancePage() {
 
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatTile value={data.tally.present} label={tr("On time")} sub={tr("of {schoolDays} school days", { schoolDays: data.tally.schoolDays })} />
-          <StatTile value={data.tally.late} label={tr("Late")} sub={data.tally.late ? tr("{minutesLate} min in all", { minutesLate: data.tally.minutesLate }) : tr("None")} />
-          <StatTile value={data.tally.absent} label={tr("Absent")} sub={tr("Not reported")} />
-          <StatTile value={data.tally.reported + data.tally.excused} label={tr("Reported")} sub={tr("Or excused by the office")} />
+          <StatTile status="present" value={data.tally.present} label={tr("On time")} sub={tr("of {schoolDays} school days", { schoolDays: data.tally.schoolDays })} />
+          <StatTile status="late" value={data.tally.late} label={tr("Late")} sub={data.tally.late ? tr("{minutesLate} min in all", { minutesLate: data.tally.minutesLate }) : tr("None")} />
+          <StatTile status="absent" value={data.tally.absent} label={tr("Absent")} sub={tr("Not reported")} />
+          <StatTile status="excused" value={data.tally.reported + data.tally.excused} label={tr("Reported")} sub={tr("Or excused by the office")} />
         </div>
       )}
 
