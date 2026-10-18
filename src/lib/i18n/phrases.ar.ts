@@ -1901,4 +1901,8 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Sent a welcome email to {email}, with a button to choose their password. It works once, for 14 days.": "أُرسلت رسالة ترحيب إلى {email} فيها زر لاختيار كلمة المرور. يعمل مرة واحدة لمدة 14 يومًا.",
   "Hifd programs": "برامج الحفظ",
   "Your sign-in isn't ready yet": "تسجيل دخولك غير جاهز بعد",
+  "Or set by pages": "أو حدّد بالصفحات",
+  "From page": "من صفحة",
+  "To page": "إلى صفحة",
+  "Fills in the surah and ayahs below from the pages of the Madinah mushaf (1 to {total}). A page can start or end partway through a surah.": "يملأ السورة والآيات أدناه من صفحات مصحف المدينة (من 1 إلى {total}). قد تبدأ الصفحة أو تنتهي في منتصف سورة.",
 };

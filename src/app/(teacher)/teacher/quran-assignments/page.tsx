@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
+import { SURAHS as QURAN, getSurahById, PAGE_STARTS, TOTAL_PAGES } from "@/data/mushaf-index";
 import { JUZ_STARTS, getJuzRange } from "@/data/juz-index";
 import {
   DEMO_ASSIGNMENTS,
@@ -52,6 +52,7 @@ import {
   DIRECTION_HINT,
   DIRECTION_LABEL,
   formatPosition,
+  pageLabel,
   nextPosition,
   pageOfPosition,
   walk,
@@ -140,6 +141,9 @@ export default function QuranAssignmentsPage() {
   // Quick-fill for muraajah: pick a starting juz' and how many to cover,
   // and "Apply" fills in the surah/ayah fields above rather than requiring
   // the teacher to look up boundaries by hand.
+  // Or the range given as mushaf pages (Madinah mushaf, 1 to 604).
+  const [pageFrom, setPageFrom] = useState("");
+  const [pageTo, setPageTo] = useState("");
   const [juzStart, setJuzStart] = useState("1");
   const [juzCount, setJuzCount] = useState("1");
   // Which way this student works through the mushaf, and where they had
@@ -583,6 +587,39 @@ export default function QuranAssignmentsPage() {
     }
   };
 
+  // Pages to ayahs: from the first ayah of the first page to the last ayah
+  // of the last (the Madinah mushaf never splits an ayah across pages).
+  const applyPageRange = () => {
+    const first = Math.max(1, Math.min(TOTAL_PAGES, parseInt(pageFrom) || 0));
+    if (!parseInt(pageFrom)) return;
+    const last = Math.max(first, Math.min(TOTAL_PAGES, parseInt(pageTo) || first));
+    const [s1, a1] = PAGE_STARTS[first - 1];
+    let sEnd = 114;
+    let aEnd = getSurahById(114)?.ayahs ?? 6;
+    if (last < TOTAL_PAGES) {
+      const [ns, na] = PAGE_STARTS[last];
+      if (na > 1) {
+        sEnd = ns;
+        aEnd = na - 1;
+      } else {
+        sEnd = ns - 1;
+        aEnd = getSurahById(sEnd)?.ayahs ?? 1;
+      }
+    }
+    setPageFrom(String(first));
+    setPageTo(String(last));
+    setSelectedSurah(String(s1));
+    setAyahStart(String(a1));
+    setAyahEnd(String(aEnd));
+    if (sEnd !== s1) {
+      setSpansSurah(true);
+      setEndSurah(String(sEnd));
+    } else {
+      setSpansSurah(false);
+      setEndSurah("");
+    }
+  };
+
   const applyJuzRange = () => {
     const range = getJuzRange(parseInt(juzStart), parseInt(juzCount) || 1, (s) => getSurahById(s)?.ayahs ?? 0);
     setSelectedSurah(String(range.surahStart));
@@ -955,6 +992,49 @@ export default function QuranAssignmentsPage() {
             </div>
           )}
 
+          {/* By mushaf pages, for any portion: "page 562 to 563" instead of
+              working out which surah and ayahs those are. */}
+          <div className="rounded-2xl border border-brand-navy/20 bg-brand-navy/5 dark:border-brand-gold/25 dark:bg-brand-gold/5 p-3.5">
+            <p className="text-sm font-semibold text-ink mb-2">{tr("Or set by pages")}</p>
+            <div className="flex items-end gap-2">
+              <label className="flex-1 min-w-0">
+                <span className="block text-[11px] text-ink-muted mb-1">{tr("From page")}</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={TOTAL_PAGES}
+                  value={pageFrom}
+                  onChange={(e) => setPageFrom(e.target.value)}
+                  placeholder="562"
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                />
+              </label>
+              <label className="flex-1 min-w-0">
+                <span className="block text-[11px] text-ink-muted mb-1">{tr("To page")}</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={TOTAL_PAGES}
+                  value={pageTo}
+                  onChange={(e) => setPageTo(e.target.value)}
+                  placeholder={pageFrom || "563"}
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={applyPageRange}
+                disabled={!parseInt(pageFrom)}
+                className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] disabled:opacity-40 transition-all"
+              >
+                {tr("Apply")}
+              </button>
+            </div>
+            <p className="text-[11px] text-ink-muted mt-2">
+              {tr("Fills in the surah and ayahs below from the pages of the Madinah mushaf (1 to {total}). A page can start or end partway through a surah.", { total: TOTAL_PAGES })}
+            </p>
+          </div>
+
           {/* Muraajah is usually set as a quantity — a juz', two juz' —
               rather than by hunting down exact ayah numbers, so give that
               as a quick-fill on top of the manual fields below. Not shown
@@ -1062,6 +1142,14 @@ export default function QuranAssignmentsPage() {
           {maxAyahs > 0 && !spansSurah && (
             <p className="text-xs text-ink-muted">
               {tr("This Surah has {maxAyahs} Ayahs", { maxAyahs })}
+            </p>
+          )}
+          {selectedSurah && parseInt(ayahStart) > 0 && parseInt(ayahEnd) > 0 && effectiveEndSurahId > 0 && (
+            <p className="text-xs font-semibold text-brand-navy dark:text-brand-gold">
+              {pageLabel(
+                { surah: parseInt(selectedSurah), ayah: parseInt(ayahStart) },
+                { surah: effectiveEndSurahId, ayah: parseInt(ayahEnd) }
+              )}
             </p>
           )}
 

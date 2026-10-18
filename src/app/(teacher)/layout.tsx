@@ -36,14 +36,6 @@ const NAV = [
     art: "pen" as const,
     icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
   },
-  // The Qa'idah straight under the Qur'an assignments: setting a child's
-  // Qa'idah lesson is the same job for the children not reading yet.
-  {
-    href: "/teacher/qaidah",
-    labelKey: "nav.qaidah",
-    art: "letters" as const,
-    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z"/><path d="M12 6.5v13.2"/></svg>,
-  },
   {
     href: "/teacher/class-work",
     labelKey: "nav.classWork",

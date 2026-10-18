@@ -1,5 +1,6 @@
 "use client";
 
+import { QaidahWorkspace } from "@/components/QaidahWorkspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -420,6 +421,10 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
   const [subject, setSubject] = useState<Subject | "all">("all");
   const [composing, setComposing] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // The page has two parts: the written work, and the Qa'idah (?tab=qaidah).
+  const [tab, setTab] = useState<"work" | "qaidah">(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "qaidah" ? "qaidah" : "work"
+  );
 
   const load = useCallback(async () => {
     try {
@@ -453,20 +458,41 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
         title={t("cw.title")}
         meta={data ? [countLabel("{count} assignment|{count} assignments", data.assignments.length, `${data.assignments.length} ${t("nav.assignments").toLowerCase()}`), countLabel("{count} submitted|{count} submitted", waiting, `${waiting} ${t("cw.status.submitted").toLowerCase()}`)] : []}
         actions={
-          <button
-            type="button"
-            onClick={() => setComposing(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition"
-          >
-            <IconPen />
-            {t("cw.new")}
-          </button>
+          tab === "work" ? (
+            <button
+              type="button"
+              onClick={() => setComposing(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition"
+            >
+              <IconPen />
+              {t("cw.new")}
+            </button>
+          ) : undefined
         }
       />
 
-      {error && <ErrorLine>{error}</ErrorLine>}
+      <SegmentedSwitch
+        label={t("cw.title")}
+        value={tab}
+        onChange={(v) => {
+          setTab(v);
+          try {
+            window.history.replaceState(null, "", v === "qaidah" ? "?tab=qaidah" : window.location.pathname);
+          } catch {
+            /* a preview that won't let the address change */
+          }
+        }}
+        options={[
+          { value: "work", label: tr("Assignments") },
+          { value: "qaidah", label: tr("Qa'idah") },
+        ]}
+      />
 
-      {data && (
+      {tab === "qaidah" && <QaidahWorkspace />}
+
+      {error && tab === "work" && <ErrorLine>{error}</ErrorLine>}
+
+      {data && tab === "work" && (
         <>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <SegmentedSwitch
