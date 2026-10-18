@@ -346,6 +346,26 @@ export default function AdminTeachersPage() {
     }
   };
 
+  // An office admin's welcome, sent again: the email with the button to choose a password.
+  const sendWelcome = async (a: { id: string; name: string }) => {
+    setResetting(true);
+    setInviteNote(null);
+    try {
+      const res = await fetch("/api/admin/accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: a.id, by: "welcome" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || phrase("Couldn't send the email"));
+      setInviteNote(tr("Sent a welcome email to {email}, with a button to choose their password. It works once, for 14 days.", { email: data.email }));
+    } catch (err) {
+      setInviteNote(err instanceof Error ? tr(err.message) : tr("Couldn't send the email"));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   // Or a link by email, so they choose a new password themselves and
   // nobody has to pass one on.
   const emailResetLink = async (t: DemoTeacher) => {
@@ -738,6 +758,16 @@ export default function AdminTeachersPage() {
                   <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">{a.email}</p>
                 </div>
                 <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex-shrink-0">{a.id === me?.id ? tr("You · admin") : tr("Admin")}</span>
+                {a.id !== me?.id && a.active && (
+                  <button
+                    type="button"
+                    onClick={() => sendWelcome(a)}
+                    disabled={resetting}
+                    className="flex-shrink-0 rounded-full border border-brand-navy/30 text-brand-navy dark:text-brand-gold dark:border-brand-gold/40 text-[11.5px] font-semibold px-3 py-1.5 hover:bg-brand-navy/5 disabled:opacity-50 transition-colors"
+                  >
+                    {tr("Send welcome email")}
+                  </button>
+                )}
               </li>
             ))}
           </ul>

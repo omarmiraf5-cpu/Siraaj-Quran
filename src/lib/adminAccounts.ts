@@ -9,8 +9,13 @@ type SessionDb = Awaited<ReturnType<typeof createClient>>;
 type ServiceDb = ReturnType<typeof createAdminClient>;
 
 /** The accounts the office manages from its Teachers and Parents pages. */
-export const ACCOUNT_ROLES = ["teacher", "parent", "admin"] as const;
+export const ACCOUNT_ROLES = ["teacher", "parent"] as const;
 export type AccountRole = (typeof ACCOUNT_ROLES)[number];
+/** What the office can create: also another admin. An admin's login is only
+ *  ever created or emailed from here — never reset, switched off or deleted
+ *  by another admin. */
+export const CREATABLE_ROLES = [...ACCOUNT_ROLES, "admin"] as const;
+export type CreatableRole = (typeof CREATABLE_ROLES)[number];
 
 // Every office account route starts the same way: prove there's a session,
 // and that it belongs to an admin. Shared so no route can drift into being
@@ -66,7 +71,7 @@ export async function requireAdmin(supabase: SessionDb) {
  * and "no such account" look identical, and the first has to be refused
  * loudly.
  */
-export async function schoolAccount(admin: ServiceDb, caller: { school_id: string | null }, id: string) {
+export async function schoolAccount(admin: ServiceDb, caller: { school_id: string | null }, id: string, alsoRoles: readonly string[] = []) {
   const { data: target, error } = await admin
     .from("profiles")
     .select("id, role, school_id, full_name, email, active")
@@ -85,7 +90,7 @@ export async function schoolAccount(admin: ServiceDb, caller: { school_id: strin
   if (target.school_id !== caller.school_id) {
     return { error: NextResponse.json({ error: "That account belongs to a different school" }, { status: 403 }) };
   }
-  if (!ACCOUNT_ROLES.includes(target.role as AccountRole)) {
+  if (!ACCOUNT_ROLES.includes(target.role as AccountRole) && !alsoRoles.includes(target.role)) {
     return { error: NextResponse.json({ error: `A ${target.role} account can't be changed here` }, { status: 400 }) };
   }
   return { target, member: false, elsewhere: false };

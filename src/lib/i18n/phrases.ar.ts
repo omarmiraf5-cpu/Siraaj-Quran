@@ -1898,4 +1898,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "They run the school (students, teachers, payments, announcements) and don't teach a halaqa.": "يديرون المدرسة (الطلاب والمعلمون والمدفوعات والإعلانات) ولا يُدرّسون حلقة.",
   "Create admin login": "إنشاء حساب مسؤول",
   "Office admins": "المسؤولون الإداريون",
+  "Sent a welcome email to {email}, with a button to choose their password. It works once, for 14 days.": "أُرسلت رسالة ترحيب إلى {email} فيها زر لاختيار كلمة المرور. يعمل مرة واحدة لمدة 14 يومًا.",
 };
