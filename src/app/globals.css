@@ -724,3 +724,19 @@ body {
 .row-open .text-ink-muted,
 .row-open .eyebrow { color: rgb(255 255 255 / 0.75); }
 .row-open .bg-brand-navy\/10 { background-color: rgb(255 255 255 / 0.15); color: #fff; }
+
+/* Each section of a page in its own colour. A section's colour goes by its
+   place among its sibling sections, so the same page reads the same in every
+   language, and neighbours differ. */
+.sec-card { --sec: #1e3f7a; --sec-ink: #1e3f7a; }
+.sec-card:nth-of-type(8n+2) { --sec: #0f8a7a; --sec-ink: #0b6b5f; }
+.sec-card:nth-of-type(8n+3) { --sec: #7c5cd6; --sec-ink: #5b3fb0; }
+.sec-card:nth-of-type(8n+4) { --sec: #d98a14; --sec-ink: #9a5a05; }
+.sec-card:nth-of-type(8n+5) { --sec: #d6406a; --sec-ink: #b4234a; }
+.sec-card:nth-of-type(8n+6) { --sec: #1f9d57; --sec-ink: #15803d; }
+.sec-card:nth-of-type(8n+7) { --sec: #1b8fd0; --sec-ink: #0369a1; }
+.sec-card:nth-of-type(8n+8) { --sec: #e0662a; --sec-ink: #c2410c; }
+.dark .sec-card { --sec-ink: color-mix(in srgb, var(--sec) 55%, #ffffff); }
+.sec-bar { background: var(--sec); }
+.sec-title { color: var(--sec-ink); }
+.sec-note { background: color-mix(in srgb, var(--sec) 12%, transparent); color: var(--sec-ink); }

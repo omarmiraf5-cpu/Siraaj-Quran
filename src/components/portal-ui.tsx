@@ -142,12 +142,17 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={`card-quiet p-5 ${className}`}>
+    <section className={`card-quiet sec-card p-5 ${className}`}>
       {/* Wraps on a phone: a long note drops under the title instead of
-          running off the edge of the card. */}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="page-title text-lg">{title}</h2>
-        {note && <span className="eyebrow">{note}</span>}
+          running off the edge of the card. Each section on a page has its own
+          colour (see .sec-card in globals.css): a bar by the title, the
+          title itself and the note. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 className="page-title text-lg sec-title flex items-center gap-2.5">
+          <span aria-hidden className="sec-bar inline-block w-1.5 h-5 rounded-full flex-shrink-0" />
+          {title}
+        </h2>
+        {note && <span className="eyebrow sec-note rounded-full px-2.5 py-1">{note}</span>}
       </div>
       <div className="gold-rule my-4" />
       {children}
