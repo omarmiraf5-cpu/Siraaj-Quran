@@ -502,7 +502,8 @@ export default function TeacherDashboard() {
           quiet one, rather than a card the size of the work above it. */}
       <Link
         href="/teacher/mushaf"
-        className="card-quiet card-feature group flex items-center gap-3.5 px-5 py-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+        className="card-quiet card-feature gem-surface group flex items-center gap-3.5 px-5 py-4"
+        style={{ "--gem": "#d9862a" } as React.CSSProperties}
       >
         <span className="icon-tile flex-shrink-0">
           <IconBook size={19} />
@@ -519,7 +520,7 @@ export default function TeacherDashboard() {
       </Link>
 
       {/* Hadith — a quiet feature panel rather than a green alert box */}
-      <section className="card-quiet px-6 py-8 text-center">
+      <section className="card-quiet gem-surface gem-list px-6 py-8 text-center">
         <p className="eyebrow">{t("common.dailyReflection")}</p>
         <p
           className="font-calligraphy text-[28px] md:text-[34px] text-ink mt-4 leading-[2.1]"

@@ -140,7 +140,7 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={`card-quiet card-lift p-5 ${className}`}>
+    <section className={`card-quiet card-lift gem-surface gem-list p-5 ${className}`}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="page-title text-lg">{title}</h2>
         {note && <span className="eyebrow flex-shrink-0">{note}</span>}
@@ -276,7 +276,7 @@ export function StatTile({
   // of just wrapping to a second line.
   if (!onClick) {
     return (
-      <motion.div whileHover={reduce || !mark ? undefined : { scale: 1.05 }} transition={spring} className="card-quiet card-lift px-4 py-4 min-w-0 rounded-[22px]">
+      <motion.div whileHover={reduce || !mark ? undefined : { scale: 1.02 }} transition={spring} className="card-quiet card-lift gem-surface gem-list px-4 py-4 min-w-0 rounded-[22px]">
         {body}
       </motion.div>
     );
@@ -287,7 +287,7 @@ export function StatTile({
       onClick={onClick}
       whileHover={reduce || !mark ? undefined : { scale: 1.05 }}
       transition={spring}
-      className="card-quiet card-lift px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start cursor-pointer hover:bg-surface-bg-warm"
+      className="card-quiet card-lift gem-surface gem-list px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start cursor-pointer"
     >
       {body}
     </motion.button>

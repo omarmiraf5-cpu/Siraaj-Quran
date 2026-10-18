@@ -51,6 +51,11 @@ const PALETTES: Record<ArtName, Palette> = {
   more: { sky: ["#141d2c", "#273750", "#43597a"], hue: "#c9d6ea" },
 };
 
+/** Saturated sky stop used as the soft panel glow for that illustration. */
+export function gemGlow(name: ArtName): string {
+  return PALETTES[name].sky[2];
+}
+
 const GOLD = ["#fff4cf", "#ffc95c", "#d98614"];
 const NAVY = "#0d2a42";
 
@@ -429,7 +434,8 @@ export function QuickActions({
         <Link
           key={item.href}
           href={item.href}
-          className="flex flex-col items-center gap-2 rounded-xl border border-[#E4E2DC] bg-white px-1.5 py-3 text-center shadow-[0_8px_20px_-16px_rgba(16,42,86,0.45)] hover:bg-[#F9F8F3]"
+          className="gem-surface flex flex-col items-center gap-2 rounded-xl px-1.5 py-3 text-center"
+          style={{ "--gem": gemGlow(item.art) } as React.CSSProperties}
         >
           <ColorTile name={item.art} size={44} />
           <span className="text-[12px] font-semibold text-[#102A56] leading-tight line-clamp-2">{item.label}</span>

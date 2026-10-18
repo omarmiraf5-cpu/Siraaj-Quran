@@ -1,11 +1,20 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import type { LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { IconTone } from "@/components/IconBadge";
 import { StatCardHeader } from "@/components/StatCardHeader";
 import { hoverSpring } from "@/lib/motion-config";
-import type { ArtName } from "@/components/gem-icons";
+import { gemGlow, type ArtName } from "@/components/gem-icons";
+
+const TONE_GLOW: Record<IconTone, string> = {
+  green: "#1b8f5c",
+  amber: "#c98426",
+  red: "#c45c54",
+  navy: "#1a4a8a",
+  gold: "#c6a15a",
+};
 
 /** Four-up metric: badge, status pill, bold figure, muted label. */
 export function StatCard({
@@ -40,8 +49,9 @@ export function StatCard({
       </div>
     );
   }
-  const hover = reduce ? undefined : { scale: 1.05 };
+  const hover = reduce ? undefined : { scale: 1.02 };
   const transition = reduce ? { duration: 0 } : hoverSpring;
+  const glow = { "--gem": art ? gemGlow(art) : TONE_GLOW[tone] } as CSSProperties;
   const body = (
     <>
       <StatCardHeader icon={icon} art={art} tone={tone} pill={pill} />
@@ -58,14 +68,15 @@ export function StatCard({
         onClick={onClick}
         whileHover={hover}
         transition={transition}
-        className="card-quiet card-lift px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start"
+        className="card-quiet card-lift gem-surface px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start"
+        style={glow}
       >
         {body}
       </motion.button>
     );
   }
   return (
-    <motion.div whileHover={hover} transition={transition} className="card-quiet card-lift px-4 py-4 min-w-0 rounded-[22px]">
+    <motion.div whileHover={hover} transition={transition} className="card-quiet card-lift gem-surface px-4 py-4 min-w-0 rounded-[22px]" style={glow}>
       {body}
     </motion.div>
   );
