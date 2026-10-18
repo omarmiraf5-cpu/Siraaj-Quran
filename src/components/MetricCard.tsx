@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ChevronDown, type LucideIcon } from "lucide-react";
 import { IconBadge, type IconTone } from "@/components/IconBadge";
+import { ColorTile, type ArtName } from "@/components/gem-icons";
 
 /* ── Metric card ───────────────────────────────────────────────────────
    One of the four numbers at the top of a home page. Every card in a row
@@ -24,6 +25,7 @@ export interface MetricDetail {
 
 export function MetricCard({
   icon,
+  art,
   tone = "navy",
   value,
   label,
@@ -37,6 +39,8 @@ export function MetricCard({
   detailsTitle,
 }: {
   icon: LucideIcon;
+  /** The card's picture, drawn as a gem; the plain `icon` stands in without one. */
+  art?: ArtName;
   tone?: IconTone;
   value: string | number;
   label: string;
@@ -100,7 +104,7 @@ export function MetricCard({
   const body = (
     <>
       <span className="flex items-start justify-between gap-2 mb-3">
-        <IconBadge icon={icon} tone={tone} size={34} />
+        {art ? <ColorTile name={art} size={40} /> : <IconBadge icon={icon} tone={tone} size={34} />}
         {corner}
       </span>
       <span

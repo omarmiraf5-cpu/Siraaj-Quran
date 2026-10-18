@@ -28,6 +28,7 @@ import type { DailyRating } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 import { SkeletonRows, SkeletonStats } from "@/components/Skeleton";
 import { IconBadge, type IconTone } from "@/components/IconBadge";
+import { ColorTile, type ArtName } from "@/components/gem-icons";
 import type { LucideIcon } from "lucide-react";
 import { countLabel } from "@/lib/i18n/phrases";
 
@@ -163,6 +164,7 @@ export function StatTile({
   sub,
   onClick,
   icon,
+  art,
   tone = "navy",
 }: {
   value: string | number;
@@ -171,13 +173,15 @@ export function StatTile({
   onClick?: () => void;
   /** A badge above the figure, for the headline tiles at the top of a home page. */
   icon?: LucideIcon;
+  /** The tile's picture, drawn as a gem; the plain `icon` stands in without one. */
+  art?: ArtName;
   tone?: IconTone;
 }) {
   const body = (
     <>
       {icon && (
         <span className="block mb-3">
-          <IconBadge icon={icon} tone={tone} size={34} />
+          {art ? <ColorTile name={art} size={40} /> : <IconBadge icon={icon} tone={tone} size={34} />}
         </span>
       )}
       <p className="text-[26px] font-bold text-ink tabular-nums leading-none"><bdi dir="ltr">{value}</bdi></p>

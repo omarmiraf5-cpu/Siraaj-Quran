@@ -22,6 +22,7 @@ import type { DemoHalaqa, DemoTeacher, DemoStudent } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { isProgramHalaqa } from "@/lib/programHalaqa";
+import { ColorTile } from "@/components/gem-icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -482,13 +483,11 @@ export default function AdminHalaqasPage() {
           aria-expanded={isOpen}
           className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
         >
-          <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
-            {count}
-          </span>
+          <ColorTile name="mosque" size={38} />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{h.name}</p>
             <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
-              {[halaqaTeacherNames(h, teachers), h.schedule].filter(Boolean).join(" · ")}
+              {[halaqaTeacherNames(h, teachers), h.schedule, tr("{count} student|{count} students", { count })].filter(Boolean).join(" · ")}
             </p>
           </div>
           {halaqaTeacherIds(h).length === 0 && (

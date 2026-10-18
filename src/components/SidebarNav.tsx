@@ -14,12 +14,20 @@ import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
 import { motion, useReducedMotion } from "motion/react";
 import { pillSpring } from "@/lib/motion-config";
+import { ColorTile, type ArtName } from "@/components/gem-icons";
 
 interface NavItem {
   href: string;
   /** Key into the translation dictionary, e.g. "nav.dashboard" — not literal text. */
   labelKey: string;
   icon: React.ReactNode;
+  /** The page's picture, drawn as a gem; the plain `icon` stands in without one. */
+  art?: ArtName;
+}
+
+// A nav item's picture at the size it's shown: the gem, or the plain icon.
+function NavIcon({ item, size }: { item: NavItem; size: number }) {
+  return item.art ? <ColorTile name={item.art} size={size} /> : <>{item.icon}</>;
 }
 
 interface SidebarNavProps {
@@ -157,7 +165,9 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 active ? "text-brand-gold" : "text-white/45 hover:text-white/80"
               }`}
             >
-              <span className={active ? "text-brand-gold" : ""}>{item.icon}</span>
+              <span className={`inline-flex transition-opacity ${item.art ? (active ? "" : "opacity-70") : active ? "text-brand-gold" : ""}`}>
+                <NavIcon item={item} size={26} />
+              </span>
               {t(item.labelKey)}
             </Link>
           );
@@ -203,7 +213,9 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                     active ? "bg-white/15 text-brand-gold" : "text-white/70 hover:bg-white/8 hover:text-white"
                   }`}
                 >
-                  <span className="flex-shrink-0 opacity-80">{item.icon}</span>
+                  <span className={`flex-shrink-0 inline-flex ${item.art ? "" : "opacity-80"}`}>
+                    <NavIcon item={item} size={28} />
+                  </span>
                   {t(item.labelKey)}
                 </Link>
               );
@@ -263,7 +275,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                className={`group relative flex items-center gap-3 px-3 ${items.some((i) => i.art) ? "py-1.5" : "py-2.5"} rounded-xl text-sm font-medium transition-colors ${
                   active
                     ? "bg-white/15 text-white"
                     : "text-white/60 hover:text-white hover:bg-white/8"
@@ -279,7 +291,9 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                     transition={reduceMotion ? { duration: 0 } : pillSpring}
                   />
                 )}
-                <span className="flex-shrink-0 opacity-80">{item.icon}</span>
+                <span className={`flex-shrink-0 inline-flex transition-opacity ${item.art ? (active ? "" : "opacity-80 group-hover:opacity-100") : "opacity-80"}`}>
+                  <NavIcon item={item} size={30} />
+                </span>
                 {t(item.labelKey)}
               </Link>
             );
@@ -308,7 +322,9 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 href={item.href}
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/8 transition-all"
               >
-                <span className="flex-shrink-0 opacity-70">{item.icon}</span>
+                <span className={`flex-shrink-0 inline-flex ${item.art ? "opacity-90" : "opacity-70"}`}>
+                  <NavIcon item={item} size={24} />
+                </span>
                 {t(item.labelKey)}
               </Link>
             ))}

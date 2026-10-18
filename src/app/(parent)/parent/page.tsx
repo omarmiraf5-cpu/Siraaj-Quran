@@ -141,6 +141,7 @@ export default function ParentDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
           icon={CalendarCheck}
+          art="calendarCheck"
           tone="gold"
           value={`${summary.rate}%`}
           label={t("common.attendanceStat")}
@@ -153,6 +154,7 @@ export default function ParentDashboard() {
         />
         <StatTile
           icon={BookOpen}
+          art="book"
           tone="green"
           value={`${memorisation}%`}
           label={t("common.memorised")}
@@ -164,12 +166,14 @@ export default function ParentDashboard() {
         />
         <StatTile
           icon={ClipboardList}
+          art="pen"
           value={active.length}
           label={t("common.openWork")}
           sub={nextDue ? `${t("common.nextDue")} ${formatDay(nextDue, language)}` : t("common.nothingDue")}
         />
         <StatTile
           icon={Award}
+          art="badge"
           tone="gold"
           value={done.length}
           label={t("assignment.completed")}

@@ -38,6 +38,7 @@ import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
 import { myHalaqas, narrowToMine, type MyHalaqa } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
 import { MetricCard } from "@/components/MetricCard";
+import { ColorTile } from "@/components/gem-icons";
 import { gradeLabel } from "@/lib/grades";
 import { Users, BookOpen, ClipboardCheck, CalendarCheck } from "lucide-react";
 
@@ -319,6 +320,7 @@ export default function TeacherDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
           icon={Users}
+          art="person"
           value={students.length}
           muted={students.length === 0}
           label={t("nav.students")}
@@ -334,6 +336,7 @@ export default function TeacherDashboard() {
         />
         <MetricCard
           icon={BookOpen}
+          art="pen"
           tone="green"
           value={active.length}
           muted={active.length === 0}
@@ -343,6 +346,7 @@ export default function TeacherDashboard() {
         />
         <MetricCard
           icon={ClipboardCheck}
+          art="check"
           tone={review.length > 0 ? "amber" : "green"}
           value={review.length}
           muted={review.length === 0}
@@ -352,6 +356,7 @@ export default function TeacherDashboard() {
         />
         <MetricCard
           icon={CalendarCheck}
+          art="calendarCheck"
           tone="gold"
           value={`${avgAttendance}%`}
           muted={avgAttendance === 0}
@@ -383,12 +388,15 @@ export default function TeacherDashboard() {
                       fit beside that, it drops underneath rather than
                       squeezing the name a letter or two to a line. */}
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5">
-                    <div className="min-w-0 flex-1 basis-48">
+                    <div className="min-w-0 flex-1 basis-48 flex items-start gap-3">
+                      <ColorTile name="mosque" size={36} />
+                      <div className="min-w-0">
                       <p className="font-semibold text-[14px] text-ink break-words">{h.label}</p>
                       <p className="text-[11px] text-ink-muted">
                         {countLabel("{count} student|{count} students", kids.length, `${kids.length} ${t("common.students")}`)} · {marked}/{kids.length} {countLabel("{count} marked|{count} marked", marked, t("teacher.attendance.marked"))}{" "}
                         {t("teacher.dashboard.today")}
                       </p>
+                      </div>
                     </div>
                     <Link
                       href={isDemo ? "/teacher/attendance" : `/teacher/attendance?halaqa=${encodeURIComponent(h.id)}`}

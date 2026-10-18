@@ -281,10 +281,10 @@ export default function AdminDashboard() {
       {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile icon={Users} tone="navy" value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
-        <StatTile icon={GraduationCap} tone="gold" value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
-        <StatTile icon={BookOpen} tone="green" value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
-        <StatTile icon={CalendarCheck} tone="amber" value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
+        <StatTile icon={Users} art="person" tone="navy" value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
+        <StatTile icon={GraduationCap} art="board" tone="gold" value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
+        <StatTile icon={BookOpen} art="mosque" tone="green" value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
+        <StatTile icon={CalendarCheck} art="calendarCheck" tone="amber" value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
