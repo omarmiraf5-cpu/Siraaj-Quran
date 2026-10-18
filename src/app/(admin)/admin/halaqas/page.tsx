@@ -720,9 +720,14 @@ export default function AdminHalaqasPage() {
               {section.grades.map(({ grade, halaqas: inGrade }) => (
                 <div key={grade ?? "all"}>
                   {grade != null && (
-                    <p className="eyebrow pt-1">
-                      {gradeLabel(grade)} · {tr("{count} halaqa|{count} halaqas", { count: inGrade.length })} ·{" "}
-                      {tr("{count} student|{count} students", { count: inGrade.reduce((n, h) => n + countOf(h), 0) })}
+                    <p className="flex flex-wrap items-center gap-1.5 pt-1 text-[11.5px] font-semibold">
+                      <span className="rounded-full px-2.5 py-1 bg-brand-navy/10 text-brand-navy dark:bg-brand-gold/15 dark:text-brand-gold">{gradeLabel(grade)}</span>
+                      <span className="rounded-full px-2.5 py-1 bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200">
+                        {tr("{count} halaqa|{count} halaqas", { count: inGrade.length })}
+                      </span>
+                      <span className="rounded-full px-2.5 py-1 bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
+                        {tr("{count} student|{count} students", { count: inGrade.reduce((n, h) => n + countOf(h), 0) })}
+                      </span>
                     </p>
                   )}
                   <ul className="divide-y divide-surface-border">{inGrade.map(renderHalaqa)}</ul>
