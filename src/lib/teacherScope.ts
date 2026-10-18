@@ -1,6 +1,7 @@
 import type { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { gradeLabel } from "@/lib/grades";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
 import { loadCampuses } from "@/lib/schoolStructure";
 
 type Db = ReturnType<typeof createClient>;
@@ -65,13 +66,13 @@ export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
     // Their halaqas at the school they're in now.
     if (h.school_id !== me.school_id || groups.has(h.id)) continue;
     const label = graded
-      ? [gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
+      ? [isProgramHalaqa(h.name) ? null : gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
       : h.name;
     groups.set(h.id, {
       id: h.id,
       label,
       studentIds: [...new Set((h.class_enrollments ?? []).map((e) => e.student_id))],
-      grade: graded ? h.grade ?? null : null,
+      grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
       campus: graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null,
     });
   }
@@ -108,9 +109,10 @@ async function myHalaqasStepByStep(supabase: Db, userId: string): Promise<MyHala
     const campus = graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null;
     groups.set(h.id, {
       id: h.id,
-      label: graded ? [gradeLabel(h.grade as number), campus, h.name].filter(Boolean).join(" · ") : h.name,
+      // A Hifd program isn't for one grade, whatever grade it's stored under.
+      label: graded ? [isProgramHalaqa(h.name) ? null : gradeLabel(h.grade as number), campus, h.name].filter(Boolean).join(" · ") : h.name,
       studentIds: [],
-      grade: graded ? h.grade ?? null : null,
+      grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
       campus,
     });
   }

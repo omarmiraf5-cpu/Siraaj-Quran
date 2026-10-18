@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { GRADES, gradeLabel } from "@/lib/grades";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
 import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
 import { allRows } from "@/lib/rosterExport";
 import { addDays } from "@/lib/planDates";
@@ -168,7 +169,7 @@ export default function StudentAttendancePage() {
   const campusName = (id: string | null) => campuses.find((c) => c.id === id)?.name ?? null;
   const halaqaById = useMemo(() => new Map(halaqas.map((h) => [h.id, h])), [halaqas]);
   const halaqaLabel = (h: Halaqa, withGrade = true) =>
-    [withGrade && graded && h.grade !== null ? gradeLabel(h.grade) : null, campusName(h.campusId), h.name].filter(Boolean).join(" · ");
+    [withGrade && graded && h.grade !== null && !isProgramHalaqa(h.name) ? gradeLabel(h.grade) : null, campusName(h.campusId), h.name].filter(Boolean).join(" · ");
   const placeOf = (s: Student, withGrade = true) => {
     const h = s.halaqaId ? halaqaById.get(s.halaqaId) : undefined;
     return h

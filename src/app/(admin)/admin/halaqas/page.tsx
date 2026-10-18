@@ -467,8 +467,12 @@ export default function AdminHalaqasPage() {
       .map((p) => ({
         ...p,
         grades: graded
-          ? GRADES.map((g) => ({ grade: g as number | null, halaqas: p.halaqas.filter((h) => (h.grade ?? 0) === g) })).filter((x) => x.halaqas.length > 0)
-          : [{ grade: null, halaqas: p.halaqas }],
+          ? [
+              // A Hifd program isn't for one grade: it has a group of its own.
+              { grade: null as number | null, program: true, halaqas: p.halaqas.filter((h) => isProgramHalaqa(h.name)) },
+              ...GRADES.map((g) => ({ grade: g as number | null, program: false, halaqas: p.halaqas.filter((h) => !isProgramHalaqa(h.name) && (h.grade ?? 0) === g) })),
+            ].filter((x) => x.halaqas.length > 0)
+          : [{ grade: null, program: false, halaqas: p.halaqas }],
       }));
   })();
 
@@ -732,8 +736,17 @@ export default function AdminHalaqasPage() {
             note={`${tr("{count} halaqa|{count} halaqas", { count: section.halaqas.length })} · ${tr("{count} student|{count} students", { count: section.halaqas.reduce((n, h) => n + countOf(h), 0) })}`}
           >
             <div className="space-y-4 -my-1">
-              {section.grades.map(({ grade, halaqas: inGrade }) => (
-                <div key={grade ?? "all"}>
+              {section.grades.map(({ grade, program, halaqas: inGrade }) => (
+                <div key={program ? "hifd" : grade ?? "all"}>
+                  {program && (
+                    <p className="flex flex-wrap items-center gap-1.5 pt-1 text-[11.5px] font-semibold">
+                      <span className="rounded-full px-2.5 py-1 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">{tr("Hifd programs")}</span>
+                      <span className="rounded-full px-2.5 py-1 bg-brand-navy/10 text-brand-navy dark:bg-brand-gold/15 dark:text-brand-gold">{tr("Every grade")}</span>
+                      <span className="rounded-full px-2.5 py-1 bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
+                        {tr("{count} student|{count} students", { count: inGrade.reduce((n, h) => n + countOf(h), 0) })}
+                      </span>
+                    </p>
+                  )}
                   {grade != null && (
                     <p className="flex flex-wrap items-center gap-1.5 pt-1 text-[11.5px] font-semibold">
                       <span className="rounded-full px-2.5 py-1 bg-brand-navy/10 text-brand-navy dark:bg-brand-gold/15 dark:text-brand-gold">{gradeLabel(grade)}</span>
