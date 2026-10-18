@@ -79,6 +79,9 @@ export const AR: Record<string, string> = {
   "login.pinResting": "محاولات خاطئة كثيرة. انتظر {minutes} دقيقة، أو اسأل معلمك.",
   "login.pinTriesLeft": "رمز الدخول غير صحيح. بقيت لك {n} محاولات، ثم انتظر قليلًا.",
   "login.pinDidntWork": "رمز الدخول غير صحيح. حاول مرة أخرى.",
+  "login.pinBusy": "كثيرون يسجلون الدخول في الوقت نفسه. انتظر دقيقة ثم جرّب رمزك مرة أخرى.",
+  "login.pinOffline": "تعذّر الاتصال بمديواني. تحقق من الإنترنت ثم حاول مرة أخرى.",
+  "login.pinNotReady": "تسجيل دخولك غير جاهز بعد. اسأل معلمك.",
   "login.demoAutofill": "تجريبي — اضغط للتعبئة التلقائية",
 
   "changePassword.titleRequired": "تعيين كلمة المرور",

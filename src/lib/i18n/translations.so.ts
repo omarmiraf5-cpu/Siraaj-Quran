@@ -79,6 +79,9 @@ export const SO: Record<string, string> = {
   "login.pinResting": "PIN qalad ah oo badan. Sug {minutes} daqiiqo, ama weydii macallinkaaga.",
   "login.pinTriesLeft": "Lambarkaas ma shaqeynin. {n} isku day ayaa kuu haray.",
   "login.pinDidntWork": "Lambarkaas ma shaqeynin. Isku day mar kale.",
+  "login.pinBusy": "Carruur badan ayaa isla markiiba soo gelaysa. Sug hal daqiiqo, kadibna isku day mar kale.",
+  "login.pinOffline": "Lama gaari karo MyDiiwaan. Hubi internetka, kadibna isku day mar kale.",
+  "login.pinNotReady": "Soo gelistaadu weli diyaar ma aha. Weydii macallinkaaga.",
   "login.demoAutofill": "Tijaabo — taabo si ay iska buuxsadaan",
 
   "changePassword.titleRequired": "Deji furahaaga sirta ah",

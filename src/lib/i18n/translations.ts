@@ -115,6 +115,9 @@ export const translations: Partial<Record<Language, Record<string, string>>> & {
     "login.pinResting": "Too many wrong PINs. Wait {minutes} minutes, or ask your teacher.",
     "login.pinTriesLeft": "That PIN didn't work. {n} more tries, then wait a little.",
     "login.pinDidntWork": "That PIN didn't work. Try again.",
+    "login.pinBusy": "Lots of children are signing in at once. Wait a minute, then try your PIN again.",
+    "login.pinOffline": "Couldn't reach MyDiiwaan. Check the internet, then try again.",
+    "login.pinNotReady": "Your sign-in isn't ready yet. Ask your teacher.",
     "login.demoAutofill": "Demo — tap to auto-fill",
 
     "changePassword.titleRequired": "Set your password",
