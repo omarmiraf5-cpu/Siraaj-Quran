@@ -260,7 +260,7 @@ export default function StudentAttendancePage() {
       <PortalHero
         eyebrow={tr("Registers")}
         title={t("nav.studentAttendance")}
-        meta={[formatDay(day, language), tr("{count} student|{count} students", { count: shown.length }), unmarked > 0 ? tr("{count} not marked", { count: unmarked }) : tr("everyone marked")]}
+        meta={[formatDay(day, language), tr("{count} student|{count} students", { count: shown.length }), unmarked > 0 ? { text: tr("{count} not marked", { count: unmarked }), tone: "amber" as const } : { text: tr("everyone marked"), tone: "green" as const }]}
       />
 
       <div className="flex flex-wrap items-center gap-2" data-section="filters">

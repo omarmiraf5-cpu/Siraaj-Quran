@@ -300,7 +300,7 @@ export default function AdminPaymentsPage() {
         title={tr("Payments")}
         meta={
           tab === "fees"
-            ? [tr("{amount} collected", { amount: money(collected) }), tr("{amount} outstanding", { amount: money(outstanding) })]
+            ? [{ text: tr("{amount} collected", { amount: money(collected) }), tone: "green" as const }, { text: tr("{amount} outstanding", { amount: money(outstanding) }), tone: "amber" as const }]
             : tab === "overview"
               ? [tr("{amount} outstanding", { amount: money(balanceFor(fees, monthOf(todayIso())).outstanding) }), tr("Fees, salaries and expenses together")]
               : [tab === "salaries" ? tr("What the school pays its staff") : tr("What the school spends")]

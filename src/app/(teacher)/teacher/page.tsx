@@ -292,7 +292,10 @@ export default function TeacherDashboard() {
         meta={[
           formatDay(today, language),
           inTodayText,
-          countLabel("{count} to review|{count} to review", review.length, `${review.length} ${t("common.toReview")}`),
+          {
+            text: countLabel("{count} to review|{count} to review", review.length, `${review.length} ${t("common.toReview")}`),
+            tone: review.length > 0 ? ("amber" as const) : ("green" as const),
+          },
         ]}
         actions={
           <>

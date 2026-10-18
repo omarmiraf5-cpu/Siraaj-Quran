@@ -3,6 +3,29 @@
 // idea of a page header — a plain sans heading here, a teal gradient there —
 // and switching portals felt like switching products.
 
+import { isValidElement } from "react";
+
+/** A banner fact's colour. Warm ones carry meaning (green is good, amber needs a look, red is a problem); the rest are just to tell the facts apart. */
+export type HeroTone = "plain" | "sky" | "teal" | "violet" | "green" | "amber" | "red" | "gold";
+export type HeroFact = React.ReactNode | { text: React.ReactNode; tone: HeroTone };
+
+const CHIP: Record<HeroTone, string> = {
+  plain: "bg-white/10 text-white/80",
+  sky: "bg-sky-300/15 text-sky-100",
+  teal: "bg-teal-300/15 text-teal-100",
+  violet: "bg-violet-300/15 text-violet-100",
+  green: "bg-emerald-400/20 text-emerald-100",
+  amber: "bg-amber-300/20 text-amber-100",
+  red: "bg-red-400/25 text-red-100",
+  gold: "bg-brand-gold/25 text-brand-gold-light",
+};
+// Facts without a tone of their own: the first plain, then a few cool colours.
+const BY_POSITION: HeroTone[] = ["plain", "sky", "teal", "violet"];
+
+function isToned(m: HeroFact): m is { text: React.ReactNode; tone: HeroTone } {
+  return typeof m === "object" && m !== null && !isValidElement(m) && !Array.isArray(m) && "tone" in m && "text" in m;
+}
+
 export function PortalHero({
   eyebrow,
   title,
@@ -14,7 +37,7 @@ export function PortalHero({
   eyebrow: string;
   title: string;
   /** Short facts under the title, joined with gold separators. */
-  meta?: React.ReactNode[];
+  meta?: HeroFact[];
   /** Key numbers, large in gold under the title: "7 total · 7 active". */
   stats?: Array<{ value: React.ReactNode; label: string }>;
   actions?: React.ReactNode;
@@ -28,13 +51,16 @@ export function PortalHero({
           <p className="eyebrow text-white/45">{eyebrow}</p>
           <h1 className="page-title text-white text-3xl mt-1.5">{title}</h1>
           {meta && meta.length > 0 && (
-            <p className="text-[13px] text-white/55 mt-2.5">
-              {meta.map((m, i) => (
-                <span key={i}>
-                  {i > 0 && <span className="text-white/25 mx-2">·</span>}
-                  {m}
-                </span>
-              ))}
+            <p className="flex flex-wrap items-center gap-1.5 mt-3">
+              {meta.map((m, i) => {
+                const toned = isToned(m);
+                const tone = toned ? m.tone : BY_POSITION[i % BY_POSITION.length];
+                return (
+                  <span key={i} className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-medium leading-tight ${CHIP[tone]}`}>
+                    {toned ? m.text : m}
+                  </span>
+                );
+              })}
             </p>
           )}
           {stats && stats.length > 0 && (

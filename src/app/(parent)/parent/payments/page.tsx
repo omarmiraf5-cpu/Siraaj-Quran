@@ -94,8 +94,8 @@ export default function ParentPaymentsPage() {
         title={t("nav.payments")}
         meta={
           outstanding > 0
-            ? [`${money(outstanding)} ${t("common.outstanding").toLowerCase()}`]
-            : [t("common.allPaidUp")]
+            ? [{ text: `${money(outstanding)} ${t("common.outstanding").toLowerCase()}`, tone: "amber" as const }]
+            : [{ text: t("common.allPaidUp"), tone: "green" as const }]
         }
       />
 

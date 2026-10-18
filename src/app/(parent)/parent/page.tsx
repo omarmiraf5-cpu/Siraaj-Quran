@@ -100,14 +100,20 @@ export default function ParentDashboard() {
         title={demoUser?.name ?? t("role.parent")}
         meta={[
           formatDay(today, language),
-          `${child.name.split(" ")[0]} ${t("common.was")} ${
-            todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
-          } ${t("common.today")}`,
-          countLabel(
-            "{count} piece of work open|{count} pieces of work open",
-            active.length,
-            active.length === 1 ? t("common.pieceOfWorkOpenOne") : `${active.length} ${t("common.pieceOfWorkOpenOther")}`,
-          ),
+          {
+            text: `${child.name.split(" ")[0]} ${t("common.was")} ${
+              todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
+            } ${t("common.today")}`,
+            tone: todayStatus === "present" ? ("green" as const) : todayStatus === "late" ? ("amber" as const) : todayStatus === "absent" ? ("red" as const) : ("plain" as const),
+          },
+          {
+            text: countLabel(
+              "{count} piece of work open|{count} pieces of work open",
+              active.length,
+              active.length === 1 ? t("common.pieceOfWorkOpenOne") : `${active.length} ${t("common.pieceOfWorkOpenOther")}`,
+            ),
+            tone: active.length > 0 ? ("amber" as const) : ("green" as const),
+          },
         ]}
         actions={
           <>

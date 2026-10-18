@@ -398,7 +398,9 @@ export default function TeacherAttendancePage() {
           formatDay(today, language),
           ...(halaqa ? [halaqa.label] : []),
           countLabel("{count} student|{count} students", roster.length, `${roster.length} ${t("common.students")}`),
-          remaining > 0 ? countLabel("{count} still to mark|{count} still to mark", remaining, `${remaining} ${t("teacher.attendance.stillToMark")}`) : t("teacher.attendance.everyoneMarked"),
+          remaining > 0
+            ? { text: countLabel("{count} still to mark|{count} still to mark", remaining, `${remaining} ${t("teacher.attendance.stillToMark")}`), tone: "amber" as const }
+            : { text: t("teacher.attendance.everyoneMarked"), tone: "green" as const },
         ]}
       />
 
