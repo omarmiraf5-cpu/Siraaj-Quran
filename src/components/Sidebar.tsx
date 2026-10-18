@@ -5,11 +5,13 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { pillSpring } from "@/lib/motion-config";
+import { ColorTile, type ArtName } from "@/components/gem-icons";
 
 export type SidebarLink = {
   href: string;
   label: string;
   mark?: LucideIcon;
+  art?: ArtName;
   glyph?: ReactNode;
 };
 
@@ -34,8 +36,8 @@ export function Sidebar({
             href={item.href}
             title={item.label}
             aria-current={active ? "page" : undefined}
-            className={`relative flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-semibold text-[#102A56] ${
-              active ? "bg-[#F4F4F6]" : "hover:bg-slate-100"
+            className={`relative flex items-center gap-3 min-h-12 px-2.5 rounded-xl text-sm font-semibold text-[#102A56] ${
+              active ? "bg-[#F3EFE3]" : "hover:bg-[#F4F1E8]"
             }`}
           >
             {active && (
@@ -45,8 +47,14 @@ export function Sidebar({
                 transition={reduce ? { duration: 0 } : pillSpring}
               />
             )}
-            {Icon ? <Icon size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : item.glyph}
-            <span className="hidden md:inline truncate">{item.label}</span>
+            {item.art ? (
+              <ColorTile name={item.art} size={32} />
+            ) : Icon ? (
+              <Icon size={20} strokeWidth={1.75} color="#102A56" aria-hidden />
+            ) : (
+              item.glyph
+            )}
+            <span className="truncate">{item.label}</span>
           </Link>
         );
       })}

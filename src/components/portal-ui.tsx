@@ -11,6 +11,7 @@ import type { LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { StatCard } from "@/components/StatCard";
 import type { IconTone } from "@/components/IconBadge";
+import type { ArtName } from "@/components/gem-icons";
 import {
   ATTENDANCE_DOT,
   DAILY_RATING_DOT,
@@ -228,6 +229,7 @@ export function StatTile({
   sub,
   icon,
   mark,
+  art,
   accent = "navy",
   onClick,
 }: {
@@ -237,6 +239,8 @@ export function StatTile({
   icon?: React.ReactNode;
   /** Lucide glyph drawn in a toned badge. Replaces the gold medallion. */
   mark?: LucideIcon;
+  /** Illustrated gem. Preferred over mark. */
+  art?: ArtName;
   /** Kept so older call sites that passed a palette index still typecheck. */
   tone?: number;
   accent?: IconTone;
@@ -244,8 +248,8 @@ export function StatTile({
 }) {
   const reduce = useReducedMotion();
   const display = useCountUp(value);
-  if (mark) {
-    return <StatCard icon={mark} tone={accent} value={display} label={label} pill={sub} />;
+  if (art || mark) {
+    return <StatCard icon={mark} art={art} tone={accent} value={display} label={label} pill={sub} onClick={onClick} />;
   }
   const pct = typeof value === "string" && value.endsWith("%") ? Number(value.replace("%", "")) : null;
   const body = (

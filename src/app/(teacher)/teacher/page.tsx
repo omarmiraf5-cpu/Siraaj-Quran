@@ -28,7 +28,8 @@ import {
   LoadingNote,
   avatarTone,
 } from "@/components/portal-ui";
-import { IconBook, IconCalendar, IconClock, IconPen, IconArrow, IconUsers, IconCheck } from "@/components/icons";
+import { IconBook, IconArrow } from "@/components/icons";
+import { ColorGlyph, QuickActions } from "@/components/gem-icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
@@ -212,13 +213,13 @@ export default function TeacherDashboard() {
         ]}
         actions={
           <>
-            <HeroButtonPrimary href="/teacher/attendance" icon={<IconCalendar />}>
+            <HeroButtonPrimary href="/teacher/attendance" icon={<ColorGlyph name="calendarCheck" size={18} />}>
               {t("common.register")}
             </HeroButtonPrimary>
-            <HeroButtonGhost href="/teacher/quran-assignments" icon={<IconPen />}>
+            <HeroButtonGhost href="/teacher/quran-assignments" icon={<ColorGlyph name="pen" size={18} />}>
               {t("common.assign")}
             </HeroButtonGhost>
-            <HeroButtonGhost href="/teacher/my-attendance" icon={<IconClock />}>
+            <HeroButtonGhost href="/teacher/my-attendance" icon={<ColorGlyph name="clock" size={18} />}>
               {t("nav.signIn")}
             </HeroButtonGhost>
           </>
@@ -233,6 +234,17 @@ export default function TeacherDashboard() {
 
       {/* Signing in on arrival — the first thing a teacher does, so it sits
           straight under the greeting rather than on a page of its own. */}
+      <QuickActions
+        items={[
+          { href: "/teacher/attendance", art: "calendarCheck", label: t("common.register") },
+          { href: "/teacher/quran-assignments", art: "pen", label: t("common.assign") },
+          { href: "/teacher/my-attendance", art: "clock", label: t("nav.signIn") },
+          { href: "/teacher/qaidah", art: "book", label: t("nav.qaidah") },
+          { href: "/teacher/messages", art: "mail", label: t("nav.messages") },
+          { href: "/teacher/class-work", art: "globe", label: t("nav.classWork") },
+        ]}
+      />
+
       {staffMode !== "loading" && <SignInCard api={staffApi} />}
 
       {/* At a glance — each number carries the context that makes it mean
@@ -243,7 +255,7 @@ export default function TeacherDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
           tone={0}
-          icon={<IconUsers size={18} />}
+          art="people"
           value={students.length}
           label={t("nav.students")}
           sub={halaqas
@@ -257,7 +269,7 @@ export default function TeacherDashboard() {
         />
         <StatTile
           tone={1}
-          icon={<IconPen size={18} />}
+          art="pen"
           value={active.length}
           label={t("common.activeWork")}
           sub={dueThisWeek > 0 ? countLabel("{count} due this week|{count} due this week", dueThisWeek, `${dueThisWeek} ${t("common.dueThisWeek")}`) : t("common.nothingDueThisWeek")}
@@ -265,7 +277,7 @@ export default function TeacherDashboard() {
         />
         <StatTile
           tone={2}
-          icon={<IconBook size={18} />}
+          art="book"
           value={review.length}
           label={t("common.toReview")}
           sub={reviewDue ? `${t("common.oldestDue")} ${formatDay(reviewDue, language)}` : t("common.allClear")}
@@ -273,7 +285,7 @@ export default function TeacherDashboard() {
         />
         <StatTile
           tone={3}
-          icon={<IconCheck size={18} />}
+          art="check"
           value={`${avgAttendance}%`}
           label={t("common.attendanceStat")}
           sub={countLabel("{inToday} of {count} in today", students.length, `${inToday} ${t("common.of")} ${students.length} ${t("common.inToday")}`, { inToday })}

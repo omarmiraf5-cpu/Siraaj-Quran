@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
 import { Segmented, SkeletonRows, SkeletonStats, SpotlightButton, useToast } from "@/components/motion-ui";
-import { Clock3, Flag, UserCheck, UserX } from "lucide-react";
 import { StatusPill, currentPosition, timesLine, useAttendanceApi, statusLabel } from "@/components/attendance-ui";
 import {
   REASON_LABEL,
@@ -102,7 +101,7 @@ interface CampusPlace {
 const RADII = [100, 150, 250, 500];
 const input =
   "field-glow w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-[14px] text-ink";
-const primary = "btn btn-primary disabled:opacity-40";
+const primary = "btn btn-amber disabled:opacity-40";
 const ghost = "btn btn-secondary disabled:opacity-40";
 
 export default function StaffAttendancePage() {
@@ -184,10 +183,10 @@ export default function StaffAttendancePage() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile mark={UserCheck} accent="green" value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
-        <StatTile mark={Clock3} accent="amber" value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
-        <StatTile mark={UserX} accent="red" value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
-        <StatTile mark={Flag} accent="navy" value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
+        <StatTile art="check" accent="green" value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
+        <StatTile art="clock" accent="amber" value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
+        <StatTile art="pin" accent="red" value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
+        <StatTile art="megaphone" accent="navy" value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
       </div>
 
       <SectionCard title={tr("Today")} note={tr("Staff due {formatClock} · {grace_minutes} min grace", { formatClock: formatClock(data.settings.start_time), grace_minutes: data.settings.grace_minutes })}>
@@ -749,7 +748,7 @@ function SettingsCard({
       {error && <p role="alert" className="text-[12.5px] text-red-700 dark:text-red-300 mt-3">{error}</p>}
       <div className="mt-4 flex justify-end gap-2.5">
         {onCancel && (
-          <button type="button" onClick={onCancel} className={ghost} disabled={busy !== ""}>
+          <button type="button" onClick={onCancel} className="btn btn-ghost disabled:opacity-40" disabled={busy !== ""}>
             {tr("Cancel")}
           </button>
         )}

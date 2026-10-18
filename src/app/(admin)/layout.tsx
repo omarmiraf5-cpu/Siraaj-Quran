@@ -2,51 +2,38 @@
 
 import { SidebarNav } from "@/components/SidebarNav";
 import { PageFade } from "@/components/motion-ui";
-import {
-  BookOpen,
-  CalendarCheck,
-  CalendarDays,
-  ClipboardCheck,
-  GraduationCap,
-  Languages,
-  LayoutDashboard,
-  Megaphone,
-  Presentation,
-  UserRound,
-  Users,
-  Wallet,
-} from "lucide-react";
+import type { ArtName } from "@/components/gem-icons";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
 import { useMyChildren } from "@/hooks/useMyChildren";
 
-const NAV = [
-  { href: "/admin", labelKey: "nav.dashboard", mark: LayoutDashboard },
-  { href: "/admin/students", labelKey: "nav.students", mark: GraduationCap },
-  { href: "/admin/teachers", labelKey: "nav.teachers", mark: Presentation },
-  { href: "/admin/student-attendance", labelKey: "nav.studentAttendance", mark: CalendarCheck },
-  { href: "/admin/staff-attendance", labelKey: "nav.staffAttendance", mark: ClipboardCheck },
-  { href: "/admin/parents", labelKey: "nav.parents", mark: Users },
-  { href: "/admin/halaqas", labelKey: "nav.halaqas", mark: BookOpen },
-  { href: "/admin/class-work", labelKey: "nav.classWork", mark: Languages },
-  { href: "/admin/payments", labelKey: "nav.payments", mark: Wallet },
-  { href: "/admin/announcements", labelKey: "nav.announcements", mark: Megaphone },
-  { href: "/admin/calendar", labelKey: "nav.calendar", mark: CalendarDays },
-  { href: "/account", labelKey: "nav.account", mark: UserRound },
+const NAV: { href: string; labelKey: string; art: ArtName }[] = [
+  { href: "/admin", labelKey: "nav.dashboard", art: "keypad" },
+  { href: "/admin/students", labelKey: "nav.students", art: "person" },
+  { href: "/admin/teachers", labelKey: "nav.teachers", art: "book" },
+  { href: "/admin/student-attendance", labelKey: "nav.studentAttendance", art: "calendarCheck" },
+  { href: "/admin/staff-attendance", labelKey: "nav.staffAttendance", art: "clock" },
+  { href: "/admin/parents", labelKey: "nav.parents", art: "people" },
+  { href: "/admin/halaqas", labelKey: "nav.halaqas", art: "mosque" },
+  { href: "/admin/class-work", labelKey: "nav.classWork", art: "globe" },
+  { href: "/admin/payments", labelKey: "nav.payments", art: "cash" },
+  { href: "/admin/announcements", labelKey: "nav.announcements", art: "megaphone" },
+  { href: "/admin/calendar", labelKey: "nav.calendar", art: "calendar" },
+  { href: "/account", labelKey: "nav.account", art: "person" },
 ];
 
 // For an admin who also teaches a halaqa: their teacher's pages.
 const MY_HALAQA = {
   href: "/teacher",
   labelKey: "nav.myHalaqa",
-  mark: BookOpen,
+  art: "mosque" as ArtName,
 };
 
 // For an admin who is also a parent of a child here: their children, as a parent.
 const PARENT_MODE = {
   href: "/parent",
   labelKey: "nav.parentMode",
-  mark: Users,
+  art: "people" as ArtName,
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -31,7 +31,7 @@ import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
-import { BookOpen, CalendarCheck, GraduationCap, Presentation } from "lucide-react";
+import { QuickActions } from "@/components/gem-icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
@@ -245,11 +245,22 @@ export default function AdminDashboard() {
           days running, a teacher reporting an absence. */}
       {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
 
+      <QuickActions
+        items={[
+          { href: "/admin/students", art: "person", label: t("nav.students") },
+          { href: "/admin/student-attendance", art: "calendarCheck", label: t("nav.studentAttendance") },
+          { href: "/admin/halaqas", art: "mosque", label: t("nav.halaqas") },
+          { href: "/admin/payments", art: "cash", label: t("nav.payments") },
+          { href: "/admin/announcements", art: "megaphone", label: t("nav.announcements") },
+          { href: "/admin/calendar", art: "calendar", label: t("nav.calendar") },
+        ]}
+      />
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile mark={GraduationCap} accent="navy" value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
-        <StatTile mark={Presentation} accent="gold" value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
-        <StatTile mark={BookOpen} accent="navy" value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
-        <StatTile mark={CalendarCheck} accent="green" value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
+        <StatTile art="person" accent="navy" value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
+        <StatTile art="book" accent="gold" value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
+        <StatTile art="mosque" accent="navy" value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
+        <StatTile art="check" accent="green" value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">

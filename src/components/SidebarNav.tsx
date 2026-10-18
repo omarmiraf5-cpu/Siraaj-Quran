@@ -13,9 +13,10 @@ import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBrandin
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
 import type { LucideIcon } from "lucide-react";
-import { LogOut, MoreHorizontal } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { IconSignOut } from "@/components/icons";
 import { Sidebar } from "@/components/Sidebar";
+import { ColorTile, type ArtName } from "@/components/gem-icons";
 
 interface NavItem {
   href: string;
@@ -24,6 +25,8 @@ interface NavItem {
   icon?: React.ReactNode;
   /** A distinct Lucide glyph. When set, this replaces the gold medallion. */
   mark?: LucideIcon;
+  /** Illustrated gem tile. Preferred over mark and icon. */
+  art?: ArtName;
 }
 
 interface SidebarNavProps {
@@ -143,7 +146,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       </header>
 
       {/* ── MOBILE BOTTOM TAB BAR ── */}
-      <div className="hidden">
+      <div className="md:hidden fixed bottom-3 inset-x-3 z-50 safe-area-bottom pointer-events-none">
       <nav className="dock pointer-events-auto mx-auto flex max-w-lg rounded-[28px] p-1.5">
         {primaryItems.map((item) => {
           const active = pathname === item.href;
@@ -152,10 +155,18 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
               key={item.href}
               href={item.href}
               className={`flex-1 flex flex-col items-center justify-center min-h-12 py-1 gap-0.5 rounded-[20px] text-[11px] font-semibold transition-all ${
-                active ? "dock-pill" : "text-ink-muted hover:text-ink"
+                active ? "dock-pill text-[#1c1408]" : "text-ink-muted hover:text-ink"
               }`}
             >
-              {item.mark ? <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]">{item.icon}</span>}
+              <span style={{ opacity: active ? 1 : 0.66 }}>
+                {item.art ? (
+                  <ColorTile name={item.art} size={28} glow={active} />
+                ) : item.mark ? (
+                  <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden />
+                ) : (
+                  <span className="text-[#102A56]">{item.icon}</span>
+                )}
+              </span>
               {t(item.labelKey)}
             </Link>
           );
@@ -166,10 +177,12 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
             className={`flex-1 flex flex-col items-center justify-center min-h-12 py-1 gap-0.5 rounded-[20px] text-[11px] font-semibold transition-all ${
-              moreActive || moreOpen ? "dock-pill" : "text-ink-muted hover:text-ink"
+              moreActive || moreOpen ? "dock-pill text-[#1c1408]" : "text-ink-muted hover:text-ink"
             }`}
           >
-            <MoreHorizontal size={20} strokeWidth={1.75} color="#102A56" aria-hidden />
+            <span style={{ opacity: moreActive || moreOpen ? 1 : 0.66 }}>
+              <ColorTile name="more" size={28} glow={moreActive || moreOpen} />
+            </span>
             {t("common.more")}
           </button>
         )}
@@ -196,7 +209,15 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                     active ? "dock-pill" : "text-ink hover:bg-brand-navy/5"
                   }`}
                 >
-                  {item.mark ? <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]">{item.icon}</span>}
+                  <span style={{ opacity: active ? 1 : 0.66 }}>
+                    {item.art ? (
+                      <ColorTile name={item.art} size={28} glow={active} />
+                    ) : item.mark ? (
+                      <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden />
+                    ) : (
+                      <span className="text-[#102A56]">{item.icon}</span>
+                    )}
+                  </span>
                   {t(item.labelKey)}
                 </Link>
               );
@@ -206,7 +227,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       )}
 
       {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="flex flex-col w-16 md:w-60 min-h-screen sticky top-0 h-screen overflow-y-auto bg-[#FAFAFA] dark:bg-[#101722] text-ink p-2 md:p-3 gap-1 flex-shrink-0 border-e border-black/5 dark:border-white/10">
+      <aside className="hidden md:flex flex-col w-60 min-h-screen sticky top-0 h-screen overflow-y-auto bg-[#F9F8F3] dark:bg-[#101722] text-ink p-3 gap-1 flex-shrink-0 border-e border-[#E4E2DC] dark:border-white/10">
         {/* Logo + branding */}
         <div className="hidden md:flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
           <Crest
@@ -255,8 +276,9 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             items={items.map((item) => ({
               href: item.href,
               label: t(item.labelKey),
-              mark: item.mark,
-              glyph: item.mark ? undefined : <span className="text-[#102A56]">{item.icon}</span>,
+              art: item.art,
+              mark: item.art ? undefined : item.mark,
+              glyph: item.art || item.mark ? undefined : <span className="text-[#102A56]">{item.icon}</span>,
             }))}
           />
         </div>
@@ -266,8 +288,8 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           onClick={handleSignOut}
           className="flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium text-[#102A56] hover:bg-slate-100 transition-colors mt-2"
         >
-          {items.some((item) => item.mark) ? <LogOut size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]"><IconSignOut size={20} /></span>}
-          <span className="hidden md:inline">{t("common.signOut")}</span>
+          {items.some((item) => item.art || item.mark) ? <LogOut size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]"><IconSignOut size={20} /></span>}
+          <span>{t("common.signOut")}</span>
         </button>
 
         {portalLinks && portalLinks.length > 0 && (

@@ -65,7 +65,7 @@ export function HeroButtonPrimary({
   children: React.ReactNode;
 }) {
   return (
-    <a href={href} className="btn btn-accent rounded-full px-4 text-[13px]">
+    <a href={href} className="btn btn-amber rounded-full px-4 text-[13px]">
       {icon}
       {children}
     </a>
@@ -85,7 +85,7 @@ export function HeroButtonGhost({
   return (
     <a
       href={href}
-      className="btn rounded-full border-white/35 bg-white/10 px-4 text-[13px] text-white hover:bg-white/20"
+      className="btn hero-ghost rounded-full px-4 text-[13px]"
     >
       {icon}
       {children}
