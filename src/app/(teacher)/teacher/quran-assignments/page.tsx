@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SURAHS as QURAN, getSurahById, PAGE_STARTS, TOTAL_PAGES, HIZB_STARTS } from "@/data/mushaf-index";
+import { RUB_STARTS } from "@/data/hizb-quarters";
 import { JUZ_STARTS, getJuzRange } from "@/data/juz-index";
 import {
   DEMO_ASSIGNMENTS,
@@ -146,7 +147,9 @@ export default function QuranAssignmentsPage() {
   const [pageTo, setPageTo] = useState("");
   // Or in hizbs (a juz' is two), for muraajah.
   const [hizbStart, setHizbStart] = useState("1");
+  const [hizbQuarter, setHizbQuarter] = useState("1"); // which quarter of that hizb it starts at
   const [hizbCount, setHizbCount] = useState("1");
+  const [hizbUnit, setHizbUnit] = useState<"hizb" | "quarter">("hizb");
   const [juzStart, setJuzStart] = useState("1");
   const [juzCount, setJuzCount] = useState("1");
   // Which way this student works through the mushaf, and where they had
@@ -623,17 +626,18 @@ export default function QuranAssignmentsPage() {
     }
   };
 
-  // Hizbs to ayahs: from where the first begins to the ayah before the one
-  // after the last.
+  // Hizbs or quarters of a hizb to ayahs: from where the first begins to
+  // the ayah before the one after the last.
   const applyHizbRange = () => {
-    const first = Math.max(1, Math.min(60, parseInt(hizbStart) || 1));
-    const count = Math.max(1, Math.min(61 - first, parseInt(hizbCount) || 1));
-    const [s1, a1] = HIZB_STARTS[first - 1];
-    const next = first + count; // the hizb after the last one asked for
+    const hizb = Math.max(1, Math.min(60, parseInt(hizbStart) || 1));
+    const startQuarter = (hizb - 1) * 4 + (Math.max(1, Math.min(4, parseInt(hizbQuarter) || 1)) - 1);
+    const wanted = Math.max(1, parseInt(hizbCount) || 1) * (hizbUnit === "hizb" ? 4 : 1);
+    const next = Math.min(240, startQuarter + wanted); // index of the quarter after the last one asked for
+    const [s1, a1] = RUB_STARTS[startQuarter];
     let sEnd = 114;
     let aEnd = getSurahById(114)?.ayahs ?? 6;
-    if (next <= 60) {
-      const [ns, na] = HIZB_STARTS[next - 1];
+    if (next < 240) {
+      const [ns, na] = RUB_STARTS[next];
       if (na > 1) {
         sEnd = ns;
         aEnd = na - 1;
@@ -1120,9 +1124,9 @@ export default function QuranAssignmentsPage() {
           {/* And in hizbs: half a juz', the other way muraajah is counted. */}
           {portion !== "new" && (
             <div className="rounded-2xl border border-teal-600/25 bg-teal-50/60 dark:bg-teal-950/20 p-3.5">
-              <p className="text-sm font-semibold text-ink mb-2">{tr("Or set by hizb")}</p>
-              <div className="flex items-end gap-2">
-                <label className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-ink mb-2">{tr("Or set by hizb or quarter")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="min-w-0">
                   <span className="block text-[11px] text-ink-muted mb-1">{tr("Starting hizb")}</span>
                   <select
                     value={hizbStart}
@@ -1136,16 +1140,42 @@ export default function QuranAssignmentsPage() {
                     ))}
                   </select>
                 </label>
+                <label className="min-w-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Starting at")}</span>
+                  <select
+                    value={hizbQuarter}
+                    onChange={(e) => setHizbQuarter(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  >
+                    <option value="1">{tr("The start of the hizb")}</option>
+                    <option value="2">{tr("The 2nd quarter (¼ in)")}</option>
+                    <option value="3">{tr("The 3rd quarter (half way)")}</option>
+                    <option value="4">{tr("The 4th quarter (¾ in)")}</option>
+                  </select>
+                </label>
+              </div>
+              <div className="flex items-end gap-2 mt-2">
                 <label className="w-20 flex-shrink-0">
-                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Hizb count")}</span>
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("How many")}</span>
                   <input
                     type="number"
                     min="1"
-                    max="60"
+                    max="240"
                     value={hizbCount}
                     onChange={(e) => setHizbCount(e.target.value)}
                     className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink text-center tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                   />
+                </label>
+                <label className="flex-1 min-w-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Counted in")}</span>
+                  <select
+                    value={hizbUnit}
+                    onChange={(e) => setHizbUnit(e.target.value as "hizb" | "quarter")}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  >
+                    <option value="hizb">{tr("Hizbs")}</option>
+                    <option value="quarter">{tr("Quarters of a hizb")}</option>
+                  </select>
                 </label>
                 <button
                   type="button"
@@ -1156,7 +1186,7 @@ export default function QuranAssignmentsPage() {
                 </button>
               </div>
               <p className="text-[11px] text-ink-muted mt-2">
-                {tr("Fills in the surah and ayahs below. A hizb is half a juz', so two hizbs are one juz'.")}
+                {tr("Fills in the surah and ayahs below. A hizb is half a juz' and has four quarters.")}
               </p>
             </div>
           )}
