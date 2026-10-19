@@ -133,6 +133,7 @@ export default function StudentDashboard() {
     { href: "/student/quran", name: t("nav.quran"), gradient: "student-gradient-teal", icon: <span className="text-3xl" aria-hidden>📖</span>, progress: quranProgress },
     { href: "/student/assignments", name: t("nav.work"), gradient: "student-gradient-blue", icon: <span className="text-3xl" aria-hidden>📝</span>, progress: null as number | null },
     { href: "/student/learn", name: t("nav.learn"), gradient: "student-gradient-indigo", icon: <span className="text-3xl" aria-hidden>🎨</span>, progress: null as number | null },
+    { href: "/student/hadith", name: t("nav.hadith"), gradient: "student-gradient-cyan", icon: <span className="text-3xl" aria-hidden>📜</span>, progress: null as number | null },
     { href: "/student/class-work", name: tr("Islamic & Arabic"), gradient: "student-gradient-orange", icon: <span className="text-3xl" aria-hidden>🕌</span>, progress: null as number | null },
     { href: "/student/attendance", name: t("nav.register"), gradient: "student-gradient-green", icon: <span className="text-3xl" aria-hidden>✅</span>, progress: attendance.length > 0 ? summary.rate : null },
   ];
@@ -237,7 +238,7 @@ export default function StudentDashboard() {
       {/* My subjects — one coloured square each, with a ring where there is a figure to show. */}
       <div className="animate-rise" style={{ animationDelay: "140ms" }}>
         <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">📚 {tr("My subjects")}</h2>
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {subjects.map((sub, i) => {
             const circumference = 2 * Math.PI * 18;
             return (
