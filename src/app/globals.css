@@ -134,10 +134,10 @@
      with. Both now start from the brand navy and travel only far enough to be
      personal. */
   .student-hero-boy {
-    background: linear-gradient(160deg, #17456e 0%, #12385c 50%, #0d2b47 100%);
+    background: linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 55%, #22d3ee 100%);
   }
   .student-hero-girl {
-    background: linear-gradient(160deg, #4a2350 0%, #3c1c46 50%, #2b1435 100%);
+    background: linear-gradient(135deg, #7c3aed 0%, #c026d3 55%, #ec4899 100%);
   }
   /* Cards arrive in sequence rather than all at once. The delay is set
      per-card inline, so the page assembles itself in the order you read it. */

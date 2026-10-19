@@ -1981,4 +1981,8 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Still to do": "المتبقي",
   "Lessons today": "دروس اليوم",
   "Reminder of the day": "تذكير اليوم",
+  "Level {n}": "المستوى {n}",
+  "My badges": "أوسمتي",
+  "Start a streak": "ابدأ سلسلة حضور",
+  "{count} finished": "{count} منتهية|{count} منتهية",
 };

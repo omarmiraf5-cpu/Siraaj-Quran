@@ -130,11 +130,11 @@ export default function StudentDashboard() {
   const levels = assignments.map((a) => a.memorization_level);
   const quranProgress = levels.length > 0 ? levels.reduce((n, v) => n + v, 0) / levels.length : null;
   const subjects = [
-    { href: "/student/quran", name: t("nav.quran"), gradient: "student-gradient-teal", icon: <IconBook size={30} />, progress: quranProgress },
-    { href: "/student/assignments", name: t("nav.work"), gradient: "student-gradient-blue", icon: <IconPen size={30} />, progress: null as number | null },
-    { href: "/student/learn", name: t("nav.learn"), gradient: "student-gradient-purple", icon: <IconPalette size={30} />, progress: null as number | null },
-    { href: "/student/class-work", name: tr("Islamic & Arabic"), gradient: "student-gradient-orange", icon: <IconBookOpen size={30} />, progress: null as number | null },
-    { href: "/student/attendance", name: t("nav.register"), gradient: "student-gradient-pink", icon: <IconCalendar size={30} />, progress: attendance.length > 0 ? summary.rate : null },
+    { href: "/student/quran", name: t("nav.quran"), gradient: "student-gradient-teal", icon: <span className="text-3xl" aria-hidden>📖</span>, progress: quranProgress },
+    { href: "/student/assignments", name: t("nav.work"), gradient: "student-gradient-blue", icon: <span className="text-3xl" aria-hidden>📝</span>, progress: null as number | null },
+    { href: "/student/learn", name: t("nav.learn"), gradient: "student-gradient-purple", icon: <span className="text-3xl" aria-hidden>🎨</span>, progress: null as number | null },
+    { href: "/student/class-work", name: tr("Islamic & Arabic"), gradient: "student-gradient-orange", icon: <span className="text-3xl" aria-hidden>🕌</span>, progress: null as number | null },
+    { href: "/student/attendance", name: t("nav.register"), gradient: "student-gradient-pink", icon: <span className="text-3xl" aria-hidden>✅</span>, progress: attendance.length > 0 ? summary.rate : null },
   ];
   const dailyQuote = DAILY_QUOTES[new Date(`${todayStr}T00:00:00Z`).getUTCDate() % DAILY_QUOTES.length];
 
@@ -145,35 +145,41 @@ export default function StudentDashboard() {
     <div className="px-4 pt-4 pb-4 space-y-5">
       {/* Hero — who you are, what you have earned, and how far to the next
           level, in the order a child reads it. */}
-      <header
-        className={`${theme.hero} rounded-[22px] px-5 py-5 relative overflow-hidden animate-rise`}
-      >
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-
-        <div className="relative flex items-center gap-3.5">
-          <Link href="/account" aria-label={tr("My account")} className="rounded-full active:scale-95 transition-transform">
-            <Avatar name={displayName} />
-          </Link>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] text-white/55">{t("common.asalaamuAlaykum")}</p>
-            <h1 className="page-title text-white text-[26px] leading-tight [overflow-wrap:anywhere]">
-              {firstName}
-            </h1>
+      <header className={`${theme.hero} rounded-3xl px-5 py-5 text-white relative overflow-hidden shadow-lg animate-rise`}>
+        <div className="relative">
+          <div className="flex items-center gap-3 mb-4">
+            <Link
+              href="/account"
+              aria-label={tr("My account")}
+              className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-xl font-bold border border-white/25 flex-shrink-0 active:scale-95 transition-transform"
+            >
+              {displayName.trim().charAt(0).toUpperCase() || "?"}
+            </Link>
+            <div className="flex-1 min-w-0">
+              <p className="text-white/75 text-sm">{t("common.asalaamuAlaykum")} 👋</p>
+              <p className="font-bold text-xl leading-tight [overflow-wrap:anywhere]">{firstName}!</p>
+            </div>
+            <span
+              className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm rounded-2xl px-3.5 py-2 border border-white/25 flex-shrink-0"
+              title={tr("{days} days in a row", { days: streak })}
+            >
+              <span className="text-lg" aria-hidden>🔥</span>
+              <span className="text-sm font-bold tabular-nums">{streak}</span>
+            </span>
           </div>
-          <StreakPill days={streak} />
-        </div>
 
-        <div className="relative mt-4">
-          <LevelBar
-            level={level.level}
-            into={level.into}
-            span={level.span}
-            percent={level.percent}
-            message={levelMessage(level)}
-          />
+          <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/15">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold">⭐ {tr("Level {n}", { n: level.level })}</span>
+              <span className="text-xs text-white/75 tabular-nums"><bdi dir="ltr">{level.into} / {level.span} XP</bdi></span>
+            </div>
+            <div className="h-2.5 bg-white/20 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-yellow-300 to-amber-400 transition-all duration-1000" style={{ width: `${Math.max(0, Math.min(100, level.percent))}%` }} />
+            </div>
+            <p className="text-[11px] text-white/70 mt-2">{levelMessage(level)}</p>
+          </div>
+          <StudentAccountButtons />
         </div>
-
-        <StudentAccountButtons />
       </header>
 
       {/* Dua — a soft amber card straight under the greeting. */}
@@ -189,14 +195,14 @@ export default function StudentDashboard() {
 
       {/* Up next — the one thing to do now: a card with a play button. */}
       <div className="animate-rise" style={{ animationDelay: "100ms" }}>
-        <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">{tr("Up next")}</h2>
+        <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">🎯 {tr("Up next")}</h2>
         {upNext ? (
           <Link
             href="/student/assignments"
             className="group flex items-center gap-4 bg-surface-card rounded-3xl border border-surface-border shadow-card p-4 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.99] transition-all"
           >
             <div className={`w-16 h-16 rounded-2xl ${GRAD_CLASS[upNextOverdue ? "vermilion" : PORTION_COLOUR[upNext.portion]]} flex items-center justify-center text-white flex-shrink-0 shadow-md`}>
-              <IconBookOpen size={28} />
+              <span className="text-3xl" aria-hidden>📖</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[11px] text-ink-muted font-bold tracking-wide uppercase">
@@ -230,7 +236,7 @@ export default function StudentDashboard() {
 
       {/* My subjects — one coloured square each, with a ring where there is a figure to show. */}
       <div className="animate-rise" style={{ animationDelay: "140ms" }}>
-        <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">{tr("My subjects")}</h2>
+        <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">📚 {tr("My subjects")}</h2>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
           {subjects.map((sub, i) => {
             const circumference = 2 * Math.PI * 18;
@@ -268,7 +274,7 @@ export default function StudentDashboard() {
       <div className="grid grid-cols-2 gap-3 animate-rise" style={{ animationDelay: "260ms" }}>
         <Link href="/student/assignments" className="bg-surface-card rounded-3xl border border-surface-border shadow-card p-4 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-verdigris"><IconCheck size={18} /></span>
+            <span className="text-lg" aria-hidden>✅</span>
             <span className="text-[11px] font-bold text-ink-muted tracking-wide uppercase">{tr("Homework")}</span>
           </div>
           <p className="text-3xl font-black text-ink leading-none tabular-nums"><bdi dir="ltr">{homework.length}</bdi></p>
@@ -276,12 +282,30 @@ export default function StudentDashboard() {
         </Link>
         <Link href="/student/assignments" className="bg-surface-card rounded-3xl border border-surface-border shadow-card p-4 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-saffron"><IconTarget size={18} /></span>
+            <span className="text-lg" aria-hidden>📅</span>
             <span className="text-[11px] font-bold text-ink-muted tracking-wide uppercase">{tr("Today")}</span>
           </div>
           <p className="text-3xl font-black text-ink leading-none tabular-nums"><bdi dir="ltr">{todayWork.length}</bdi></p>
           <p className="text-xs text-ink-muted mt-1.5">{tr("Lessons today")}</p>
         </Link>
+      </div>
+
+      {/* My badges — four figures, tap-friendly cards. */}
+      <div className="animate-rise" style={{ animationDelay: "300ms" }}>
+        <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">🏅 {tr("My badges")}</h2>
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { icon: "🔥", label: streak > 0 ? tr("{days} days in a row", { days: streak }) : tr("Start a streak") },
+            { icon: "⭐", label: `${xp.total} XP` },
+            { icon: "📚", label: tr("{count} finished", { count: done.length }) },
+            { icon: "🏆", label: tr("Level {n}", { n: level.level }) },
+          ].map((b) => (
+            <div key={b.icon} className="flex flex-col items-center justify-center gap-1.5 py-4 px-2 rounded-3xl bg-surface-card border border-surface-border shadow-card">
+              <span className="text-4xl" aria-hidden>{b.icon}</span>
+              <span className="text-[10px] text-ink-muted text-center leading-tight font-semibold">{b.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <AchievementsCard studentId={student.id} />
@@ -290,7 +314,7 @@ export default function StudentDashboard() {
 
       {/* Reminder of the day. */}
       <div className="rounded-3xl bg-surface-card border border-surface-border shadow-card px-5 py-5 text-center animate-rise">
-        <p className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-2.5">{tr("Reminder of the day")}</p>
+        <p className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-2.5">🕌 {tr("Reminder of the day")}</p>
         <p className="text-base md:text-lg text-ink font-medium leading-relaxed italic mb-2" dir={language === "ar" ? "rtl" : "ltr"}>
           &ldquo;{language === "ar" ? dailyQuote.ar : dailyQuote.en}&rdquo;
         </p>
