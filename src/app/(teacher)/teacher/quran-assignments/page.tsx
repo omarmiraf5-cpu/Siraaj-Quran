@@ -173,6 +173,8 @@ export default function QuranAssignmentsPage() {
   const [planSummaries, setPlanSummaries] = useState<Record<string, PlanSummaryDto>>({});
   const [confirmingSurah, setConfirmingSurah] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
+  // Whether it's for today's lesson, in class, or homework to do at home.
+  const [forWhen, setForWhen] = useState<"today" | "homework">("today");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -430,6 +432,7 @@ export default function QuranAssignmentsPage() {
       setSpansSurah(false);
       setEndSurah("");
       setDueDate("");
+      setForWhen("today");
       setNotes("");
 
       setTimeout(() => setSuccess(false), 3000);
@@ -670,6 +673,31 @@ export default function QuranAssignmentsPage() {
       setSpansSurah(false);
       setEndSurah("");
     }
+  };
+
+  // Today on this device (the sample school keeps its own fixed day).
+  const todayStr = isDemo ? DEMO_TODAY : new Date().toLocaleDateString("en-CA");
+  const dayAfter = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString("en-CA");
+  };
+  const chooseWhen = (w: "today" | "homework") => {
+    setForWhen(w);
+    // Today's lesson is due today; homework is due a day on, unless a later day is already chosen.
+    setDueDate(w === "today" ? todayStr : dueDate && dueDate > todayStr ? dueDate : dayAfter(todayStr));
+  };
+  // What a set piece of work is: today's, homework, or overdue — read off its dates.
+  const whenOf = (a: QuranicAssignment): { text: string; tone: string } | null => {
+    if (a.status === "completed") return null;
+    const set = (a.assigned_at ?? "").slice(0, 10);
+    if (a.due_date) {
+      if (a.due_date === todayStr) return { text: tr("Today"), tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200" };
+      if (a.due_date > todayStr) return { text: tr("Homework"), tone: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200" };
+      return { text: tr("Overdue"), tone: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200" };
+    }
+    if (set === todayStr) return { text: tr("Today"), tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200" };
+    return set ? { text: tr("Set {day}", { day: formatDay(set, language) }), tone: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-200" } : null;
   };
 
   const canPreview = selectedSurah && ayahStart && ayahEnd;
@@ -1307,13 +1335,36 @@ export default function QuranAssignmentsPage() {
             ))}
 
           <div>
+            <p className="text-sm font-semibold text-ink mb-2">{tr("This is for")}</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["today", "homework"] as const).map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => chooseWhen(w)}
+                  aria-pressed={forWhen === w}
+                  className={`rounded-2xl border px-3 py-2.5 text-center transition ${
+                    forWhen === w ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                  }`}
+                >
+                  <span className="block text-[13px] font-semibold leading-tight">{w === "today" ? tr("Today's lesson") : tr("Homework")}</span>
+                  <span className="block text-[11px] leading-tight mt-0.5 opacity-70">{w === "today" ? tr("Done in class today") : tr("To do at home, by the due date")}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              {tr("Due Date (optional)")}
+              {forWhen === "homework" ? tr("Due Date") : tr("Due Date (optional)")}
             </label>
             <input
               type="date"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(e) => {
+                setDueDate(e.target.value);
+                setForWhen(e.target.value && e.target.value > todayStr ? "homework" : "today");
+              }}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
@@ -1448,6 +1499,12 @@ export default function QuranAssignmentsPage() {
                       <span className="underline decoration-2 underline-offset-2">
                         {PORTION_LABELS[a.portion]}
                       </span>
+                      {(() => {
+                        const w = whenOf(a);
+                        return w ? (
+                          <span className={`ms-2 align-middle text-[10px] font-semibold px-2 py-0.5 rounded-full ${isOpen ? "bg-white/20 text-white" : w.tone}`}>{w.text}</span>
+                        ) : null;
+                      })()}
                     </p>
                     <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                       {rangeLabel}

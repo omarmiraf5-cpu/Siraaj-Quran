@@ -1951,4 +1951,12 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Add students": "إضافة طلاب",
   "They stay in their own halaqa too.": "يبقون في حلقتهم أيضًا.",
   "Add": "إضافة",
+  "Homework": "واجب منزلي",
+  "Overdue": "متأخر",
+  "Set {day}": "حُدّد {day}",
+  "This is for": "هذا لـ",
+  "Today's lesson": "درس اليوم",
+  "Done in class today": "يُنجز في الحصة اليوم",
+  "To do at home, by the due date": "يُنجز في البيت حتى الموعد",
+  "Due Date": "الموعد",
 };
