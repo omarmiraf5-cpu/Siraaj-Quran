@@ -1985,4 +1985,11 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "My badges": "أوسمتي",
   "Start a streak": "ابدأ سلسلة حضور",
   "{count} finished": "{count} منتهية|{count} منتهية",
+  "{name}'s sign-in PIN": "رمز دخول {name}",
+  "Forgotten, or want a new one? Set it here.": "نُسي الرمز أو تريد رمزًا جديدًا؟ عيّنه هنا.",
+  "Done. {name} can sign in with the new PIN now.": "تم. يستطيع {name} الدخول بالرمز الجديد الآن.",
+  "Save new PIN": "حفظ الرمز الجديد",
+  "Couldn't change the PIN. Please try again.": "تعذّر تغيير الرمز. حاول مرة أخرى.",
+  "That isn't your child": "هذا ليس ابنك",
+  "A child and a 4-digit PIN are required": "مطلوب طفل ورمز من 4 أرقام",
 };

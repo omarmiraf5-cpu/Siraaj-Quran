@@ -37,6 +37,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { FeesDueLine } from "@/components/FeesDueLine";
+import { ChildPinCard } from "@/components/ChildPinCard";
 import { ByLanguage } from "@/components/ByLanguage";
 import { CalendarCheck, BookOpen, ClipboardList, Award } from "lucide-react";
 
@@ -193,6 +194,8 @@ export default function ParentDashboard() {
       <AchievementsCard studentId={child.id} studentFirstName={child.name.split(" ")[0]} />
 
       <AnnouncementsFeed audience="parents" />
+
+      <ChildPinCard key={child.id} studentId={child.id} firstName={child.name.split(" ")[0]} demo={mode === "demo"} />
 
       <ChildQaidahCard
         rows={qaidahRows.filter((r) => r.student_id === child.id)}
