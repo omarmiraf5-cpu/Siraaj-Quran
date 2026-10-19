@@ -1944,4 +1944,11 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Hizbs": "أحزاب",
   "Quarters of a hizb": "أرباع الحزب",
   "Fills in the surah and ayahs below. A hizb is half a juz' and has four quarters.": "يملأ السورة والآيات أدناه. الحزب نصف جزء وله أربعة أرباع.",
+  "Couldn't add them. Please try again.": "تعذّرت إضافتهم. حاول مرة أخرى.",
+  "Couldn't take them off. Please try again.": "تعذّرت إزالتهم. حاول مرة أخرى.",
+  "None yet. Add students below.": "لا أحد بعد. أضف طلابًا أدناه.",
+  "Take {name} off": "إزالة {name}",
+  "Add students": "إضافة طلاب",
+  "They stay in their own halaqa too.": "يبقون في حلقتهم أيضًا.",
+  "Add": "إضافة",
 };

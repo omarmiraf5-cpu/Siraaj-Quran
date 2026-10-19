@@ -448,8 +448,41 @@ export default function AdminHalaqasPage() {
   // grades and campuses; by name in the sample school, which has no ids.
   // A halaqa's students, by name.
   const studentsOf = (h: DemoHalaqa) =>
-    (isDemo ? studentsInHalaqa(h.name, students) : students.filter((s) => s.halaqaId === h.id || s.programs?.some((p) => p.id === h.id))).sort((a, b) => a.name.localeCompare(b.name));
+    (isDemo
+      ? [...studentsInHalaqa(h.name, students), ...students.filter((s) => s.programs?.some((p) => p.id === h.id))]
+      : students.filter((s) => s.halaqaId === h.id || s.programs?.some((p) => p.id === h.id))
+    ).sort((a, b) => a.name.localeCompare(b.name));
   const countOf = (h: DemoHalaqa) => studentsOf(h).length;
+
+  // A Hifd program is beside a student's own halaqa, so students are put in it
+  // and taken out of it from here, without touching the halaqa they're in.
+  const [programSearch, setProgramSearch] = useState("");
+  const [programNote, setProgramNote] = useState<string | null>(null);
+  const addToProgram = async (h: DemoHalaqa, s: DemoStudent) => {
+    setProgramNote(null);
+    try {
+      if (!isDemo) {
+        const { error } = await supabase.from("class_enrollments").insert({ class_id: h.id, student_id: s.id });
+        if (error && error.code !== "23505") throw error;
+      }
+      setStudents((now) => now.map((x) => (x.id === s.id ? { ...x, programs: [...(x.programs ?? []).filter((p) => p.id !== h.id), { id: h.id, name: h.name }] } : x)));
+      setProgramSearch("");
+    } catch {
+      setProgramNote(tr("Couldn't add them. Please try again."));
+    }
+  };
+  const removeFromProgram = async (h: DemoHalaqa, s: DemoStudent) => {
+    setProgramNote(null);
+    try {
+      if (!isDemo) {
+        const { error } = await supabase.from("class_enrollments").delete().eq("class_id", h.id).eq("student_id", s.id);
+        if (error) throw error;
+      }
+      setStudents((now) => now.map((x) => (x.id === s.id ? { ...x, programs: (x.programs ?? []).filter((p) => p.id !== h.id) } : x)));
+    } catch {
+      setProgramNote(tr("Couldn't take them off. Please try again."));
+    }
+  };
   const placed = isDemo ? students.length : students.filter((s) => s.halaqaId).length;
 
   // An academic school's halaqas: by campus (when it has them), then grade.
@@ -551,20 +584,72 @@ export default function AdminHalaqasPage() {
                 {tr("{count} student in this halaqa|{count} students in this halaqa", { count })}
               </p>
               {count === 0 ? (
-                <p className="text-[11.5px] text-ink-muted">{tr("None yet. Put students in a halaqa from the Students page.")}</p>
+                <p className="text-[11.5px] text-ink-muted">
+                  {isProgramHalaqa(h.name) ? tr("None yet. Add students below.") : tr("None yet. Put students in a halaqa from the Students page.")}
+                </p>
               ) : (
                 <ul className="flex flex-wrap gap-1.5">
                   {studentsOf(h).map((s) => (
                     <li
                       key={s.id}
-                      className={`text-[12px] rounded-full border border-surface-border bg-surface-card px-2.5 py-1 ${
-                        s.active === false ? "text-ink-muted line-through" : "text-ink"
-                      }`}
+                      className={`text-[12px] rounded-full border border-surface-border bg-surface-card ps-2.5 py-1 inline-flex items-center gap-1 ${
+                        isProgramHalaqa(h.name) ? "pe-1" : "pe-2.5"
+                      } ${s.active === false ? "text-ink-muted line-through" : "text-ink"}`}
                     >
                       {s.name}
+                      {isProgramHalaqa(h.name) && (
+                        <button
+                          type="button"
+                          onClick={() => removeFromProgram(h, s)}
+                          aria-label={tr("Take {name} off", { name: s.name })}
+                          className="w-5 h-5 rounded-full text-ink-muted hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950/40 flex items-center justify-center text-[13px] leading-none"
+                        >
+                          ×
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
+              )}
+              {isProgramHalaqa(h.name) && (
+                <div className="mt-3 rounded-xl border border-surface-border bg-surface-card p-3">
+                  <p className="text-xs font-semibold text-ink mb-1.5">{tr("Add students")}</p>
+                  <input
+                    value={programSearch}
+                    onChange={(e) => setProgramSearch(e.target.value)}
+                    placeholder={tr("Search a student…")}
+                    className={smallField}
+                  />
+                  <p className="text-[11px] text-ink-muted mt-1.5">{tr("They stay in their own halaqa too.")}</p>
+                  {programSearch.trim().length > 0 && (
+                    <ul className="mt-2 divide-y divide-surface-border max-h-60 overflow-y-auto">
+                      {students
+                        .filter(
+                          (s) =>
+                            s.active !== false &&
+                            !studentsOf(h).some((x) => x.id === s.id) &&
+                            s.name.toLowerCase().includes(programSearch.trim().toLowerCase())
+                        )
+                        .slice(0, 12)
+                        .map((s) => (
+                          <li key={s.id} className="flex items-center justify-between gap-3 py-2">
+                            <span className="min-w-0">
+                              <span className="block text-[13px] text-ink [overflow-wrap:anywhere]">{s.name}</span>
+                              {s.halaqa && <span className="block text-[11px] text-ink-muted [overflow-wrap:anywhere]">{s.halaqa}</span>}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addToProgram(h, s)}
+                              className="flex-shrink-0 rounded-full gradient-emerald text-white text-[12px] font-semibold px-3.5 py-1.5 hover:opacity-90 active:scale-95 transition"
+                            >
+                              {tr("Add")}
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                  {programNote && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{programNote}</p>}
+                </div>
               )}
             </div>
             {editError && <p className="text-xs text-red-600 dark:text-red-400">{editError}</p>}
