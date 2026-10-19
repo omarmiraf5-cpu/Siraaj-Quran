@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SURAHS as QURAN, getSurahById, PAGE_STARTS, TOTAL_PAGES } from "@/data/mushaf-index";
+import { SURAHS as QURAN, getSurahById, PAGE_STARTS, TOTAL_PAGES, HIZB_STARTS } from "@/data/mushaf-index";
 import { JUZ_STARTS, getJuzRange } from "@/data/juz-index";
 import {
   DEMO_ASSIGNMENTS,
@@ -144,6 +144,9 @@ export default function QuranAssignmentsPage() {
   // Or the range given as mushaf pages (Madinah mushaf, 1 to 604).
   const [pageFrom, setPageFrom] = useState("");
   const [pageTo, setPageTo] = useState("");
+  // Or in hizbs (a juz' is two), for muraajah.
+  const [hizbStart, setHizbStart] = useState("1");
+  const [hizbCount, setHizbCount] = useState("1");
   const [juzStart, setJuzStart] = useState("1");
   const [juzCount, setJuzCount] = useState("1");
   // Which way this student works through the mushaf, and where they had
@@ -620,6 +623,37 @@ export default function QuranAssignmentsPage() {
     }
   };
 
+  // Hizbs to ayahs: from where the first begins to the ayah before the one
+  // after the last.
+  const applyHizbRange = () => {
+    const first = Math.max(1, Math.min(60, parseInt(hizbStart) || 1));
+    const count = Math.max(1, Math.min(61 - first, parseInt(hizbCount) || 1));
+    const [s1, a1] = HIZB_STARTS[first - 1];
+    const next = first + count; // the hizb after the last one asked for
+    let sEnd = 114;
+    let aEnd = getSurahById(114)?.ayahs ?? 6;
+    if (next <= 60) {
+      const [ns, na] = HIZB_STARTS[next - 1];
+      if (na > 1) {
+        sEnd = ns;
+        aEnd = na - 1;
+      } else {
+        sEnd = ns - 1;
+        aEnd = getSurahById(sEnd)?.ayahs ?? 1;
+      }
+    }
+    setSelectedSurah(String(s1));
+    setAyahStart(String(a1));
+    setAyahEnd(String(aEnd));
+    if (sEnd !== s1) {
+      setSpansSurah(true);
+      setEndSurah(String(sEnd));
+    } else {
+      setSpansSurah(false);
+      setEndSurah("");
+    }
+  };
+
   const applyJuzRange = () => {
     const range = getJuzRange(parseInt(juzStart), parseInt(juzCount) || 1, (s) => getSurahById(s)?.ayahs ?? 0);
     setSelectedSurah(String(range.surahStart));
@@ -1079,6 +1113,50 @@ export default function QuranAssignmentsPage() {
               </div>
               <p className="text-[11px] text-ink-muted mt-2">
                 {tr("Fills in the surah and ayahs below — a juz' rarely lines up with a surah's edges, so this often spans more than one.")}
+              </p>
+            </div>
+          )}
+
+          {/* And in hizbs: half a juz', the other way muraajah is counted. */}
+          {portion !== "new" && (
+            <div className="rounded-2xl border border-teal-600/25 bg-teal-50/60 dark:bg-teal-950/20 p-3.5">
+              <p className="text-sm font-semibold text-ink mb-2">{tr("Or set by hizb")}</p>
+              <div className="flex items-end gap-2">
+                <label className="flex-1 min-w-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Starting hizb")}</span>
+                  <select
+                    value={hizbStart}
+                    onChange={(e) => setHizbStart(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  >
+                    {HIZB_STARTS.map((_, i) => (
+                      <option key={i} value={i + 1}>
+                        {tr("Hizb {hizb} (Juz {juz})", { hizb: i + 1, juz: Math.floor(i / 2) + 1 })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="w-20 flex-shrink-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Hizb count")}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={hizbCount}
+                    onChange={(e) => setHizbCount(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink text-center tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={applyHizbRange}
+                  className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] transition-all"
+                >
+                  {tr("Apply")}
+                </button>
+              </div>
+              <p className="text-[11px] text-ink-muted mt-2">
+                {tr("Fills in the surah and ayahs below. A hizb is half a juz', so two hizbs are one juz'.")}
               </p>
             </div>
           )}

@@ -1929,4 +1929,9 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "To do": "للإنجاز",
   "Passed": "اجتاز",
   "Pages set for you": "صفحات حُدّدت لك",
+  "Or set by hizb": "أو حدّد بالحزب",
+  "Starting hizb": "الحزب الأول",
+  "Hizb count": "عدد الأحزاب",
+  "Hizb {hizb} (Juz {juz})": "الحزب {hizb} (الجزء {juz})",
+  "Fills in the surah and ayahs below. A hizb is half a juz', so two hizbs are one juz'.": "يملأ السورة والآيات أدناه. الحزب نصف جزء، فكل حزبين جزء.",
 };
