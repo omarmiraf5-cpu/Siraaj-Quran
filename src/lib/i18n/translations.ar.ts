@@ -50,7 +50,7 @@ export const AR: Record<string, string> = {
   "nav.quran": "القرآن",
   "nav.work": "عملي",
   "nav.learn": "تعلّم",
-  "nav.register": "السجل",
+  "nav.register": "حضوري",
 
   "role.admin": "المدير",
   "role.teacher": "المعلم",

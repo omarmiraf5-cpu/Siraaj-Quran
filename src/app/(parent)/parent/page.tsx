@@ -36,6 +36,7 @@ import { AchievementsCard } from "@/components/AchievementsCard";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
+import { FeesDueLine } from "@/components/FeesDueLine";
 import { ByLanguage } from "@/components/ByLanguage";
 import { CalendarCheck, BookOpen, ClipboardList, Award } from "lucide-react";
 
@@ -130,6 +131,7 @@ export default function ParentDashboard() {
       {/* The school's notices for this family — a child absent five school
           days in a row — until the parent dismisses them. */}
       {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
+      <FeesDueLine />
 
       {/* Which child. A parent with one child never sees this. */}
       {children.length > 1 && (

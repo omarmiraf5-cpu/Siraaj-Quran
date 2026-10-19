@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEMO_STUDENTS,
   DEMO_ATTENDANCE,
@@ -321,6 +321,12 @@ export default function TeacherAttendancePage() {
   const changed = roster.some((s) => unsaved(s.id));
 
   const saveAttendance = async () => {
+    // A register left open past midnight is still for the day it was opened:
+    // ask before saving those marks under a day that has ended.
+    const now = todayIso();
+    if (!isDemo && now !== today && !window.confirm(tr("It's now {now}, but this register is for {today}. Save these marks for {today}?", { now: formatDay(now, language), today: formatDay(today, language) }))) {
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -380,6 +386,22 @@ export default function TeacherAttendancePage() {
       setSaving(false);
     }
   };
+
+  // Marks tapped with no signal are saved on their own when it comes back,
+  // so a teacher who walked off to find a signal doesn't have to remember to.
+  const wasOffline = useRef(false);
+  const saveRef = useRef(saveAttendance);
+  saveRef.current = saveAttendance;
+  useEffect(() => {
+    if (!online) {
+      wasOffline.current = true;
+      return;
+    }
+    if (wasOffline.current && changed && !saving && fresh) {
+      wasOffline.current = false;
+      void saveRef.current();
+    }
+  }, [online, changed, saving, fresh]);
 
   if (!ready) {
     return (

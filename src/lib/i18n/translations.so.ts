@@ -42,7 +42,7 @@ export const SO: Record<string, string> = {
   "login.help": "Caawimaad",
   "nav.progress": "Horumarka",
   "nav.yearlyPlan": "Qorshaha sanadka",
-  "nav.signIn": "Soo gal",
+  "nav.signIn": "Gelitaanka shaqada",
   "nav.classWork": "Diinta & Carabiga",
   "nav.studentAttendance": "Xaadiridda ardayda",
   "nav.staffAttendance": "Xaadiridda macallimiinta",
@@ -50,7 +50,7 @@ export const SO: Record<string, string> = {
   "nav.quran": "Quraanka",
   "nav.work": "Shaqada",
   "nav.learn": "Barasho",
-  "nav.register": "Diiwaanka",
+  "nav.register": "Joogitaankayga",
 
   "role.admin": "Maamule",
   "role.teacher": "Macallin",

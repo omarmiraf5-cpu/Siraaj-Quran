@@ -293,6 +293,22 @@ export default function AdminPaymentsPage() {
     return byStatus !== 0 ? byStatus : a.dueDate.localeCompare(b.dueDate);
   });
 
+
+  // The charges now on screen (search and filter applied), as a spreadsheet.
+  const exportCsv = () => {
+    const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    const rows = [
+      ["Student", "Charge", "Due date", "Amount due", "Amount paid", "Status"],
+      ...sorted.map((f) => [studentName(f.studentId), f.description, f.dueDate, f.amountDue.toFixed(2), f.amountPaid.toFixed(2), feeStatus(f)]),
+    ];
+    const blob = new Blob(["\ufeff" + rows.map((r) => r.map(cell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `charges-${todayIso()}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
@@ -413,6 +429,14 @@ export default function AdminPaymentsPage() {
                   aria-label={tr("Search by student or charge")}
                   className="flex-1 min-w-0 bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                 />
+                <button
+                  type="button"
+                  onClick={exportCsv}
+                  disabled={sorted.length === 0}
+                  className="flex-shrink-0 rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-[13px] font-semibold text-ink hover:bg-surface-bg disabled:opacity-40"
+                >
+                  {tr("Export CSV")}
+                </button>
                 <div role="group" aria-label={tr("Show")} className="flex flex-wrap gap-1.5">
                   {(["all", "unpaid", "partial", "paid"] as const).map((k) => (
                     <button
@@ -491,7 +515,7 @@ export default function AdminPaymentsPage() {
                         <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                           {status === "paid" ? (
                             <p className="text-[13px] text-ink-muted">
-                              {tr("Paid in full on {dueDate}. Nothing outstanding.", { dueDate: f.dueDate })}
+                              {tr("Paid in full. It was due on {dueDate}. Nothing outstanding.", { dueDate: f.dueDate })}
                             </p>
                           ) : (
                             <>

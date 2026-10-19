@@ -40,6 +40,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { AgreementsBanner } from "@/components/AgreementsBanner";
+import { GetStartedCard } from "@/components/GetStartedCard";
 import { Users, GraduationCap, BookOpen, CalendarCheck } from "lucide-react";
 
 type ReviewItem = { id: string; halaqaName: string };
@@ -275,6 +276,7 @@ export default function AdminDashboard() {
       />
 
       <AgreementsBanner enabled={!isDemoSchool} />
+      {ready && !isDemoSchool && <GetStartedCard teachers={teachers.length} halaqas={halaqas.length} students={studentCount} />}
 
       {/* Notices the portal raised on its own — a child absent five school
           days running, a teacher reporting an absence. */}

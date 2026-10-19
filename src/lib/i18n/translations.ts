@@ -78,7 +78,7 @@ export const translations: Partial<Record<Language, Record<string, string>>> & {
     "login.help": "Help",
     "nav.progress": "Progress",
     "nav.yearlyPlan": "Yearly plan",
-    "nav.signIn": "Sign in",
+    "nav.signIn": "Clock in",
     "nav.classWork": "Islamic & Arabic",
     "nav.studentAttendance": "Student attendance",
     "nav.staffAttendance": "Staff attendance",
@@ -86,7 +86,7 @@ export const translations: Partial<Record<Language, Record<string, string>>> & {
     "nav.quran": "Quran",
     "nav.work": "Work",
     "nav.learn": "Learn",
-    "nav.register": "Register",
+    "nav.register": "My attendance",
 
     "role.admin": "Admin",
     "role.teacher": "Teacher",
