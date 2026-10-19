@@ -11,6 +11,7 @@ import {
   useQaidahBookChoice,
 } from "@/components/QaidahBook";
 import { QaidahAssignPanel, useQaidahClassroom } from "@/components/QaidahAssignPanel";
+import { QaidahPagesPanel } from "@/components/QaidahPagesPanel";
 
 /**
  * The teacher's Qa'idah: the book's lessons and each child's lesson, with
@@ -36,6 +37,9 @@ export function QaidahWorkspace() {
   return (
     <div className="space-y-4">
       <QaidahBookTabs value={bookId} onChange={setBookId} />
+
+      {/* Work set by pages of the book, beside the lesson-by-lesson panel below. */}
+      <QaidahPagesPanel room={room} book={bookId} />
 
       {/* Side by side on a wide screen, the children's lessons beside the
           book; on a phone the children come first, since setting their

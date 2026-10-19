@@ -14,6 +14,8 @@ import {
   useQaidahBookChoice,
 } from "@/components/QaidahBook";
 import { MyQaidahLesson } from "@/components/QaidahLessonCard";
+import { MyQaidahPages } from "@/components/MyQaidahPages";
+import { useQaidahPages } from "@/hooks/useQaidahPages";
 import { useLanguage } from "@/components/LanguageProvider";
 
 export default function StudentQaidahPage() {
@@ -23,6 +25,7 @@ export default function StudentQaidahPage() {
   const { mode, students } = usePortalRoster([DEMO_CURRENT_STUDENT]);
   const me = students[0] ?? null;
   const { rows, ready } = useQaidahLessons(mode, me ? [me.id] : []);
+  const pages = useQaidahPages(mode, me ? [me.id] : []);
   const mine = me ? (currentLessons(rows).get(me.id) ?? null) : null;
 
   const [bookId, setBookId] = useQaidahBookChoice();
@@ -75,6 +78,7 @@ export default function StudentQaidahPage() {
       </header>
 
       {mine && <MyQaidahLesson row={mine} onOpen={openMine} />}
+      <MyQaidahPages rows={pages.rows} />
 
       <QaidahBookTabs value={bookId} onChange={setBookId} />
       <QaidahSummary book={book} />

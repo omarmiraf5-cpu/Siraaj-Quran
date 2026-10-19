@@ -2450,3 +2450,40 @@ end $$;
 
 -- Supabase's API reads the tables afresh, new ones included.
 notify pgrst, 'reload schema';
+create table if not exists qaidah_page_assignments (
+  id          uuid primary key default gen_random_uuid(),
+  student_id  uuid not null references students(id) on delete cascade,
+  school_id   uuid not null references schools(id) on delete cascade,
+  teacher_id  uuid references profiles(id) on delete set null,
+  book        text not null check (book in ('ahsanul_qawaid', 'nuraniyah', 'baghdadiyah')),
+  page_start  int  not null check (page_start between 1 and 999),
+  page_end    int  not null check (page_end between 1 and 999),
+  portion     text not null default 'new' check (portion in ('new', 'recent', 'old')),
+  due_date    date,
+  note        text check (char_length(note) <= 500),
+  status      text not null default 'assigned' check (status in ('assigned', 'passed', 'repeat')),
+  assigned_at timestamptz not null default now(),
+  passed_at   timestamptz,
+  updated_at  timestamptz not null default now(),
+  check (page_end >= page_start)
+);
+alter table qaidah_page_assignments enable row level security;
+create index if not exists idx_qaidah_pages_student on qaidah_page_assignments(student_id, assigned_at desc);
+create index if not exists idx_qaidah_pages_school on qaidah_page_assignments(school_id, assigned_at desc);
+
+-- The same rules as a child's Qa'idah lessons: the school's teachers and
+-- office set and read them; a child reads their own, a parent their children's.
+drop policy if exists "School staff manage Qaidah pages" on qaidah_page_assignments;
+create policy "School staff manage Qaidah pages" on qaidah_page_assignments
+  for all using (
+    school_id = my_school_id() and my_role() in ('admin', 'teacher')
+  ) with check (
+    school_id = my_school_id() and my_role() in ('admin', 'teacher')
+    and student_school_id(student_id) = school_id
+  );
+drop policy if exists "Students read their own Qaidah pages" on qaidah_page_assignments;
+create policy "Students read their own Qaidah pages" on qaidah_page_assignments
+  for select using (student_id in (select id from students where profile_id = auth.uid()));
+drop policy if exists "Parents read their children's Qaidah pages" on qaidah_page_assignments;
+create policy "Parents read their children's Qaidah pages" on qaidah_page_assignments
+  for select using (student_id in (select my_children_student_ids()));
