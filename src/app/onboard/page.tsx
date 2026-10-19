@@ -191,22 +191,16 @@ export default function OnboardPage() {
   // login of their own (the platform's owner) can make it the new school's
   // admin, and keep its password.
   const [signedIn, setSignedIn] = useState<string | null>(null);
-  // Only the platform's owner sets up an academic school (one kept in
-  // grades, with campuses): everyone else signs up a Qur'an school.
-  const [platformOwner, setPlatformOwner] = useState(false);
   useEffect(() => {
     const supabase = createClient();
     supabase.auth
       .getUser()
-      .then(async ({ data: { user } }) => {
-        setSignedIn(user?.email?.toLowerCase() ?? null);
-        if (!user) return;
-        const { data } = await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
-        setPlatformOwner(data?.is_platform_admin === true);
-      })
+      .then(({ data: { user } }) => setSignedIn(user?.email?.toLowerCase() ?? null))
       .catch(() => {});
   }, []);
-  const academic = platformOwner && school.kind === "academic";
+  // A Qur'an school (students in halaqas) or an academic school (students in
+  // grades, with campuses): every school chooses.
+  const academic = school.kind === "academic";
   const steps = academic ? ACADEMIC_STEPS : STEPS;
   const adminEmail = admin.email.trim().toLowerCase();
   const ownLogin = !!signedIn && adminEmail === signedIn;
@@ -607,10 +601,8 @@ export default function OnboardPage() {
                 ))}
               </select>
             </div>
-            {platformOwner && (
             <fieldset>
               <legend className={labelClass}>{tr("What kind of school is it?")}</legend>
-              <p className="text-xs text-ink-muted -mt-1 mb-2">{tr("Only you see this choice, as MyDiiwaan's owner.")}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {([
                   ["quran", "A Qur'an school", "Students in halaqas."],
@@ -636,7 +628,6 @@ export default function OnboardPage() {
                 ))}
               </div>
             </fieldset>
-            )}
             {academic && (
               <div>
                 <label className={labelClass}>
