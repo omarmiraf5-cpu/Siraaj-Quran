@@ -68,7 +68,7 @@ function StudentTabBar() {
                 <Icon size={18} />
               </span>
               <span
-                className={`text-[10px] font-bold leading-none transition-colors ${
+                className={`text-[11px] font-bold leading-none transition-colors ${
                   active ? "text-ink" : "text-ink-muted"
                 }`}
               >

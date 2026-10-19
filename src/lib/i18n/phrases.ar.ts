@@ -1972,4 +1972,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Upload a spreadsheet with a parent email on every row. Each student gets a PIN, and each parent a welcome email with it.": "ارفع جدولاً فيه بريد ولي الأمر في كل صف. يحصل كل طالب على رمز PIN، ويحصل كل ولي أمر على رسالة ترحيب تتضمنه.",
   "Get your school started": "ابدأ مدرستك",
   "Three steps, in this order.": "ثلاث خطوات بهذا الترتيب.",
+  "{count} more": "{count} أخرى",
+  "All my work": "كل واجباتي",
+  "Am I here?": "هل حضرت؟",
 };
