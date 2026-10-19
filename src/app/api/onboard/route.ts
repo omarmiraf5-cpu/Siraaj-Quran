@@ -474,6 +474,7 @@ export async function POST(request: NextRequest) {
         email,
         role: "parent",
         children: childIndexes.map((i) => studentList[i].name.trim()),
+        childPins: childIndexes.map((i) => ({ name: studentList[i].name.trim(), pin: studentPins[i].pin })),
       });
     }
 

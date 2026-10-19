@@ -247,7 +247,9 @@ export async function POST(req: NextRequest) {
             if (parent.id) {
               const { error } = await admin.from("parent_students").insert({ parent_id: parent.id, student_id: student.id });
               if (error && error.code !== "23505") throw error;
-              welcomes.find((w) => w.userId === parent.id)?.children?.push(name);
+              const welcome = welcomes.find((w) => w.userId === parent.id);
+              welcome?.children?.push(name);
+              if (welcome) (welcome.childPins ??= []).push({ name, pin });
             }
             result.parent = {
               email: parent.email,
