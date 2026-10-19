@@ -132,9 +132,9 @@ export default function StudentDashboard() {
   const subjects = [
     { href: "/student/quran", name: t("nav.quran"), gradient: "student-gradient-teal", icon: <span className="text-3xl" aria-hidden>📖</span>, progress: quranProgress },
     { href: "/student/assignments", name: t("nav.work"), gradient: "student-gradient-blue", icon: <span className="text-3xl" aria-hidden>📝</span>, progress: null as number | null },
-    { href: "/student/learn", name: t("nav.learn"), gradient: "student-gradient-purple", icon: <span className="text-3xl" aria-hidden>🎨</span>, progress: null as number | null },
+    { href: "/student/learn", name: t("nav.learn"), gradient: "student-gradient-indigo", icon: <span className="text-3xl" aria-hidden>🎨</span>, progress: null as number | null },
     { href: "/student/class-work", name: tr("Islamic & Arabic"), gradient: "student-gradient-orange", icon: <span className="text-3xl" aria-hidden>🕌</span>, progress: null as number | null },
-    { href: "/student/attendance", name: t("nav.register"), gradient: "student-gradient-pink", icon: <span className="text-3xl" aria-hidden>✅</span>, progress: attendance.length > 0 ? summary.rate : null },
+    { href: "/student/attendance", name: t("nav.register"), gradient: "student-gradient-green", icon: <span className="text-3xl" aria-hidden>✅</span>, progress: attendance.length > 0 ? summary.rate : null },
   ];
   const dailyQuote = DAILY_QUOTES[new Date(`${todayStr}T00:00:00Z`).getUTCDate() % DAILY_QUOTES.length];
 

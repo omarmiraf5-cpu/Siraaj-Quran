@@ -126,6 +126,12 @@
   .student-gradient-orange {
     background: linear-gradient(135deg, #ea580c 0%, #f97316 50%, #fb923c 100%);
   }
+  .student-gradient-green {
+    background: linear-gradient(135deg, #15803d 0%, #22a559 50%, #4ade80 100%);
+  }
+  .student-gradient-indigo {
+    background: linear-gradient(135deg, #3730a3 0%, #4f46e5 50%, #818cf8 100%);
+  }
   .student-gradient-pink {
     background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f472b6 100%);
   }
