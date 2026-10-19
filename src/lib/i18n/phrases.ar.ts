@@ -1975,4 +1975,10 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "{count} more": "{count} أخرى",
   "All my work": "كل واجباتي",
   "Am I here?": "هل حضرت؟",
+  "Islamic & Arabic": "الإسلامية والعربية",
+  "Up next": "التالي",
+  "My subjects": "موادّي",
+  "Still to do": "المتبقي",
+  "Lessons today": "دروس اليوم",
+  "Reminder of the day": "تذكير اليوم",
 };

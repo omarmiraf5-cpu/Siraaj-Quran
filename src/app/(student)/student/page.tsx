@@ -41,10 +41,13 @@ import {
   ProgressRing,
   FriendlyEmpty,
   ILLUM_CLASS,
+  GRAD_CLASS,
 } from "@/components/student-ui";
 import {
   IconBook,
   IconPalette,
+  IconPen,
+  IconCalendar,
   IconArrow,
   IconCheck,
   IconStar,
@@ -54,6 +57,14 @@ import {
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { ByLanguage } from "@/components/ByLanguage";
+
+const DAILY_QUOTES = [
+  { en: "Read! In the Name of your Lord, Who has created.", ar: "اقْرَأْ بِاسْمِ رَبِّكَ الَّذِي خَلَقَ", ref: "Qur'an 96:1", refAr: "القرآن ٩٦:١" },
+  { en: "Indeed, with hardship comes ease.", ar: "إِنَّ مَعَ الْعُسْرِ يُسْرًا", ref: "Qur'an 94:6", refAr: "القرآن ٩٤:٦" },
+  { en: "So remember Me; I will remember you.", ar: "فَاذْكُرُونِي أَذْكُرْكُمْ", ref: "Qur'an 2:152", refAr: "القرآن ٢:١٥٢" },
+  { en: "The best among you are those with the best character.", ar: "إِنَّ مِنْ خِيَارِكُمْ أَحْسَنَكُمْ أَخْلَاقًا", ref: "Prophet Muhammad ﷺ", refAr: "النبي ﷺ" },
+  { en: "Whoever takes a path seeking knowledge, Allah makes easy for him a path to Paradise.", ar: "مَنْ سَلَكَ طَرِيقًا يَلْتَمِسُ فِيهِ عِلْمًا سَهَّلَ اللَّهُ لَهُ بِهِ طَرِيقًا إِلَى الْجَنَّةِ", ref: "Prophet Muhammad ﷺ", refAr: "النبي ﷺ" },
+];
 
 export default function StudentDashboard() {
   const { t, language, tr } = useLanguage();
@@ -114,6 +125,19 @@ export default function StudentDashboard() {
     return to ? `${name} – ${to.englishName}` : name;
   };
 
+  const upNext = todayWork[0] ?? null;
+  const upNextOverdue = Boolean(upNext?.due_date && upNext.due_date < todayStr);
+  const levels = assignments.map((a) => a.memorization_level);
+  const quranProgress = levels.length > 0 ? levels.reduce((n, v) => n + v, 0) / levels.length : null;
+  const subjects = [
+    { href: "/student/quran", name: t("nav.quran"), gradient: "student-gradient-teal", icon: <IconBook size={30} />, progress: quranProgress },
+    { href: "/student/assignments", name: t("nav.work"), gradient: "student-gradient-blue", icon: <IconPen size={30} />, progress: null as number | null },
+    { href: "/student/learn", name: t("nav.learn"), gradient: "student-gradient-purple", icon: <IconPalette size={30} />, progress: null as number | null },
+    { href: "/student/class-work", name: tr("Islamic & Arabic"), gradient: "student-gradient-orange", icon: <IconBookOpen size={30} />, progress: null as number | null },
+    { href: "/student/attendance", name: t("nav.register"), gradient: "student-gradient-pink", icon: <IconCalendar size={30} />, progress: attendance.length > 0 ? summary.rate : null },
+  ];
+  const dailyQuote = DAILY_QUOTES[new Date(`${todayStr}T00:00:00Z`).getUTCDate() % DAILY_QUOTES.length];
+
   const displayName = demoUser?.name ?? student.name;
   const firstName = displayName.split(" ")[0];
 
@@ -152,196 +176,126 @@ export default function StudentDashboard() {
         <StudentAccountButtons />
       </header>
 
-      {/* Today — the lesson and anything overdue, one big card each, so the
-          first thing a child sees is what to do now. */}
-      <div className="space-y-2.5 animate-rise" style={{ animationDelay: "100ms" }}>
-        <SectionLabel colour="vermilion" icon={<IconTarget size={13} />}>
-          {tr("Today")}
-        </SectionLabel>
-        {todayWork.length === 0 && !myQaidah ? (
+      {/* Dua — a soft amber card straight under the greeting. */}
+      <div className="rounded-3xl bg-amber-50 dark:bg-amber-950/25 border border-amber-200/70 dark:border-amber-800/40 px-5 py-5 text-center animate-rise" style={{ animationDelay: "60ms" }}>
+        <p className="font-calligraphy font-bold text-3xl md:text-4xl text-amber-900 dark:text-amber-100 leading-[2] mb-2" dir="rtl" lang="ar">
+          اللَّهُمَّ لَا سَهْلَ إِلَّا مَا جَعَلْتَهُ سَهْلًا
+        </p>
+        <ByLanguage
+          en={<p className="text-sm md:text-base text-amber-800/90 dark:text-amber-200/80 italic" dir="ltr">&ldquo;O Allah, nothing is easy except what You make easy.&rdquo;</p>}
+          ar={null}
+        />
+      </div>
+
+      {/* Up next — the one thing to do now: a card with a play button. */}
+      <div className="animate-rise" style={{ animationDelay: "100ms" }}>
+        <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">{tr("Up next")}</h2>
+        {upNext ? (
+          <Link
+            href="/student/assignments"
+            className="group flex items-center gap-4 bg-surface-card rounded-3xl border border-surface-border shadow-card p-4 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.99] transition-all"
+          >
+            <div className={`w-16 h-16 rounded-2xl ${GRAD_CLASS[upNextOverdue ? "vermilion" : PORTION_COLOUR[upNext.portion]]} flex items-center justify-center text-white flex-shrink-0 shadow-md`}>
+              <IconBookOpen size={28} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] text-ink-muted font-bold tracking-wide uppercase">
+                {t(`portion.${upNext.portion}`)} · {upNextOverdue ? tr("Overdue") : tr("Today's lesson")}
+              </p>
+              <p className="font-bold text-base text-ink leading-snug [overflow-wrap:anywhere]">{workTitle(upNext)}</p>
+              <p className="text-xs text-ink-muted mt-0.5">
+                {t("common.ayahs")} {upNext.ayah_start}–{upNext.ayah_end} · {upNext.memorization_level}% {t("common.learnt")}
+              </p>
+            </div>
+            <div className={`w-11 h-11 rounded-full ${GRAD_CLASS[upNextOverdue ? "vermilion" : PORTION_COLOUR[upNext.portion]]} flex items-center justify-center text-white flex-shrink-0 shadow-md group-hover:scale-105 transition-transform`}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><polygon points="6 3 20 12 6 21 6 3" /></svg>
+            </div>
+          </Link>
+        ) : (
           <div className="card-quiet p-5">
             <FriendlyEmpty title={t("common.allDoneToday")} sub={t("common.beautifulWorkComeBack")} mood="happy" />
           </div>
-        ) : (
-          <div className="space-y-2.5">
-            {todayWork.map((a) => {
-              const overdue = Boolean(a.due_date && a.due_date < todayStr);
-              return (
-                <UpNextCard
-                  key={a.id}
-                  colour={overdue ? "vermilion" : PORTION_COLOUR[a.portion]}
-                  eyebrow={`${t(`portion.${a.portion}`)} · ${overdue ? tr("Overdue") : tr("Today's lesson")}`}
-                  title={workTitle(a)}
-                  detail={`${t("common.ayahs")} ${a.ayah_start}–${a.ayah_end}`}
-                  href="/student/assignments"
-                  level={a.memorization_level}
-                />
-              );
-            })}
-            {myQaidah && <MyQaidahLesson row={myQaidah} href="/student/qaidah" />}
+        )}
+        {myQaidah && (
+          <div className="mt-2.5">
+            <MyQaidahLesson row={myQaidah} href="/student/qaidah" />
           </div>
         )}
-        {todayWork.find((a) => a.teacher_notes)?.teacher_notes && (
-          <div className="card-quiet px-5 py-4">
-            <TeacherNote>{todayWork.find((a) => a.teacher_notes)!.teacher_notes}</TeacherNote>
+        {upNext?.teacher_notes && (
+          <div className="card-quiet px-5 py-4 mt-2.5">
+            <TeacherNote>{upNext.teacher_notes}</TeacherNote>
           </div>
         )}
       </div>
 
-      {/* Homework — what is due on a later day, in the order it falls due. */}
-      {homework.length > 0 && (
-        <div className="space-y-2.5 animate-rise" style={{ animationDelay: "140ms" }}>
-          <SectionLabel colour="lapis" icon={<IconBookOpen size={13} />}>
-            {tr("Homework")}
-          </SectionLabel>
-          <div className="card-quiet divide-y divide-surface-border overflow-hidden">
-            {homework.slice(0, 4).map((a) => {
-              const due = dueText(a.due_date);
-              return (
-                <Link key={a.id} href="/student/assignments" className="flex items-center gap-3 px-4 py-3 active:bg-surface-bg transition-colors">
-                  <span className={`${ILLUM_CLASS[PORTION_COLOUR[a.portion]]} flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl`}>
-                    <IconBookOpen size={18} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold text-ink">{workTitle(a)}</span>
-                    <span className="block text-[12px] text-ink-muted">
-                      {t(`portion.${a.portion}`)} · {t("common.ayahs")} {a.ayah_start}–{a.ayah_end}
-                    </span>
-                  </span>
-                  {due && (
-                    <span className={`flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${due.urgent ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200" : "bg-surface-bg text-ink-muted"}`}>
-                      {due.text}
-                    </span>
+      {/* My subjects — one coloured square each, with a ring where there is a figure to show. */}
+      <div className="animate-rise" style={{ animationDelay: "140ms" }}>
+        <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">{tr("My subjects")}</h2>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+          {subjects.map((sub, i) => {
+            const circumference = 2 * Math.PI * 18;
+            return (
+              <Link
+                key={sub.href}
+                href={sub.href}
+                className="group relative aspect-square overflow-hidden rounded-3xl text-white flex flex-col items-center justify-center gap-1.5 shadow-md hover:-translate-y-1 hover:shadow-lg active:scale-95 transition-all animate-rise"
+                style={{ animationDelay: `${180 + i * 50}ms` }}
+              >
+                <div className={`absolute inset-0 ${sub.gradient}`} />
+                <div className="relative w-14 h-14 flex items-center justify-center">
+                  {sub.progress !== null && (
+                    <svg className="absolute inset-0 -rotate-90 w-full h-full" viewBox="0 0 40 40" aria-hidden>
+                      <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="3" />
+                      <circle
+                        cx="20" cy="20" r="18" fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth="3" strokeLinecap="round"
+                        strokeDasharray={circumference} strokeDashoffset={circumference - (Math.max(0, Math.min(100, sub.progress)) / 100) * circumference}
+                      />
+                    </svg>
                   )}
-                </Link>
-              );
-            })}
-          </div>
-          {homework.length > 4 && (
-            <Link href="/student/assignments" className="block text-center text-[12px] font-bold text-ink-muted">
-              {tr("{count} more", { count: homework.length - 4 })}
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* Where to go — four big buttons, one thumb each. */}
-      <div className="grid grid-cols-2 gap-3 animate-rise" style={{ animationDelay: "180ms" }}>
-        <BigTile href="/student/quran" colour="lapis" icon={<IconBook size={20} />} title={t("common.myQuran")} sub={t("common.readYourAyahs")} delay={200} />
-        <BigTile href="/student/assignments" colour="verdigris" icon={<IconBookOpen size={20} />} title={t("nav.work")} sub={tr("All my work")} delay={230} />
-        <BigTile href="/student/learn" colour="aubergine" icon={<IconPalette size={20} />} title={t("nav.learn")} sub={t("common.tajweedBlurb")} delay={260} />
-        <BigTile href="/student/attendance" colour="turquoise" icon={<IconCheck size={20} />} title={t("nav.register")} sub={tr("Am I here?")} delay={290} />
-      </div>
-
-      {/* How the points were earned. A total nobody can explain is not a
-          reward, so the breakdown is on the page. */}
-      <div className="space-y-2.5 animate-rise" style={{ animationDelay: "300ms" }}>
-        <SectionLabel colour="saffron" icon={<IconStar size={13} />}>
-          {t("common.yourPoints")}
-        </SectionLabel>
-
-        <div className="grid grid-cols-3 gap-2.5">
-          <XpTile
-            colour="saffron"
-            icon={<IconBookOpen size={15} />}
-            value={xp.memorising}
-            label={t("common.memorising")}
-            delay={300}
-          />
-          <XpTile
-            colour="verdigris"
-            icon={<IconCheck size={15} />}
-            value={xp.finishing}
-            label={t("common.finishing")}
-            delay={340}
-          />
-          <XpTile
-            colour="turquoise"
-            icon={<IconStar size={15} />}
-            value={xp.attending}
-            label={t("common.turningUp")}
-            delay={380}
-          />
+                  <span className="relative">{sub.icon}</span>
+                </div>
+                <div className="relative text-center leading-tight px-1">
+                  <p className="text-xs font-bold [overflow-wrap:anywhere]">{sub.name}</p>
+                  {sub.progress !== null && <p className="text-[10px] text-white/80 tabular-nums">{Math.round(sub.progress)}%</p>}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
 
-      {/* Register — a ring and a full-height strip, rather than the hairline
-          it was. Kept as a white card so the run of colour above it has
-          somewhere to land. */}
-      <div className="space-y-2.5 animate-rise" style={{ animationDelay: "360ms" }}>
-        <SectionCard
-          title={t("common.yourRegister")}
-          note={countLabel(
-            "the last {count} day|the last {count} days",
-            Math.min(14, attendance.length),
-            [t("common.last"), Math.min(14, attendance.length), t("common.days")].filter((x) => x !== "").join(" "),
-          )}
-        >
-          <div className="flex items-center gap-4">
-            <ProgressRing value={summary.rate} colour="turquoise" size={64} label={t("common.here")} />
-            <div className="min-w-0 flex-1">
-              <AttendanceStrip days={attendance} size="lg" />
-              <p className="text-[12px] text-ink-muted mt-2.5">
-                {streak > 1
-                  ? `${countLabel("{count} day in a row — that's|{count} days in a row — that's", streak, `${streak} ${t("common.daysInARowThatIs")}`)} ${streak * 25} XP.`
-                  : t("common.everyDayShowUp")}
-              </p>
-            </div>
+      {/* Homework and Today. */}
+      <div className="grid grid-cols-2 gap-3 animate-rise" style={{ animationDelay: "260ms" }}>
+        <Link href="/student/assignments" className="bg-surface-card rounded-3xl border border-surface-border shadow-card p-4 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-verdigris"><IconCheck size={18} /></span>
+            <span className="text-[11px] font-bold text-ink-muted tracking-wide uppercase">{tr("Homework")}</span>
           </div>
-          <p className="text-[11px] text-ink-muted mt-4 pt-3 border-t border-surface-border">
-            {formatDay(mode === "demo" ? DEMO_TODAY : new Date().toLocaleDateString("en-CA"), language)}
-            <span className="mx-1.5">·</span>
-            {countLabel("{count} finished|{count} finished", done.length, `${done.length} ${t("common.finished").toLowerCase()}`)}
-            <span className="mx-1.5">·</span>
-            {countLabel("{count} to go", open.length, `${open.length} ${t("common.toGo")}`)}
-          </p>
-        </SectionCard>
+          <p className="text-3xl font-black text-ink leading-none tabular-nums"><bdi dir="ltr">{homework.length}</bdi></p>
+          <p className="text-xs text-ink-muted mt-1.5">{tr("Still to do")}</p>
+        </Link>
+        <Link href="/student/assignments" className="bg-surface-card rounded-3xl border border-surface-border shadow-card p-4 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-saffron"><IconTarget size={18} /></span>
+            <span className="text-[11px] font-bold text-ink-muted tracking-wide uppercase">{tr("Today")}</span>
+          </div>
+          <p className="text-3xl font-black text-ink leading-none tabular-nums"><bdi dir="ltr">{todayWork.length}</bdi></p>
+          <p className="text-xs text-ink-muted mt-1.5">{tr("Lessons today")}</p>
+        </Link>
       </div>
 
       <AchievementsCard studentId={student.id} />
 
       <AnnouncementsFeed audience="students" />
 
-      <Link
-        href="/student/assignments"
-        className="group flex items-center justify-center gap-1.5 text-[12px] font-bold text-ink-muted hover:text-ink transition-colors py-1"
-      >
-        {t("common.seeAllMyWork")}
-        <span className="group-hover:translate-x-0.5 transition-transform">
-          <IconArrow size={14} />
-        </span>
-      </Link>
-
-      {/* Dua — the calm beat between the scoreboard and the work. Coloured
-          with the page's own hero gradient rather than one of the six
-          portion/status colours: every one of those already means something
-          specific elsewhere on this page (new lesson, finishing, needs
-          review…), and the dua is not any of them. The personal gradient
-          has no such job, so it bookends the page instead — greeting and
-          reflection in the same hue, the work between them in the palette. */}
-      <section
-        className={`${theme.hero} relative overflow-hidden rounded-[20px] px-5 py-6 text-center animate-rise`}
-        style={{ animationDelay: "60ms" }}
-      >
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <p
-          className="relative font-calligraphy text-[25px] md:text-[30px] text-white leading-[2.1]"
-          dir="rtl"
-          lang="ar"
-        >
-          اللَّهُمَّ لَا سَهْلَ إِلَّا مَا جَعَلْتَهُ سَهْلًا
+      {/* Reminder of the day. */}
+      <div className="rounded-3xl bg-surface-card border border-surface-border shadow-card px-5 py-5 text-center animate-rise">
+        <p className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-2.5">{tr("Reminder of the day")}</p>
+        <p className="text-base md:text-lg text-ink font-medium leading-relaxed italic mb-2" dir={language === "ar" ? "rtl" : "ltr"}>
+          &ldquo;{language === "ar" ? dailyQuote.ar : dailyQuote.en}&rdquo;
         </p>
-        <div className="gold-rule w-20 mx-auto my-4 relative" />
-        {/* The English meaning, for readers of the Arabic above who need it. */}
-        <ByLanguage
-          en={
-            <p className="relative font-serif text-[14px] text-white/80 italic" dir="ltr">
-              “O Allah, nothing is easy except what You make easy.”
-            </p>
-          }
-          ar={null}
-        />
-      </section>
+        <p className="text-xs text-ink-muted">— {language === "ar" ? dailyQuote.refAr : dailyQuote.ref}</p>
+      </div>
 
       <Link
         href="/account"
