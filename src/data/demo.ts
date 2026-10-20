@@ -388,7 +388,7 @@ export const DAILY_RATING_LABELS: Record<DailyRating, string> = {
   very_good: "Very good",
   good: "Good",
   weak: "Weak",
-  not_recited: "Didn't recite",
+  not_recited: "Did not recite",
 };
 
 export const DAILY_RATING_STYLES: Record<DailyRating, string> = {
