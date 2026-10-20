@@ -2028,4 +2028,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Only the school office can merge campuses": "مكتب المدرسة فقط يستطيع دمج الفروع",
   "This is a Hifd program": "هذا برنامج حفظ",
   "It isn't tied to a grade: a child stays in their own grade's halaqa and joins it as well.": "لا يرتبط بصف: يبقى الطفل في حلقة صفه وينضم إليه أيضًا.",
+  "Delete {name}? Its {count} students stay at the school but are no longer in it, and their past records are kept. This can't be undone.": "حذف {name}؟ يبقى طلابها البالغ عددهم {count} في المدرسة لكنهم لن يكونوا فيها، وتُحفظ سجلاتهم السابقة. لا يمكن التراجع عن هذا.",
+  "Delete {name}? This can't be undone.": "حذف {name}؟ لا يمكن التراجع عن هذا.",
+  "Delete this halaqa": "حذف هذه الحلقة",
 };

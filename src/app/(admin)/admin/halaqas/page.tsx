@@ -387,6 +387,32 @@ export default function AdminHalaqasPage() {
     setEditError(null);
   };
 
+  // Removes a halaqa. Its students stay on the school's list, just out of it;
+  // their past attendance and lessons stay too, no longer tied to a halaqa.
+  const deleteHalaqa = async (h: DemoHalaqa) => {
+    if (isDemo) return;
+    const n = studentsOf(h).length;
+    const question = n
+      ? tr("Delete {name}? Its {count} students stay at the school but are no longer in it, and their past records are kept. This can't be undone.", { name: h.name, count: n })
+      : tr("Delete {name}? This can't be undone.", { name: h.name });
+    if (!window.confirm(question)) return;
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const { error } = await supabase.from("classes").delete().eq("id", h.id);
+      if (error) throw error;
+      const [list, roster] = await Promise.all([loadRealHalaqas(), loadRealStudents()]);
+      setHalaqas(list);
+      setStudents(roster);
+      setEditingId(null);
+      staffRolesChanged();
+    } catch (err) {
+      setEditError(err instanceof Error ? tr(err.message) : tr("Couldn't delete it. Please try again."));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const saveEdit = async (h: DemoHalaqa) => {
     const { lead, others } = splitTeachers(draftTeacherIds, h.teacherId);
     // A graded school's halaqa follows its teacher's name.
@@ -721,6 +747,16 @@ export default function AdminHalaqasPage() {
                 {tr("Cancel")}
               </button>
             </div>
+            {!isDemo && (
+              <button
+                type="button"
+                onClick={() => deleteHalaqa(h)}
+                disabled={savingEdit}
+                className="text-[12.5px] font-semibold text-red-700 dark:text-red-400 hover:underline disabled:opacity-50"
+              >
+                {tr("Delete this halaqa")}
+              </button>
+            )}
           </div>
         )}
       </li>
