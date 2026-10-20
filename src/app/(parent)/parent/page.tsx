@@ -37,6 +37,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { FeesDueLine } from "@/components/FeesDueLine";
+import { MilestoneBanner } from "@/components/MilestoneBanner";
 import { ChildPinCard } from "@/components/ChildPinCard";
 import { autoStars } from "@/lib/progress";
 import { ByLanguage } from "@/components/ByLanguage";
@@ -134,6 +135,7 @@ export default function ParentDashboard() {
           days in a row — until the parent dismisses them. */}
       {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
       <FeesDueLine />
+      <MilestoneBanner studentId={child.id} assignments={assignments} firstName={child.name.split(" ")[0]} />
 
       {/* Which child. A parent with one child never sees this. */}
       {children.length > 1 && (

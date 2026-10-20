@@ -30,6 +30,7 @@ import { currentLessons } from "@/lib/qaidahLessons";
 import { MyQaidahLesson } from "@/components/QaidahLessonCard";
 import { SectionCard, AttendanceStrip, TeacherNote } from "@/components/portal-ui";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
+import { MilestoneBanner } from "@/components/MilestoneBanner";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { StudentAccountButtons } from "@/components/StudentAccountButtons";
 import {
@@ -191,6 +192,8 @@ export default function StudentDashboard() {
           <StudentAccountButtons />
         </div>
       </header>
+
+      <MilestoneBanner studentId={student.id} assignments={assignments} />
 
       {/* Dua — a soft amber card straight under the greeting. */}
       <div className="rounded-3xl bg-amber-50 dark:bg-amber-950/25 border border-amber-200/70 dark:border-amber-800/40 px-5 py-5 text-center animate-rise" style={{ animationDelay: "60ms" }}>

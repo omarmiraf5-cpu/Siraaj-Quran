@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { announceMilestones } from "@/lib/milestoneServer";
 import { creditPlanForLesson, statusForRating, type GradedLesson } from "@/lib/autoAssignments";
 
 export async function PATCH(
@@ -76,6 +77,10 @@ export async function PATCH(
     }
 
     await creditPlanForLesson(supabase, user.id, before as GradedLesson, data as GradedLesson);
+    // A finished surah or juz', or one nearly halfway, is told to the parents.
+    if (data.status === "completed" && data.portion === "new" && before.status !== "completed") {
+      await announceMilestones(String(data.student_id));
+    }
 
     return NextResponse.json(data);
   } catch (error) {
