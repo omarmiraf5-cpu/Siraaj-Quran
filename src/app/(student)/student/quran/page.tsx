@@ -1,5 +1,6 @@
 "use client";
 
+import { StudentPageHeader } from "@/components/student-ui";
 import { Mushaf } from "@/components/Mushaf";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -9,10 +10,7 @@ export default function StudentQuranPage() {
   // spread gets the height it needs on a phone.
   return (
     <div className="px-3 pt-4 pb-2 space-y-3">
-      <div className="flex items-baseline justify-between px-1">
-        <h1 className="page-title text-xl">{tr("Mushaf")}</h1>
-        <span className="eyebrow">{tr("Madinah script")}</span>
-      </div>
+      <StudentPageHeader compact emoji="📖" eyebrow={tr("Madinah script")} title={tr("Mushaf")} />
       <Mushaf />
     </div>
   );

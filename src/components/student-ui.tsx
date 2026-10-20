@@ -15,6 +15,7 @@ import {
   IconBookOpen,
 } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useStudentTheme } from "@/hooks/useStudentTheme";
 
 /* ── Illumination colours ──────────────────────────────────────────────
    Six, assigned to a surah by its number so the same surah is always the
@@ -711,5 +712,64 @@ export function FriendlyEmpty({
       <p className="page-title text-[15px] mt-2.5">{title}</p>
       <p className="text-[12px] text-ink-muted mt-1">{sub}</p>
     </div>
+  );
+}
+
+/**
+ * The blue card at the top of every student page: a big emoji, what the page
+ * is, and — on a page inside another — a way back. Same on every page, so a
+ * child always knows where they are. `aside` is for a figure on the right (a
+ * ring); `children` for anything under the title.
+ */
+export function StudentPageHeader({
+  emoji,
+  eyebrow,
+  title,
+  arabic,
+  subtitle,
+  back,
+  aside,
+  children,
+  compact = false,
+}: {
+  emoji: string;
+  eyebrow?: string;
+  title: string;
+  arabic?: string;
+  subtitle?: React.ReactNode;
+  back?: { href: string; label: string };
+  aside?: React.ReactNode;
+  children?: React.ReactNode;
+  compact?: boolean;
+}) {
+  const theme = useStudentTheme();
+  return (
+    <header className={`${theme.hero} rounded-3xl ${compact ? "px-4 py-3" : "px-5 py-5"} text-white relative overflow-hidden shadow-lg animate-rise`}>
+      {back && (
+        <a href={back.href} className="inline-flex items-center gap-1 text-[12px] font-semibold text-white/80 hover:text-white mb-2.5">
+          <span aria-hidden className="rtl:-scale-x-100">‹</span> {back.label}
+        </a>
+      )}
+      <div className="flex items-center gap-4">
+        <span
+          className={`${compact ? "w-10 h-10 text-2xl" : "w-14 h-14 text-3xl"} rounded-2xl bg-white/20 backdrop-blur-sm border border-white/25 flex items-center justify-center flex-shrink-0`}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+        <div className="min-w-0 flex-1">
+          {eyebrow && <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/75">{eyebrow}</p>}
+          <h1 className={`font-bold leading-tight [overflow-wrap:anywhere] ${compact ? "text-lg" : "text-2xl"}`}>{title}</h1>
+          {arabic && (
+            <p className="font-calligraphy text-[24px] text-yellow-200 leading-tight mt-0.5" dir="rtl" lang="ar">
+              {arabic}
+            </p>
+          )}
+          {subtitle && <p className="text-[13px] text-white/80 mt-1">{subtitle}</p>}
+        </div>
+        {aside}
+      </div>
+      {children}
+    </header>
   );
 }

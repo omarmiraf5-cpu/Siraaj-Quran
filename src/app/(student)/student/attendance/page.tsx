@@ -9,7 +9,7 @@ import {
 } from "@/data/demo";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { SectionCard, AttendanceStrip, LoadingNote } from "@/components/portal-ui";
-import { ProgressRing, StreakBadge, ILLUM_CLASS } from "@/components/student-ui";
+import { ProgressRing, StreakBadge, ILLUM_CLASS, StudentPageHeader } from "@/components/student-ui";
 import { IconCheck, IconClock, IconX, IconNote } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
@@ -55,27 +55,25 @@ export default function StudentAttendancePage() {
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
       {/* The rate as a ring, given the room it deserves. */}
-      <header
-        className={`${theme.hero} rounded-[22px] px-6 py-7 relative overflow-hidden text-center animate-rise`}
-      >
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="relative flex flex-col items-center">
-          <p className="eyebrow text-white/45">{t("common.yourRegister")}</p>
-          <div className="mt-4 rounded-full bg-white/10 p-2 backdrop-blur-sm">
-            <div className="rounded-full bg-surface-card p-2">
-              <ProgressRing value={s.rate} colour="saffron" size={104} label={t("common.here")} />
+      <StudentPageHeader
+        emoji="✅"
+        eyebrow={t("nav.register")}
+        title={t("common.yourRegister")}
+        subtitle={countLabel("the last {count} school day|the last {count} school days", s.total, [t("common.last"), s.total, t("common.schoolDays")].filter((x) => x !== "").join(" "))}
+        aside={
+          <div className="flex-shrink-0 rounded-full bg-white/15 p-2 backdrop-blur-sm">
+            <div className="rounded-full bg-surface-card p-1.5">
+              <ProgressRing value={s.rate} colour="saffron" size={76} label={t("common.here")} />
             </div>
           </div>
-          <p className="text-[13px] text-white/55 mt-3.5">
-            {countLabel("the last {count} school day|the last {count} school days", s.total, [t("common.last"), s.total, t("common.schoolDays")].filter((x) => x !== "").join(" "))}
-          </p>
-          {streak > 1 && (
-            <div className="mt-4">
-              <StreakBadge days={streak} />
-            </div>
-          )}
-        </div>
-      </header>
+        }
+      >
+        {streak > 1 && (
+          <div className="mt-3">
+            <StreakBadge days={streak} />
+          </div>
+        )}
+      </StudentPageHeader>
 
       <div className="grid grid-cols-4 gap-2.5">
         {MARKS.map((m, i) => (
