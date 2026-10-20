@@ -1992,4 +1992,8 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Couldn't change the PIN. Please try again.": "تعذّر تغيير الرمز. حاول مرة أخرى.",
   "That isn't your child": "هذا ليس ابنك",
   "A child and a 4-digit PIN are required": "مطلوب طفل ورمز من 4 أرقام",
+  "{count} star|{count} stars": "نجمة واحدة|{count} نجوم",
+  "{count} more stars to {tier}.": "بقي {count} نجوم للوصول إلى {tier}.",
+  "Gold reached. Well done!": "وصلت إلى الذهبي. أحسنت!",
+  "First badge: {count} stars": "أول وسام عند {count} نجوم",
 };

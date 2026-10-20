@@ -64,9 +64,12 @@ const TIER_KEY: Record<string, string> = {
 export function AchievementsCard({
   studentId,
   studentFirstName,
+  bonusStars = 0,
 }: {
   studentId: string;
   studentFirstName?: string;
+  /** Stars earned by the work itself, counted with the teachers'. */
+  bonusStars?: number;
 }) {
   const { t } = useLanguage();
   const [stars, setStars] = useState<DemoStar[]>([]);
@@ -122,7 +125,7 @@ export function AchievementsCard({
     load().finally(() => setReady(true));
   }, [studentId]);
 
-  const count = stars.length;
+  const count = stars.length + bonusStars;
   const tier = tierFor(count);
   const next = nextTier(count);
   const percent = tierPercent(count);

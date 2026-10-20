@@ -21,7 +21,9 @@ const PORTION_COLOUR: Record<HifzPortion, IllumColour> = {
   old: "aubergine",
 };
 import { getSurahById } from "@/data/mushaf-index";
-import { computeXp, levelFor, levelMessage } from "@/lib/progress";
+import { autoStars } from "@/lib/progress";
+import { useTeacherStars } from "@/hooks/useTeacherStars";
+import { TIERS, tierFor, nextTier, tierPercent } from "@/data/awards";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { useQaidahLessons } from "@/hooks/useQaidahLessons";
 import { currentLessons } from "@/lib/qaidahLessons";
@@ -33,11 +35,9 @@ import { StudentAccountButtons } from "@/components/StudentAccountButtons";
 import {
   Avatar,
   StreakPill,
-  LevelBar,
   UpNextCard,
   SectionLabel,
   BigTile,
-  XpTile,
   ProgressRing,
   FriendlyEmpty,
   ILLUM_CLASS,
@@ -94,8 +94,11 @@ export default function StudentDashboard() {
     streak++;
   }
 
-  const xp = computeXp(assignments, attendance);
-  const level = levelFor(xp.total);
+  const teacherStars = useTeacherStars(students[0]?.id ?? null);
+  const bonusStars = autoStars(assignments);
+  const stars = teacherStars + bonusStars;
+  const tier = tierFor(stars);
+  const upcoming = nextTier(stars);
 
   // Today's lesson and anything overdue come first; what falls due on a later
   // day, or was set earlier with no date, is homework.
@@ -171,13 +174,19 @@ export default function StudentDashboard() {
 
           <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/15">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold">⭐ {tr("Level {n}", { n: level.level })}</span>
-              <span className="text-xs text-white/75 tabular-nums"><bdi dir="ltr">{level.into} / {level.span} XP</bdi></span>
+              <span className="text-sm font-semibold">⭐ {countLabel("{count} star|{count} stars", stars, `${stars} ${t(stars === 1 ? "achievements.star" : "achievements.stars")}`)}</span>
+              <span className="text-xs text-white/85">
+                {upcoming ? `${upcoming.tier.emoji} ${t(`award.tier.${upcoming.tier.key}`)}` : `${TIERS[TIERS.length - 1].emoji} ${t("award.tier.gold")}`}
+              </span>
             </div>
             <div className="h-2.5 bg-white/20 rounded-full overflow-hidden">
-              <div className="h-full rounded-full bg-gradient-to-r from-yellow-300 to-amber-400 transition-all duration-1000" style={{ width: `${Math.max(0, Math.min(100, level.percent))}%` }} />
+              <div className="h-full rounded-full bg-gradient-to-r from-yellow-300 to-amber-400 transition-all duration-1000" style={{ width: `${tierPercent(stars)}%` }} />
             </div>
-            <p className="text-[11px] text-white/70 mt-2">{levelMessage(level)}</p>
+            <p className="text-[11px] text-white/70 mt-2">
+              {upcoming
+                ? tr("{count} more stars to {tier}.", { count: upcoming.toGo, tier: t(`award.tier.${upcoming.tier.key}`) })
+                : tr("Gold reached. Well done!")}
+            </p>
           </div>
           <StudentAccountButtons />
         </div>
@@ -297,9 +306,9 @@ export default function StudentDashboard() {
         <div className="grid grid-cols-4 gap-3">
           {[
             { icon: "🔥", label: streak > 0 ? tr("{days} days in a row", { days: streak }) : tr("Start a streak") },
-            { icon: "⭐", label: `${xp.total} XP` },
+            { icon: "⭐", label: countLabel("{count} star|{count} stars", stars, `${stars} ${t(stars === 1 ? "achievements.star" : "achievements.stars")}`) },
             { icon: "📚", label: tr("{count} finished", { count: done.length }) },
-            { icon: "🏆", label: tr("Level {n}", { n: level.level }) },
+            { icon: tier ? tier.emoji : "🏆", label: tier ? t(`award.tier.${tier.key}`) : tr("First badge: {count} stars", { count: TIERS[0].stars }) },
           ].map((b) => (
             <div key={b.icon} className="flex flex-col items-center justify-center gap-1.5 py-4 px-2 rounded-3xl bg-surface-card border border-surface-border shadow-card">
               <span className="text-4xl" aria-hidden>{b.icon}</span>
@@ -309,7 +318,7 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      <AchievementsCard studentId={student.id} />
+      <AchievementsCard studentId={student.id} bonusStars={bonusStars} />
 
       <AnnouncementsFeed audience="students" />
 

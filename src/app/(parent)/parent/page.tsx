@@ -38,6 +38,7 @@ import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { FeesDueLine } from "@/components/FeesDueLine";
 import { ChildPinCard } from "@/components/ChildPinCard";
+import { autoStars } from "@/lib/progress";
 import { ByLanguage } from "@/components/ByLanguage";
 import { CalendarCheck, BookOpen, ClipboardList, Award } from "lucide-react";
 
@@ -191,7 +192,7 @@ export default function ParentDashboard() {
         />
       </div>
 
-      <AchievementsCard studentId={child.id} studentFirstName={child.name.split(" ")[0]} />
+      <AchievementsCard studentId={child.id} studentFirstName={child.name.split(" ")[0]} bonusStars={autoStars(assignments)} />
 
       <AnnouncementsFeed audience="parents" />
 

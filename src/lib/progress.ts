@@ -1,83 +1,17 @@
 import type { QuranicAssignment } from "@/hooks/useQuranicAssignments";
-import type { AttendanceDay } from "@/data/demo";
-import { phrase } from "@/lib/i18n/phrases";
 
-// Points and levels for the student portal.
-//
-// The model is deliberately transparent rather than a black box: a child earns
-// from the three things they can actually influence — how much of a surah they
-// have memorised, finishing one, and turning up — and the portal shows that
-// breakdown rather than only a total. A number nobody can explain is not a
-// reward, it is a slot machine.
+// Stars for the student portal. A child sees one number — stars — and it is
+// earned in ways they can see: finishing a lesson, and learning ayahs. A
+// teacher can add more (see awards.ts), and the two are shown as one total.
 
-export const XP_PER_LEVEL = 250;
+/** Stars for each assignment carried all the way to completed. */
+const STARS_PER_FINISHED = 1;
+/** One star for every this-many percent learnt, across the assignments still open. */
+const PERCENT_PER_STAR = 50;
 
-/** Points per percent memorised, across all of a student's surahs. */
-const XP_PER_PERCENT = 3;
-/** Bonus for carrying a surah all the way to completed. */
-const XP_PER_COMPLETED = 100;
-/** Points for each day present or late — late still counts as showing up. */
-const XP_PER_DAY_IN = 25;
-
-export interface XpBreakdown {
-  memorising: number;
-  finishing: number;
-  attending: number;
-  total: number;
-}
-
-export function computeXp(
-  assignments: QuranicAssignment[],
-  attendance: AttendanceDay[]
-): XpBreakdown {
-  const memorising =
-    assignments.reduce((sum, a) => sum + a.memorization_level, 0) * XP_PER_PERCENT;
-  const finishing =
-    assignments.filter((a) => a.status === "completed").length * XP_PER_COMPLETED;
-  const attending =
-    attendance.filter((d) => d.status === "present" || d.status === "late").length *
-    XP_PER_DAY_IN;
-
-  return {
-    memorising,
-    finishing,
-    attending,
-    total: memorising + finishing + attending,
-  };
-}
-
-export interface LevelState {
-  level: number;
-  /** Points earned inside the current level. */
-  into: number;
-  /** Points needed to finish the current level. */
-  span: number;
-  /** Points still to go. */
-  toNext: number;
-  /** Percent of the way through the current level. */
-  percent: number;
-}
-
-export function levelFor(totalXp: number): LevelState {
-  const level = Math.floor(totalXp / XP_PER_LEVEL) + 1;
-  const into = totalXp % XP_PER_LEVEL;
-  const toNext = XP_PER_LEVEL - into;
-  return {
-    level,
-    into,
-    span: XP_PER_LEVEL,
-    toNext,
-    percent: Math.round((into / XP_PER_LEVEL) * 100),
-  };
-}
-
-/** The line under the level bar. Encouraging, and honest about the distance. */
-export function levelMessage(state: LevelState): string {
-  if (state.percent >= 80) {
-    return phrase("{xp} XP to Level {level} — nearly there!", { xp: state.toNext, level: state.level + 1 });
-  }
-  if (state.percent >= 40) {
-    return phrase("{xp} XP to Level {level} — keep going.", { xp: state.toNext, level: state.level + 1 });
-  }
-  return phrase("{xp} XP to Level {level}.", { xp: state.toNext, level: state.level + 1 });
+/** Stars earned by the work itself, apart from those a teacher gives. */
+export function autoStars(assignments: QuranicAssignment[]): number {
+  const finished = assignments.filter((a) => a.status === "completed").length;
+  const learnt = assignments.filter((a) => a.status !== "completed").reduce((sum, a) => sum + a.memorization_level, 0);
+  return finished * STARS_PER_FINISHED + Math.floor(learnt / PERCENT_PER_STAR);
 }
