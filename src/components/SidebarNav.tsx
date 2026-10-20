@@ -9,6 +9,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { SchoolSwitcher } from "@/components/SchoolSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useDemoUser } from "@/hooks/useDemoUser";
+import { useMyName } from "@/hooks/useMyName";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
@@ -102,7 +103,8 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   useRecordVisit();
   useSwitchedOffGuard();
   const role = t(roleKey);
-  const displayName = demoUser?.name ?? userName ?? role;
+  const myName = useMyName();
+  const displayName = demoUser?.name ?? myName ?? userName ?? role;
   const [moreOpen, setMoreOpen] = useState(false);
 
   const showOverflow = items.length > MAX_PRIMARY_TABS + 1;
@@ -132,7 +134,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           />
           <div className="min-w-0 leading-tight">
             <Wordmark branding={branding} className="block font-display text-sm font-bold tracking-tight truncate" />
-            <span className="block text-white/40 text-[11px] font-medium truncate">{role}</span>
+            <span className="block text-white/60 text-[11px] font-medium truncate">{demoUser?.name ?? myName ?? role}</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0 ms-2">
