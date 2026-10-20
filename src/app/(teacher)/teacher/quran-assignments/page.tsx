@@ -170,6 +170,9 @@ export default function QuranAssignmentsPage() {
   // up, not picking them in the form below. Keyed by student_id; a
   // student missing from this map has no active anchored plan, not just
   // one still loading.
+  // Where each of the teacher's students sits — "Grade 3 · North · Halaqa A" — for grouping the list.
+  const [placeOf, setPlaceOf] = useState<Record<string, string>>({});
+  const [listGroup, setListGroup] = useState("");
   const [planSummaries, setPlanSummaries] = useState<Record<string, PlanSummaryDto>>({});
   const [confirmingSurah, setConfirmingSurah] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
@@ -233,6 +236,7 @@ export default function QuranAssignmentsPage() {
             readDemoStore(DEMO_STUDENT_OVERRIDES_KEY, {})
           );
           setRoster(fullRoster);
+          setPlaceOf(Object.fromEntries(fullRoster.filter((s) => s.halaqa).map((s) => [s.id, s.halaqa])));
           setStudents(
             fullRoster
               .filter((s) => s.active !== false)
@@ -264,6 +268,7 @@ export default function QuranAssignmentsPage() {
         if (studentError) throw studentError;
         const studentData = mine ? (allStudentData ?? []).filter((s) => mine.has(s.id)) : allStudentData;
 
+        if (mine) setPlaceOf(Object.fromEntries(mine));
         if (studentData) {
           setStudents(studentData);
           // Real students weren't fed into `roster` at all here, which
@@ -717,6 +722,16 @@ export default function QuranAssignmentsPage() {
         ]
       : realAssignments
   ).map((a) => withOverride(a, overrides));
+
+  // The list, one group per halaqa (with its grade, where the school has them),
+  // so a teacher with several halaqas grades one at a time.
+  const NO_PLACE = "\u0000";
+  const groupNames = [...new Set(allAssignments.map((a) => placeOf[a.student_id] ?? NO_PLACE))].sort((x, y) =>
+    x === NO_PLACE ? 1 : y === NO_PLACE ? -1 : x.localeCompare(y, undefined, { numeric: true })
+  );
+  const groups = groupNames
+    .filter((g) => !listGroup || g === listGroup)
+    .map((g) => ({ name: g, items: allAssignments.filter((a) => (placeOf[a.student_id] ?? NO_PLACE) === g) }));
 
   const startEditing = (a: QuranicAssignment) => {
     setEditingId(a.id === editingId ? null : a.id);
@@ -1467,8 +1482,36 @@ export default function QuranAssignmentsPage() {
         {!loadError && allAssignments.length === 0 && (
           <EmptyNote>{tr("No assignments yet — set the first one above.")}</EmptyNote>
         )}
+        {groupNames.length > 1 && (
+          <div role="group" aria-label={tr("Show")} className="flex flex-wrap gap-1.5 mb-3">
+            {[{ key: "", label: tr("All"), count: allAssignments.length }, ...groupNames.map((g) => ({
+              key: g,
+              label: g === NO_PLACE ? tr("Other students") : g,
+              count: allAssignments.filter((a) => (placeOf[a.student_id] ?? NO_PLACE) === g).length,
+            }))].map((chip) => (
+              <button
+                key={chip.key || "all"}
+                type="button"
+                onClick={() => setListGroup(chip.key)}
+                aria-pressed={listGroup === chip.key}
+                className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                  listGroup === chip.key ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                }`}
+              >
+                {chip.label} <span className="opacity-70 tabular-nums">{chip.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {groups.map((group) => (
+        <div key={group.name} className="mb-4 last:mb-0">
+          {groupNames.length > 1 && (
+            <p className="eyebrow px-1 pb-1.5">
+              {group.name === NO_PLACE ? tr("Other students") : group.name} · {group.items.length}
+            </p>
+          )}
         <ul className="divide-y divide-surface-border -my-1">
-          {allAssignments.map((a) => {
+          {group.items.map((a) => {
             const surah = getSurahById(a.surah);
             const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
             const name = studentName(a.student_id, roster);
@@ -1612,6 +1655,8 @@ export default function QuranAssignmentsPage() {
             );
           })}
         </ul>
+        </div>
+        ))}
       </SectionCard>
     </div>
   );
