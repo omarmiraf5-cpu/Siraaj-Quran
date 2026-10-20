@@ -177,6 +177,8 @@ export default function AdminHalaqasPage() {
 
   const [newCampus, setNewCampus] = useState("");
   const [campusBusy, setCampusBusy] = useState(false);
+  const [merging, setMerging] = useState(false);
+  const [mergeName, setMergeName] = useState("");
   const [campusError, setCampusError] = useState<string | null>(null);
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
@@ -442,6 +444,32 @@ export default function AdminHalaqasPage() {
     setCampuses(fresh);
     setHalaqas(list);
     setCampusBusy(false);
+  };
+
+  const mergeCampuses = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = mergeName.trim();
+    if (!name) return;
+    setCampusBusy(true);
+    setCampusError(null);
+    try {
+      const res = await fetch("/api/admin/campuses/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Couldn't merge the campuses. Please try again.");
+      const [fresh, list] = await Promise.all([loadCampuses(supabase), loadRealHalaqas()]);
+      setCampuses(fresh);
+      setHalaqas(list);
+      setMerging(false);
+      setMergeName("");
+    } catch (err) {
+      setCampusError(err instanceof Error ? tr(err.message) : tr("Couldn't merge the campuses. Please try again."));
+    } finally {
+      setCampusBusy(false);
+    }
   };
 
   // How many children are in a halaqa: by its id where names repeat across
@@ -744,6 +772,47 @@ export default function AdminHalaqasPage() {
               </button>
             </form>
           </div>
+          {campuses.length > 1 &&
+            (merging ? (
+              <form onSubmit={mergeCampuses} className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                <p className="text-[13px] font-semibold text-ink">{tr("Make {count} campuses into one", { count: campuses.length })}</p>
+                <p className="text-[12.5px] text-ink-muted">
+                  {tr("Every halaqa and student moves to the one campus, and the others are removed. Staff then sign in at that campus's pin and place — check it under Staff attendance afterwards.")}
+                </p>
+                <label className="block">
+                  <span className="text-[12px] text-ink-muted">{tr("Name of the one campus")}</span>
+                  <input
+                    value={mergeName}
+                    onChange={(e) => setMergeName(e.target.value.slice(0, 60))}
+                    placeholder={tr("e.g. Main campus")}
+                    className="mt-1 w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[14px] text-ink focus:outline-none focus:border-emerald-600"
+                  />
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={!mergeName.trim() || campusBusy}
+                    className="gradient-emerald text-white text-[13.5px] font-semibold px-4 py-2 rounded-xl disabled:opacity-40"
+                  >
+                    {campusBusy ? tr("Merging…") : tr("Merge into one campus")}
+                  </button>
+                  <button type="button" onClick={() => setMerging(false)} className="text-[13px] font-semibold text-ink-muted hover:text-ink">
+                    {tr("Cancel")}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMergeName(campuses[0]?.name ?? "");
+                  setMerging(true);
+                }}
+                className="text-[12.5px] font-semibold text-ink-muted hover:text-ink underline underline-offset-2"
+              >
+                {tr("Make these one campus")}
+              </button>
+            ))}
           {campusError && <p className="text-xs text-red-600 dark:text-red-400">{campusError}</p>}
         </section>
       )}
