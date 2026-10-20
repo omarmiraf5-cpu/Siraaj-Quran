@@ -188,7 +188,7 @@ export default function QuranAssignmentsPage() {
   const [confirmingSurah, setConfirmingSurah] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
   // Whether it's for today's lesson, in class, or homework to do at home.
-  const [forWhen, setForWhen] = useState<"today" | "homework">("today");
+  const [forWhen, setForWhen] = useState<"today" | "homework" | "not_recited">("today");
   // More work given in the same save: homework, a recent revision, an old
   // revision — each with its own surah, ayahs and due date. A hifz day is
   // usually the three portions together.
@@ -399,7 +399,7 @@ export default function QuranAssignmentsPage() {
         // attach the row to. Simulate the write in the browser instead of
         // dead-ending the one workflow a prospective school would want to
         // try first.
-        const demoRow = (piece: { portion?: typeof portion; surah: number; ayah_start: number; surah_end: number; ayah_end: number; due_date: string }): QuranicAssignment => ({
+        const demoRow = (piece: { rating?: DailyRating; portion?: typeof portion; surah: number; ayah_start: number; surah_end: number; ayah_end: number; due_date: string }): QuranicAssignment => ({
           id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           student_id: selectedStudent,
           teacher_id: "t1",
@@ -417,14 +417,14 @@ export default function QuranAssignmentsPage() {
           due_date: piece.due_date || null,
           status: "assigned",
           memorization_level: 0,
-          daily_rating: null,
+          daily_rating: piece.rating ?? null,
           teacher_notes: notes || null,
           student_notes: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
         const created = [
-          demoRow({ surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue }),
+          demoRow({ rating: forWhen === "not_recited" ? "not_recited" : undefined, surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue }),
           ...extraPieces.map(demoRow),
         ];
         const next = [...created, ...demoCreated];
@@ -452,6 +452,22 @@ export default function QuranAssignmentsPage() {
               teacher_notes: notes || null,
             }),
           });
+          if (res.ok && i === 0 && forWhen === "not_recited") {
+            // Set, but the child didn't recite it: graded straight away, so it is heard another day.
+            const made = await res.json().catch(() => null);
+            if (made?.id) {
+              await fetch(`/api/quranic-assignments/${made.id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ daily_rating: "not_recited", teacher_notes: notes || null }),
+              });
+              await fetch("/api/recitation-log", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ student_id: selectedStudent, ...piece, rating: "not_recited", notes: notes || null }),
+              });
+            }
+          }
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             // If the lesson went in and the homework didn't, say so rather than leave a half-done save.
@@ -732,10 +748,10 @@ export default function QuranAssignmentsPage() {
     d.setDate(d.getDate() + 1);
     return d.toLocaleDateString("en-CA");
   };
-  const chooseWhen = (w: "today" | "homework") => {
+  const chooseWhen = (w: "today" | "homework" | "not_recited") => {
     setForWhen(w);
     // Today's lesson is due today; homework is due a day on, unless a later day is already chosen.
-    setDueDate(w === "today" ? todayStr : dueDate && dueDate > todayStr ? dueDate : dayAfter(todayStr));
+    setDueDate(w !== "homework" ? todayStr : dueDate && dueDate > todayStr ? dueDate : dayAfter(todayStr));
   };
   // What a set piece of work is: today's, homework, or overdue — read off its dates.
   const whenOf = (a: QuranicAssignment): { text: string; tone: string } | null => {
@@ -1408,8 +1424,8 @@ export default function QuranAssignmentsPage() {
 
           <div>
             <p className="text-sm font-semibold text-ink mb-2">{tr("This is for")}</p>
-            <div className="grid grid-cols-2 gap-2">
-              {(["today", "homework"] as const).map((w) => (
+            <div className="grid grid-cols-3 gap-2">
+              {(["today", "homework", "not_recited"] as const).map((w) => (
                 <button
                   key={w}
                   type="button"
@@ -1419,8 +1435,8 @@ export default function QuranAssignmentsPage() {
                     forWhen === w ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
                   }`}
                 >
-                  <span className="block text-[13px] font-semibold leading-tight">{w === "today" ? tr("Today's lesson") : tr("Homework")}</span>
-                  <span className="block text-[11px] leading-tight mt-0.5 opacity-70">{w === "today" ? tr("Done in class today") : tr("To do at home, by the due date")}</span>
+                  <span className="block text-[13px] font-semibold leading-tight">{w === "today" ? tr("Today's lesson") : w === "homework" ? tr("Homework") : DAILY_RATING_LABELS.not_recited}</span>
+                  <span className="block text-[11px] leading-tight mt-0.5 opacity-70">{w === "today" ? tr("Done in class today") : w === "homework" ? tr("To do at home, by the due date") : tr("Set, but not recited today")}</span>
                 </button>
               ))}
             </div>
