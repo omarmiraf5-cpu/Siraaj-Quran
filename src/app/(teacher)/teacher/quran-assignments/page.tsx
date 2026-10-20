@@ -178,6 +178,12 @@ export default function QuranAssignmentsPage() {
   const [dueDate, setDueDate] = useState("");
   // Whether it's for today's lesson, in class, or homework to do at home.
   const [forWhen, setForWhen] = useState<"today" | "homework">("today");
+  // Homework given with today's lesson, in the same save: its own surah, ayahs and due date.
+  const [hwOn, setHwOn] = useState(false);
+  const [hwSurah, setHwSurah] = useState("");
+  const [hwStart, setHwStart] = useState("");
+  const [hwEnd, setHwEnd] = useState("");
+  const [hwDue, setHwDue] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -356,20 +362,31 @@ export default function QuranAssignmentsPage() {
 
       const surahEndValue = parseInt(spansSurah && endSurah ? endSurah : selectedSurah);
 
+      // Today's lesson and homework at once: the lesson is due today, the homework on its own day.
+      if (hwOn) {
+        const hwMissing = [!hwSurah && "the homework surah", !hwStart && "the homework's starting ayah", !hwEnd && "the homework's ending ayah", !hwDue && "the homework's due date"].filter(Boolean) as string[];
+        if (hwMissing.length > 0) throw new Error(phrase("Still needed: {fields}.", { fields: hwMissing.join(", ") }));
+        if (parseInt(hwEnd) < parseInt(hwStart)) throw new Error(phrase("The homework's last ayah comes before its first."));
+      }
+      const lessonDue = hwOn ? dueDate || todayStr : dueDate;
+      const homework = hwOn
+        ? { surah: parseInt(hwSurah), ayah_start: parseInt(hwStart), surah_end: parseInt(hwSurah), ayah_end: parseInt(hwEnd), due_date: hwDue }
+        : null;
+
       if (isDemo) {
         // No real session to write against — /api/quranic-assignments would
         // correctly 401 here, since it has no school or teacher row to
         // attach the row to. Simulate the write in the browser instead of
         // dead-ending the one workflow a prospective school would want to
         // try first.
-        const created: QuranicAssignment = {
+        const demoRow = (piece: { surah: number; ayah_start: number; surah_end: number; ayah_end: number; due_date: string }): QuranicAssignment => ({
           id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           student_id: selectedStudent,
           teacher_id: "t1",
-          surah: parseInt(selectedSurah),
-          ayah_start: parseInt(ayahStart),
-          surah_end: surahEndValue,
-          ayah_end: parseInt(ayahEnd),
+          surah: piece.surah,
+          ayah_start: piece.ayah_start,
+          surah_end: piece.surah_end,
+          ayah_end: piece.ayah_end,
           portion,
           // A plain date, not a full timestamp — formatDay elsewhere expects
           // "YYYY-MM-DD" the way every other assigned_at in the app is
@@ -377,7 +394,7 @@ export default function QuranAssignmentsPage() {
           // created row reads as "today" on the same fixed timeline the
           // rest of the demo data uses instead of the real calendar date.
           assigned_at: DEMO_TODAY,
-          due_date: dueDate || null,
+          due_date: piece.due_date || null,
           status: "assigned",
           memorization_level: 0,
           daily_rating: null,
@@ -385,8 +402,12 @@ export default function QuranAssignmentsPage() {
           student_notes: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        };
-        const next = [created, ...demoCreated];
+        });
+        const created = [
+          demoRow({ surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue }),
+          ...(homework ? [demoRow(homework)] : []),
+        ];
+        const next = [...created, ...demoCreated];
         setDemoCreated(next);
         try {
           localStorage.setItem(DEMO_CREATED_KEY, JSON.stringify(next));
@@ -395,24 +416,27 @@ export default function QuranAssignmentsPage() {
           // for this visit, it just won't survive a refresh.
         }
       } else {
-        const res = await fetch("/api/quranic-assignments", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            student_id: selectedStudent,
-            surah: parseInt(selectedSurah),
-            ayah_start: parseInt(ayahStart),
-            surah_end: surahEndValue,
-            ayah_end: parseInt(ayahEnd),
-            portion,
-            due_date: dueDate || null,
-            teacher_notes: notes || null,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || phrase("Failed to create assignment"));
+        const pieces = [
+          { surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue },
+          ...(homework ? [homework] : []),
+        ];
+        for (const [i, piece] of pieces.entries()) {
+          const res = await fetch("/api/quranic-assignments", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              student_id: selectedStudent,
+              ...piece,
+              portion,
+              due_date: piece.due_date || null,
+              teacher_notes: notes || null,
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            // If the lesson went in and the homework didn't, say so rather than leave a half-done save.
+            throw new Error(i > 0 ? phrase("Today's lesson was saved, but the homework wasn't: {error}", { error: data.error || phrase("Failed to create assignment") }) : data.error || phrase("Failed to create assignment"));
+          }
         }
 
         // Re-read so the new assignment appears in the list below straight
@@ -438,6 +462,11 @@ export default function QuranAssignmentsPage() {
       setEndSurah("");
       setDueDate("");
       setForWhen("today");
+      setHwOn(false);
+      setHwSurah("");
+      setHwStart("");
+      setHwEnd("");
+      setHwDue("");
       setNotes("");
 
       setTimeout(() => setSuccess(false), 3000);
@@ -1383,6 +1412,61 @@ export default function QuranAssignmentsPage() {
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
+
+          {/* Homework to go with today's lesson, in the same save. */}
+          {!hwOn ? (
+            <button
+              type="button"
+              onClick={() => {
+                setHwOn(true);
+                setHwSurah(selectedSurah);
+                const next = parseInt(ayahEnd) + 1;
+                setHwStart(selectedSurah && next && next <= (selectedSurahData?.ayahs ?? 0) && !spansSurah ? String(next) : "");
+                setHwEnd("");
+                setHwDue(dayAfter(todayStr));
+                if (!dueDate) setDueDate(todayStr);
+                setForWhen("today");
+              }}
+              className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+            >
+              {tr("+ Also give homework")}
+            </button>
+          ) : (
+            <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-ink">{tr("Homework")}</p>
+                <button type="button" onClick={() => setHwOn(false)} className="text-[12.5px] font-semibold text-ink-muted hover:text-ink">
+                  {tr("Remove homework")}
+                </button>
+              </div>
+              <p className="text-[12px] text-ink-muted">{tr("Saved with today's lesson above, which is due today.")}</p>
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Surah *")}</label>
+                <select value={hwSurah} onChange={(e) => setHwSurah(e.target.value)} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600">
+                  <option value="">{tr("Choose…")}</option>
+                  {QURAN.map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {q.id}. {q.englishName} ({q.ayahs} {tr("Ayahs")})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah Start *")}</label>
+                  <input type="number" min={1} max={getSurahById(parseInt(hwSurah) || 0)?.ayahs} value={hwStart} onChange={(e) => setHwStart(e.target.value)} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah End *")}</label>
+                  <input type="number" min={1} max={getSurahById(parseInt(hwSurah) || 0)?.ayahs} value={hwEnd} onChange={(e) => setHwEnd(e.target.value)} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Due Date")} *</label>
+                <input type="date" min={todayStr} value={hwDue} onChange={(e) => setHwDue(e.target.value)} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">

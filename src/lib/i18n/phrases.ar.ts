@@ -2052,4 +2052,9 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Halaqa not found": "لم يُعثر على الحلقة",
   "That isn't your halaqa": "هذه ليست حلقتك",
   "Couldn't remove them. Please try again.": "تعذّرت الإزالة. حاول مرة أخرى.",
+  "The homework's last ayah comes before its first.": "آخر آية في الواجب تسبق أولها.",
+  "Today's lesson was saved, but the homework wasn't: {error}": "حُفظ درس اليوم لكن الواجب لم يُحفظ: {error}",
+  "+ Also give homework": "+ أعطِ واجبًا أيضًا",
+  "Remove homework": "إزالة الواجب",
+  "Saved with today's lesson above, which is due today.": "يُحفظ مع درس اليوم أعلاه، وموعده اليوم.",
 };
