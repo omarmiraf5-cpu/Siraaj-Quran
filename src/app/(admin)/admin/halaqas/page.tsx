@@ -310,7 +310,7 @@ export default function AdminHalaqasPage() {
   const placeMissing = (grade: string, campusId: string, program = false) =>
     (graded && !program && grade === "") || (campuses.length > 0 && !campusId);
   // A graded school's halaqa is called after its teacher; a program's name says it is one.
-  const nameFor = (teacher: string, program: boolean) => (program && teacher ? `Full-time Hifd · ${teacher}` : teacher);
+  const nameFor = (teacher: string, program: boolean) => (program && teacher ? `Hifd program · ${teacher}` : teacher);
 
   // In an academic school the teacher is the halaqa: it's called by its
   // (first) teacher's name, and changes name when its teacher changes.
