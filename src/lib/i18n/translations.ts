@@ -205,6 +205,7 @@ export const translations: Partial<Record<Language, Record<string, string>>> & {
     "rating.veryGood": "Very good",
     "rating.good": "Good",
     "rating.weak": "Weak",
+    "rating.notRecited": "Didn't recite",
     "assignment.assigned": "To start",
     "assignment.inProgress": "In progress",
     "assignment.completed": "Completed",

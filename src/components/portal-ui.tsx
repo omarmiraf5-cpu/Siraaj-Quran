@@ -39,6 +39,7 @@ const RATING_KEY: Record<DailyRating, string> = {
   very_good: "rating.veryGood",
   good: "rating.good",
   weak: "rating.weak",
+  not_recited: "rating.notRecited",
 };
 
 /* ── Modal ─────────────────────────────────────────────────────────────

@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const RATINGS = ["excellent", "very_good", "good", "weak"];
+    const RATINGS = ["excellent", "very_good", "good", "weak", "not_recited"];
     if (!RATINGS.includes(rating)) {
       return NextResponse.json(
         { error: `rating must be one of: ${RATINGS.join(", ")}` },

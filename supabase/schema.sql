@@ -630,7 +630,7 @@ create table if not exists quranic_assignments (
   memorization_level   int not null default 0 check (memorization_level between 0 and 100),
   -- How the teacher graded today's recitation. Parents read this before any
   -- percentage, so it is set independently of memorization_level.
-  daily_rating         text check (daily_rating in ('excellent', 'very_good', 'good', 'weak')),
+  daily_rating         text check (daily_rating in ('excellent', 'very_good', 'good', 'weak', 'not_recited')),
   teacher_notes        text,
   student_notes        text,
   created_at           timestamptz default now(),
@@ -662,7 +662,7 @@ begin
   ) then
     alter table quranic_assignments
       add constraint quranic_assignments_daily_rating_check
-      check (daily_rating in ('excellent', 'very_good', 'good', 'weak'));
+      check (daily_rating in ('excellent', 'very_good', 'good', 'weak', 'not_recited'));
   end if;
 end $$;
 alter table quranic_assignments
@@ -1043,7 +1043,7 @@ create table if not exists recitation_log (
   -- for the common single-surah case.
   surah_end     int not null check (surah_end between surah and 114),
   ayah_end      int not null check (ayah_end >= ayah_start),
-  rating        text not null check (rating in ('excellent', 'very_good', 'good', 'weak')),
+  rating        text not null check (rating in ('excellent', 'very_good', 'good', 'weak', 'not_recited')),
   notes         text,
   -- The day the session was heard, distinct from created_at (when the row
   -- was written) so a teacher can log yesterday's session without it

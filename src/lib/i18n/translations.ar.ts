@@ -169,6 +169,7 @@ export const AR: Record<string, string> = {
   "rating.veryGood": "جيد جدًا",
   "rating.good": "جيد",
   "rating.weak": "ضعيف",
+  "rating.notRecited": "لم يسمّع",
   "assignment.assigned": "لم يبدأ",
   "assignment.inProgress": "قيد التنفيذ",
   "assignment.completed": "مكتمل",

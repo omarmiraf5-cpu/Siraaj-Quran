@@ -116,6 +116,16 @@ const OVERRIDES_KEY = "demo_assignment_overrides";
 // Read by the parent portal too, for the same reason.
 const LOG_KEY = "demo_recitation_log_v1";
 
+type ExtraKind = "homework" | "recent" | "old";
+interface ExtraPiece {
+  kind: ExtraKind;
+  surah: string;
+  start: string;
+  end: string;
+  due: string;
+}
+const EXTRA_KINDS: ExtraKind[] = ["homework", "recent", "old"];
+
 export default function QuranAssignmentsPage() {
   const supabase = createClient();
   const { language, tr } = useLanguage();
@@ -178,12 +188,12 @@ export default function QuranAssignmentsPage() {
   const [dueDate, setDueDate] = useState("");
   // Whether it's for today's lesson, in class, or homework to do at home.
   const [forWhen, setForWhen] = useState<"today" | "homework">("today");
-  // Homework given with today's lesson, in the same save: its own surah, ayahs and due date.
-  const [hwOn, setHwOn] = useState(false);
-  const [hwSurah, setHwSurah] = useState("");
-  const [hwStart, setHwStart] = useState("");
-  const [hwEnd, setHwEnd] = useState("");
-  const [hwDue, setHwDue] = useState("");
+  // More work given in the same save: homework, a recent revision, an old
+  // revision — each with its own surah, ayahs and due date. A hifz day is
+  // usually the three portions together.
+  const [extras, setExtras] = useState<ExtraPiece[]>([]);
+  const updateExtra = (kind: ExtraKind, patch: Partial<ExtraPiece>) =>
+    setExtras((list) => list.map((x) => (x.kind === kind ? { ...x, ...patch } : x)));
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -362,16 +372,23 @@ export default function QuranAssignmentsPage() {
 
       const surahEndValue = parseInt(spansSurah && endSurah ? endSurah : selectedSurah);
 
-      // Today's lesson and homework at once: the lesson is due today, the homework on its own day.
-      if (hwOn) {
-        const hwMissing = [!hwSurah && "the homework surah", !hwStart && "the homework's starting ayah", !hwEnd && "the homework's ending ayah", !hwDue && "the homework's due date"].filter(Boolean) as string[];
-        if (hwMissing.length > 0) throw new Error(phrase("Still needed: {fields}.", { fields: hwMissing.join(", ") }));
-        if (parseInt(hwEnd) < parseInt(hwStart)) throw new Error(phrase("The homework's last ayah comes before its first."));
+      // The lesson and anything given with it: each extra is checked, and the
+      // lesson is due today when others go with it.
+      const extraLabel: Record<ExtraKind, string> = { homework: phrase("homework"), recent: phrase("recent revision"), old: phrase("old revision") };
+      for (const x of extras) {
+        const need = [!x.surah && phrase("surah"), !x.start && phrase("starting ayah"), !x.end && phrase("ending ayah"), !x.due && phrase("due date")].filter(Boolean) as string[];
+        if (need.length > 0) throw new Error(phrase("Still needed for the {piece}: {fields}.", { piece: extraLabel[x.kind], fields: need.join(", ") }));
+        if (parseInt(x.end) < parseInt(x.start)) throw new Error(phrase("The {piece}'s last ayah comes before its first.", { piece: extraLabel[x.kind] }));
       }
-      const lessonDue = hwOn ? dueDate || todayStr : dueDate;
-      const homework = hwOn
-        ? { surah: parseInt(hwSurah), ayah_start: parseInt(hwStart), surah_end: parseInt(hwSurah), ayah_end: parseInt(hwEnd), due_date: hwDue }
-        : null;
+      const lessonDue = extras.length > 0 ? dueDate || todayStr : dueDate;
+      const extraPieces = extras.map((x) => ({
+        portion: x.kind === "homework" ? portion : (x.kind as "recent" | "old"),
+        surah: parseInt(x.surah),
+        ayah_start: parseInt(x.start),
+        surah_end: parseInt(x.surah),
+        ayah_end: parseInt(x.end),
+        due_date: x.due,
+      }));
 
       if (isDemo) {
         // No real session to write against — /api/quranic-assignments would
@@ -379,7 +396,7 @@ export default function QuranAssignmentsPage() {
         // attach the row to. Simulate the write in the browser instead of
         // dead-ending the one workflow a prospective school would want to
         // try first.
-        const demoRow = (piece: { surah: number; ayah_start: number; surah_end: number; ayah_end: number; due_date: string }): QuranicAssignment => ({
+        const demoRow = (piece: { portion?: typeof portion; surah: number; ayah_start: number; surah_end: number; ayah_end: number; due_date: string }): QuranicAssignment => ({
           id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           student_id: selectedStudent,
           teacher_id: "t1",
@@ -387,7 +404,7 @@ export default function QuranAssignmentsPage() {
           ayah_start: piece.ayah_start,
           surah_end: piece.surah_end,
           ayah_end: piece.ayah_end,
-          portion,
+          portion: piece.portion ?? portion,
           // A plain date, not a full timestamp — formatDay elsewhere expects
           // "YYYY-MM-DD" the way every other assigned_at in the app is
           // shaped, and DEMO_TODAY rather than the real clock so a newly
@@ -405,7 +422,7 @@ export default function QuranAssignmentsPage() {
         });
         const created = [
           demoRow({ surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue }),
-          ...(homework ? [demoRow(homework)] : []),
+          ...extraPieces.map(demoRow),
         ];
         const next = [...created, ...demoCreated];
         setDemoCreated(next);
@@ -417,8 +434,8 @@ export default function QuranAssignmentsPage() {
         }
       } else {
         const pieces = [
-          { surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue },
-          ...(homework ? [homework] : []),
+          { portion, surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue },
+          ...extraPieces,
         ];
         for (const [i, piece] of pieces.entries()) {
           const res = await fetch("/api/quranic-assignments", {
@@ -427,7 +444,7 @@ export default function QuranAssignmentsPage() {
             body: JSON.stringify({
               student_id: selectedStudent,
               ...piece,
-              portion,
+              portion: piece.portion ?? portion,
               due_date: piece.due_date || null,
               teacher_notes: notes || null,
             }),
@@ -435,7 +452,7 @@ export default function QuranAssignmentsPage() {
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             // If the lesson went in and the homework didn't, say so rather than leave a half-done save.
-            throw new Error(i > 0 ? phrase("Today's lesson was saved, but the homework wasn't: {error}", { error: data.error || phrase("Failed to create assignment") }) : data.error || phrase("Failed to create assignment"));
+            throw new Error(i > 0 ? phrase("The first piece was saved, but another wasn't: {error}", { error: data.error || phrase("Failed to create assignment") }) : data.error || phrase("Failed to create assignment"));
           }
         }
 
@@ -462,11 +479,7 @@ export default function QuranAssignmentsPage() {
       setEndSurah("");
       setDueDate("");
       setForWhen("today");
-      setHwOn(false);
-      setHwSurah("");
-      setHwStart("");
-      setHwEnd("");
-      setHwDue("");
+      setExtras([]);
       setNotes("");
 
       setTimeout(() => setSuccess(false), 3000);
@@ -1413,60 +1426,76 @@ export default function QuranAssignmentsPage() {
             />
           </div>
 
-          {/* Homework to go with today's lesson, in the same save. */}
-          {!hwOn ? (
-            <button
-              type="button"
-              onClick={() => {
-                setHwOn(true);
-                setHwSurah(selectedSurah);
-                const next = parseInt(ayahEnd) + 1;
-                setHwStart(selectedSurah && next && next <= (selectedSurahData?.ayahs ?? 0) && !spansSurah ? String(next) : "");
-                setHwEnd("");
-                setHwDue(dayAfter(todayStr));
-                if (!dueDate) setDueDate(todayStr);
-                setForWhen("today");
-              }}
-              className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
-            >
-              {tr("+ Also give homework")}
-            </button>
-          ) : (
-            <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-ink">{tr("Homework")}</p>
-                <button type="button" onClick={() => setHwOn(false)} className="text-[12.5px] font-semibold text-ink-muted hover:text-ink">
-                  {tr("Remove homework")}
-                </button>
-              </div>
-              <p className="text-[12px] text-ink-muted">{tr("Saved with today's lesson above, which is due today.")}</p>
-              <div>
-                <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Surah *")}</label>
-                <select value={hwSurah} onChange={(e) => setHwSurah(e.target.value)} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600">
-                  <option value="">{tr("Choose…")}</option>
-                  {QURAN.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.id}. {q.englishName} ({q.ayahs} {tr("Ayahs")})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah Start *")}</label>
-                  <input type="number" min={1} max={getSurahById(parseInt(hwSurah) || 0)?.ayahs} value={hwStart} onChange={(e) => setHwStart(e.target.value)} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+          {/* More work in the same save: homework, a recent revision, an old revision. */}
+          <div className="space-y-3">
+            {extras.map((x) => (
+              <div key={x.kind} className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-ink">
+                    {x.kind === "homework" ? tr("Homework") : x.kind === "recent" ? tr("Recent revision") : tr("Old revision")}
+                  </p>
+                  <button type="button" onClick={() => setExtras((l) => l.filter((y) => y.kind !== x.kind))} className="text-[12.5px] font-semibold text-ink-muted hover:text-ink">
+                    {tr("Remove")}
+                  </button>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah End *")}</label>
-                  <input type="number" min={1} max={getSurahById(parseInt(hwSurah) || 0)?.ayahs} value={hwEnd} onChange={(e) => setHwEnd(e.target.value)} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                  <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Surah *")}</label>
+                  <select value={x.surah} onChange={(e) => updateExtra(x.kind, { surah: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600">
+                    <option value="">{tr("Choose…")}</option>
+                    {QURAN.map((q) => (
+                      <option key={q.id} value={q.id}>
+                        {q.id}. {q.englishName} ({q.ayahs} {tr("Ayahs")})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah Start *")}</label>
+                    <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.start} onChange={(e) => updateExtra(x.kind, { start: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah End *")}</label>
+                    <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.end} onChange={(e) => updateExtra(x.kind, { end: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Due Date")} *</label>
+                  <input type="date" min={todayStr} value={x.due} onChange={(e) => updateExtra(x.kind, { due: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Due Date")} *</label>
-                <input type="date" min={todayStr} value={hwDue} onChange={(e) => setHwDue(e.target.value)} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+            ))}
+            {EXTRA_KINDS.some((k) => !extras.some((x) => x.kind === k)) && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="text-[12.5px] text-ink-muted">{tr("Also give:")}</span>
+                {EXTRA_KINDS.filter((k) => !extras.some((x) => x.kind === k)).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => {
+                      const next = parseInt(ayahEnd) + 1;
+                      const sameSurah = selectedSurah && !spansSurah;
+                      setExtras((list) => [
+                        ...list,
+                        {
+                          kind: k,
+                          surah: k === "homework" ? selectedSurah : "",
+                          start: k === "homework" && sameSurah && next && next <= (selectedSurahData?.ayahs ?? 0) ? String(next) : "",
+                          end: "",
+                          due: k === "homework" ? dayAfter(todayStr) : todayStr,
+                        },
+                      ]);
+                      if (!dueDate) setDueDate(todayStr);
+                      setForWhen("today");
+                    }}
+                    className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                  >
+                    {k === "homework" ? tr("+ Homework") : k === "recent" ? tr("+ Recent revision") : tr("+ Old revision")}
+                  </button>
+                ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
@@ -1674,7 +1703,7 @@ export default function QuranAssignmentsPage() {
                       <p className="text-xs font-semibold text-ink mb-2">
                         {tr("Today's rating")}
                       </p>
-                      <div className="grid grid-cols-4 gap-1.5">
+                      <div className="grid grid-cols-2 min-[420px]:grid-cols-3 gap-1.5">
                         {DAILY_RATING_ORDER.map((r) => {
                           const active = draftRating === r;
                           return (

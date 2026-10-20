@@ -169,6 +169,7 @@ export const SO: Record<string, string> = {
   "rating.veryGood": "Aad Wanaagsan",
   "rating.good": "Wanaagsan",
   "rating.weak": "Daciif",
+  "rating.notRecited": "Ma akhriyin",
   "assignment.assigned": "Aan Bilaabin",
   "assignment.inProgress": "Socda",
   "assignment.completed": "Dhammaystiran",
