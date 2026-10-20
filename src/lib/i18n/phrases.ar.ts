@@ -2026,4 +2026,6 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "There's only one campus, so nothing to merge": "يوجد فرع واحد فقط، فلا شيء للدمج",
   "Give the campus a name": "أعطِ الفرع اسمًا",
   "Only the school office can merge campuses": "مكتب المدرسة فقط يستطيع دمج الفروع",
+  "This is a Hifd program": "هذا برنامج حفظ",
+  "It isn't tied to a grade: a child stays in their own grade's halaqa and joins it as well.": "لا يرتبط بصف: يبقى الطفل في حلقة صفه وينضم إليه أيضًا.",
 };
