@@ -29,7 +29,7 @@ export function MyQaidahLesson({
   const lesson = qaidahLesson(row.book, row.lesson);
   const repeat = row.status === "repeat";
   const finished = row.status === "passed";
-  const colour = repeat ? "vermilion" : finished ? "verdigris" : "saffron";
+  const colour = repeat ? "vermilion" : finished ? "verdigris" : "lapis";
   const body = (
     <>
       <span className="pattern-lattice absolute inset-0 opacity-30 pointer-events-none" />
@@ -98,7 +98,7 @@ export function ChildQaidahCard({
     : current.status === "repeat"
       ? t("qaidah.statusRepeat")
       : t("qaidah.statusAssigned");
-  const colour = finished ? "verdigris" : current.status === "repeat" ? "vermilion" : "saffron";
+  const colour = finished ? "verdigris" : current.status === "repeat" ? "vermilion" : "lapis";
   const recording = finished ? undefined : recordings?.get(recordingKey(current.book, current.lesson));
 
   return (
