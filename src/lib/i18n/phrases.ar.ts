@@ -2073,4 +2073,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "+ Old revision": "+ مراجعة بعيدة",
   "{count} piece of work|{count} pieces of work": "قطعة عمل واحدة|{count} قطع عمل",
   "Set, but not recited today": "مُعيَّن، لكن لم يُسمَّع اليوم",
+  "All grades": "كل الصفوف",
+  "{grade} only": "{grade} فقط",
+  "No one else in this grade. Tap \"All grades\", or search by name.": "لا أحد آخر في هذا الصف. اضغط «كل الصفوف» أو ابحث بالاسم.",
 };

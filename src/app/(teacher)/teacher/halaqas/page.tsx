@@ -85,6 +85,8 @@ function HalaqaRow({ halaqa, open, onToggle, onCount }: { halaqa: MyHalaqa; open
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  // A halaqa in a graded school offers its own grade's children first; "All grades" widens it.
+  const [allGrades, setAllGrades] = useState(false);
 
   useEffect(() => {
     if (!open || detail) return;
@@ -132,8 +134,14 @@ function HalaqaRow({ halaqa, open, onToggle, onCount }: { halaqa: MyHalaqa; open
 
   const shown = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
-    return (detail?.candidates ?? []).filter((c) => !needle || c.name.toLocaleLowerCase().includes(needle)).slice(0, 40);
-  }, [detail, query]);
+    const narrow = typeof halaqa.grade === "number" && !allGrades && !needle;
+    return (detail?.candidates ?? [])
+      .filter((c) => (!needle || c.name.toLocaleLowerCase().includes(needle)) && (!narrow || c.grade === halaqa.grade))
+      // Children with no halaqa yet come first: they are the ones who need one.
+      .sort((a, b) => Number(Boolean(a.elsewhere)) - Number(Boolean(b.elsewhere)) || a.name.localeCompare(b.name))
+      .slice(0, 40);
+  }, [detail, query, allGrades, halaqa.grade]);
+  const gradeOnly = typeof halaqa.grade === "number" && !allGrades && !query.trim();
 
   return (
     <li>
@@ -192,8 +200,29 @@ function HalaqaRow({ halaqa, open, onToggle, onCount }: { halaqa: MyHalaqa; open
                   aria-label={tr("Search by name")}
                   className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40"
                 />
+                {typeof halaqa.grade === "number" && (
+                  <div role="group" aria-label={tr("Show")} className="flex gap-1.5 mt-2">
+                    {[false, true].map((all) => (
+                      <button
+                        key={String(all)}
+                        type="button"
+                        onClick={() => setAllGrades(all)}
+                        aria-pressed={allGrades === all}
+                        className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                          allGrades === all ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                        }`}
+                      >
+                        {all ? tr("All grades") : tr("{grade} only", { grade: gradeLabel(halaqa.grade as number) })}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <ul className="mt-2 divide-y divide-surface-border max-h-80 overflow-y-auto rounded-xl bg-surface-card border border-surface-border">
-                  {shown.length === 0 && <li className="px-3 py-3 text-[12.5px] text-ink-muted">{tr("No one found.")}</li>}
+                  {shown.length === 0 && (
+                    <li className="px-3 py-3 text-[12.5px] text-ink-muted">
+                      {gradeOnly ? tr("No one else in this grade. Tap \"All grades\", or search by name.") : tr("No one found.")}
+                    </li>
+                  )}
                   {shown.map((c) => (
                     <li key={c.id} className="flex items-center gap-3 px-3 py-2">
                       <Avatar name={c.name} />
