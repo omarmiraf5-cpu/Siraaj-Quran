@@ -196,7 +196,7 @@ export default function StudentDashboard() {
       <MilestoneBanner studentId={student.id} assignments={assignments} />
 
       {/* Dua — a soft amber card straight under the greeting. */}
-      <div className="rounded-3xl bg-amber-50 dark:bg-amber-950/25 border border-amber-200/70 dark:border-amber-800/40 px-5 py-5 text-center animate-rise" style={{ animationDelay: "60ms" }}>
+      <div className="rounded-3xl bg-amber-50 dark:bg-amber-950/25 border border-amber-200/70 dark:border-amber-800/40 px-5 py-8 text-center animate-rise" style={{ animationDelay: "60ms" }}>
         <p className="font-calligraphy font-bold text-3xl md:text-4xl text-amber-900 dark:text-amber-100 leading-[2] mb-2" dir="rtl" lang="ar">
           اللَّهُمَّ لَا سَهْلَ إِلَّا مَا جَعَلْتَهُ سَهْلًا
         </p>
@@ -230,13 +230,14 @@ export default function StudentDashboard() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><polygon points="6 3 20 12 6 21 6 3" /></svg>
             </div>
           </Link>
-        ) : (
+        ) : !myQaidah ? (
+          // Only "all done" when there is no Qa'idah lesson to do either.
           <div className="card-quiet p-5">
             <FriendlyEmpty title={t("common.allDoneToday")} sub={t("common.beautifulWorkComeBack")} mood="happy" />
           </div>
-        )}
+        ) : null}
         {myQaidah && (
-          <div className="mt-2.5">
+          <div className={upNext ? "mt-2.5" : ""}>
             <MyQaidahLesson row={myQaidah} href="/student/qaidah" />
           </div>
         )}
@@ -250,7 +251,7 @@ export default function StudentDashboard() {
       {/* My subjects — one coloured square each, with a ring where there is a figure to show. */}
       <div className="animate-rise" style={{ animationDelay: "140ms" }}>
         <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">📚 {tr("My subjects")}</h2>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {subjects.map((sub, i) => {
             const circumference = 2 * Math.PI * 18;
             return (
