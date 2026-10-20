@@ -21,6 +21,7 @@ import {
   PORTION_BLURB,
   DAILY_RATING_ORDER,
   DAILY_RATING_LABELS,
+  DAILY_RATING_STYLES,
   withOverride,
   recitationLogFor,
   type AssignmentOverride,
@@ -209,6 +210,8 @@ export default function QuranAssignmentsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Which student's pieces of work are showing: a tap on a name opens that child's day.
+  const [openStudent, setOpenStudent] = useState<string | null>(null);
   const [draftRating, setDraftRating] = useState<DailyRating | null>(null);
   const [draftNotes, setDraftNotes] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -775,29 +778,41 @@ export default function QuranAssignmentsPage() {
     .filter((g) => !listGroup || g === listGroup)
     .map((g) => ({ name: g, items: allAssignments.filter((a) => (placeOf[a.student_id] ?? NO_PLACE) === g) }));
 
+  // One entry per child in a group, in name order, with their pieces of work.
+  const studentsOf = (items: QuranicAssignment[]) => {
+    const byStudent = new Map<string, QuranicAssignment[]>();
+    for (const a of items) byStudent.set(a.student_id, [...(byStudent.get(a.student_id) ?? []), a]);
+    return [...byStudent.entries()]
+      .map(([id, list]) => ({ id, name: studentName(id, roster), items: list }))
+      .sort((x, y) => x.name.localeCompare(y.name));
+  };
+
   const startEditing = (a: QuranicAssignment) => {
     setEditingId(a.id === editingId ? null : a.id);
     setDraftRating(a.daily_rating);
     setDraftNotes(a.teacher_notes ?? "");
   };
 
-  const saveEdit = async (a: QuranicAssignment) => {
+  // `quick` grades a piece straight from its row — "Did not recite" — leaving its note alone.
+  const saveEdit = async (a: QuranicAssignment, quick?: DailyRating) => {
+    const rating = quick !== undefined ? quick : draftRating;
+    const noteText = quick !== undefined ? a.teacher_notes ?? null : draftNotes.trim() || null;
     setSavingEdit(true);
     const patch: AssignmentOverride = {
-      daily_rating: draftRating,
-      teacher_notes: draftNotes.trim() || null,
+      daily_rating: rating,
+      teacher_notes: noteText,
     };
     try {
       if (isDemo && isDemoPlanLesson(a.id)) {
         // A plan lesson: rated the way the live site rates one, which also
         // carries it through to the student's yearly plan.
-        demoGradePlanLesson(a.id, draftRating, draftNotes.trim() || null);
+        demoGradePlanLesson(a.id, rating, noteText);
         refreshDemoPlans();
       } else if (isDemo) {
         // The rating settles the status too, the same as on the live site.
         const next = {
           ...overrides,
-          [a.id]: { ...overrides[a.id], ...patch, status: statusForRating(draftRating) },
+          [a.id]: { ...overrides[a.id], ...patch, status: statusForRating(rating) },
         };
         setOverrides(next);
         writeDemoStore(OVERRIDES_KEY, next);
@@ -806,7 +821,7 @@ export default function QuranAssignmentsPage() {
         // A rating turns into today's entry in the history log — replacing
         // today's entry for this same portion if one already exists, rather
         // than piling up duplicates from re-grading the same session.
-        if (draftRating) {
+        if (rating) {
           const withoutToday = log.filter(
             (e) => !(e.student_id === a.student_id && e.portion === a.portion && e.date === DEMO_TODAY)
           );
@@ -820,8 +835,8 @@ export default function QuranAssignmentsPage() {
               ayah_start: a.ayah_start,
               surah_end: a.surah_end,
               ayah_end: a.ayah_end,
-              rating: draftRating,
-              notes: draftNotes.trim() || null,
+              rating: rating,
+              notes: noteText,
               date: DEMO_TODAY,
             },
           ];
@@ -834,7 +849,7 @@ export default function QuranAssignmentsPage() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify(patch),
         });
-        if (draftRating) {
+        if (rating) {
           await fetch("/api/recitation-log", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -845,8 +860,8 @@ export default function QuranAssignmentsPage() {
               ayah_start: a.ayah_start,
               surah_end: a.surah_end,
               ayah_end: a.ayah_end,
-              rating: draftRating,
-              notes: draftNotes.trim() || null,
+              rating: rating,
+              notes: noteText,
             }),
           });
         }
@@ -1624,7 +1639,29 @@ export default function QuranAssignmentsPage() {
             </p>
           )}
         <ul className="divide-y divide-surface-border -my-1">
-          {group.items.map((a) => {
+          {studentsOf(group.items).map((st) => (
+            <li key={st.id}>
+              <button
+                type="button"
+                onClick={() => setOpenStudent(openStudent === st.id ? null : st.id)}
+                aria-expanded={openStudent === st.id}
+                className={`w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${openStudent === st.id ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
+              >
+                <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
+                  {initials(st.name)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">{st.name}</p>
+                  <p className={`text-[11.5px] ${openStudent === st.id ? "text-white/80" : "text-ink-muted"}`}>
+                    {tr("{count} piece of work|{count} pieces of work", { count: st.items.length })}
+                    {st.items.some((x) => x.daily_rating === "not_recited") ? ` · ${DAILY_RATING_LABELS.not_recited}` : ""}
+                  </p>
+                </div>
+                <RowChevron open={openStudent === st.id} />
+              </button>
+              {openStudent === st.id && (
+          <ul className="ms-3 border-s border-surface-border ps-3 divide-y divide-surface-border">
+          {st.items.map((a) => {
             const surah = getSurahById(a.surah);
             const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
             const name = studentName(a.student_id, roster);
@@ -1661,6 +1698,11 @@ export default function QuranAssignmentsPage() {
                           <span className={`ms-2 align-middle text-[10px] font-semibold px-2 py-0.5 rounded-full ${isOpen ? "bg-white/20 text-white" : w.tone}`}>{w.text}</span>
                         ) : null;
                       })()}
+                      {a.daily_rating === "not_recited" && (
+                        <span className={`ms-2 align-middle text-[10px] font-semibold px-2 py-0.5 rounded-full ${isOpen ? "bg-white/20 text-white" : DAILY_RATING_STYLES.not_recited}`}>
+                          {DAILY_RATING_LABELS.not_recited}
+                        </span>
+                      )}
                     </p>
                     <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                       {rangeLabel}
@@ -1697,6 +1739,18 @@ export default function QuranAssignmentsPage() {
                   <RowChevron open={isOpen} />
                 </button>
 
+                {!isOpen && a.daily_rating !== "not_recited" && (
+                  <div className="pb-2 ps-12">
+                    <button
+                      type="button"
+                      onClick={() => saveEdit(a, "not_recited")}
+                      disabled={savingEdit}
+                      className="text-[12px] font-semibold px-2.5 py-1 rounded-full border border-surface-border bg-surface-card text-ink-muted hover:text-ink hover:border-slate-400 disabled:opacity-50"
+                    >
+                      {DAILY_RATING_LABELS.not_recited}
+                    </button>
+                  </div>
+                )}
                 {isOpen && (
                   <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                     <div>
@@ -1767,6 +1821,10 @@ export default function QuranAssignmentsPage() {
               </li>
             );
           })}
+          </ul>
+              )}
+            </li>
+          ))}
         </ul>
         </div>
         ))}

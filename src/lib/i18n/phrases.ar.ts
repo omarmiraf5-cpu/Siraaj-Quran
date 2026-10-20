@@ -2071,4 +2071,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "+ Homework": "+ واجب",
   "+ Recent revision": "+ مراجعة قريبة",
   "+ Old revision": "+ مراجعة بعيدة",
+  "{count} piece of work|{count} pieces of work": "قطعة عمل واحدة|{count} قطع عمل",
 };
