@@ -32,6 +32,7 @@ export const SO: Record<string, string> = {
   "nav.mushaf": "Mushafka",
   "nav.qaidah": "Qaa'idada",
   "nav.myHalaqa": "Xalqadayda",
+  "nav.myHalaqas": "Xalqadahayga",
   "nav.office": "Xafiiska dugsiga",
   "nav.hadith": "Afartanka Xadiith",
   "nav.awards": "Xiddigaha iyo Sumadaha",

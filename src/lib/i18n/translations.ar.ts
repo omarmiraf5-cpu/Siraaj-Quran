@@ -32,6 +32,7 @@ export const AR: Record<string, string> = {
   "nav.mushaf": "المصحف",
   "nav.qaidah": "القاعدة",
   "nav.myHalaqa": "حلقتي",
+  "nav.myHalaqas": "حلقاتي",
   "nav.office": "إدارة المدرسة",
   "nav.hadith": "الأربعون النووية",
   "nav.awards": "النجوم والأوسمة",
