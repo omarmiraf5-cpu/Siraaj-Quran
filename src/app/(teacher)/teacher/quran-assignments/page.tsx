@@ -30,6 +30,7 @@ import {
 import type { DemoStudent } from "@/data/demo";
 import type { HifzPortion, QuranicAssignment, DailyRating } from "@/hooks/useQuranicAssignments";
 import { Mushaf } from "@/components/Mushaf";
+import { SurahPicker } from "@/components/SurahPicker";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { PortalHero } from "@/components/PortalHero";
@@ -162,6 +163,8 @@ export default function QuranAssignmentsPage() {
   // Or the range given as mushaf pages (Madinah mushaf, 1 to 604).
   const [pageFrom, setPageFrom] = useState("");
   const [pageTo, setPageTo] = useState("");
+  // What the preview follows: the surah and ayahs, or a page number being typed.
+  const [previewBy, setPreviewBy] = useState<"surah" | "page">("surah");
   // Or in hizbs (a juz' is two), for muraajah.
   const [hizbStart, setHizbStart] = useState("1");
   const [hizbQuarter, setHizbQuarter] = useState("1"); // which quarter of that hizb it starts at
@@ -722,6 +725,7 @@ export default function QuranAssignmentsPage() {
     const first = blocks[0];
     const last = blocks[blocks.length - 1];
     setSelectedSurah(String(first.from_surah));
+    setPreviewBy("surah");
     setAyahStart(String(first.from_ayah));
     setAyahEnd(String(last.to_ayah));
     // A portion that runs into a second surah has to say so, or the end
@@ -766,6 +770,7 @@ export default function QuranAssignmentsPage() {
     setPageFrom(String(first));
     setPageTo(String(last));
     setSelectedSurah(String(s1));
+    setPreviewBy("surah");
     setAyahStart(String(a1));
     setAyahEnd(String(aEnd));
     if (sEnd !== s1) {
@@ -798,6 +803,7 @@ export default function QuranAssignmentsPage() {
       }
     }
     setSelectedSurah(String(s1));
+    setPreviewBy("surah");
     setAyahStart(String(a1));
     setAyahEnd(String(aEnd));
     if (sEnd !== s1) {
@@ -812,6 +818,7 @@ export default function QuranAssignmentsPage() {
   const applyJuzRange = () => {
     const range = getJuzRange(parseInt(juzStart), parseInt(juzCount) || 1, (s) => getSurahById(s)?.ayahs ?? 0);
     setSelectedSurah(String(range.surahStart));
+    setPreviewBy("surah");
     setAyahStart(String(range.ayahStart));
     setAyahEnd(String(range.ayahEnd));
     if (range.surahEnd !== range.surahStart) {
@@ -938,7 +945,18 @@ export default function QuranAssignmentsPage() {
     return set ? { text: tr("Set {day}", { day: formatDay(set, language) }), tone: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-200" } : null;
   };
 
-  const canPreview = selectedSurah && ayahStart && ayahEnd;
+  // The preview opens the moment there's something to show: a surah picked
+  // (on its first page, or the start ayah's page once that's in) or a page
+  // number typed. The highlight waits for both ayahs.
+  const typedPage = parseInt(pageFrom);
+  const previewPage =
+    previewBy === "page" && typedPage >= 1 && typedPage <= TOTAL_PAGES
+      ? typedPage
+      : selectedSurah
+        ? pageOfPosition({ surah: parseInt(selectedSurah), ayah: parseInt(ayahStart) || 1 })
+        : null;
+  const canPreview = previewPage !== null;
+  const canHighlight = Boolean(selectedSurah && ayahStart && ayahEnd);
 
   // Newest first, so an assignment just created shows at the top of the list
   // below rather than getting lost among the rest. The sample assignments
@@ -1396,7 +1414,10 @@ export default function QuranAssignmentsPage() {
                   min="1"
                   max={TOTAL_PAGES}
                   value={pageFrom}
-                  onChange={(e) => setPageFrom(e.target.value)}
+                  onChange={(e) => {
+                    setPageFrom(e.target.value);
+                    setPreviewBy("page");
+                  }}
                   placeholder="562"
                   className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                 />
@@ -1408,7 +1429,10 @@ export default function QuranAssignmentsPage() {
                   min="1"
                   max={TOTAL_PAGES}
                   value={pageTo}
-                  onChange={(e) => setPageTo(e.target.value)}
+                  onChange={(e) => {
+                    setPageTo(e.target.value);
+                    setPreviewBy("page");
+                  }}
                   placeholder={pageFrom || "563"}
                   className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
                 />
@@ -1550,22 +1574,17 @@ export default function QuranAssignmentsPage() {
             <label className="block text-sm font-semibold text-ink mb-2">
               {tr("Surah *")}
             </label>
-            <select
+            {/* Type to find it — "mulk", "67", "الملك" — and the preview
+                opens on the surah straight away. */}
+            <SurahPicker
               value={selectedSurah}
-              onChange={(e) => {
-                setSelectedSurah(e.target.value);
+              onChange={(id) => {
+                setSelectedSurah(id);
                 setSpansSurah(false);
                 setEndSurah("");
+                setPreviewBy("surah");
               }}
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-            >
-              <option value="">{tr("Select a Surah")}</option>
-              {surahs.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {tr("{id}. {englishName} ({ayahs} Ayahs)", { id: s.id, englishName: s.englishName, ayahs: s.ayahs })}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -1580,6 +1599,7 @@ export default function QuranAssignmentsPage() {
                 value={ayahStart}
                 onChange={(e) => {
                   setAyahStart(e.target.value);
+                  setPreviewBy("surah");
                 }}
                 placeholder="1"
                 className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
@@ -1710,14 +1730,7 @@ export default function QuranAssignmentsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Surah *")}</label>
-                  <select value={x.surah} onChange={(e) => updateExtra(x.kind, { surah: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600">
-                    <option value="">{tr("Choose…")}</option>
-                    {QURAN.map((q) => (
-                      <option key={q.id} value={q.id}>
-                        {q.id}. {q.englishName} ({q.ayahs} {tr("Ayahs")})
-                      </option>
-                    ))}
-                  </select>
+                  <SurahPicker value={x.surah} onChange={(id) => updateExtra(x.kind, { surah: id })} placeholder={tr("Choose…")} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1807,7 +1820,9 @@ export default function QuranAssignmentsPage() {
               <h2 className="page-title text-lg">
                 {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
                   ? `${selectedSurahData?.englishName ?? phrase("Preview")} – ${endSurahData.englishName}`
-                  : (selectedSurahData?.englishName ?? tr("Preview"))}
+                  : previewBy === "page" && previewPage
+                    ? tr("Page {page}", { page: previewPage })
+                    : (selectedSurahData?.englishName ?? tr("Preview"))}
               </h2>
               <div className="gold-rule my-4" />
               <Mushaf
@@ -1815,17 +1830,18 @@ export default function QuranAssignmentsPage() {
                 // again when the starting ayah changes. Mushaf only reads
                 // initialPage when it mounts, so the key remounts it; the
                 // end ayah only redraws the highlight, which needs no jump.
-                key={`${selectedSurah}:${ayahStart}`}
-                initialPage={pageOfPosition({
-                  surah: parseInt(selectedSurah),
-                  ayah: parseInt(ayahStart) || 1,
-                })}
-                highlightedRange={{
-                  surah: parseInt(selectedSurah),
-                  start: parseInt(ayahStart),
-                  surahEnd: effectiveEndSurahId,
-                  end: parseInt(ayahEnd),
-                }}
+                key={`p${previewPage}`}
+                initialPage={previewPage ?? 1}
+                highlightedRange={
+                  canHighlight
+                    ? {
+                        surah: parseInt(selectedSurah),
+                        start: parseInt(ayahStart),
+                        surahEnd: effectiveEndSurahId,
+                        end: parseInt(ayahEnd),
+                      }
+                    : undefined
+                }
               />
             </div>
           ) : (

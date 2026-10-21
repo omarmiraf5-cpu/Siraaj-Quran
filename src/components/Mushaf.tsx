@@ -10,6 +10,7 @@ import {
   getSurahsOnPage,
 } from "@/data/mushaf-index";
 import { useLanguage } from "@/components/LanguageProvider";
+import { SurahPicker } from "@/components/SurahPicker";
 import { QcfMushafPage, usePageLayout } from "./QcfMushafPage";
 import { RECITERS, getAudioSources, type Reciter } from "@/lib/recitation";
 
@@ -672,6 +673,14 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     }, SLIDE_MS);
   };
 
+  // A page number typed in goes there as soon as typing pauses — no Enter needed.
+  useEffect(() => {
+    const n = parseInt(pageInput);
+    if (!n || n < 1 || n > TOTAL_PAGES || n === currentPage) return;
+    const t = setTimeout(() => goTo(n), 450);
+    return () => clearTimeout(t);
+  }, [pageInput, currentPage, goTo]);
+
   const handlePageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const n = parseInt(pageInput);
@@ -701,18 +710,15 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
 
       {/* Controls */}
       <div className="flex items-center gap-1.5">
-        <select
-          onChange={(e) => handleSurahJump(e.target.value)}
-          defaultValue=""
-          className="flex-1 min-w-0 bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-        >
-          <option value="">{tr("Jump to Surah...")}</option>
-          {SURAHS.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.id}. {s.englishName}
-            </option>
-          ))}
-        </select>
+        {/* Type a surah's name or number to jump to it. */}
+        <SurahPicker
+          value=""
+          onChange={handleSurahJump}
+          placeholder={tr("Jump to Surah...")}
+          size="sm"
+          clearAfterPick
+          className="flex-1 min-w-0"
+        />
 
         <form onSubmit={handlePageSubmit} className="flex items-center gap-1 flex-shrink-0">
           <input
@@ -721,7 +727,9 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
             max={TOTAL_PAGES}
             value={pageInput}
             onChange={(e) => setPageInput(e.target.value)}
-            className="w-11 bg-surface-card border border-surface-border rounded-md px-1 py-1 text-[11px] text-ink text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/50 tabular-nums"
+            inputMode="numeric"
+            aria-label={tr("Page")}
+            className="w-14 bg-surface-card border border-surface-border rounded-md px-1 py-1 text-[11px] text-ink text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/50 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <span className="text-[9px] text-ink-muted">/{TOTAL_PAGES}</span>
         </form>
