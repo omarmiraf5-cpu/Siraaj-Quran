@@ -1663,7 +1663,7 @@ export default function QuranAssignmentsPage() {
                 >
                   {endSurahOptions.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {tr("{id}. {englishName} ({ayahs} Ayahs)", { id: s.id, englishName: s.englishName, ayahs: s.ayahs })}
+                      {tr("{id}. {englishName} ({ayahs} Ayahs)", { id: s.id, englishName: s.englishName, ayahs: s.ayahs })} · {s.name}
                     </option>
                   ))}
                 </select>
@@ -1823,6 +1823,14 @@ export default function QuranAssignmentsPage() {
                   : previewBy === "page" && previewPage
                     ? tr("Page {page}", { page: previewPage })
                     : (selectedSurahData?.englishName ?? tr("Preview"))}
+                {!(previewBy === "page" && !canHighlight) && selectedSurahData && (
+                  <span className="ms-3 font-arabic text-ink-muted font-normal">
+                    <bdi dir="rtl">
+                      {selectedSurahData.name}
+                      {spansSurah && endSurahData && endSurahData.id !== selectedSurahData.id ? ` – ${endSurahData.name}` : ""}
+                    </bdi>
+                  </span>
+                )}
               </h2>
               <div className="gold-rule my-4" />
               <Mushaf
@@ -1967,6 +1975,11 @@ export default function QuranAssignmentsPage() {
                     </p>
                     <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                       {rangeLabel}
+                      {surah && (
+                        <span className="mx-1 font-arabic text-[14px] text-ink">
+                          · <bdi dir="rtl">{surah.name}{surahEnd ? ` – ${surahEnd.name}` : ""}</bdi>
+                        </span>
+                      )}
                       {a.due_date ? tr(" · due {formatDay}", { formatDay: formatDay(a.due_date, language) }) : ""}
                     </p>
                     {/* On the narrowest phones the rating sits under the

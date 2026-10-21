@@ -152,11 +152,23 @@ export function SurahPicker({ value, onChange, placeholder, only, size = "md", c
           }
         }}
         className={
-          sm
+          (chosen && !clearAfterPick && !open ? (sm ? "pe-16 " : "pe-28 ") : "") +
+          (sm
             ? "w-full bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-            : "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+            : "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition")
         }
       />
+      {/* The chosen surah's Arabic name, at the end of the box. */}
+      {chosen && !clearAfterPick && !open && (
+        // Placed by the page's own direction (so it sits at the far end in
+        // English and Arabic alike); only the name inside reads right to left.
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute inset-y-0 end-0 flex items-center text-ink font-arabic ${sm ? "pe-2 text-[14px]" : "pe-4 text-[20px]"}`}
+        >
+          <bdi dir="rtl">{chosen.name}</bdi>
+        </span>
+      )}
       {open && (
         <ul
           ref={listRef}
@@ -188,7 +200,7 @@ export function SurahPicker({ value, onChange, placeholder, only, size = "md", c
                   {s.englishName}
                   {!sm && <span className="text-ink-muted text-[12px]"> · {s.ayahs} {tr("Ayahs")}</span>}
                 </span>
-                <span dir="rtl" className={`text-ink-muted ${sm ? "text-[13px]" : "text-[15px]"}`}>{s.name}</span>
+                <span dir="rtl" className={`font-arabic text-ink ${sm ? "text-[15px]" : "text-[18px]"}`}>{s.name}</span>
               </li>
             ))
           )}
