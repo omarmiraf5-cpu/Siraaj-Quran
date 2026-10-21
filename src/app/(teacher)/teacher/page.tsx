@@ -135,6 +135,7 @@ export default function TeacherDashboard() {
           [...new Set(DEMO_STUDENTS.map((s) => s.halaqa))].map((h) => ({
             id: h,
             label: h,
+            name: h,
             studentIds: DEMO_STUDENTS.filter((s) => s.halaqa === h).map((s) => s.id),
           }))
         );

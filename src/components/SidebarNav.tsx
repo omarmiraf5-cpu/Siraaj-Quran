@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -24,6 +24,8 @@ interface NavItem {
   icon: React.ReactNode;
   /** The page's picture, drawn as a gem; the plain `icon` stands in without one. */
   art?: ArtName;
+  /** The heading this item sits under in the sidebar, in English (translated with tr). */
+  section?: string;
 }
 
 // A nav item's picture at the size it's shown: the gem, or the plain icon.
@@ -98,7 +100,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const supabase = createClient();
   const demoUser = useDemoUser();
   const branding = useSchoolBranding();
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
   const reduceMotion = useReducedMotion();
   useRecordVisit();
   useSwitchedOffGuard();
@@ -270,9 +272,18 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
 
         {/* Nav links */}
         <nav className="space-y-0.5 border-t border-white/10 pt-3">
-          {items.map((item) => {
+          {items.map((item, i) => {
             const active = pathname === item.href;
+            // A small heading where a new group starts, so a long list reads
+            // as a few short ones.
+            const heading = item.section && item.section !== items[i - 1]?.section ? item.section : null;
+            const gap = !item.section && items[i - 1]?.section;
             return (
+              <Fragment key={item.href}>
+              {heading && (
+                <p className={`text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/35 px-3 pb-1 ${i === 0 ? "pt-0.5" : "pt-3"}`}>{tr(heading)}</p>
+              )}
+              {gap && <div aria-hidden className="border-t border-white/10 my-2" />}
               <Link
                 key={item.href}
                 href={item.href}
@@ -298,6 +309,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 </span>
                 {t(item.labelKey)}
               </Link>
+              </Fragment>
             );
           })}
         </nav>
