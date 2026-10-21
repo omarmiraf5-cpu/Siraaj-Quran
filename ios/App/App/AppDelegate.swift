@@ -7,11 +7,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Push notifications are not part of 1.0. Do not request notification
-        // permission until a provider is chosen; add @capacitor/push-notifications
-        // and the Push Notifications capability then. The shell does not need
-        // to change for that.
         return true
+    }
+
+    // Push notifications: hand the phone's token (or the failure) to the
+    // @capacitor/push-notifications plugin, which gives it to the web page.
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

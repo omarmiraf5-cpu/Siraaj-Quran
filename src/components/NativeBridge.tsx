@@ -2,6 +2,61 @@
 
 import { useEffect } from "react";
 import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
+import { PushNotifications } from "@capacitor/push-notifications";
+import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
+
+const PUSH_TOKEN_KEY = "push_token";
+
+/**
+ * Asks for permission to send notices to this phone and tells the portal where
+ * to send them. Only for staff and parents, once someone is signed in; children
+ * are not sent notifications. Asked once: the phone remembers the answer.
+ */
+async function registerForPush() {
+  try {
+    const supabase = createClient();
+    const user = await sessionUser(supabase);
+    if (!user) return;
+    const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (!me || me.role === "student") return;
+
+    let permission = await PushNotifications.checkPermissions();
+    if (permission.receive === "prompt" || permission.receive === "prompt-with-rationale") {
+      permission = await PushNotifications.requestPermissions();
+    }
+    if (permission.receive !== "granted") return;
+
+    await PushNotifications.removeAllListeners();
+    await PushNotifications.addListener("registration", async ({ value }) => {
+      try {
+        const res = await fetch("/api/push/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: value, platform: Capacitor.getPlatform() }),
+        });
+        if (res.ok) localStorage.setItem(PUSH_TOKEN_KEY, value);
+      } catch {
+        /* Tried again next time the app opens. */
+      }
+    });
+    await PushNotifications.register();
+  } catch {
+    /* Push is a convenience; the portal works without it. */
+  }
+}
+
+/** Stops sending this phone the signed-out person's notices. */
+export async function forgetPushToken() {
+  try {
+    const token = localStorage.getItem(PUSH_TOKEN_KEY);
+    if (!token) return;
+    localStorage.removeItem(PUSH_TOKEN_KEY);
+    await fetch("/api/push/register", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }), keepalive: true });
+  } catch {
+    /* Nothing more to do. */
+  }
+}
 
 /**
  * Small adjustments that only apply inside the MyDiiwaan iOS/Android app
@@ -26,6 +81,12 @@ export function NativeBridge() {
     }
 
     SystemBars.setStyle({ style: SystemBarsStyle.Dark }).catch(() => {});
+    void registerForPush();
+    // Someone signing in after the app opened (the page does not reload).
+    const { data: sub } = createClient().auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") void registerForPush();
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   return null;

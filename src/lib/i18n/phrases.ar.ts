@@ -2079,4 +2079,6 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "the homework's due date": "موعد الواجب",
   "Different work, to do at home": "عمل مختلف، يُنجز في البيت",
   "Tap Today's lesson and Homework together to give both, each with its own ayahs.": "اضغط درس اليوم والواجب معًا لإعطاء الاثنين، لكل منهما آياته.",
+  "A device token and platform are required": "مطلوب رمز الجهاز والمنصة",
+  "Couldn't save this phone": "تعذّر حفظ هذا الهاتف",
 };

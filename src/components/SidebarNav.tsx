@@ -10,6 +10,7 @@ import { SchoolSwitcher } from "@/components/SchoolSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import { useMyName } from "@/hooks/useMyName";
+import { forgetPushToken } from "@/components/NativeBridge";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
@@ -115,6 +116,8 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const handleSignOut = async () => {
     localStorage.removeItem("demo_user");
     document.cookie = "demo_mode=; path=/; max-age=0";
+    // Before the session ends, so the portal knows whose phone to stop.
+    await forgetPushToken();
     await supabase.auth.signOut();
     router.push("/login");
   };

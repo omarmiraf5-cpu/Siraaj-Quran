@@ -1,6 +1,7 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
+import { sendPush } from "@/lib/pushServer";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildCalendar, DEFAULT_CALENDAR, type SchoolCalendar } from "@/lib/schoolCalendar";
 import { localClock, type SchoolPlace, type StaffPolicy } from "@/lib/attendanceRules";
@@ -141,10 +142,18 @@ export interface NewNotification {
 export async function notify(admin: Db, rows: NewNotification[]): Promise<number> {
   if (rows.length === 0) return 0;
   try {
-    const { error } = await admin
+    const { data, error } = await admin
       .from("notifications")
-      .upsert(rows, { onConflict: "recipient_id,dedupe_key", ignoreDuplicates: true });
+      .upsert(rows, { onConflict: "recipient_id,dedupe_key", ignoreDuplicates: true })
+      .select("recipient_id, title, body");
     if (error) throw error;
+    // Only notices that were new go to people's phones: one already sent under
+    // the same key returns nothing here, so no one is buzzed twice for it.
+    const fresh = ((data ?? []) as Array<{ recipient_id: string; title: string; body: string }>).map((r) => ({
+      userId: r.recipient_id,
+      message: { title: r.title, body: r.body },
+    }));
+    await sendPush(fresh);
     return rows.length;
   } catch (error) {
     console.error("Notifications: could not raise", error);

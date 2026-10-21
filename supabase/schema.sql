@@ -2487,3 +2487,20 @@ create policy "Students read their own Qaidah pages" on qaidah_page_assignments
 drop policy if exists "Parents read their children's Qaidah pages" on qaidah_page_assignments;
 create policy "Parents read their children's Qaidah pages" on qaidah_page_assignments
   for select using (student_id in (select my_children_student_ids()));
+
+-- ══════════════════════════════════════
+-- Phones for push notifications
+-- ══════════════════════════════════════
+create table if not exists push_devices (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references profiles(id) on delete cascade,
+  school_id   uuid references schools(id) on delete cascade,
+  platform    text not null check (platform in ('ios', 'android')),
+  token       text not null unique,
+  created_at  timestamptz not null default now(),
+  last_seen   timestamptz not null default now()
+);
+alter table push_devices enable row level security;
+create index if not exists idx_push_devices_user on push_devices(user_id);
+grant all on public.push_devices to service_role;
+

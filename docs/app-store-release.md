@@ -184,6 +184,7 @@ websites. Do not tick Tracking. There is no analytics.
 | Precise location | App functionality | Yes | No |
 | Other user content (lessons, notes, messages) | App functionality | Yes | No |
 | Other financial info (school fees owed and paid, no card numbers) | App functionality | Yes | No |
+| Device ID (the phone's notification address) | App functionality | Yes | No |
 | User ID | App functionality | Yes | No |
 
 Location is read only when a teacher taps Sign in or Sign out, to check they
@@ -224,10 +225,10 @@ you can reply with something like this:
 > issued by the school. Location is requested only at staff sign-in, never in
 > the background, and never for students or parents.
 
-Push notifications (for example an absence alert) are not in version 1.0. If
-Apple still wants more, that is the next feature to add. It needs a push
-service and a new submission. The project is ready for that plugin later; it
-is deliberately not asking for notification permission yet.
+Push notifications (absence alerts, a child finishing a surah) are in the
+app now: see `docs/push-notifications.md`. They need keys that only you can
+create, and the notification permission is asked only of staff and parents.
+Add them to the reply above if Apple asks for more than a website.
 
 ---
 
@@ -410,5 +411,5 @@ the stores will approve the app:
    jsDelivr)?
 5. Will the Play account be a personal account (12 testers for 14 days) or an
    organisation account?
-6. Do you want absence alerts as phone notifications in a later version? They
-   are not in 1.0, on purpose.
+6. Push notifications are built; follow `docs/push-notifications.md` to switch
+   them on before you archive.

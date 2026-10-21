@@ -87,6 +87,13 @@ export default function PrivacyPage() {
           <strong>The school&apos;s location</strong>, set by the school&apos;s admin for that check.
         </li>
         <li>
+          <strong>Your phone&apos;s notification address</strong> — if you use the MyDiiwaan app and allow
+          notifications, an identifier for your phone is kept so the portal&apos;s notices (for example an absence
+          alert) can reach it. It is sent to Apple&apos;s or Google&apos;s notification service to deliver the message,
+          is only for staff and parents (never students), and is removed when you sign out or delete your account.
+          You can turn notifications off in your phone&apos;s settings at any time.
+        </li>
+        <li>
           <strong>Notices and emails</strong> the portal sends — for example to parents and the office when a child
           has missed five school days in a row; a welcome or password-reset email; and, if the school uses them, a
           Friday email to parents about their child&apos;s week. Every Friday email has a link to unsubscribe, and
