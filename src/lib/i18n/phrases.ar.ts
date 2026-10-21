@@ -805,6 +805,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "New temporary password for {n}: {temp_password} — share it with them. They'll set their own the next time they sign in.": "كلمة المرور المؤقتة الجديدة لـ{n}: {temp_password} — شاركها معه، وسيختار كلمة مروره الخاصة عند دخوله التالي.",
   "New yearly plan": "خطة سنوية جديدة",
   "Next": "التالي",
+  "See it in the mushaf": "عرضها في المصحف",
   "Page": "الصفحة",
   "Name or number — e.g. Mulk, 67, الملك": "الاسم أو الرقم — مثل الملك، 67",
   "No surah matches that.": "لا توجد سورة بهذا الاسم.",

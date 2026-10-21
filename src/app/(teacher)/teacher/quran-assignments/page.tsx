@@ -165,6 +165,28 @@ export default function QuranAssignmentsPage() {
   const [pageTo, setPageTo] = useState("");
   // What the preview follows: the surah and ayahs, or a page number being typed.
   const [previewBy, setPreviewBy] = useState<"surah" | "page">("surah");
+  // A wide screen shows the preview beside the form; a phone opens it as a panel.
+  const [wide, setWide] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => {
+      setWide(mq.matches);
+      if (mq.matches) setPreviewOpen(false);
+    };
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  // The page behind the panel doesn't scroll along with it.
+  useEffect(() => {
+    if (!previewOpen) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = before;
+    };
+  }, [previewOpen]);
   // Or in hizbs (a juz' is two), for muraajah.
   const [hizbStart, setHizbStart] = useState("1");
   const [hizbQuarter, setHizbQuarter] = useState("1"); // which quarter of that hizb it starts at
@@ -1099,6 +1121,52 @@ export default function QuranAssignmentsPage() {
     ...programs.map((p) => ({ key: `p:${p.id}`, label: p.name, count: students.filter((s) => p.studentIds.includes(s.id)).length })),
   ];
 
+  // The preview's heading and the mushaf itself — shown beside the form on a
+  // wide screen, and in a full-screen panel on a phone.
+  const previewTitle = (
+    <>
+                {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
+                  ? `${selectedSurahData?.englishName ?? phrase("Preview")} – ${endSurahData.englishName}`
+                  : previewBy === "page" && previewPage
+                    ? tr("Page {page}", { page: previewPage })
+                    : (selectedSurahData?.englishName ?? tr("Preview"))}
+                {!(previewBy === "page" && !canHighlight) && selectedSurahData && (
+                  <span className="ms-3 font-arabic text-ink-muted font-normal">
+                    <bdi dir="rtl">
+                      {selectedSurahData.name}
+                      {spansSurah && endSurahData && endSurahData.id !== selectedSurahData.id ? ` – ${endSurahData.name}` : ""}
+                    </bdi>
+                  </span>
+                )}
+              </>
+  );
+  const previewMushaf = canPreview ? (
+    <Mushaf
+                // Open on the page the lesson starts on, and move there
+                // again when the starting ayah changes. Mushaf only reads
+                // initialPage when it mounts, so the key remounts it; the
+                // end ayah only redraws the highlight, which needs no jump.
+                key={`p${previewPage}`}
+                initialPage={previewPage ?? 1}
+                highlightedRange={
+                  canHighlight
+                    ? {
+                        surah: parseInt(selectedSurah),
+                        start: parseInt(ayahStart),
+                        surahEnd: effectiveEndSurahId,
+                        end: parseInt(ayahEnd),
+                      }
+                    : undefined
+                }
+              />
+  ) : null;
+  const previewRange =
+    canHighlight && selectedSurahData
+      ? `${selectedSurahData.englishName} ${ayahStart}–${spansSurah && endSurahData && endSurahData.id !== selectedSurahData.id ? `${endSurahData.englishName} ` : ""}${ayahEnd}`
+      : previewBy === "page" && previewPage
+        ? tr("Page {page}", { page: previewPage })
+        : selectedSurahData?.englishName ?? "";
+
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
@@ -1636,6 +1704,23 @@ export default function QuranAssignmentsPage() {
             </p>
           )}
 
+          {/* On a phone the preview would sit below the whole form; this
+              opens it over the page instead, right where the ayahs are set. */}
+          {!wide && canPreview && (
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="w-full flex items-center gap-3 rounded-2xl border border-brand-navy/25 bg-brand-navy/[.05] dark:bg-white/[.04] px-4 py-3 text-start active:scale-[.99] transition"
+            >
+              <ColorTile name="rehal" size={34} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-semibold text-ink">{tr("See it in the mushaf")}</span>
+                <span className="block text-[12px] text-ink-muted truncate">{previewRange}</span>
+              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="text-ink-muted rtl:rotate-180"><path d="M9 18l6-6-6-6" /></svg>
+            </button>
+          )}
+
           {/* Multiple surahs, manually: for a lesson or muraajah that
               simply doesn't line up with the quantity picker above. */}
           {selectedSurah &&
@@ -1814,43 +1899,13 @@ export default function QuranAssignmentsPage() {
             setting it here rather than on paper, and a teacher shouldn't
             have to ask for it every time. It follows the fields live, so
             correcting an ayah number redraws it. */}
+        {wide && (
         <div className="lg:sticky lg:top-10 lg:self-start">
           {canPreview ? (
             <div className="card-quiet p-5 overflow-hidden">
-              <h2 className="page-title text-lg">
-                {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
-                  ? `${selectedSurahData?.englishName ?? phrase("Preview")} – ${endSurahData.englishName}`
-                  : previewBy === "page" && previewPage
-                    ? tr("Page {page}", { page: previewPage })
-                    : (selectedSurahData?.englishName ?? tr("Preview"))}
-                {!(previewBy === "page" && !canHighlight) && selectedSurahData && (
-                  <span className="ms-3 font-arabic text-ink-muted font-normal">
-                    <bdi dir="rtl">
-                      {selectedSurahData.name}
-                      {spansSurah && endSurahData && endSurahData.id !== selectedSurahData.id ? ` – ${endSurahData.name}` : ""}
-                    </bdi>
-                  </span>
-                )}
-              </h2>
+              <h2 className="page-title text-lg">{previewTitle}</h2>
               <div className="gold-rule my-4" />
-              <Mushaf
-                // Open on the page the lesson starts on, and move there
-                // again when the starting ayah changes. Mushaf only reads
-                // initialPage when it mounts, so the key remounts it; the
-                // end ayah only redraws the highlight, which needs no jump.
-                key={`p${previewPage}`}
-                initialPage={previewPage ?? 1}
-                highlightedRange={
-                  canHighlight
-                    ? {
-                        surah: parseInt(selectedSurah),
-                        start: parseInt(ayahStart),
-                        surahEnd: effectiveEndSurahId,
-                        end: parseInt(ayahEnd),
-                      }
-                    : undefined
-                }
-              />
+              {previewMushaf}
             </div>
           ) : (
             <div className="card-quiet card-feature p-8 text-center">
@@ -1864,6 +1919,7 @@ export default function QuranAssignmentsPage() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* What has already been set. Sample data until the school has its own
@@ -2103,6 +2159,38 @@ export default function QuranAssignmentsPage() {
         </div>
         ))}
       </SectionCard>
+
+      {/* Phone: a small button that stays in reach while scrolling the form. */}
+      {!wide && canPreview && !previewOpen && !saved && (
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="fixed z-30 end-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] flex items-center gap-2 rounded-full bg-brand-navy text-white shadow-lg ps-3 pe-4 py-2.5 text-[13px] font-semibold active:scale-95 transition"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+          {tr("Mushaf")}
+        </button>
+      )}
+
+      {/* Phone: the preview as a full-screen panel over the form. */}
+      {!wide && previewOpen && canPreview && (
+        <div className="fixed inset-0 z-50 flex flex-col" role="dialog" aria-modal="true" aria-label={tr("Mushaf preview")}>
+          <button type="button" aria-label={tr("Close")} onClick={() => setPreviewOpen(false)} className="h-6 flex-shrink-0 bg-black/40" />
+          <div className="flex-1 min-h-0 flex flex-col rounded-t-3xl bg-surface-bg shadow-2xl">
+            <div className="flex items-center gap-3 px-4 pt-3 pb-2 border-b border-surface-border">
+              <h2 className="page-title text-[17px] min-w-0 flex-1 truncate">{previewTitle}</h2>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="flex-shrink-0 rounded-full bg-surface-card border border-surface-border px-3.5 py-1.5 text-[13px] font-semibold text-ink"
+              >
+                {tr("Done")}
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-2 pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))]">{previewMushaf}</div>
+          </div>
+        </div>
+      )}
 
       {/* What was just saved, with a way to take it back. Sits above the
           phone tab bar; gone by itself after a few seconds. */}
