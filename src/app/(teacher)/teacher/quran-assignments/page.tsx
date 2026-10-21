@@ -125,7 +125,7 @@ interface ExtraPiece {
   end: string;
   due: string;
 }
-const EXTRA_KINDS: ExtraKind[] = ["homework", "recent", "old"];
+const EXTRA_KINDS: ExtraKind[] = ["recent", "old"];
 
 export default function QuranAssignmentsPage() {
   const supabase = createClient();
@@ -188,7 +188,11 @@ export default function QuranAssignmentsPage() {
   const [confirmingSurah, setConfirmingSurah] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
   // Whether it's for today's lesson, in class, or homework to do at home.
-  const [forWhen, setForWhen] = useState<"today" | "homework" | "not_recited">("today");
+  // What the main fields above are for. "today" and "not_recited" are the
+  // class lesson; null means only homework was chosen, so they are the homework.
+  // Homework alongside a lesson is its own block below, with its own surah and ayahs.
+  const [lessonSel, setLessonSel] = useState<"today" | "not_recited" | null>("today");
+  const forWhen: "today" | "homework" | "not_recited" = lessonSel ?? "homework";
   // More work given in the same save: homework, a recent revision, an old
   // revision — each with its own surah, ayahs and due date. A hifz day is
   // usually the three portions together.
@@ -383,7 +387,8 @@ export default function QuranAssignmentsPage() {
         if (need.length > 0) throw new Error(phrase("Still needed for the {piece}: {fields}.", { piece: extraLabel[x.kind], fields: need.join(", ") }));
         if (parseInt(x.end) < parseInt(x.start)) throw new Error(phrase("The {piece}'s last ayah comes before its first.", { piece: extraLabel[x.kind] }));
       }
-      const lessonDue = extras.length > 0 ? dueDate || todayStr : dueDate;
+      if (lessonSel === null && !dueDate) throw new Error(phrase("Still needed: {fields}.", { fields: phrase("the homework's due date") }));
+      const lessonDue = lessonSel !== null && extras.length > 0 ? dueDate || todayStr : dueDate;
       const extraPieces = extras.map((x) => ({
         portion: x.kind === "homework" ? portion : (x.kind as "recent" | "old"),
         surah: parseInt(x.surah),
@@ -497,7 +502,7 @@ export default function QuranAssignmentsPage() {
       setSpansSurah(false);
       setEndSurah("");
       setDueDate("");
-      setForWhen("today");
+      setLessonSel("today");
       setExtras([]);
       setNotes("");
 
@@ -748,10 +753,29 @@ export default function QuranAssignmentsPage() {
     d.setDate(d.getDate() + 1);
     return d.toLocaleDateString("en-CA");
   };
-  const chooseWhen = (w: "today" | "homework" | "not_recited") => {
-    setForWhen(w);
-    // Today's lesson is due today; homework is due a day on, unless a later day is already chosen.
-    setDueDate(w !== "homework" ? todayStr : dueDate && dueDate > todayStr ? dueDate : dayAfter(todayStr));
+  const hasHomeworkBlock = extras.some((x) => x.kind === "homework");
+  const homeworkOn = lessonSel === null || hasHomeworkBlock;
+  const newHomework = (): ExtraPiece => ({ kind: "homework", surah: "", start: "", end: "", due: dayAfter(todayStr) });
+  // Today's lesson / Did not recite: the class piece. Pressing the one already on turns it off, if homework is chosen.
+  const chooseLesson = (kind: "today" | "not_recited") => {
+    if (lessonSel === kind) {
+      if (!homeworkOn || lessonSel === null) return;
+      // Homework only: the fields above become the homework.
+      setExtras((l) => l.filter((x) => x.kind !== "homework"));
+      setLessonSel(null);
+      setDueDate(dueDate && dueDate > todayStr ? dueDate : dayAfter(todayStr));
+      return;
+    }
+    const wasHomeworkOnly = lessonSel === null;
+    setLessonSel(kind);
+    setDueDate(todayStr);
+    // The fields above are now the lesson, so the homework gets a block of its own.
+    if (wasHomeworkOnly) setExtras((l) => [newHomework(), ...l.filter((x) => x.kind !== "homework")]);
+  };
+  // Homework: its own surah, ayahs and due date, next to the lesson.
+  const chooseHomework = () => {
+    if (lessonSel === null) return;
+    setExtras((l) => (hasHomeworkBlock ? l.filter((x) => x.kind !== "homework") : [newHomework(), ...l]));
   };
   // What a set piece of work is: today's, homework, or overdue — read off its dates.
   const whenOf = (a: QuranicAssignment): { text: string; tone: string } | null => {
@@ -1425,21 +1449,25 @@ export default function QuranAssignmentsPage() {
           <div>
             <p className="text-sm font-semibold text-ink mb-2">{tr("This is for")}</p>
             <div className="grid grid-cols-3 gap-2">
-              {(["today", "homework", "not_recited"] as const).map((w) => (
-                <button
-                  key={w}
-                  type="button"
-                  onClick={() => chooseWhen(w)}
-                  aria-pressed={forWhen === w}
-                  className={`rounded-2xl border px-3 py-2.5 text-center transition ${
-                    forWhen === w ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
-                  }`}
-                >
-                  <span className="block text-[13px] font-semibold leading-tight">{w === "today" ? tr("Today's lesson") : w === "homework" ? tr("Homework") : DAILY_RATING_LABELS.not_recited}</span>
-                  <span className="block text-[11px] leading-tight mt-0.5 opacity-70">{w === "today" ? tr("Done in class today") : w === "homework" ? tr("To do at home, by the due date") : tr("Set, but not recited today")}</span>
-                </button>
-              ))}
+              {(["today", "homework", "not_recited"] as const).map((w) => {
+                const on = w === "homework" ? homeworkOn : lessonSel === w;
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => (w === "homework" ? chooseHomework() : chooseLesson(w))}
+                    aria-pressed={on}
+                    className={`rounded-2xl border px-3 py-2.5 text-center transition ${
+                      on ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                    }`}
+                  >
+                    <span className="block text-[13px] font-semibold leading-tight">{w === "today" ? tr("Today's lesson") : w === "homework" ? tr("Homework") : DAILY_RATING_LABELS.not_recited}</span>
+                    <span className="block text-[11px] leading-tight mt-0.5 opacity-70">{w === "today" ? tr("Done in class today") : w === "homework" ? tr("Different work, to do at home") : tr("Set, but not recited today")}</span>
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-[11.5px] text-ink-muted mt-1.5">{tr("Tap Today's lesson and Homework together to give both, each with its own ayahs.")}</p>
           </div>
 
           <div>
@@ -1449,10 +1477,7 @@ export default function QuranAssignmentsPage() {
             <input
               type="date"
               value={dueDate}
-              onChange={(e) => {
-                setDueDate(e.target.value);
-                setForWhen(e.target.value && e.target.value > todayStr ? "homework" : "today");
-              }}
+              onChange={(e) => setDueDate(e.target.value)}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
@@ -1516,8 +1541,7 @@ export default function QuranAssignmentsPage() {
                           due: k === "homework" ? dayAfter(todayStr) : todayStr,
                         },
                       ]);
-                      if (!dueDate) setDueDate(todayStr);
-                      setForWhen("today");
+                      if (!dueDate && lessonSel !== null) setDueDate(todayStr);
                     }}
                     className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
                   >

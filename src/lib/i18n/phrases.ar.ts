@@ -2076,4 +2076,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "All grades": "كل الصفوف",
   "{grade} only": "{grade} فقط",
   "No one else in this grade. Tap \"All grades\", or search by name.": "لا أحد آخر في هذا الصف. اضغط «كل الصفوف» أو ابحث بالاسم.",
+  "the homework's due date": "موعد الواجب",
+  "Different work, to do at home": "عمل مختلف، يُنجز في البيت",
+  "Tap Today's lesson and Homework together to give both, each with its own ayahs.": "اضغط درس اليوم والواجب معًا لإعطاء الاثنين، لكل منهما آياته.",
 };
