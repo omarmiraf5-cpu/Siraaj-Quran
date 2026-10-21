@@ -168,6 +168,20 @@ export default function QuranAssignmentsPage() {
   // A wide screen shows the preview beside the form; a phone opens it as a panel.
   const [wide, setWide] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // On a phone the preview opens by itself a moment after the ayahs or pages
+  // are set by hand (not when they're filled in for you) — each keystroke
+  // pushes it back, so it never jumps up mid-number.
+  const autoPreview = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queuePreview = (now = false) => {
+    if (wide) return;
+    if (autoPreview.current) clearTimeout(autoPreview.current);
+    autoPreview.current = setTimeout(() => setPreviewOpen(true), now ? 250 : 1100);
+  };
+  const cancelPreview = () => {
+    if (autoPreview.current) clearTimeout(autoPreview.current);
+    autoPreview.current = null;
+  };
+  useEffect(() => cancelPreview, []);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
     const update = () => {
@@ -407,6 +421,7 @@ export default function QuranAssignmentsPage() {
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
+    cancelPreview();
     e.preventDefault();
     setError(null);
     setSuccess(false);
@@ -1423,7 +1438,10 @@ export default function QuranAssignmentsPage() {
                     </label>
                     <button
                       type="button"
-                      onClick={applyNextPortion}
+                      onClick={() => {
+                        applyNextPortion();
+                        queuePreview(true);
+                      }}
                       disabled={!resumeAt}
                       className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] disabled:opacity-40 transition-all"
                     >
@@ -1484,6 +1502,7 @@ export default function QuranAssignmentsPage() {
                   value={pageFrom}
                   onChange={(e) => {
                     setPageFrom(e.target.value);
+                    queuePreview();
                     setPreviewBy("page");
                   }}
                   placeholder="562"
@@ -1499,6 +1518,7 @@ export default function QuranAssignmentsPage() {
                   value={pageTo}
                   onChange={(e) => {
                     setPageTo(e.target.value);
+                    queuePreview();
                     setPreviewBy("page");
                   }}
                   placeholder={pageFrom || "563"}
@@ -1507,7 +1527,10 @@ export default function QuranAssignmentsPage() {
               </label>
               <button
                 type="button"
-                onClick={applyPageRange}
+                onClick={() => {
+                        applyPageRange();
+                        queuePreview(true);
+                      }}
                 disabled={!parseInt(pageFrom)}
                 className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] disabled:opacity-40 transition-all"
               >
@@ -1556,7 +1579,10 @@ export default function QuranAssignmentsPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={applyJuzRange}
+                  onClick={() => {
+                        applyJuzRange();
+                        queuePreview(true);
+                      }}
                   className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] transition-all"
                 >
                   {tr("Apply")}
@@ -1626,7 +1652,10 @@ export default function QuranAssignmentsPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={applyHizbRange}
+                  onClick={() => {
+                        applyHizbRange();
+                        queuePreview(true);
+                      }}
                   className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] transition-all"
                 >
                   {tr("Apply")}
@@ -1667,6 +1696,7 @@ export default function QuranAssignmentsPage() {
                 value={ayahStart}
                 onChange={(e) => {
                   setAyahStart(e.target.value);
+                  if (ayahEnd) queuePreview();
                   setPreviewBy("surah");
                 }}
                 placeholder="1"
@@ -1684,6 +1714,7 @@ export default function QuranAssignmentsPage() {
                 value={ayahEnd}
                 onChange={(e) => {
                   setAyahEnd(e.target.value);
+                  if (e.target.value) queuePreview();
                 }}
                 placeholder={maxAyahsEnd.toString()}
                 className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
