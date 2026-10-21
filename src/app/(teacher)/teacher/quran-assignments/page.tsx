@@ -763,6 +763,39 @@ export default function QuranAssignmentsPage() {
     d.setDate(d.getDate() + 1);
     return d.toLocaleDateString("en-CA");
   };
+  // Adds a second piece to the same save — homework starts where today's lesson ends.
+  const addExtra = (k: ExtraKind) => {
+    const next = parseInt(ayahEnd) + 1;
+    const sameSurah = selectedSurah && !spansSurah;
+    setExtras((list) =>
+      list.some((x) => x.kind === k)
+        ? list
+        : [
+            ...list,
+            {
+              kind: k,
+              surah: k === "homework" ? selectedSurah : "",
+              start: k === "homework" && sameSurah && next && next <= (selectedSurahData?.ayahs ?? 0) ? String(next) : "",
+              end: "",
+              due: k === "homework" ? dayAfter(todayStr) : todayStr,
+            },
+          ]
+    );
+    if (!dueDate) setDueDate(todayStr);
+    setForWhen("today");
+  };
+  // Today's lesson and homework go together: with today's lesson on, Homework
+  // adds a homework piece beside it (and a second tap takes it away) rather
+  // than turning today's lesson off.
+  const tapWhen = (w: "today" | "homework" | "not_recited") => {
+    if (w === "homework" && forWhen === "today") {
+      if (extras.some((x) => x.kind === "homework")) setExtras((l) => l.filter((x) => x.kind !== "homework"));
+      else addExtra("homework");
+      return;
+    }
+    if (w !== "today") setExtras((l) => l.filter((x) => x.kind !== "homework"));
+    chooseWhen(w);
+  };
   const chooseWhen = (w: "today" | "homework" | "not_recited") => {
     setForWhen(w);
     // Today's lesson is due today; homework is due a day on, unless a later day is already chosen.
@@ -1450,10 +1483,10 @@ export default function QuranAssignmentsPage() {
                 <button
                   key={w}
                   type="button"
-                  onClick={() => chooseWhen(w)}
-                  aria-pressed={forWhen === w}
+                  onClick={() => tapWhen(w)}
+                  aria-pressed={forWhen === w || (w === "homework" && extras.some((x) => x.kind === "homework"))}
                   className={`rounded-2xl border px-3 py-2.5 text-center transition ${
-                    forWhen === w ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                    forWhen === w || (w === "homework" && extras.some((x) => x.kind === "homework")) ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
                   }`}
                 >
                   <span className="block text-[13px] font-semibold leading-tight">{w === "today" ? tr("Today's lesson") : w === "homework" ? tr("Homework") : DAILY_RATING_LABELS.not_recited}</span>
@@ -1520,26 +1553,11 @@ export default function QuranAssignmentsPage() {
             {EXTRA_KINDS.some((k) => !extras.some((x) => x.kind === k)) && (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="text-[12.5px] text-ink-muted">{tr("Also give:")}</span>
-                {EXTRA_KINDS.filter((k) => !extras.some((x) => x.kind === k)).map((k) => (
+                {EXTRA_KINDS.filter((k) => !extras.some((x) => x.kind === k) && !(k === "homework" && forWhen === "homework")).map((k) => (
                   <button
                     key={k}
                     type="button"
-                    onClick={() => {
-                      const next = parseInt(ayahEnd) + 1;
-                      const sameSurah = selectedSurah && !spansSurah;
-                      setExtras((list) => [
-                        ...list,
-                        {
-                          kind: k,
-                          surah: k === "homework" ? selectedSurah : "",
-                          start: k === "homework" && sameSurah && next && next <= (selectedSurahData?.ayahs ?? 0) ? String(next) : "",
-                          end: "",
-                          due: k === "homework" ? dayAfter(todayStr) : todayStr,
-                        },
-                      ]);
-                      if (!dueDate) setDueDate(todayStr);
-                      setForWhen("today");
-                    }}
+                    onClick={() => addExtra(k)}
                     className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
                   >
                     {k === "homework" ? tr("+ Homework") : k === "recent" ? tr("+ Recent revision") : tr("+ Old revision")}
