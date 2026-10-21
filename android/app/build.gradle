@@ -18,13 +18,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // The Play upload key comes from repository secrets in the release
-    // workflow. Without them (a local build) the release build is simply
-    // left unsigned rather than failing.
+    // Local release builds read android/keystore.properties (gitignored).
+    // storeFile is relative to the android/ directory unless it is absolute.
+    // The GitHub release workflow has no properties file; it passes the same
+    // upload key through ANDROID_KEYSTORE_* environment variables instead.
+    // With neither, the release build is left unsigned rather than failing.
+    def keystorePropertiesFile = rootProject.file("keystore.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+    }
     def uploadKey = System.getenv("ANDROID_KEYSTORE_PATH")
+    def releaseSigningReady = keystorePropertiesFile.exists() || uploadKey
     signingConfigs {
         release {
-            if (uploadKey) {
+            if (keystorePropertiesFile.exists()) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            } else if (uploadKey) {
                 storeFile file(uploadKey)
                 storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("ANDROID_KEY_ALIAS")
@@ -36,7 +49,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            if (uploadKey) {
+            if (releaseSigningReady) {
                 signingConfig signingConfigs.release
             }
         }
