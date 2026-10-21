@@ -1680,6 +1680,8 @@ export default function QuranAssignmentsPage() {
                 setSpansSurah(false);
                 setEndSurah("");
                 setPreviewBy("surah");
+                // On a phone, the surah opens in the mushaf as soon as it's picked.
+                queuePreview(true);
               }}
             />
           </div>
