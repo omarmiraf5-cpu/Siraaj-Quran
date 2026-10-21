@@ -224,23 +224,33 @@ function HalaqaRow({ halaqa, open, onToggle, onCount }: { halaqa: MyHalaqa; open
                     </li>
                   )}
                   {shown.map((c) => (
-                    <li key={c.id} className="flex items-center gap-3 px-3 py-2">
-                      <Avatar name={c.name} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{c.name}</p>
-                        {(c.elsewhere || c.grade !== null) && (
-                          <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
-                            {c.elsewhere ? tr("In {halaqa}", { halaqa: c.elsewhere }) : typeof c.grade === "number" ? gradeLabel(c.grade) : ""}
-                          </p>
-                        )}
-                      </div>
+                    <li key={c.id}>
+                      {/* The whole row adds the child: tap the name, not just the button. */}
                       <button
                         type="button"
-                        onClick={() => change("POST", c)}
-                        disabled={Boolean(c.elsewhere) || busy === c.id}
-                        className="flex-shrink-0 text-[12.5px] font-semibold px-3 py-1.5 rounded-xl bg-brand-navy text-white disabled:opacity-35"
+                        onClick={async () => {
+                          await change("POST", c);
+                          setQuery("");
+                        }}
+                        disabled={Boolean(c.elsewhere) || busy !== null}
+                        aria-label={tr("Add {name}", { name: c.name })}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-start transition-colors hover:bg-surface-bg-warm active:bg-surface-bg-warm disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
-                        {busy === c.id ? tr("Adding…") : tr("+ Add")}
+                        <Avatar name={c.name} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{c.name}</p>
+                          {(c.elsewhere || c.grade !== null) && (
+                            <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
+                              {c.elsewhere ? tr("In {halaqa}", { halaqa: c.elsewhere }) : typeof c.grade === "number" ? gradeLabel(c.grade) : ""}
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          aria-hidden="true"
+                          className={`flex-shrink-0 text-[12.5px] font-semibold px-3 py-1.5 rounded-xl bg-brand-navy text-white ${c.elsewhere ? "opacity-35" : ""}`}
+                        >
+                          {busy === c.id ? tr("Adding…") : tr("+ Add")}
+                        </span>
                       </button>
                     </li>
                   ))}

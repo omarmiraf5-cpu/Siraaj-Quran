@@ -2040,6 +2040,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "In this halaqa": "في هذه الحلقة",
   "No children yet. Add them below.": "لا أطفال بعد. أضفهم أدناه.",
   "Take {name} out": "إخراج {name}",
+  "Add {name}": "إضافة {name}",
   "Add a child": "أضف طفلًا",
   "Search by name": "ابحث بالاسم",
   "No one found.": "لم يُعثر على أحد.",

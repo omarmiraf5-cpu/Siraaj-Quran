@@ -45,7 +45,8 @@ import {
 } from "@/lib/demoPlans";
 import { statusForRating } from "@/lib/planLessons";
 import { useLanguage } from "@/components/LanguageProvider";
-import { myHalaqaStudents } from "@/lib/teacherScope";
+import { myHalaqas } from "@/lib/teacherScope";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
 import { loadSchoolShape } from "@/lib/schoolStructure";
 import { gradeLabel } from "@/lib/grades";
 import { readCache, writeCache } from "@/lib/pageCache";
@@ -141,6 +142,9 @@ export default function QuranAssignmentsPage() {
   // scrolling one long list of names.
   const [graded, setGraded] = useState(() => readCache<boolean>(GRADED_KEY) ?? false);
   const [gradeFilter, setGradeFilter] = useState("");
+  // The teacher's program halaqas (Hifd) — offered as chips beside the
+  // grades, since a Hifd class spans grades. A chip key of "p:<id>".
+  const [programs, setPrograms] = useState<{ id: string; name: string; studentIds: string[] }[]>([]);
   const [portion, setPortion] = useState<HifzPortion>("new");
   const [selectedSurah, setSelectedSurah] = useState("");
   const [ayahStart, setAyahStart] = useState("");
@@ -271,11 +275,11 @@ export default function QuranAssignmentsPage() {
           return;
         }
 
-        const [{ data: allStudentData, error: studentError }, mine, schoolGraded] = await Promise.all([
+        const [{ data: allStudentData, error: studentError }, myGroups, schoolGraded] = await Promise.all([
           supabase.from("students").select("id, full_name, grade").order("full_name"),
           // Just the children of their own halaqas:
           // every one of a school's hundreds is synced below otherwise.
-          myHalaqaStudents(supabase),
+          myHalaqas(supabase),
           // Whether this school is kept in grades — a Qur'an school's
           // students carry an age grade too, which means nothing there.
           // Asked alongside the students, so the grade buttons arrive
@@ -284,6 +288,17 @@ export default function QuranAssignmentsPage() {
         ]);
         setGraded(schoolGraded);
         writeCache(GRADED_KEY, schoolGraded);
+        // The same map myHalaqaStudents gives: each child and where they sit.
+        let mine: Map<string, string> | null = null;
+        if (myGroups) {
+          mine = new Map();
+          for (const h of myGroups) for (const id of h.studentIds) if (!mine.has(id)) mine.set(id, h.label);
+          setPrograms(
+            myGroups
+              .filter((h) => isProgramHalaqa(h.label.split(" · ").pop()))
+              .map((h) => ({ id: h.id, name: h.label.split(" · ").pop() ?? h.label, studentIds: h.studentIds }))
+          );
+        }
         if (studentError) throw studentError;
         const studentData = mine ? (allStudentData ?? []).filter((s) => mine.has(s.id)) : allStudentData;
 
@@ -898,6 +913,16 @@ export default function QuranAssignmentsPage() {
   const grades = graded
     ? [...new Set(students.map((s) => s.grade).filter(isGradeNum))].sort((x, y) => x - y)
     : [];
+  // Whether a student falls under the chip that's on: a grade, or a Hifd class.
+  const inFilter = (s: Student, key: string) => {
+    if (!key) return true;
+    if (key.startsWith("p:")) return programs.find((p) => `p:${p.id}` === key)?.studentIds.includes(s.id) ?? false;
+    return String(s.grade) === key;
+  };
+  const chips = [
+    ...grades.map((g) => ({ key: String(g), label: gradeLabel(g), count: students.filter((s) => s.grade === g).length })),
+    ...programs.map((p) => ({ key: `p:${p.id}`, label: p.name, count: students.filter((s) => p.studentIds.includes(s.id)).length })),
+  ];
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-4 pt-2">
@@ -966,13 +991,9 @@ export default function QuranAssignmentsPage() {
             <label className="block text-sm font-semibold text-ink mb-2">
               {tr("Student *")}
             </label>
-            {grades.length > 1 && (
+            {chips.length > 1 && (
               <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label={tr("Grade")}>
-                {[{ key: "", label: tr("All"), count: students.length }, ...grades.map((g) => ({
-                  key: String(g),
-                  label: gradeLabel(g),
-                  count: students.filter((s) => s.grade === g).length,
-                }))].map((chip) => {
+                {[{ key: "", label: tr("All"), count: students.length }, ...chips].map((chip) => {
                   const on = gradeFilter === chip.key;
                   return (
                     <button
@@ -982,7 +1003,7 @@ export default function QuranAssignmentsPage() {
                       onClick={() => {
                         setGradeFilter(chip.key);
                         const picked = students.find((s) => s.id === selectedStudent);
-                        if (chip.key && picked && String(picked.grade) !== chip.key) setSelectedStudent("");
+                        if (chip.key && picked && !inFilter(picked, chip.key)) setSelectedStudent("");
                       }}
                       className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold border transition ${
                         on
@@ -1017,7 +1038,7 @@ export default function QuranAssignmentsPage() {
                     );
                   })
                 : students
-                    .filter((s) => !gradeFilter || String(s.grade) === gradeFilter)
+                    .filter((s) => inFilter(s, gradeFilter))
                     .map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.full_name}
