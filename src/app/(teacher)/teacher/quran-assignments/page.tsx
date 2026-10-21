@@ -431,7 +431,7 @@ export default function QuranAssignmentsPage() {
       const createdIds: string[] = [];
       // One child, or everyone under the chip that's on.
       const inGroup = students.filter((s) => inFilter(s, gradeFilter));
-      const everyone = selectedStudent === EVERYONE;
+      const everyone = selectedStudent === EVERYONE && !gradeFilter.startsWith("p:");
       const targets = everyone ? inGroup.map((s) => s.id) : [selectedStudent];
       if (targets.length === 0) throw new Error(phrase("There's no one in this group yet."));
       const groupName = chips.find((c) => c.key === gradeFilter)?.label ?? "";
@@ -1181,7 +1181,9 @@ export default function QuranAssignmentsPage() {
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
               <option value="">{tr("Select a student")}</option>
-              {gradeFilter && students.some((s) => inFilter(s, gradeFilter)) && (
+              {/* Only for a grade, where the class learns the same surah together —
+                  never a Hifd class, where every child is at their own place. */}
+              {gradeFilter && !gradeFilter.startsWith("p:") && students.some((s) => inFilter(s, gradeFilter)) && (
                 <option value={EVERYONE}>
                   {tr("Everyone in {group} ({count})", {
                     group: chips.find((c) => c.key === gradeFilter)?.label ?? "",
