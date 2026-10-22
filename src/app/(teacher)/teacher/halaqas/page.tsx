@@ -5,6 +5,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote, Avatar, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
+import { readCache, writeCache } from "@/lib/pageCache";
 import { myHalaqas, shortHalaqaLabel, type MyHalaqa } from "@/lib/teacherScope";
 import { useMyName } from "@/hooks/useMyName";
 import { gradeLabel } from "@/lib/grades";
@@ -33,7 +34,8 @@ interface Detail {
  */
 export default function TeacherHalaqasPage() {
   const { tr } = useLanguage();
-  const [halaqas, setHalaqas] = useState<MyHalaqa[] | null>(null);
+  // The last visit's list, shown at once while it is read again.
+  const [halaqas, setHalaqas] = useState<MyHalaqa[] | null>(() => readCache<MyHalaqa[]>("teacher-halaqas") ?? null);
   const [signedIn, setSignedIn] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
   const myName = useMyName();
@@ -46,7 +48,9 @@ export default function TeacherHalaqasPage() {
         setHalaqas([]);
         return;
       }
-      setHalaqas((await myHalaqas(supabase)) ?? []);
+      const mine = (await myHalaqas(supabase)) ?? [];
+      setHalaqas(mine);
+      writeCache("teacher-halaqas", mine);
     })().catch(() => setHalaqas([]));
   }, []);
 

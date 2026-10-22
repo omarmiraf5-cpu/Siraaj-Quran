@@ -14,6 +14,7 @@ import { SectionCard, EmptyNote, LoadingNote, Avatar, OPEN_ROW, RowChevron } fro
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
+import { readCache, writeCache } from "@/lib/pageCache";
 import { welcomeNote } from "@/lib/welcomeNote";
 import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
 import ParentImport from "@/components/ParentImport";
@@ -40,10 +41,12 @@ export default function AdminParentsPage() {
   const { tr } = useLanguage();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
-  const [ready, setReady] = useState(false);
+  // What the last visit loaded, shown at once while it is read again.
+  const seen = readCache<{ parents: ParentRow[]; students: DemoStudent[] }>("admin-parents");
+  const [ready, setReady] = useState(Boolean(seen));
 
-  const [parents, setParents] = useState<ParentRow[]>([]);
-  const [students, setStudents] = useState<DemoStudent[]>([]);
+  const [parents, setParents] = useState<ParentRow[]>(seen?.parents ?? []);
+  const [students, setStudents] = useState<DemoStudent[]>(seen?.students ?? []);
   const [created, setCreated] = useState<ParentRow[]>([]);
 
   const [showForm, setShowForm] = useState(false);
@@ -141,30 +144,34 @@ export default function AdminParentsPage() {
     }
   };
 
-  const loadReal = async () => {
-    const { data: links } = await supabase.from("parent_students").select("parent_id, student_id");
-    // The school's parents, and its teachers and office who are parents too.
-    const linkedIds = [...new Set((links ?? []).map((l) => l.parent_id as string))];
-    const { data: profileRows } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, active, role")
-      .or(`role.eq.parent${linkedIds.length ? `,id.in.(${linkedIds.join(",")})` : ""}`)
-      .order("full_name");
+  const loadReal = async (): Promise<ParentRow[]> => {
+    // The links and the school's parents are asked side by side.
+    const [{ data: links }, { data: parentRows }] = await Promise.all([
+      supabase.from("parent_students").select("parent_id, student_id"),
+      supabase.from("profiles").select("id, full_name, email, active, role").eq("role", "parent").order("full_name"),
+    ]);
+    // Plus the teachers and office who are parents too: linked to a child, but not role "parent".
+    const have = new Set((parentRows ?? []).map((p) => p.id as string));
+    const extraIds = [...new Set((links ?? []).map((l) => l.parent_id as string))].filter((id) => !have.has(id));
+    const { data: extraRows } = extraIds.length
+      ? await supabase.from("profiles").select("id, full_name, email, active, role").in("id", extraIds)
+      : { data: [] as typeof parentRows };
+    const profileRows = [...(parentRows ?? []), ...(extraRows ?? [])].sort((x, y) => String(x.full_name).localeCompare(String(y.full_name)));
     const childrenByParent = new Map<string, string[]>();
     for (const l of links ?? []) {
       childrenByParent.set(l.parent_id, [...(childrenByParent.get(l.parent_id) ?? []), l.student_id]);
     }
 
-    setParents(
-      (profileRows ?? []).map((p) => ({
-        id: p.id,
-        name: p.role && p.role !== "parent" ? `${p.full_name} (${p.role === "admin" ? "office" : "teacher"})` : p.full_name,
-        staffRole: p.role === "teacher" || p.role === "admin" ? p.role : undefined,
-        email: p.email ?? "",
-        childIds: childrenByParent.get(p.id) ?? [],
-        active: p.active,
-      }))
-    );
+    const rows: ParentRow[] = profileRows.map((p) => ({
+      id: p.id,
+      name: p.role && p.role !== "parent" ? `${p.full_name} (${p.role === "admin" ? "office" : "teacher"})` : p.full_name,
+      staffRole: p.role === "teacher" || p.role === "admin" ? (p.role as "teacher" | "admin") : undefined,
+      email: p.email ?? "",
+      childIds: childrenByParent.get(p.id) ?? [],
+      active: p.active,
+    }));
+    setParents(rows);
+    return rows;
   };
 
   useEffect(() => {
@@ -185,14 +192,13 @@ export default function AdminParentsPage() {
         return;
       }
 
-      const { data: studentRows } = await supabase
-        .from("students")
-        .select("id, full_name, active")
-        .order("full_name");
-      setStudents(
-        (studentRows ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: "", active: s.active }))
-      );
-      await loadReal();
+      const [{ data: studentRows }, rows] = await Promise.all([
+        supabase.from("students").select("id, full_name, active").order("full_name"),
+        loadReal(),
+      ]);
+      const roster = (studentRows ?? []).map((s) => ({ id: s.id, name: s.full_name, halaqa: "", active: s.active }));
+      setStudents(roster);
+      writeCache("admin-parents", { parents: rows, students: roster });
     };
     load().finally(() => setReady(true));
   }, []);

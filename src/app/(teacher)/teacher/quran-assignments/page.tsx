@@ -378,31 +378,7 @@ export default function QuranAssignmentsPage() {
           setRoster(studentData.map((s) => ({ id: s.id, name: s.full_name, halaqa: "" })));
         }
 
-        // Catches every student's "new" lesson up with their own yearly
-        // plan before the list below is read — the point of automating
-        // this away is that a teacher never has to open the form and pick
-        // a student just to make it happen, so nothing here waits on that.
-        const summaries: Record<string, PlanSummaryDto> = {};
-        await Promise.all(
-          (studentData ?? []).map(async (s) => {
-            try {
-              const r = await fetch(`/api/quranic-assignments?student_id=${encodeURIComponent(s.id)}`);
-              const b = await r.json();
-              if (b?.plan_summary) summaries[s.id] = b.plan_summary;
-            } catch {
-              // One student's sync failing should not stop the rest, or
-              // the list below from loading at all.
-            }
-          })
-        );
-        setPlanSummaries(summaries);
-
-        // This school's own assignments, read after the sync above so a
-        // lesson it just generated shows up on this very first load rather
-        // than needing a second visit. Without loading them at all, the
-        // list below fell back to the sample data for everyone, so a
-        // school that had just signed up opened this page to twenty-one
-        // invented assignments belonging to a student called "Student".
+        // This school's own assignments first, so the list shows at once.
         const { data: assignmentData, error: assignmentError } = await supabase
           .from("quranic_assignments")
           .select(
@@ -415,6 +391,36 @@ export default function QuranAssignmentsPage() {
           ((assignmentData ?? []) as QuranicAssignment[]).filter((a) => !mine || mine.has(a.student_id))
         );
         void loadRealLog();
+        setListReady(true);
+
+        // Then, in the background, catch every student's "new" lesson up with
+        // their own yearly plan (a few at a time, so a teacher with forty
+        // children does not send forty requests at once) and show any lesson
+        // that made. Nothing waits on this: the list above is already there.
+        void (async () => {
+          const summaries: Record<string, PlanSummaryDto> = {};
+          const queue = [...(studentData ?? [])];
+          const worker = async () => {
+            for (let s = queue.shift(); s; s = queue.shift()) {
+              try {
+                const r = await fetch(`/api/quranic-assignments?student_id=${encodeURIComponent(s.id)}`);
+                const b = await r.json();
+                if (b?.plan_summary) summaries[s.id] = b.plan_summary;
+              } catch {
+                // One student's sync failing should not stop the rest.
+              }
+            }
+          };
+          await Promise.all(Array.from({ length: 5 }, worker));
+          setPlanSummaries(summaries);
+          const { data: again } = await supabase
+            .from("quranic_assignments")
+            .select(
+              "id, student_id, teacher_id, surah, ayah_start, surah_end, ayah_end, portion, assigned_at, due_date, status, memorization_level, daily_rating, teacher_notes, student_notes, created_at, updated_at"
+            )
+            .order("assigned_at", { ascending: false });
+          if (again) setRealAssignments((again as QuranicAssignment[]).filter((a) => !mine || mine.has(a.student_id)));
+        })();
       } catch (err) {
         console.error("Error loading data:", err);
         setLoadError(
