@@ -87,6 +87,11 @@
   .gradient-navy {
     background: linear-gradient(155deg, #1a3f78 0%, #102A56 58%, #0a1c3a 100%);
   }
+  /* Sign-in stage only. The shared navy token above is the refreshed one;
+     the login page keeps the earlier two-column gradient. */
+  .login-navy {
+    background: linear-gradient(160deg, #1e3f7a 0%, #15305f 50%, #0e2347 100%);
+  }
   /* Repeating eight-point star. Encoded so it can sit behind a hero or the
      sign-in stage without a second network request. */
   .geo-fill {
@@ -810,6 +815,10 @@ body {
       0 20px 46px -16px rgba(16, 42, 86, 0.5),
       0 0 34px -6px rgba(198, 161, 90, 0.38);
     transition: box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  /* Beats .gradient-navy: that token is emitted later in the built sheet. */
+  .hero-frame.gradient-navy {
+    background: linear-gradient(168deg, #0e1c36 0%, #0a1630 46%, #060e22 100%);
   }
   .dark .hero-frame {
     box-shadow:

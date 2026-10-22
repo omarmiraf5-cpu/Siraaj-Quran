@@ -14,7 +14,6 @@ import type { Role } from "@/lib/types";
 import { homeOf, mayOpen } from "@/lib/portalAccess";
 import { safeNextPath } from "@/lib/safeNextPath";
 import { ByLanguage } from "@/components/ByLanguage";
-import { IconBook, IconBuildings, IconUser, IconUsers } from "@/components/icons";
 
 const ROLES: { key: Role; labelKey: string; portalKey: string }[] = [
   { key: "parent",  labelKey: "role.parent",  portalKey: "login.portal.parent"  },
@@ -332,16 +331,17 @@ export default function LoginPage() {
   }, [pin, roster, studentId]);
 
   return (
-    <div className="page-enter relative min-h-screen gradient-navy flex items-start md:items-center justify-center overflow-x-hidden">
-      <div className="geo-fill absolute inset-0 opacity-50 pointer-events-none" />
+    <div className="relative min-h-screen login-navy flex items-center justify-center overflow-hidden">
+      {/* Ambient texture */}
+      <div className="absolute inset-0 pattern-lattice pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/25 pointer-events-none" />
 
       {/* Dark mode + language toggles — top corner (end side, so it swaps
           with the reading direction rather than colliding with the role
           switcher's mirrored position under Arabic) */}
       <div className="fixed top-3 end-3 z-50 flex items-center gap-1.5">
-        <LanguageToggle variant="pill" className="min-h-12 px-4 text-sm bg-white/15 text-white hover:bg-white/25" />
-        <ThemeToggle variant="pill" className="min-h-12 px-4 text-sm bg-white/15 text-white hover:bg-white/25" />
+        <LanguageToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
+        <ThemeToggle variant="pill" className="bg-white/10 text-white/70 hover:bg-white/20" />
       </div>
 
       <div className="relative w-full max-w-6xl flex flex-col md:flex-row items-center md:items-stretch gap-4 md:gap-0 px-6 py-10 md:py-14">
@@ -414,71 +414,66 @@ export default function LoginPage() {
       <div className="flex flex-col items-center justify-center w-full md:w-1/2 px-2 md:ps-10 py-4">
 
         {/* Mobile-only compact header */}
-        <div className="login-card">
-        <div className="flex flex-col items-center mb-4">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden ring-2 ring-brand-gold/50 shadow-e2 mb-2">
-            <Image src="/crest.jpg" alt="MyDiiwaan" width={64} height={64} className="object-cover w-full h-full" />
+        <div className="flex md:hidden flex-col items-center mb-6">
+          <div className="w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark mb-2">
+            <Image src="/crest.jpg" alt="MyDiiwaan" width={80} height={80} className="object-cover w-full h-full" />
           </div>
-          <h1 className="font-display text-[1.7rem] font-bold tracking-tight text-center text-ink">
-            <span>My</span>
-            <span className="text-brand-gold">Diiwaan</span>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-center">
+            <span className="text-white">My</span>
+            <span className="gold-foil">Diiwaan</span>
           </h1>
-          <p className="font-calligraphy text-2xl text-brand-gold leading-none mt-1" dir="rtl" lang="ar">ديواني</p>
+          <p className="font-calligraphy text-2xl text-brand-gold-light leading-none mt-1.5" dir="rtl" lang="ar">ديواني</p>
         </div>
 
-        {/* Role switcher */}
-        <p className="text-center text-[13px] leading-relaxed text-ink mb-3">
-          {t("login.howToGetAccess")}
-        </p>
-        <div className="grid grid-cols-2 gap-2.5 mb-4">
-          {ROLES.map((r) => (
-            <button
-              key={r.key}
-              onClick={() => { setRole(r.key); setPin(""); setError(null); }}
-              className={`role-tile ${role === r.key ? "role-tile-on" : ""}`}
-            >
-              <span className="role-ico" aria-hidden>
-                {r.key === "parent" && <IconUsers size={20} />}
-                {r.key === "teacher" && <IconBook size={20} />}
-                {r.key === "student" && <IconUser size={20} />}
-                {r.key === "admin" && <IconBuildings size={20} />}
-              </span>
-              {t(r.labelKey)}
-            </button>
-          ))}
-        </div>
-
+        {/* Daily reflection */}
         {(() => {
           const r = DAILY_REFLECTIONS[new Date().getDay()];
           return (
-            <div className="w-full mb-4 text-center space-y-1">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-brand-gold-dark dark:text-brand-gold-light">
+            <div className="w-full max-w-sm mb-6 text-center space-y-2">
+              <p className="font-display text-emerald-400 text-sm uppercase tracking-[0.2em] font-bold">
                 {t("login.dailyReflection")}
               </p>
               <p
-                className="font-calligraphy text-[22px] text-ink leading-[1.7]"
+                className="font-calligraphy text-[30px] text-brand-gold-light leading-[2.1]"
                 dir="rtl" lang="ar"
               >
                 {r.arabic}
               </p>
               <ByLanguage
                 en={
-                  <p className="font-serif text-ink-body text-[14px] leading-relaxed" dir="ltr">
+                  <p className="font-serif text-white/85 text-[15px] leading-relaxed" dir="ltr">
                     &ldquo;{r.english}&rdquo;
                   </p>
                 }
                 ar={null}
               />
-              <p className="text-ink-muted text-xs tracking-wide">— {tr(r.source)}</p>
+              <p className="text-white/50 text-xs tracking-wide">— {tr(r.source)}</p>
             </div>
           );
         })()}
+
+        {/* Role switcher */}
+        <div className="flex rounded-pill backdrop-blur-md bg-white/10 border border-white/10 p-1 mb-5 gap-1 shadow-dark">
+          {ROLES.map((r) => (
+            <button
+              key={r.key}
+              onClick={() => { setRole(r.key); setPin(""); setError(null); }}
+              className={`px-3 min-[380px]:px-4 py-2 rounded-pill text-[13px] min-[380px]:text-sm font-semibold transition-all ${
+                role === r.key
+                  ? "bg-surface-card text-ink shadow-card"
+                  : "text-white/70 hover:text-white"
+              }`}
+            >
+              {t(r.labelKey)}
+            </button>
+          ))}
+        </div>
 
         <div className="w-full max-w-sm">
           {role === "student" ? (
             <div className="space-y-5">
               {schoolName && (
-                <p className="text-center text-ink-body text-sm">
+                <p className="text-center text-white/70 text-sm">
                   {schoolName} — {t("login.tapNameThenPin")}
                 </p>
               )}
@@ -528,7 +523,7 @@ export default function LoginPage() {
                 // gave a real child five strangers to choose from and a PIN
                 // that could never work, with nothing explaining why.
                 <form onSubmit={findSchool} className="space-y-3">
-                  <p className="text-center text-ink-body text-sm leading-relaxed px-4">
+                  <p className="text-center text-white/70 text-sm leading-relaxed px-4">
                     {t("login.enterSchoolCode")}
                   </p>
                   <div className="flex gap-2">
@@ -539,12 +534,12 @@ export default function LoginPage() {
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
-                      className="flex-1 min-w-0 min-h-12 rounded-2xl bg-surface-bg border border-surface-border px-4 text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/40"
+                      className="flex-1 min-w-0 rounded-card bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-brand-gold/70"
                     />
                     <button
                       type="submit"
                       disabled={!schoolCode.trim() || schoolLookup === "loading"}
-                      className="btn btn-accent rounded-card px-4 disabled:opacity-50"
+                      className="rounded-card bg-brand-gold text-brand-navy font-semibold px-4 disabled:opacity-50 active:scale-95 transition-all"
                     >
                       {schoolLookup === "loading" ? "…" : t("login.findSchool")}
                     </button>
@@ -557,7 +552,7 @@ export default function LoginPage() {
 
               {roster && schoolName && (
                 <p className="text-center">
-                    <button type="button" onClick={forgetSchool} className="text-[11px] text-ink-muted underline underline-offset-2 hover:text-ink">
+                  <button type="button" onClick={forgetSchool} className="text-[11px] text-white/50 underline underline-offset-2 hover:text-white/80">
                     {t("login.notYourSchool")}
                   </button>
                 </p>
@@ -588,7 +583,7 @@ export default function LoginPage() {
                       <button
                         key={d}
                         onClick={() => handlePin(String(d))}
-                        className="h-14 min-h-11 rounded-2xl bg-surface-bg border border-surface-border text-ink text-xl font-semibold hover:border-brand-navy active:scale-95 transition-all"
+                        className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl font-semibold hover:bg-white/20 active:scale-95 transition-all"
                       >
                         {d}
                       </button>
@@ -596,13 +591,13 @@ export default function LoginPage() {
                     <div />
                     <button
                       onClick={() => handlePin("0")}
-                      className="h-14 min-h-11 rounded-2xl bg-surface-bg border border-surface-border text-ink text-xl font-semibold hover:border-brand-navy active:scale-95 transition-all"
+                      className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl font-semibold hover:bg-white/20 active:scale-95 transition-all"
                     >
                       0
                     </button>
                     <button
                       onClick={() => setPin((p) => p.slice(0, -1))}
-                      className="h-14 min-h-11 rounded-2xl bg-surface-bg border border-surface-border text-ink text-xl hover:border-brand-navy active:scale-95 transition-all flex items-center justify-center"
+                      className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center"
                     >
                       ⌫
                     </button>
@@ -613,24 +608,24 @@ export default function LoginPage() {
           ) : (
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="relative">
-                <span className="absolute start-4 top-1/2 -translate-y-1/2 text-brand-gold-dark">
+                <span className="absolute start-4 top-1/2 -translate-y-1/2 text-brand-gold-light/85">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                 </span>
                 <input
                   type="email" required placeholder={t("login.emailAddress")}
                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full min-h-12 bg-surface-bg border border-surface-border rounded-2xl ps-11 pe-4 text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/40 transition-all"
+                  className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
                 />
               </div>
               <div className="relative">
-                <span className="absolute start-4 top-1/2 -translate-y-1/2 text-brand-gold-dark">
+                <span className="absolute start-4 top-1/2 -translate-y-1/2 text-brand-gold-light/85">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </span>
                 <input
                   type="password" required placeholder="••••••••"
                   value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full min-h-12 bg-surface-bg border border-surface-border rounded-2xl ps-11 pe-4 text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/40 transition-all"
+                  className="w-full backdrop-blur-sm bg-white/[0.08] border border-white/20 rounded-card ps-11 pe-4 py-3.5 text-white placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 focus:bg-white/[0.1] transition-all"
                 />
               </div>
 
@@ -642,9 +637,8 @@ export default function LoginPage() {
 
               <button
                 type="submit" disabled={loading}
-                className="btn btn-accent relative w-full rounded-card shadow-dark disabled:opacity-60"
+                className="relative w-full overflow-hidden gradient-emerald text-white font-semibold py-3.5 rounded-card shadow-dark hover:opacity-95 hover:shadow-lg active:scale-[.98] transition-all disabled:opacity-60"
               >
-                {loading && <span className="btn-spinner" aria-hidden="true" />}
                 {loading ? t("login.signingIn") : `${t("login.signInTo")} ${t(ROLES.find((r) => r.key === role)?.portalKey ?? "")}`}
               </button>
 
@@ -656,14 +650,14 @@ export default function LoginPage() {
                 onClick={() => {
                   try { sessionStorage.setItem(RESET_EMAIL_KEY, email.trim()); } catch { /* private mode */ }
                 }}
-                className="flex items-center justify-center min-h-11 px-3 text-center text-[15px] font-semibold text-ink underline-offset-2 hover:underline transition-colors"
+                className="block text-center text-white/65 hover:text-white text-xs font-semibold underline-offset-2 hover:underline transition-colors"
               >
                 {t("login.forgotPassword")}
               </Link>
 
               {SHOW_DEMO_LOGINS && (
-                <div className="mt-4 bg-surface-bg border border-surface-border rounded-2xl px-3 py-3">
-                  <p className="text-ink-muted text-xs uppercase tracking-wider font-semibold mb-2">{t("login.demoAutofill")}</p>
+                <div className="mt-4 bg-white/5 border border-white/10 rounded-card px-4 py-3">
+                  <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-2">{t("login.demoAutofill")}</p>
                   <div className="space-y-1.5 text-xs">
                     {(["teacher", "parent", "admin"] as const).map((key) => {
                       const acct = DEMO_ACCOUNTS[key];
@@ -672,9 +666,9 @@ export default function LoginPage() {
                           key={key}
                           type="button"
                           onClick={() => { setEmail(acct.email); setPassword(acct.password); setRole(acct.role); setError(null); }}
-                          className="w-full text-start min-h-11 px-2.5 rounded-xl hover:bg-white dark:hover:bg-white/5 transition text-ink-muted hover:text-ink"
+                          className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition text-white/50 hover:text-white/80"
                         >
-                          <span className="text-ink font-semibold">{t(`role.${key}`)}:</span> {acct.email} / {acct.password}
+                          <span className="text-white/70">{t(`role.${key}`)}:</span> {acct.email} / {acct.password}
                         </button>
                       );
                     })}
@@ -684,14 +678,13 @@ export default function LoginPage() {
             </form>
           )}
 
-          <p className="mt-4 flex flex-wrap items-center justify-center gap-x-1 text-[15px]">
-            <Link href="/privacy" className="inline-flex items-center justify-center min-h-11 px-3 font-semibold text-ink">{t("common.privacy")}</Link>
-            <span className="text-ink-muted" aria-hidden>·</span>
-            <Link href="/terms" className="inline-flex items-center justify-center min-h-11 px-3 font-semibold text-ink">{t("common.terms")}</Link>
-            <span className="text-ink-muted" aria-hidden>·</span>
-            <Link href="/support" className="inline-flex items-center justify-center min-h-11 px-3 font-semibold text-ink">{t("login.help")}</Link>
+          <p className="mt-6 text-center text-[11.5px] text-white/40">
+            <Link href="/privacy" className="hover:text-white/70">{t("common.privacy")}</Link>
+            <span className="mx-2">·</span>
+            <Link href="/terms" className="hover:text-white/70">{t("common.terms")}</Link>
+            <span className="mx-2">·</span>
+            <Link href="/support" className="hover:text-white/70">{t("login.help")}</Link>
           </p>
-        </div>
         </div>
       </div>
       </div>
