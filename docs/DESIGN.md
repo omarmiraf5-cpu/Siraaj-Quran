@@ -12,11 +12,14 @@ shouts. Colour is used to mean something, never for decoration.
 
 ## Rules
 
-1. **Colour.** Navy for structure, cream for the page, gold for emphasis only
-   (one gold accent per screen area). Green, amber and red mean present/late/absent
-   and good/warning/problem, and nothing else. No purple, pink or orange tiles.
-2. **One icon family.** The same style everywhere: the gem tiles for navigation,
-   cards and buttons (`gem-icons.tsx`). Do not mix flat line icons beside them.
+1. **Colour.** Navy for structure, cream for the page, gold for emphasis. Green,
+   amber and red mean present/late/absent and good/warning/problem, and nothing else.
+   Outside the gem tiles (rule 2) there are no purple, pink or orange surfaces.
+2. **Gem tiles are the icon family.** Navigation, cards and shortcuts use the
+   coloured gem tiles from `gem-icons.tsx` (decided with the owner, October 2026).
+   Do not add outline or flat icons beside them, and do not add a new gem colour
+   without adding it to `gem-icons.tsx` for every screen. Small marks inside text
+   (chevrons, close) stay plain line icons.
 3. **One way to do each thing per screen.** A page does not repeat the same
    actions in two rows (a header's buttons and a tile row below it). Pick one.
 4. **Effects are rare.** At most one soft shadow level. No glow on every card, no
