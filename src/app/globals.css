@@ -1401,3 +1401,30 @@ body {
 .sec-bar { background: var(--sec); }
 .sec-title { color: var(--sec-ink); }
 .sec-note { background: color-mix(in srgb, var(--sec) 12%, transparent); color: var(--sec-ink); }
+
+/* ── Phones: comfortable to tap, and no zoom-on-focus ──────────────────
+   iPhone Safari and the app zoom the page whenever a text box under 16px
+   is tapped, so every field is 16px on a phone. Small text links and
+   buttons get an invisible 44px-tall touch band (Apple's minimum) that
+   does not change the layout. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+@media (pointer: coarse) {
+  :where(a, button):not(:where(.shine, .no-hit, .gem-surface, .card-feature, .hero-frame, .absolute, .fixed, .sticky))::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: max(100%, 44px);
+    transform: translateY(-50%);
+  }
+  :where(a, button):not(:where(.shine, .no-hit, .gem-surface, .card-feature, .hero-frame, .absolute, .fixed, .sticky)) {
+    position: relative;
+  }
+}
