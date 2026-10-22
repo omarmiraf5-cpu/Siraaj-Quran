@@ -1,6 +1,7 @@
 "use client";
 
 import { SidebarNav } from "@/components/SidebarNav";
+import { PageFade } from "@/components/motion-ui";
 import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
 import { useMyChildren } from "@/hooks/useMyChildren";
@@ -109,7 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex min-h-screen bg-surface-bg">
       <SidebarNav items={items} roleKey="role.admin" />
-      <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6 overflow-auto">{blocked ? null : children}</main>
+      <main className="flex-1 px-4 md:px-8 pt-20 md:pt-10 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:pb-8 overflow-auto">{blocked ? null : <PageFade>{children}</PageFade>}</main>
     </div>
   );
 }
