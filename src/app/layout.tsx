@@ -4,7 +4,6 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { ToastProvider } from "@/components/Toast";
 import { NativeBridge } from "@/components/NativeBridge";
-import { ToastProvider as MotionToastProvider } from "@/components/motion-ui";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -75,7 +74,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#102A56",
+  themeColor: "#0e2347",
 };
 
 export default function RootLayout({
@@ -90,29 +89,13 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen">
-        <svg width="0" height="0" className="absolute" aria-hidden>
-          <defs>
-            <linearGradient id="myd-gold" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#f0d48a" />
-              <stop offset="46%" stopColor="#c4963c" />
-              <stop offset="100%" stopColor="#6e4e16" />
-            </linearGradient>
-            <linearGradient id="myd-gold-rich" x1="20%" y1="0%" x2="80%" y2="100%">
-              <stop offset="0%" stopColor="#ffe7a8" />
-              <stop offset="40%" stopColor="#e0b04a" />
-              <stop offset="100%" stopColor="#7a5414" />
-            </linearGradient>
-          </defs>
-        </svg>
         {/* Behind the phone's status bar: in the app the page starts below
             it, and this keeps the strip the portal's navy in either theme. */}
         <div aria-hidden className="status-bar-strip" />
         <NativeBridge />
         <ThemeProvider>
           <LanguageProvider>
-            <ToastProvider>
-              <MotionToastProvider>{children}</MotionToastProvider>
-            </ToastProvider>
+            <ToastProvider>{children}</ToastProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

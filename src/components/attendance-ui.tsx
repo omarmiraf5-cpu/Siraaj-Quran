@@ -26,12 +26,6 @@ export type Api = (input: string, init?: RequestInit) => Promise<Response>;
 export function useAttendanceApi(role: DemoRole): { mode: "loading" | "demo" | "real"; api: Api } {
   const [mode, setMode] = useState<"loading" | "demo" | "real">("loading");
   useEffect(() => {
-    try {
-      if (localStorage.getItem("demo_user") && !document.cookie.includes("auth-token")) {
-        setMode("demo");
-        return;
-      }
-    } catch { /* private mode — fall through to the session check */ }
     sessionUser(createClient())
       .then((user) => setMode(user ? "real" : "demo"))
       .catch(() => setMode("demo"));
@@ -60,7 +54,7 @@ export async function currentPosition(): Promise<Fix> {
   if (Capacitor.isNativePlatform()) return nativePosition();
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      reject(new Error(phrase("This device can't share its location, so it can't be used to clock in. Try your phone.")));
+      reject(new Error(phrase("This device can't share its location, so it can't be used to sign in. Try your phone.")));
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -179,11 +173,11 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
     if (res.ok) {
       setData(body);
       writeCache(SIGN_IN_KEY, body);
-    } else setError(tr(body.error ?? "Could not load today's clock-in"));
+    } else setError(tr(body.error ?? "Could not load today's sign-in"));
   }, [api]);
 
   useEffect(() => {
-    load().catch(() => setError(tr("Could not load today's clock-in")));
+    load().catch(() => setError(tr("Could not load today's sign-in")));
   }, [load]);
 
   const act = async (action: "sign_in" | "sign_out") => {
@@ -203,7 +197,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? phrase("That didn't go through — please try again"));
-      setDone(body.message ?? (action === "sign_in" ? phrase("Clocked in — have a good day.") : phrase("Clocked out — see you next time.")));
+      setDone(body.message ?? (action === "sign_in" ? "Signed in — have a good day." : phrase("Signed out — see you next time.")));
       await load();
       onChange?.();
     } catch (e) {
@@ -221,7 +215,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
         {error ? (
           <p className="text-[13px] text-ink-muted">{error}</p>
         ) : (
-          <div className="space-y-2.5" aria-label={tr("Checking today's clock-in…")}>
+          <div className="space-y-2.5" aria-label={tr("Checking today's sign-in…")}>
             <div className="skeleton h-3 w-36 rounded-full" />
             <div className="skeleton h-5 w-56 max-w-full rounded-full" />
             <div className="skeleton h-3 w-80 max-w-full rounded-full" />
@@ -234,19 +228,19 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
   const { day, settings } = data;
   const due = formatClock(settings.start_time);
   const headline = data.signed_out
-    ? phrase("Clocked out at {time}", { time: formatClock(day.signedOut!) })
+    ? phrase("Signed out at {time}", { time: formatClock(day.signedOut!) })
     : data.signed_in
-      ? phrase("Clocked in at {time}", { time: formatClock(day.signedIn!) })
+      ? phrase("Signed in at {time}", { time: formatClock(day.signedIn!) })
       : day.status === "reported"
         ? phrase("You reported an absence for today")
         : day.status === "off"
           ? phrase("No school today")
-          : phrase("You haven't clocked in yet");
+          : phrase("You haven't signed in yet");
   const sub = data.signed_in
     ? day.status === "late"
       ? phrase("{count} minute after the {due} start.|{count} minutes after the {due} start.", { count: day.minutesLate, due })
       : phrase("On time for the {due} start.", { due })
-    : phrase("Staff are due at {due}. You can only clock in at the school.", { due });
+    : phrase("Staff are due at {due}. You can only sign in on the school premises.", { due });
 
   const canSignIn = settings.configured && !data.signed_in;
   const canSignOut = settings.configured && data.signed_in && !data.signed_out;
@@ -255,7 +249,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
     <section className="card-quiet p-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
-          <p className="eyebrow">{tr("Today · clock in")}</p>
+          <p className="eyebrow">{tr("Today · staff sign-in")}</p>
           <p className="page-title text-lg mt-1">{headline}</p>
           <p className="text-[12.5px] text-ink-muted mt-1 leading-relaxed">{sub}</p>
           {data.signed_in && (
@@ -272,7 +266,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
               disabled={busy !== ""}
               className="gradient-emerald text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-50 active:scale-[.98] transition-all"
             >
-              {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Clocking in…") : tr("Clock in")}
+              {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Signing in…") : tr("Sign in")}
             </button>
           )}
           {canSignOut && (
@@ -282,7 +276,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
               disabled={busy !== ""}
               className="bg-brand-navy text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-50 active:scale-[.98] transition-all"
             >
-              {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Clocking out…") : tr("Clock out")}
+              {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Signing out…") : tr("Sign out")}
             </button>
           )}
         </div>
@@ -294,16 +288,13 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
         </p>
       )}
       {!settings.configured && (
-        <div className="mt-3 rounded-2xl border border-amber-300/80 bg-amber-50/80 dark:border-amber-800/50 dark:bg-amber-950/25 px-4 py-3">
-          <p className="text-[13px] font-semibold text-amber-950 dark:text-amber-100">{tr("Clock in isn't available yet")}</p>
-          <p className="text-[12.5px] text-amber-900 dark:text-amber-200 mt-1 leading-relaxed">
-            {tr("The school location hasn't been set, so the portal can't confirm you're at the school. Ask your school office — an admin — to set it under Staff attendance. Once they save the location, you can clock in from your phone while you're there.")}
-          </p>
-        </div>
+        <p className="text-[12.5px] text-amber-800 dark:text-amber-300 mt-3">
+          {tr("Signing in isn't switched on yet — the office needs to set the school's location first.")}
+        </p>
       )}
       {settings.demo && (
         <p className="text-[11.5px] text-ink-muted mt-3">
-          {tr("Sample portal: the location check and times are simulated. On your school's portal, clocking in and out only works at the school.")}
+          {tr("Sample portal: the location check and times are simulated. On your school's portal, signing in and out only works on the premises.")}
         </p>
       )}
       {error && (

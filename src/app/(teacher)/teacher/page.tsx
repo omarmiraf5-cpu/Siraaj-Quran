@@ -8,7 +8,6 @@ import {
   DEMO_ASSIGNMENTS,
   DEMO_ATTENDANCE,
   DEMO_TODAY,
-  ATTENDANCE_STYLES,
   summariseAttendance,
   formatDay,
   daysFromToday,
@@ -26,7 +25,6 @@ import {
   EmptyNote,
   LoadingNote,
   HalaqaTitle,
-  avatarTone,
 } from "@/components/portal-ui";
 import { IconCalendar, IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
@@ -41,7 +39,7 @@ import { SignInCard, useAttendanceApi } from "@/components/attendance-ui";
 import { myHalaqas, narrowToMine, type MyHalaqa } from "@/lib/teacherScope";
 import { ByLanguage } from "@/components/ByLanguage";
 import { MetricCard } from "@/components/MetricCard";
-import { ColorGlyph, ColorTile, QuickActions } from "@/components/gem-icons";
+import { ColorTile, ColorGlyph } from "@/components/gem-icons";
 import { gradeLabel } from "@/lib/grades";
 import { Users, BookOpen, ClipboardCheck, CalendarCheck } from "lucide-react";
 
@@ -309,31 +307,14 @@ export default function TeacherDashboard() {
               {t("common.assign")}
             </HeroButtonGhost>
             <HeroButtonGhost href="/teacher/my-attendance" icon={<ColorGlyph name="clock" size={22} />}>
-              {t("nav.clockIn")}
+              {t("nav.signIn")}
             </HeroButtonGhost>
           </>
         }
-        stats={[
-          { value: students.length, label: t("nav.students") },
-          { value: active.length, label: t("common.activeWork") },
-          { value: review.length, label: t("common.toReview") },
-          { value: `${avgAttendance}%`, label: t("common.attendanceStat") },
-        ]}
       />
 
       {/* Signing in on arrival — the first thing a teacher does, so it sits
           straight under the greeting rather than on a page of its own. */}
-      <QuickActions
-        items={[
-          { href: "/teacher/attendance", art: "calendarCheck", label: t("common.register") },
-          { href: "/teacher/quran-assignments", art: "pen", label: t("common.assign") },
-          { href: "/teacher/my-attendance", art: "clock", label: t("nav.clockIn") },
-          { href: "/teacher/qaidah", art: "book", label: t("nav.qaidah") },
-          { href: "/teacher/messages", art: "mail", label: t("nav.messages") },
-          { href: "/teacher/class-work", art: "globe", label: t("nav.classWork") },
-        ]}
-      />
-
       {staffMode !== "loading" && <SignInCard api={staffApi} />}
 
       {/* At a glance — each number carries the context that makes it mean
@@ -503,7 +484,7 @@ export default function TeacherDashboard() {
                     onClick={() => setSelectedStudentId(student.id)}
                     className="w-full flex items-center gap-3 text-start rounded-xl px-2 py-1.5 -mx-2 hover:bg-surface-bg-warm transition-colors"
                   >
-                    <span className={`w-11 h-11 rounded-full text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${avatarTone(student.name)}`}>
+                    <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
                       {initials(student.name)}
                     </span>
                     <span className="flex-1 min-w-0">
@@ -512,7 +493,7 @@ export default function TeacherDashboard() {
                       </span>
                       <span className="block text-[11px] text-ink-muted">{student.halaqa}</span>
                     </span>
-                    <span className={`badge flex-shrink-0 ${ATTENDANCE_STYLES[status]}`}>
+                    <span className={`text-[12px] font-semibold capitalize flex-shrink-0 ${STATUS_TEXT[status]}`}>
                       {t(`common.${status}`)}
                     </span>
                   </button>
@@ -543,7 +524,7 @@ export default function TeacherDashboard() {
                 const student = students.find((s) => s.id === a.student_id);
                 const content = (
                   <>
-                    <span className={`w-11 h-11 rounded-full text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${avatarTone(student?.name ?? "?")}`}>
+                    <span className="w-8 h-8 rounded-full bg-surface-bg-warm border border-surface-border flex items-center justify-center text-[11px] font-bold text-ink-muted flex-shrink-0">
                       {initials(student?.name ?? "?")}
                     </span>
                     <div className="flex-1 min-w-0">
@@ -606,8 +587,7 @@ export default function TeacherDashboard() {
           quiet one, rather than a card the size of the work above it. */}
       <Link
         href="/teacher/mushaf"
-        className="card-quiet card-feature gem-surface group flex items-center gap-3.5 px-5 py-4"
-        style={{ "--gem": "#d9862a" } as React.CSSProperties}
+        className="card-quiet card-feature group flex items-center gap-3.5 px-5 py-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
       >
         <ColorTile name="rehal" size={42} />
         <span className="flex-1 min-w-0">
@@ -622,7 +602,7 @@ export default function TeacherDashboard() {
       </Link>
 
       {/* Hadith — a quiet feature panel rather than a green alert box */}
-      <section className="card-quiet gem-surface gem-list px-6 py-8 text-center">
+      <section className="card-quiet px-6 py-8 text-center">
         <p className="eyebrow">{t("common.dailyReflection")}</p>
         <p
           className="font-calligraphy text-[28px] md:text-[34px] text-ink mt-4 leading-[2.1]"

@@ -31,7 +31,6 @@ import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
-import { QuickActions } from "@/components/gem-icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -274,12 +273,6 @@ export default function AdminDashboard() {
             `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
           ),
         ]}
-        stats={[
-          { value: activeStudentCount, label: t("nav.students") },
-          { value: activeTeachers.length, label: t("nav.teachers") },
-          { value: halaqas.length, label: t("nav.halaqas") },
-          { value: attendanceRate == null ? "—" : `${attendanceRate}%`, label: t("common.attendanceStat") },
-        ]}
       />
 
       <AgreementsBanner enabled={!isDemoSchool} />
@@ -288,17 +281,6 @@ export default function AdminDashboard() {
       {/* Notices the portal raised on its own — a child absent five school
           days running, a teacher reporting an absence. */}
       {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
-
-      <QuickActions
-        items={[
-          { href: "/admin/students", art: "person", label: t("nav.students") },
-          { href: "/admin/student-attendance", art: "calendarCheck", label: t("nav.studentAttendance") },
-          { href: "/admin/halaqas", art: "mosque", label: t("nav.halaqas") },
-          { href: "/admin/payments", art: "cash", label: t("nav.payments") },
-          { href: "/admin/announcements", art: "megaphone", label: t("nav.announcements") },
-          { href: "/admin/calendar", art: "calendar", label: t("nav.calendar") },
-        ]}
-      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile icon={Users} art="person" tone="navy" value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />

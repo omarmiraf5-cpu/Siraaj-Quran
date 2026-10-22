@@ -321,10 +321,10 @@ export function PlanAlertBanner({
   return (
     <div
       role={level === "critical" ? "alert" : "status"}
-      className={`gem-surface rounded-[18px] px-5 py-4 flex items-start gap-3.5 ${
+      className={`rounded-[18px] border px-5 py-4 flex items-start gap-3.5 ${
         acknowledged ? "opacity-60" : ""
       }`}
-      style={{ "--gem": colour } as React.CSSProperties}
+      style={{ borderColor: `${colour}44`, background: `${colour}0f` }}
     >
       {/* A vertical rule rather than a filled block — the same stop that a
           margin note uses, which keeps the banner quiet enough to live
@@ -332,7 +332,7 @@ export function PlanAlertBanner({
       <span aria-hidden className="w-[3px] self-stretch rounded-full" style={{ background: colour }} />
       <AlertGlyph colour={colour} />
       <div className="min-w-0 flex-1">
-        <p className="gem-alert-title text-[13px] font-bold tracking-tight" style={{ "--gem": colour } as React.CSSProperties}>
+        <p className="text-[13px] font-bold tracking-tight" style={{ color: colour }}>
           {title}
         </p>
         <p className="text-[13px] text-ink-body mt-1 leading-relaxed">{detail}</p>

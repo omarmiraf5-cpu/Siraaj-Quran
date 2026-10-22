@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Flag, UserCheck, UserX } from "lucide-react";
 import dynamic from "next/dynamic";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
-import { Segmented, SkeletonRows, SkeletonStats, SpotlightButton, useToast } from "@/components/motion-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { StatusPill, currentPosition, timesLine, useAttendanceApi, statusLabel } from "@/components/attendance-ui";
 import {
   REASON_LABEL,
@@ -101,9 +99,11 @@ interface CampusPlace {
 
 const RADII = [100, 150, 250, 500];
 const input =
-  "field-glow w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-[14px] text-ink";
-const primary = "btn btn-amber disabled:opacity-40";
-const ghost = "btn btn-secondary disabled:opacity-40";
+  "w-full bg-surface-card border border-surface-border rounded-xl px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition";
+const primary =
+  "bg-brand-navy text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl hover:bg-brand-navy-mid disabled:opacity-40 active:scale-[.98] transition-all";
+const ghost =
+  "text-[13px] font-semibold py-2.5 px-5 rounded-xl border border-surface-border text-ink hover:bg-surface-bg-warm disabled:opacity-40 transition";
 
 export default function StaffAttendancePage() {
   const { language, tr } = useLanguage();
@@ -129,9 +129,8 @@ export default function StaffAttendancePage() {
 
   if (mode === "loading" || (!data && !error)) {
     return (
-      <div className="max-w-6xl mx-auto pt-10 space-y-4" aria-busy="true" aria-label={tr("Loading staff attendance…")}>
-        <SkeletonStats />
-        <SkeletonRows />
+      <div className="max-w-6xl mx-auto pt-10">
+        <LoadingNote>{tr("Loading staff attendance…")}</LoadingNote>
       </div>
     );
   }
@@ -184,10 +183,10 @@ export default function StaffAttendancePage() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile icon={UserCheck} art="check" tone="green" value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
-        <StatTile icon={Clock3} art="clock" tone="amber" status="late" value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
-        <StatTile icon={UserX} art="pin" tone="red" status="absent" value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
-        <StatTile icon={Flag} art="megaphone" tone="navy" status="excused" value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
+        <StatTile value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
+        <StatTile status="late" value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
+        <StatTile status="absent" value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
+        <StatTile status="excused" value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
       </div>
 
       <SectionCard title={tr("Today")} note={tr("Staff due {formatClock} · {grace_minutes} min grace", { formatClock: formatClock(data.settings.start_time), grace_minutes: data.settings.grace_minutes })}>
@@ -458,7 +457,6 @@ function SettingsCard({
   const [error, setError] = useState<string | null>(null);
   const [locateError, setLocateError] = useState<string | null>(null);
   const { language, tr } = useLanguage();
-  const toast = useToast();
 
   // Picking the spot on a map: the pin is the two numbers above.
   const [mapOpen, setMapOpen] = useState(false);
@@ -599,12 +597,9 @@ function SettingsCard({
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? phrase("Could not save"));
-      toast.success(tr("Done"));
       onSaved();
     } catch (e) {
-      const message = e instanceof Error ? tr(e.message) : tr("Could not save");
-      setError(message);
-      toast.error(typeof message === "string" ? message : tr("Could not save"));
+      setError(e instanceof Error ? tr(e.message) : tr("Could not save"));
     } finally {
       setBusy("");
     }
@@ -645,9 +640,9 @@ function SettingsCard({
         )
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <SpotlightButton onClick={here} disabled={busy !== ""} loading={busy === "locating"}>
+        <button type="button" onClick={here} disabled={busy !== ""} className={primary}>
           {busy === "locating" ? tr("Finding you…") : tr("Use my current location")}
-        </SpotlightButton>
+        </button>
         <button type="button" onClick={toggleMap} aria-expanded={mapOpen} className={ghost}>
           {mapOpen ? tr("Hide the map") : tr("Pick on a map")}
         </button>
@@ -725,12 +720,20 @@ function SettingsCard({
       )}
 
       <p className="eyebrow mt-5 mb-2">{tr("How close counts as on the premises")}</p>
-      <Segmented
-        label={tr("How close counts as on the premises")}
-        value={radius}
-        onChange={setRadius}
-        options={RADII.map((r) => ({ value: r, label: formatDistance(r) }))}
-      />
+      <div className="flex flex-wrap gap-2">
+        {RADII.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => setRadius(r)}
+            className={`px-3.5 py-2 rounded-full text-[13px] font-semibold transition-all ${
+              radius === r ? "bg-brand-navy text-white" : "bg-surface-card border border-surface-border text-ink-muted hover:text-ink"
+            }`}
+          >
+            {formatDistance(r)}
+          </button>
+        ))}
+      </div>
       <p className="text-[11.5px] text-ink-muted mt-2">
         {tr("150 m suits most buildings. Go bigger for a large site or a car park teachers arrive through.")}
       </p>
@@ -749,13 +752,13 @@ function SettingsCard({
       {error && <p role="alert" className="text-[12.5px] text-red-700 dark:text-red-300 mt-3">{error}</p>}
       <div className="mt-4 flex justify-end gap-2.5">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="btn btn-ghost disabled:opacity-40" disabled={busy !== ""}>
+          <button type="button" onClick={onCancel} className={ghost} disabled={busy !== ""}>
             {tr("Cancel")}
           </button>
         )}
-        <SpotlightButton onClick={save} disabled={busy !== "" || !lat || !lng} loading={busy === "saving"}>
+        <button type="button" onClick={save} disabled={busy !== "" || !lat || !lng} className={primary}>
           {busy === "saving" ? tr("Saving…") : tr("Save settings")}
-        </SpotlightButton>
+        </button>
       </div>
     </SectionCard>
   );

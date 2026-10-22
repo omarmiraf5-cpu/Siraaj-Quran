@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { placeLabel } from "@/lib/places";
 import { useLanguage } from "@/components/LanguageProvider";
-import { ActionLink, DangerButton, MotionBody, MotionTr, StatusBadge, useToast } from "@/components/motion-ui";
 
 interface School {
   id: string;
@@ -35,6 +34,12 @@ interface School {
     last_sign_in_at: string | null;
   }>;
 }
+
+const PLAN_STYLES: Record<string, string> = {
+  starter: "bg-surface-border text-ink-muted",
+  growth: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+  premium: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+};
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(dateLocale("en"), { year: "numeric", month: "short", day: "numeric" });
@@ -66,7 +71,6 @@ function freshness(iso: string | null | undefined): string {
 
 export default function PlatformPage() {
   const { tr } = useLanguage();
-  const toast = useToast();
   const router = useRouter();
   const supabase = createClient();
   const [schools, setSchools] = useState<School[] | null>(null);
@@ -152,13 +156,10 @@ export default function PlatformPage() {
       const res = await fetch(`/api/platform/schools/${school.id}/welcome`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "The welcome email didn't send");
-      const message = phrase("Welcome email sent to {email}.", { email: data.sentTo });
-      setWelcome((prev) => ({ ...prev, [school.id]: { sending: false, ok: true, message } }));
-      if (typeof message === "string") toast.success(message);
+      setWelcome((prev) => ({ ...prev, [school.id]: { sending: false, ok: true, message: phrase("Welcome email sent to {email}.", { email: data.sentTo }) } }));
     } catch (err) {
       const message = err instanceof Error ? err.message : "The welcome email didn't send";
       setWelcome((prev) => ({ ...prev, [school.id]: { sending: false, ok: false, message } }));
-      toast.error(tr(message));
     }
   };
 
@@ -252,10 +253,10 @@ export default function PlatformPage() {
                     <th className="px-4 py-3 font-semibold" />
                   </tr>
                 </thead>
-                <MotionBody>
-                  {schools.map((s, i) => (
+                <tbody className="divide-y divide-surface-border">
+                  {schools.map((s) => (
                     <Fragment key={s.id}>
-                    <MotionTr index={i}>
+                    <tr className="hover:bg-surface-bg-warm transition-colors">
                       <td className="px-4 py-4 min-w-[200px]">
                         <p className="font-semibold text-ink">{s.name}</p>
                         <p className="text-ink-muted text-xs">
@@ -263,9 +264,13 @@ export default function PlatformPage() {
                         </p>
                       </td>
                       <td className="px-4 py-4">
-                        <StatusBadge tip={tr("Plan")}>
-                          <span className="capitalize">{s.plan}</span>
-                        </StatusBadge>
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-1 rounded-full capitalize ${
+                            PLAN_STYLES[s.plan] ?? PLAN_STYLES.starter
+                          }`}
+                        >
+                          {s.plan}
+                        </span>
                       </td>
                       <td className="px-4 py-4 text-ink">{s.studentCount}</td>
                       <td className="px-4 py-4 text-ink">{s.teacherCount}</td>
@@ -274,9 +279,14 @@ export default function PlatformPage() {
                           <>
                             <p className="text-ink">{s.adminContact.full_name}</p>
                             <p className="text-ink-muted text-xs">{s.adminContact.email}</p>
-                            <ActionLink onClick={() => sendWelcome(s)} disabled={welcome[s.id]?.sending}>
+                            <button
+                              type="button"
+                              onClick={() => sendWelcome(s)}
+                              disabled={welcome[s.id]?.sending}
+                              className="text-[11px] font-semibold text-ink hover:underline disabled:opacity-50 mt-1"
+                            >
                               {welcome[s.id]?.sending ? tr("Sending…") : tr("Send welcome email")}
-                            </ActionLink>
+                            </button>
                           </>
                         ) : (
                           <span className="text-ink-muted text-xs">{tr("No admin found")}</span>
@@ -308,18 +318,28 @@ export default function PlatformPage() {
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <StatusBadge tip={s.active ? tr("Active") : tr("Inactive")}>
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-1 rounded-full ${
+                            s.active
+                              ? "bg-status-success-bg text-status-success-text"
+                              : "bg-status-error-bg text-status-error-text"
+                          }`}
+                        >
                           {s.active ? tr("Active") : tr("Inactive")}
-                        </StatusBadge>
+                        </span>
                       </td>
                       <td className="px-4 py-4 text-end whitespace-nowrap">
                         {confirmingId !== s.id && (
-                          <DangerButton onClick={() => startConfirm(s.id)}>
+                          <button
+                            type="button"
+                            onClick={() => startConfirm(s.id)}
+                            className="text-[11px] font-semibold text-status-error-text hover:underline"
+                          >
                             {tr("Delete")}
-                          </DangerButton>
+                          </button>
                         )}
                       </td>
-                    </MotionTr>
+                    </tr>
                     {openStaff.has(s.id) && s.staff && (
                       <tr>
                         <td colSpan={9} className="px-4 pb-4 pt-0 bg-surface-bg-warm/50">
@@ -406,7 +426,7 @@ export default function PlatformPage() {
                     )}
                     </Fragment>
                   ))}
-                </MotionBody>
+                </tbody>
               </table>
             </div>
           </div>

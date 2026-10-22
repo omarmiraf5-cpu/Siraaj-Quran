@@ -52,8 +52,7 @@ export function ThemeToggle({ className = "", variant = "icon" }: ThemeTogglePro
       <button
         onClick={toggle}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${className}`}
-        aria-label={isDark ? t("common.lightMode") : t("common.darkMode")}
-        title={isDark ? t("common.lightMode") : t("common.darkMode")}
+        aria-label={t("common.darkMode")}
       >
         {isDark ? <SunIcon /> : <MoonIcon />}
         {isDark ? t("common.light") : t("common.dark")}
@@ -67,8 +66,7 @@ export function ThemeToggle({ className = "", variant = "icon" }: ThemeTogglePro
       <button
         onClick={toggle}
         className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all ${className}`}
-        aria-label={isDark ? t("common.lightMode") : t("common.darkMode")}
-        title={isDark ? t("common.lightMode") : t("common.darkMode")}
+        aria-label={t("common.darkMode")}
       >
         <span className="flex-shrink-0 opacity-80">
           {isDark ? <SunIcon /> : <MoonIcon />}
@@ -99,9 +97,8 @@ export function ThemeToggle({ className = "", variant = "icon" }: ThemeTogglePro
   return (
     <button
       onClick={toggle}
-      className={`w-11 h-11 rounded-full flex items-center justify-center transition ${className}`}
-      aria-label={isDark ? t("common.lightMode") : t("common.darkMode")}
-      title={isDark ? t("common.lightMode") : t("common.darkMode")}
+      className={`w-8 h-8 rounded-full flex items-center justify-center transition ${className}`}
+      aria-label={t("common.darkMode")}
     >
       {isDark ? <SunIcon /> : <MoonIcon />}
     </button>

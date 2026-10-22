@@ -228,13 +228,13 @@ export function StatTile({
   // out the grid — and with it the page's horizontal scroll — instead
   // of just wrapping to a second line.
   if (!onClick) {
-    return <div className="card-quiet card-lift gem-surface px-4 py-4 min-w-0 rounded-[22px]">{body}</div>;
+    return <div className="card-quiet card-lift px-4 py-4 min-w-0">{body}</div>;
   }
   return (
     <button
       type="button"
       onClick={onClick}
-      className="card-quiet card-lift gem-surface px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start cursor-pointer active:scale-[.98]"
+      className="card-quiet card-lift px-4 py-4 min-w-0 text-start cursor-pointer hover:bg-surface-bg-warm active:scale-[.98]"
     >
       {body}
     </button>
@@ -366,7 +366,7 @@ export function SegmentedSwitch<T extends string>({
       ref={strip}
       role="tablist"
       aria-label={label}
-      className="flex w-full min-w-0 max-w-full flex-wrap p-1 gap-1 rounded-2xl bg-surface-bg-warm border border-surface-border"
+      className="inline-flex max-w-full overflow-x-auto no-scrollbar p-1 gap-1 rounded-full bg-surface-bg-warm border border-surface-border"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -376,7 +376,7 @@ export function SegmentedSwitch<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`relative min-h-11 min-w-0 max-w-full px-4 py-2 rounded-full text-[13px] font-semibold leading-snug whitespace-normal break-words text-center transition-colors ${
+            className={`relative flex-shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
               active ? "text-white" : "text-ink-muted hover:text-ink"
             }`}
           >
@@ -388,7 +388,7 @@ export function SegmentedSwitch<T extends string>({
                 transition={reduce ? { duration: 0 } : pillSpring}
               />
             )}
-            <span className="relative break-words">{o.label}</span>
+            <span className="relative">{o.label}</span>
           </button>
         );
       })}
@@ -765,9 +765,4 @@ export function HalaqaTitle({ label, onDark = false, className = "" }: { label: 
       <span className={`font-semibold [overflow-wrap:anywhere] ${onDark ? "text-white" : "text-ink"}`}>{name}</span>
     </span>
   );
-}
-
-/** Class string for a name's avatar colour. Same colour every time. */
-export function avatarTone(name: string) {
-  return toneFor(name);
 }

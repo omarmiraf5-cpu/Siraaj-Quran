@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { SignInCard, StatusPill, timesLine, useAttendanceApi } from "@/components/attendance-ui";
 import { REASON_LABEL, type AbsenceReport, type StaffDay, type StaffTally } from "@/lib/attendanceRules";
 import { formatDay } from "@/data/demo";
@@ -80,16 +80,8 @@ export default function MyAttendancePage() {
 
   if (mode === "loading" || (!data && !error)) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4 pt-2" aria-busy="true">
-        <div className="card-quiet p-5 space-y-3">
-          <div className="skeleton w-28" />
-          <div className="skeleton w-2/3" />
-          <div className="skeleton w-full h-11 rounded-xl" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="card-quiet p-4"><div className="skeleton w-1/2" /></div>
-          <div className="card-quiet p-4"><div className="skeleton w-1/2" /></div>
-        </div>
+      <div className="max-w-4xl mx-auto pt-10">
+        <LoadingNote>{tr("Loading your attendance…")}</LoadingNote>
       </div>
     );
   }
@@ -103,7 +95,7 @@ export default function MyAttendancePage() {
     <div className="max-w-4xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow={tr("Staff")}
-        title={t("nav.clockIn")}
+        title={t("nav.signIn")}
         meta={data ? [formatDay(data.today, language), tr("Last 4 weeks")] : []}
       />
 
@@ -227,7 +219,7 @@ export default function MyAttendancePage() {
                   <p className="text-[13px] font-semibold text-ink">{formatDay(d.date, language)}</p>
                   <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                     {timesLine(d) ||
-                      (d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : d.note ?? tr("No clock-in"))}
+                      (d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : d.note ?? tr("No sign-in"))}
                   </p>
                 </div>
                 <StatusPill day={d} isToday={d.date === data?.today} />

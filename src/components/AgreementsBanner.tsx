@@ -27,7 +27,7 @@ export function AgreementsBanner({ enabled }: { enabled: boolean }) {
   const btn =
     "self-start text-[13px] font-semibold px-4 py-2 rounded-xl bg-brand-navy text-white disabled:opacity-40 hover:opacity-90 transition";
   return (
-    <section className="gem-surface rounded-2xl p-5 space-y-4" style={{ "--gem": "#c98426" } as React.CSSProperties} data-section="agreements">
+    <section className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/25 dark:border-amber-800/40 p-5 space-y-4" data-section="agreements">
       <div>
         <p className="font-semibold text-[14px] text-amber-900 dark:text-amber-200">{tr("Before you carry on: two things for your school")}</p>
         <p className="text-[12.5px] text-amber-800/80 dark:text-amber-300/80 mt-0.5">{tr("Asked once. They're saved with your name and today's date.")}</p>
