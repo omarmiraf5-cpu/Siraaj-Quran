@@ -78,6 +78,8 @@ export default function ParentDashboard() {
   const today = mode === "demo" ? DEMO_TODAY : new Date().toLocaleDateString("en-CA");
   // Only a mark for today is today's — not the last one taken.
   const todayStatus = attendance[0]?.date === today ? attendance[0]?.status : undefined;
+  const attendancePending = mode !== "loading" && !!child && !ready;
+  const noAttendance = ready && summary.total === 0;
 
   // Everything below reads from one child, so there is nothing to draw until
   // the roster has arrived — and a parent whose children haven't been linked
@@ -104,12 +106,16 @@ export default function ParentDashboard() {
         title={demoUser?.name ?? t("role.parent")}
         meta={[
           formatDay(today, language),
-          {
-            text: `${child.name.split(" ")[0]} ${t("common.was")} ${
-              todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
-            } ${t("common.today")}`,
-            tone: todayStatus === "present" ? ("green" as const) : todayStatus === "late" ? ("amber" as const) : todayStatus === "absent" ? ("red" as const) : ("plain" as const),
-          },
+          attendancePending
+            ? { text: "…", tone: "plain" as const }
+            : noAttendance
+              ? { text: t("common.noAttendanceYet"), tone: "plain" as const }
+              : {
+                  text: `${child.name.split(" ")[0]} ${t("common.was")} ${
+                    todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
+                  } ${t("common.today")}`,
+                  tone: todayStatus === "present" ? ("green" as const) : todayStatus === "late" ? ("amber" as const) : todayStatus === "absent" ? ("red" as const) : ("plain" as const),
+                },
           {
             text: countLabel(
               "{count} piece of work open|{count} pieces of work open",
@@ -129,6 +135,12 @@ export default function ParentDashboard() {
             </HeroButtonGhost>
           </>
         }
+        stats={[
+          { value: noAttendance ? "—" : attendancePending ? "…" : `${summary.rate}%`, label: t("common.attendanceStat") },
+          { value: `${memorisation}%`, label: t("common.memorised") },
+          { value: active.length, label: t("common.openWork") },
+          { value: done.length, label: t("assignment.completed") },
+        ]}
       />
 
       {/* The school's notices for this family — a child absent five school
@@ -139,7 +151,7 @@ export default function ParentDashboard() {
 
       {/* Which child. A parent with one child never sees this. */}
       {children.length > 1 && (
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           <span className="eyebrow flex-shrink-0">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
@@ -156,14 +168,20 @@ export default function ParentDashboard() {
           icon={CalendarCheck}
           art="calendarCheck"
           tone="gold"
-          value={`${summary.rate}%`}
+          value={noAttendance ? "—" : attendancePending ? "…" : `${summary.rate}%`}
           label={t("common.attendanceStat")}
-          sub={countLabel(
-            "{present} of {count} days",
-            summary.total - summary.excused,
-            `${summary.present + summary.late} ${t("common.of")} ${summary.total - summary.excused} ${t("common.days")}`,
-            { present: summary.present + summary.late },
-          )}
+          sub={
+            noAttendance
+              ? t("common.noAttendanceYet")
+              : attendancePending
+                ? ""
+                : countLabel(
+                    "{present} of {count} days",
+                    summary.total - summary.excused,
+                    `${summary.present + summary.late} ${t("common.of")} ${summary.total - summary.excused} ${t("common.days")}`,
+                    { present: summary.present + summary.late },
+                  )
+          }
         />
         <StatTile
           icon={BookOpen}

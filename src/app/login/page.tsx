@@ -331,7 +331,7 @@ export default function LoginPage() {
   }, [pin, roster, studentId]);
 
   return (
-    <div className="relative min-h-screen gradient-navy flex items-center justify-center overflow-hidden">
+    <div className="relative min-h-screen login-navy flex items-center justify-center overflow-hidden">
       {/* Ambient texture */}
       <div className="absolute inset-0 pattern-lattice pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/25 pointer-events-none" />

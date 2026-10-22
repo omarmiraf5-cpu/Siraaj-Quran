@@ -91,3 +91,40 @@ export async function PATCH(
     );
   }
 }
+
+/**
+ * Undo, straight after saving: takes back a piece of work this teacher set in
+ * the last fifteen minutes and hasn't graded. Anything older, graded, or set
+ * by someone else is left alone — that's a correction, not an undo.
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const supabase = await createClient();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("quranic_assignments")
+      .delete()
+      .eq("id", id)
+      .eq("teacher_id", user.id)
+      .is("daily_rating", null)
+      .gte("created_at", since)
+      .select("id");
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: "That can't be undone any more." }, { status: 409 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Error undoing assignment:", error);
+    return NextResponse.json({ error: "Couldn't undo that. Please try again." }, { status: 500 });
+  }
+}

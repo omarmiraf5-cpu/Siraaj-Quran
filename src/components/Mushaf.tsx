@@ -10,6 +10,7 @@ import {
   getSurahsOnPage,
 } from "@/data/mushaf-index";
 import { useLanguage } from "@/components/LanguageProvider";
+import { SurahPicker } from "@/components/SurahPicker";
 import { QcfMushafPage, usePageLayout } from "./QcfMushafPage";
 import { RECITERS, getAudioSources, type Reciter } from "@/lib/recitation";
 
@@ -605,6 +606,81 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
   const atStart = (isSpread ? rightPage : currentPage) <= 1;
   const atEnd = (isSpread ? leftPageNum : currentPage) >= TOTAL_PAGES;
 
+  // Swiping turns the page, the way a printed mushaf does: drag the page to
+  // the right for the next one (it lies to the left), to the left to go back.
+  // The page follows the finger, then slides off and the new one slides in.
+  // A tap on an ayah still plays it — only a sideways drag counts as a swipe.
+  const swipeBox = useRef<HTMLDivElement>(null);
+  const swipe = useRef<{ x: number; y: number; axis: "x" | "y" | null } | null>(null);
+  const swiped = useRef(false);
+  const [dragX, setDragX] = useState(0);
+  const [sliding, setSliding] = useState(false);
+  const SLIDE_MS = 170;
+  const reduceMotion = () =>
+    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  const onSwipeStart = (e: React.PointerEvent) => {
+    if (sliding || (e.pointerType === "mouse" && e.button !== 0)) return;
+    swipe.current = { x: e.clientX, y: e.clientY, axis: null };
+    swiped.current = false;
+  };
+  const onSwipeMove = (e: React.PointerEvent) => {
+    const s = swipe.current;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (!s.axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) s.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    if (s.axis !== "x") return;
+    swiped.current = true;
+    // Past the first or last page the page only gives a little.
+    const blocked = (dx > 0 && atEnd) || (dx < 0 && atStart);
+    setDragX(blocked ? dx * 0.25 : dx);
+  };
+  const onSwipeEnd = (e: React.PointerEvent) => {
+    const s = swipe.current;
+    swipe.current = null;
+    if (!s || s.axis !== "x") return;
+    const dx = e.clientX - s.x;
+    const width = swipeBox.current?.offsetWidth ?? 600;
+    const dir = dx > 0 ? 1 : -1;
+    const turn = Math.abs(dx) > Math.min(70, width * 0.15) && !(dir > 0 ? atEnd : atStart);
+    if (!turn) {
+      setSliding(true);
+      setDragX(0);
+      setTimeout(() => setSliding(false), SLIDE_MS);
+      return;
+    }
+    const change = dir > 0 ? goNext : goPrev;
+    if (reduceMotion()) {
+      setDragX(0);
+      change();
+      return;
+    }
+    // Off one side, then the new page in from the other.
+    setSliding(true);
+    setDragX(dir * width);
+    setTimeout(() => {
+      change();
+      setSliding(false);
+      setDragX(-dir * width);
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          setSliding(true);
+          setDragX(0);
+          setTimeout(() => setSliding(false), SLIDE_MS);
+        })
+      );
+    }, SLIDE_MS);
+  };
+
+  // A page number typed in goes there as soon as typing pauses — no Enter needed.
+  useEffect(() => {
+    const n = parseInt(pageInput);
+    if (!n || n < 1 || n > TOTAL_PAGES || n === currentPage) return;
+    const t = setTimeout(() => goTo(n), 450);
+    return () => clearTimeout(t);
+  }, [pageInput, currentPage, goTo]);
+
   const handlePageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const n = parseInt(pageInput);
@@ -634,18 +710,15 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
 
       {/* Controls */}
       <div className="flex items-center gap-1.5">
-        <select
-          onChange={(e) => handleSurahJump(e.target.value)}
-          defaultValue=""
-          className="flex-1 min-w-0 bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-        >
-          <option value="">{tr("Jump to Surah...")}</option>
-          {SURAHS.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.id}. {s.englishName}
-            </option>
-          ))}
-        </select>
+        {/* Type a surah's name or number to jump to it. */}
+        <SurahPicker
+          value=""
+          onChange={handleSurahJump}
+          placeholder={tr("Jump to Surah...")}
+          size="sm"
+          clearAfterPick
+          className="flex-1 min-w-0"
+        />
 
         <form onSubmit={handlePageSubmit} className="flex items-center gap-1 flex-shrink-0">
           <input
@@ -654,7 +727,9 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
             max={TOTAL_PAGES}
             value={pageInput}
             onChange={(e) => setPageInput(e.target.value)}
-            className="w-11 bg-surface-card border border-surface-border rounded-md px-1 py-1 text-[11px] text-ink text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/50 tabular-nums"
+            inputMode="numeric"
+            aria-label={tr("Page")}
+            className="w-14 bg-surface-card border border-surface-border rounded-md px-1 py-1 text-[11px] text-ink text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/50 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <span className="text-[9px] text-ink-muted">/{TOTAL_PAGES}</span>
         </form>
@@ -729,7 +804,23 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
       {/* Book spread — lower page number sits on the right (RTL). Whether the
           second page shows, and the row direction, are container-query driven
           (see .mushaf-* rules in globals.css). */}
-      <div className="relative bg-[var(--mushaf-sheet)] rounded-xl p-1.5 lg:p-2 border border-black/[0.06] dark:border-white/[0.06]">
+      <div
+        ref={swipeBox}
+        onPointerDown={onSwipeStart}
+        onPointerMove={onSwipeMove}
+        onPointerUp={onSwipeEnd}
+        onPointerCancel={onSwipeEnd}
+        // A swipe isn't also a tap on the ayah under the finger.
+        onClickCapture={(e) => {
+          if (swiped.current) {
+            e.preventDefault();
+            e.stopPropagation();
+            swiped.current = false;
+          }
+        }}
+        style={{ touchAction: "pan-y" }}
+        className="relative overflow-hidden select-none bg-[var(--mushaf-sheet)] rounded-xl p-1.5 lg:p-2 border border-black/[0.06] dark:border-white/[0.06]"
+      >
         {/* The book-spine shadow between two pages. Its own visibility was
             purely CSS/container-width driven, with no idea whether a second
             page actually exists to divide from the first — so on page 604,
@@ -748,7 +839,14 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         {/* Always laid out left to right, so row-reverse (globals.css) puts
             the lower page on the right in every language: under an Arabic
             UI's dir="rtl" it would reverse a second time and swap them. */}
-        <div dir="ltr" className="mushaf-spread-row flex flex-col items-center justify-center gap-1.5 lg:gap-[3px]">
+        <div
+          dir="ltr"
+          className="mushaf-spread-row flex flex-col items-center justify-center gap-1.5 lg:gap-[3px]"
+          style={{
+            transform: dragX ? `translateX(${dragX}px)` : undefined,
+            transition: sliding ? `transform ${SLIDE_MS}ms ease-out` : "none",
+          }}
+        >
           <MushafPage
             pageNum={rightPage}
             highlightedRange={highlightedRange}
@@ -835,26 +933,35 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
       {/* Navigation — Next advances leftward, as the pages do, whatever
           the UI's own direction. */}
       <div dir="ltr" className="flex items-center justify-between">
+        {/* Each button names the page it goes to, so which way is "next"
+            in a right-to-left mushaf is never a guess. */}
         <button
           onClick={goNext}
           disabled={atEnd}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg bg-surface-card border border-surface-border text-xs font-semibold text-ink hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
+          aria-label={tr("Next page")}
+          title={tr("Next page")}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface-card border border-surface-border text-sm font-semibold text-ink tabular-nums hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
-          {tr("Next")}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
+          {atEnd ? "" : Math.min(TOTAL_PAGES, (isSpread ? leftPageNum : currentPage) + 1)}
         </button>
 
-        <span className="text-xs font-bold text-ink tabular-nums">
-          {isSpread ? `${rightPage} – ${Math.min(leftPageNum, TOTAL_PAGES)}` : currentPage}
+        <span className="text-center">
+          <span className="block text-xs font-bold text-ink tabular-nums">
+            {isSpread ? `${rightPage} – ${Math.min(leftPageNum, TOTAL_PAGES)}` : currentPage}
+          </span>
+          <span className="block text-[10.5px] text-ink-muted">{tr("Swipe to turn the page")}</span>
         </span>
 
         <button
           onClick={goPrev}
           disabled={atStart}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg bg-surface-card border border-surface-border text-xs font-semibold text-ink hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
+          aria-label={tr("Previous page")}
+          title={tr("Previous page")}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface-card border border-surface-border text-sm font-semibold text-ink tabular-nums hover:bg-surface-bg disabled:opacity-30 transition active:scale-95"
         >
-          {tr("Previous")}
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
+          {atStart ? "" : Math.max(1, (isSpread ? rightPage : currentPage) - 1)}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
         </button>
       </div>
     </div>

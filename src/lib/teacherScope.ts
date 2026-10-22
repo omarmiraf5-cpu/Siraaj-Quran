@@ -25,6 +25,8 @@ export async function myHalaqaStudents(supabase: Db): Promise<Map<string, string
 export interface MyHalaqa {
   id: string;
   label: string;
+  /** The halaqa's own name as the office typed it — "Hifd · Ustadh Omar", say. */
+  name: string;
   studentIds: string[];
   /** In a school kept in grades: the grade it's for, and its campus's name. */
   grade?: number | null;
@@ -71,6 +73,7 @@ export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
     groups.set(h.id, {
       id: h.id,
       label,
+      name: h.name,
       studentIds: [...new Set((h.class_enrollments ?? []).map((e) => e.student_id))],
       grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
       campus: graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null,
@@ -109,6 +112,7 @@ async function myHalaqasStepByStep(supabase: Db, userId: string): Promise<MyHala
     const campus = graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null;
     groups.set(h.id, {
       id: h.id,
+      name: h.name,
       // A Hifd program isn't for one grade, whatever grade it's stored under.
       label: graded ? [isProgramHalaqa(h.name) ? null : gradeLabel(h.grade as number), campus, h.name].filter(Boolean).join(" · ") : h.name,
       studentIds: [],
@@ -127,4 +131,24 @@ async function myHalaqasStepByStep(supabase: Db, userId: string): Promise<MyHala
 export function narrowToMine<T extends { id: string; halaqa: string }>(students: T[], mine: Map<string, string> | null): T[] {
   if (!mine) return students;
   return students.filter((s) => mine.has(s.id)).map((s) => ({ ...s, halaqa: mine.get(s.id)! }));
+}
+
+/**
+ * A halaqa's label without what the teacher already knows: their own name,
+ * and the campus when all their halaqas are at the same one. "Grade 3 · Al
+ * Faruq · Ustadh Omar Abdullahi" reads as "Grade 3" to Ustadh Omar, while a
+ * halaqa he shares with someone else keeps that teacher's name. Never empty:
+ * a label that would be is left whole.
+ */
+export function shortHalaqaLabel(h: MyHalaqa, all: MyHalaqa[], myName: string | null): string {
+  const norm = (x: string) => x.toLocaleLowerCase().replace(/^(ustadh|ustadha|ustaz|ustadhah|sheikh|shaykh|mr\.?|mrs\.?|ms\.?)\s+/i, "").trim();
+  const me = myName ? norm(myName) : null;
+  const campuses = new Set(all.map((x) => x.campus ?? ""));
+  const oneCampus = campuses.size <= 1;
+  const parts = h.label.split(" · ").filter((p) => {
+    if (oneCampus && h.campus && p === h.campus) return false;
+    if (me && norm(p) === me) return false;
+    return true;
+  });
+  return parts.length ? parts.join(" · ") : h.label;
 }

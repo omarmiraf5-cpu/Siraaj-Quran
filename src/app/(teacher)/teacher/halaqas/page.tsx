@@ -5,9 +5,11 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote, Avatar, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
-import { myHalaqas, type MyHalaqa } from "@/lib/teacherScope";
+import { myHalaqas, shortHalaqaLabel, type MyHalaqa } from "@/lib/teacherScope";
+import { useMyName } from "@/hooks/useMyName";
 import { gradeLabel } from "@/lib/grades";
 import { useLanguage } from "@/components/LanguageProvider";
+import Link from "next/link";
 
 interface Member {
   id: string;
@@ -34,6 +36,7 @@ export default function TeacherHalaqasPage() {
   const [halaqas, setHalaqas] = useState<MyHalaqa[] | null>(null);
   const [signedIn, setSignedIn] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const myName = useMyName();
 
   useEffect(() => {
     (async () => {
@@ -67,6 +70,7 @@ export default function TeacherHalaqasPage() {
               <HalaqaRow
                 key={h.id}
                 halaqa={h}
+                title={shortHalaqaLabel(h, halaqas, myName)}
                 open={openId === h.id}
                 onToggle={() => setOpenId(openId === h.id ? null : h.id)}
                 onCount={(n) => setHalaqas((now) => (now ?? []).map((x) => (x.id === h.id ? { ...x, studentIds: new Array(n).fill("") } : x)))}
@@ -79,7 +83,7 @@ export default function TeacherHalaqasPage() {
   );
 }
 
-function HalaqaRow({ halaqa, open, onToggle, onCount }: { halaqa: MyHalaqa; open: boolean; onToggle: () => void; onCount: (n: number) => void }) {
+function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaqa; title: string; open: boolean; onToggle: () => void; onCount: (n: number) => void }) {
   const { tr } = useLanguage();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -152,7 +156,7 @@ function HalaqaRow({ halaqa, open, onToggle, onCount }: { halaqa: MyHalaqa; open
         className={`w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${open ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
       >
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">{halaqa.label}</p>
+          <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">{title}</p>
           <p className={`text-[12px] ${open ? "text-white/80" : "text-ink-muted"}`}>
             {tr("{count} students", { count: detail ? detail.members.length : halaqa.studentIds.length })}
           </p>
@@ -167,14 +171,32 @@ function HalaqaRow({ halaqa, open, onToggle, onCount }: { halaqa: MyHalaqa; open
           {detail && (
             <>
               <div>
-                <p className="text-xs font-semibold text-ink mb-2">{tr("In this halaqa")}</p>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <p className="text-xs font-semibold text-ink">{tr("In this halaqa")}</p>
+                  {detail.members.length > 0 && (
+                    // Today's work for the whole halaqa, one child after another.
+                    <Link
+                      href={`/teacher/quran-assignments?group=${encodeURIComponent(detail.halaqa.program || typeof halaqa.grade !== "number" ? `p:${halaqa.id}` : String(halaqa.grade))}`}
+                      className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                    >
+                      {tr("Set today's work →")}
+                    </Link>
+                  )}
+                </div>
                 {detail.members.length === 0 ? (
                   <p className="text-[12.5px] text-ink-muted">{tr("No children yet. Add them below.")}</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.members.map((m) => (
-                      <span key={m.id} className="inline-flex items-center gap-1 ps-3 pe-1 py-1 rounded-full bg-surface-card border border-surface-border text-[12.5px] font-semibold text-ink">
-                        {m.name}
+                      <span key={m.id} className="inline-flex items-center gap-1 ps-1 pe-1 py-1 rounded-full bg-surface-card border border-surface-border text-[12.5px] font-semibold text-ink">
+                        {/* Tap a child to set their lesson. */}
+                        <Link
+                          href={`/teacher/quran-assignments?student=${encodeURIComponent(m.id)}`}
+                          title={tr("Set {name}'s lesson", { name: m.name })}
+                          className="ps-2 pe-0.5 rounded-full hover:text-brand-navy hover:underline dark:hover:text-brand-gold"
+                        >
+                          {m.name}
+                        </Link>
                         <button
                           type="button"
                           onClick={() => change("DELETE", m)}
@@ -224,23 +246,33 @@ function HalaqaRow({ halaqa, open, onToggle, onCount }: { halaqa: MyHalaqa; open
                     </li>
                   )}
                   {shown.map((c) => (
-                    <li key={c.id} className="flex items-center gap-3 px-3 py-2">
-                      <Avatar name={c.name} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{c.name}</p>
-                        {(c.elsewhere || c.grade !== null) && (
-                          <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
-                            {c.elsewhere ? tr("In {halaqa}", { halaqa: c.elsewhere }) : typeof c.grade === "number" ? gradeLabel(c.grade) : ""}
-                          </p>
-                        )}
-                      </div>
+                    <li key={c.id}>
+                      {/* The whole row adds the child: tap the name, not just the button. */}
                       <button
                         type="button"
-                        onClick={() => change("POST", c)}
-                        disabled={Boolean(c.elsewhere) || busy === c.id}
-                        className="flex-shrink-0 text-[12.5px] font-semibold px-3 py-1.5 rounded-xl bg-brand-navy text-white disabled:opacity-35"
+                        onClick={async () => {
+                          await change("POST", c);
+                          setQuery("");
+                        }}
+                        disabled={Boolean(c.elsewhere) || busy !== null}
+                        aria-label={tr("Add {name}", { name: c.name })}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-start transition-colors hover:bg-surface-bg-warm active:bg-surface-bg-warm disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
-                        {busy === c.id ? tr("Adding…") : tr("+ Add")}
+                        <Avatar name={c.name} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{c.name}</p>
+                          {(c.elsewhere || c.grade !== null) && (
+                            <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
+                              {c.elsewhere ? tr("In {halaqa}", { halaqa: c.elsewhere }) : typeof c.grade === "number" ? gradeLabel(c.grade) : ""}
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          aria-hidden="true"
+                          className={`flex-shrink-0 text-[12.5px] font-semibold px-3 py-1.5 rounded-xl bg-brand-navy text-white ${c.elsewhere ? "opacity-35" : ""}`}
+                        >
+                          {busy === c.id ? tr("Adding…") : tr("+ Add")}
+                        </span>
                       </button>
                     </li>
                   ))}
