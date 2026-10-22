@@ -152,7 +152,7 @@ export function SurahPicker({ value, onChange, placeholder, only, size = "md", c
           }
         }}
         className={
-          (chosen && !clearAfterPick && !open ? (sm ? "pe-16 " : "pe-28 ") : "") +
+          (chosen && !clearAfterPick && !open ? (sm ? "pe-20 " : "pe-36 ") : sm ? "pe-7 " : "pe-11 ") +
           (sm
             ? "w-full bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
             : "w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition")
@@ -164,17 +164,44 @@ export function SurahPicker({ value, onChange, placeholder, only, size = "md", c
         // English and Arabic alike); only the name inside reads right to left.
         <span
           aria-hidden
-          className={`pointer-events-none absolute inset-y-0 end-0 flex items-center text-ink font-arabic ${sm ? "pe-2 text-[14px]" : "pe-4 text-[20px]"}`}
+          className={`pointer-events-none absolute inset-y-0 flex items-center text-ink font-arabic ${sm ? "end-6 pe-1 text-[14px]" : "end-10 pe-1 text-[20px]"}`}
         >
           <bdi dir="rtl">{chosen.name}</bdi>
         </span>
       )}
+      {/* Browse the whole list: the phone's own scrolling picker, for anyone who
+          would rather scroll than type. */}
+      <label
+        className={`absolute inset-y-0 end-0 flex items-center justify-center text-ink-muted ${sm ? "w-6" : "w-10"}`}
+        title={tr("Browse all surahs")}
+      >
+        <span aria-hidden className={sm ? "text-[10px]" : "text-[13px]"}>▾</span>
+        <select
+          aria-label={tr("Browse all surahs")}
+          value={value}
+          onChange={(e) => {
+            if (e.target.value) {
+              onChange(e.target.value);
+              setOpen(false);
+              setQuery("");
+            }
+          }}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        >
+          <option value="">{tr("Select a Surah")}</option>
+          {list.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.id}. {x.englishName} ({x.ayahs} {tr("Ayahs")})
+            </option>
+          ))}
+        </select>
+      </label>
       {open && (
         <ul
           ref={listRef}
           id={`${id}-list`}
           role="listbox"
-          className={`absolute z-40 left-0 right-0 mt-1 overflow-y-auto rounded-xl border border-surface-border bg-surface-card shadow-xl ${sm ? "max-h-64 min-w-[220px]" : "max-h-80"}`}
+          className={`absolute z-40 left-0 right-0 mt-1 overflow-y-auto overscroll-contain touch-pan-y rounded-xl border border-surface-border bg-surface-card shadow-xl ${sm ? "max-h-64 min-w-[220px]" : "max-h-[min(20rem,42svh)]"}`}
         >
           {matches.length === 0 ? (
             <li className="px-3 py-2.5 text-[12.5px] text-ink-muted">{tr("No surah matches that.")}</li>
@@ -185,11 +212,10 @@ export function SurahPicker({ value, onChange, placeholder, only, size = "md", c
                 data-i={i}
                 role="option"
                 aria-selected={i === active}
-                // pointerdown, not click: the input's blur would close the list first.
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  pick(s);
-                }}
+                // A tap picks, a drag scrolls: pick on click (which a scroll never
+                // fires), and stop the mouse press taking focus from the box.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(s)}
                 onPointerEnter={() => setActive(i)}
                 className={`flex items-center gap-3 cursor-pointer ${sm ? "px-2.5 py-1.5" : "px-3 py-2"} ${
                   i === active ? "bg-brand-navy/[.07] dark:bg-white/[.06]" : ""

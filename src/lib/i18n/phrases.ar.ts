@@ -2133,4 +2133,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Your session has ended": "انتهت جلستك",
   "Sign in again to carry on.": "سجّل الدخول مرة أخرى للمتابعة.",
   "Couldn't load your clock-in": "تعذّر تحميل تسجيل حضورك",
+  "Browse all surahs": "تصفّح كل السور",
 };
