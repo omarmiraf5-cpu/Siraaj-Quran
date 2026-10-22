@@ -1,0 +1,175 @@
+# iOS release, run by hand: GitHub → Actions → "iOS → TestFlight" → Run workflow.
+#
+# The app loads https://www.mydiiwaan.com, so this does not build the website.
+# It syncs the native shell, signs it, and uploads to TestFlight. It does not
+# submit for App Store review.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   APPLE_TEAM_ID            T6L2L5B4QH (individual team)
+#   ASC_KEY_ID               App Store Connect API key id
+#   ASC_ISSUER_ID            Issuer id shown above the keys
+#   ASC_KEY_P8_BASE64        the AuthKey_….p8 file, base64-encoded
+#   IOS_DIST_CERT_P12_BASE64 the existing Apple Distribution certificate
+#                            (M6TPLDDU24), exported as a .p12, base64-encoded
+#   IOS_DIST_CERT_PASSWORD   password of that .p12
+#
+# The .p12 secrets are what stop a new certificate being created. Leave
+# "allow a new distribution certificate" off unless that private key is lost.
+# The API key needs Admin access so it can register the bundle id and upload.
+#
+# The register step creates bundle id com.mydiiwaan.app and the App Store
+# Connect app MyDiiwaan (English, SKU mydiiwaan-ios) if they are missing.
+# fastlane 2.241 produce still asks for an Apple ID password, so the lane
+# calls the App Store Connect API with the key instead. It never submits
+# for review.
+
+name: iOS → TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "register = create the app record only. testflight = upload a build (does not submit for review)."
+        type: choice
+        options:
+          - testflight
+          - register
+        default: testflight
+      version:
+        description: "Version people see, such as 1.0.0. The build number is chosen from TestFlight."
+        required: false
+        default: "1.0.0"
+      allow_new_distribution_certificate:
+        description: "Create a new distribution certificate. Off unless the existing one (M6TPLDDU24) cannot be exported."
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: ${{ inputs.task == 'register' && 'Register the app' || 'Upload to TestFlight' }}
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+      IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+      MARKETING_VERSION: ${{ inputs.version }}
+      ALLOW_NEW_DISTRIBUTION_CERTIFICATE: ${{ inputs.allow_new_distribution_certificate && 'true' || 'false' }}
+    steps:
+      - name: Check the secrets are set
+        run: |
+          set -euo pipefail
+          missing=""
+          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ "${{ inputs.task }}" = "testflight" ] && [ "${{ inputs.allow_new_distribution_certificate }}" != "true" ]; then
+            for v in IOS_DIST_CERT_P12_BASE64 IOS_DIST_CERT_PASSWORD; do
+              [ -n "${!v}" ] || missing="$missing $v"
+            done
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing. See docs/ios-app-store-release.md."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The shell loads the live site, so the website is not built here.
+      - name: Sync the iOS project
+        run: npx cap sync ios
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Decode the API key and certificate
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/keys"
+          ruby -e 'require "base64"; File.binwrite(ARGV[0], Base64.decode64(STDIN.read))' \
+            "$RUNNER_TEMP/keys/AuthKey.p8" <<<"$ASC_KEY_P8_BASE64"
+          if ! grep -q "BEGIN" "$RUNNER_TEMP/keys/AuthKey.p8"; then
+            echo "::error::ASC_KEY_P8_BASE64 did not decode to a .p8 key file."
+            exit 1
+          fi
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/keys/AuthKey.p8" >> "$GITHUB_ENV"
+          if [ -n "${IOS_DIST_CERT_P12_BASE64}" ]; then
+            ruby -e 'require "base64"; File.binwrite(ARGV[0], Base64.decode64(STDIN.read))' \
+              "$RUNNER_TEMP/keys/dist.p12" <<<"$IOS_DIST_CERT_P12_BASE64"
+            if [ ! -s "$RUNNER_TEMP/keys/dist.p12" ]; then
+              echo "::error::IOS_DIST_CERT_P12_BASE64 decoded to an empty file."
+              exit 1
+            fi
+            echo "IOS_DIST_CERT_P12_PATH=$RUNNER_TEMP/keys/dist.p12" >> "$GITHUB_ENV"
+          fi
+
+      - name: Register or upload
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.task }}" = "register" ]; then
+            bundle exec fastlane register
+          else
+            bundle exec fastlane beta
+          fi
+
+      - name: Keep a new certificate, if one was created
+        if: always() && inputs.task == 'testflight' && inputs.allow_new_distribution_certificate
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-distribution-certificate
+          path: |
+            ios/fastlane/certs-out/AppleDistribution.p12
+            ios/fastlane/certs-out/p12-password.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.task }}" = "register" ]; then
+            echo "App record step finished. Nothing was uploaded, and nothing was submitted for review." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "If the upload step succeeded, the build is on its way to TestFlight. It was not submitted for App Store review. It shows under App Store Connect → MyDiiwaan → TestFlight after Apple finishes processing (usually 10–30 minutes)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f ios/fastlane/certs-out/p12-password.txt ]; then
+            {
+              echo ""
+              echo "A new Apple Distribution certificate was created. Download the artifact **new-distribution-certificate** from this run."
+              echo "Put the .p12 file, base64-encoded, in the secret IOS_DIST_CERT_P12_BASE64, and put the password below in IOS_DIST_CERT_PASSWORD."
+              echo "Then delete the artifact. Leave \"allow a new distribution certificate\" off next time."
+              echo ""
+              echo '```'
+              cat ios/fastlane/certs-out/p12-password.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Remove keys
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/keys" ios/fastlane/certs-out ios/build

@@ -7,12 +7,17 @@
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
 	<!--
-	  Data the portal collects, including through the web view. This matches
-	  the App Privacy answers in docs/app-store-release.md. There is no
-	  tracking and no analytics SDK.
-	  Required-reason APIs (UserDefaults, file timestamps, disk space, system
-	  boot time, active keyboards) are not called by this app target, and
-	  Capacitor 8's own privacy manifests declare none, so none are listed.
+	  Matches the App Privacy answers in docs/ios-app-store-release.md and
+	  store/ios/privacy-answers.md. No tracking and no analytics SDK.
+
+	  Required-reason APIs are intentionally empty. Checked against this
+	  target and Capacitor 8.5.2 (including Geolocation, App, and Splash
+	  Screen): nothing calls UserDefaults, file-timestamp APIs, disk-space
+	  APIs, system boot time, or active keyboards. Capacitor keeps its small
+	  preferences in files under Library/kvstore, not in UserDefaults.
+	  Core Location, used for the staff premises check, is not one of those
+	  APIs. If an upload is later rejected for a named required-reason API,
+	  add that reason here and nowhere else.
 	-->
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array/>
@@ -57,6 +62,30 @@
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeAudioData</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>
