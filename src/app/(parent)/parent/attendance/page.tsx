@@ -110,7 +110,7 @@ export default function ParentAttendancePage() {
         </div>
       </SectionCard>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 max-[359px]:grid-cols-2 gap-2">
         {(["present", "late", "absent", "excused"] as const).map((k) => (
           <div key={k} className={`rounded-2xl px-2 py-3.5 text-center ${ATTENDANCE_STYLES[k]}`}>
             <p className="text-[22px] font-bold tabular-nums leading-none">{s[k]}</p>

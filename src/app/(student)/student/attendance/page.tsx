@@ -75,7 +75,7 @@ export default function StudentAttendancePage() {
         )}
       </StudentPageHeader>
 
-      <div className="grid grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-4 max-[359px]:grid-cols-2 gap-2.5">
         {MARKS.map((m, i) => (
           <div
             key={m.status}

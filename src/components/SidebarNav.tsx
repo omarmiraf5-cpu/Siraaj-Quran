@@ -185,7 +185,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 min-w-0 flex flex-col items-center justify-start min-h-12 pt-1.5 pb-1 gap-0.5 rounded-[20px] text-[11px] leading-tight text-center font-semibold transition-all ${
+              className={`flex-1 min-w-0 flex flex-col items-center justify-start min-h-12 pt-1.5 pb-1 gap-0.5 rounded-[20px] text-[11px] max-[359px]:text-[9px] max-[359px]:tracking-tight leading-tight text-center font-semibold break-words transition-all ${
                 active ? "dock-pill text-[#1c1408]" : "text-ink-muted hover:text-ink"
               }`}
             >
@@ -201,7 +201,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
-            className={`flex-1 min-w-0 flex flex-col items-center justify-start min-h-12 pt-1.5 pb-1 gap-0.5 rounded-[20px] text-[11px] leading-tight text-center font-semibold transition-all ${
+            className={`flex-1 min-w-0 flex flex-col items-center justify-start min-h-12 pt-1.5 pb-1 gap-0.5 rounded-[20px] text-[11px] max-[359px]:text-[9px] max-[359px]:tracking-tight leading-tight text-center font-semibold break-words transition-all ${
               moreActive || moreOpen ? "dock-pill text-[#1c1408]" : "text-ink-muted hover:text-ink"
             }`}
           >

@@ -478,7 +478,7 @@ export default function TeacherAttendancePage() {
       )}
 
       {/* Today's tally */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 max-[359px]:grid-cols-2 gap-2">
         {MARKS.map((m) => (
           <div key={m.status} className="card-quiet px-2 sm:px-3 py-3 min-w-0">
             <p className={`text-2xl font-bold tabular-nums leading-none ${m.num}`}>

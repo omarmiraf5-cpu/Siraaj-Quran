@@ -56,7 +56,7 @@ function StudentTabBar() {
                 <span className="text-xl" aria-hidden>{emoji}</span>
               </span>
               <span
-                className={`text-[11px] font-bold leading-tight text-center transition-colors ${
+                className={`text-[11px] max-[359px]:text-[9px] max-[359px]:tracking-tight font-bold leading-tight text-center transition-colors ${
                   active ? "text-subject-blue" : "text-ink-muted"
                 }`}
               >
