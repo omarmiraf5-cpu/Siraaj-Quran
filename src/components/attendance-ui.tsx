@@ -219,7 +219,31 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
     return (
       <section className="card-quiet p-5" aria-busy={!error}>
         {error ? (
-          <p className="text-[13px] text-ink-muted">{error}</p>
+          <div role="alert">
+            <p className="eyebrow">{tr("Today · clock in")}</p>
+            <p className="page-title text-lg mt-1">
+              {/please sign in/i.test(error) ? tr("Your session has ended") : tr("Couldn't load your clock-in")}
+            </p>
+            <p className="text-[12.5px] text-ink-muted mt-1 leading-relaxed">
+              {/please sign in/i.test(error) ? tr("Sign in again to carry on.") : error}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {/please sign in/i.test(error) ? (
+                <a href="/login" className="text-[13px] font-semibold px-4 py-2 rounded-xl bg-brand-navy text-white">{tr("Sign in")}</a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    load().catch(() => setError(tr("Could not load today's clock-in")));
+                  }}
+                  className="text-[13px] font-semibold px-4 py-2 rounded-xl border border-surface-border bg-surface-card text-ink"
+                >
+                  {tr("Try again")}
+                </button>
+              )}
+            </div>
+          </div>
         ) : (
           <div className="space-y-2.5" aria-label={tr("Checking today's clock-in…")}>
             <div className="skeleton h-3 w-36 rounded-full" />

@@ -2130,4 +2130,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Couldn't save this phone": "تعذّر حفظ هذا الهاتف",
   "Lessons": "الدروس",
   "useToast must be used within ToastProvider": "يجب استخدام useToast داخل ToastProvider",
+  "Your session has ended": "انتهت جلستك",
+  "Sign in again to carry on.": "سجّل الدخول مرة أخرى للمتابعة.",
+  "Couldn't load your clock-in": "تعذّر تحميل تسجيل حضورك",
 };

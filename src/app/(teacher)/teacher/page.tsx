@@ -19,7 +19,7 @@ import {
 import { getSurahById } from "@/data/mushaf-index";
 import { StudentDetailPanel } from "@/components/StudentDetailPanel";
 import { TeacherDrilldown, type DrilldownView } from "@/components/TeacherDrilldown";
-import { PortalHero, HeroButtonPrimary, HeroButtonGhost } from "@/components/PortalHero";
+import { PortalHero } from "@/components/PortalHero";
 import {
   SectionCard,
   AttendanceLegend,
@@ -300,25 +300,6 @@ export default function TeacherDashboard() {
             tone: review.length > 0 ? ("amber" as const) : ("green" as const),
           },
         ]}
-        actions={
-          <>
-            <HeroButtonPrimary href="/teacher/attendance" icon={<ColorGlyph name="calendarCheck" size={22} />}>
-              {t("common.register")}
-            </HeroButtonPrimary>
-            <HeroButtonGhost href="/teacher/quran-assignments" icon={<ColorGlyph name="pen" size={22} />}>
-              {t("common.assign")}
-            </HeroButtonGhost>
-            <HeroButtonGhost href="/teacher/my-attendance" icon={<ColorGlyph name="clock" size={22} />}>
-              {t("nav.clockIn")}
-            </HeroButtonGhost>
-          </>
-        }
-        stats={[
-          { value: students.length, label: t("nav.students") },
-          { value: active.length, label: t("common.activeWork") },
-          { value: review.length, label: t("common.toReview") },
-          { value: `${avgAttendance}%`, label: t("common.attendanceStat") },
-        ]}
       />
 
       {/* Signing in on arrival — the first thing a teacher does, so it sits
@@ -334,7 +315,17 @@ export default function TeacherDashboard() {
         ]}
       />
 
-      {staffMode !== "loading" && <SignInCard api={staffApi} />}
+      {staffMode !== "loading" ? (
+        <SignInCard api={staffApi} />
+      ) : (
+        <section className="card-quiet p-5" aria-busy="true">
+          <div className="space-y-2.5">
+            <div className="skeleton h-3 w-36 rounded-full" />
+            <div className="skeleton h-5 w-56 max-w-full rounded-full" />
+            <div className="skeleton h-3 w-80 max-w-full rounded-full" />
+          </div>
+        </section>
+      )}
 
       {/* At a glance — each number carries the context that makes it mean
           something, and opens the list it is counting. Opening a list is a
