@@ -135,12 +135,6 @@ export default function ParentDashboard() {
             </HeroButtonGhost>
           </>
         }
-        stats={[
-          { value: noAttendance ? "—" : attendancePending ? "…" : `${summary.rate}%`, label: t("common.attendanceStat") },
-          { value: `${memorisation}%`, label: t("common.memorised") },
-          { value: active.length, label: t("common.openWork") },
-          { value: done.length, label: t("assignment.completed") },
-        ]}
       />
 
       {/* The school's notices for this family — a child absent five school

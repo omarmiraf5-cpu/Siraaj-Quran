@@ -274,12 +274,6 @@ export default function AdminDashboard() {
             `${reviewItems.length + unassignedHalaqas.length} ${t("common.openItems")}`,
           ),
         ]}
-        stats={[
-          { value: activeStudentCount, label: t("nav.students") },
-          { value: activeTeachers.length, label: t("nav.teachers") },
-          { value: halaqas.length, label: t("nav.halaqas") },
-          { value: attendanceRate == null ? "—" : `${attendanceRate}%`, label: t("common.attendanceStat") },
-        ]}
       />
 
       <AgreementsBanner enabled={!isDemoSchool} />
