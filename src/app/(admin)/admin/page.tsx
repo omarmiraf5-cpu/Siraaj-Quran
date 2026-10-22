@@ -28,6 +28,7 @@ import {
 } from "@/data/demo";
 import { DEMO_SCHOOL } from "@/lib/demo";
 import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
+import { gradeLabel } from "@/lib/grades";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { IconArrow } from "@/components/icons";
@@ -62,7 +63,7 @@ interface AdminSnapshot {
 
 export default function AdminDashboard() {
   const supabase = createClient();
-  const { t, language } = useLanguage();
+  const { t, tr, language } = useLanguage();
   const { mode: noticeMode, api: noticeApi } = useAttendanceApi("admin");
   // Last visit's dashboard, shown at once while it's read again.
   const seen = readCache<AdminSnapshot>(SNAPSHOT_KEY);
@@ -260,6 +261,17 @@ export default function AdminDashboard() {
     );
   }
 
+  // A teacher's halaqas in a line. In a school kept in grades each halaqa is
+  // named after its teacher, so listing the names would repeat one name; say
+  // how many there are and which grades instead.
+  const halaqaSummary = (list: DemoHalaqa[]): string => {
+    const names = [...new Set(list.map((h) => h.name))];
+    if (names.length === list.length) return names.join(", ");
+    const grades = [...new Set(list.filter((h) => typeof h.grade === "number").map((h) => h.grade as number))].sort((x, y) => x - y);
+    const count = tr("{count} halaqas", { count: list.length });
+    return grades.length > 0 ? `${count} · ${grades.map(gradeLabel).join(", ")}` : `${names.join(", ")} (${list.length})`;
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-4 pt-2">
       <PortalHero
@@ -343,9 +355,7 @@ export default function AdminDashboard() {
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{teacher.name}</p>
                   <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
-                    {theirHalaqas.length > 0
-                      ? theirHalaqas.map((h) => h.name).join(", ")
-                      : t("common.noHalaqaAssigned")}
+                    {theirHalaqas.length > 0 ? halaqaSummary(theirHalaqas) : t("common.noHalaqaAssigned")}
                   </p>
                 </div>
                 {teacher.active === false && (
