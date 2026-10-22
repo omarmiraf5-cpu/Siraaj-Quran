@@ -325,8 +325,8 @@ export default function LoginPage() {
           with the reading direction rather than colliding with the role
           switcher's mirrored position under Arabic) */}
       <div className="fixed top-3 end-3 z-50 flex items-center gap-1.5">
-        <LanguageToggle variant="pill" className="min-h-11 bg-white/10 text-white/85 hover:bg-white/20" />
-        <ThemeToggle variant="pill" className="min-h-11 bg-white/10 text-white/85 hover:bg-white/20" />
+        <LanguageToggle variant="pill" className="min-h-12 px-4 text-sm bg-white/15 text-white hover:bg-white/25" />
+        <ThemeToggle variant="pill" className="min-h-12 px-4 text-sm bg-white/15 text-white hover:bg-white/25" />
       </div>
 
       <div className="relative w-full max-w-6xl flex flex-col md:flex-row items-center md:items-stretch gap-4 md:gap-0 px-6 py-10 md:py-14">
@@ -412,7 +412,10 @@ export default function LoginPage() {
         </div>
 
         {/* Role switcher */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <p className="text-center text-[13px] leading-relaxed text-ink mb-3">
+          {t("login.howToGetAccess")}
+        </p>
+        <div className="grid grid-cols-2 gap-2.5 mb-4">
           {ROLES.map((r) => (
             <button
               key={r.key}
@@ -638,7 +641,7 @@ export default function LoginPage() {
                 onClick={() => {
                   try { sessionStorage.setItem(RESET_EMAIL_KEY, email.trim()); } catch { /* private mode */ }
                 }}
-                className="block text-center text-ink-muted hover:text-ink text-xs font-semibold underline-offset-2 hover:underline transition-colors"
+                className="flex items-center justify-center min-h-11 px-3 text-center text-[15px] font-semibold text-ink underline-offset-2 hover:underline transition-colors"
               >
                 {t("login.forgotPassword")}
               </Link>
@@ -666,12 +669,12 @@ export default function LoginPage() {
             </form>
           )}
 
-          <p className="mt-5 text-center text-[11.5px] text-ink-muted">
-            <Link href="/privacy" className="hover:text-ink">{t("common.privacy")}</Link>
-            <span className="mx-2">·</span>
-            <Link href="/terms" className="hover:text-ink">{t("common.terms")}</Link>
-            <span className="mx-2">·</span>
-            <Link href="/support" className="hover:text-ink">{t("login.help")}</Link>
+          <p className="mt-4 flex flex-wrap items-center justify-center gap-x-1 text-[15px]">
+            <Link href="/privacy" className="inline-flex items-center justify-center min-h-11 px-3 font-semibold text-ink">{t("common.privacy")}</Link>
+            <span className="text-ink-muted" aria-hidden>·</span>
+            <Link href="/terms" className="inline-flex items-center justify-center min-h-11 px-3 font-semibold text-ink">{t("common.terms")}</Link>
+            <span className="text-ink-muted" aria-hidden>·</span>
+            <Link href="/support" className="inline-flex items-center justify-center min-h-11 px-3 font-semibold text-ink">{t("login.help")}</Link>
           </p>
         </div>
         </div>

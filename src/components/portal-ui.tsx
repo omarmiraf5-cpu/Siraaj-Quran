@@ -403,7 +403,7 @@ export function SegmentedSwitch<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="inline-flex p-1 gap-1 rounded-full bg-surface-bg-warm border border-surface-border"
+      className="flex w-full min-w-0 max-w-full flex-wrap p-1 gap-1 rounded-2xl bg-surface-bg-warm border border-surface-border"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -413,7 +413,7 @@ export function SegmentedSwitch<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`min-h-11 px-4 rounded-full text-[13px] font-semibold transition-all duration-200 ease-out ${
+            className={`min-h-11 min-w-0 max-w-full px-4 py-2 rounded-full text-[13px] font-semibold leading-snug whitespace-normal break-words text-center transition-all duration-200 ease-out ${
               active
                 ? "bg-brand-navy-dark text-white shadow-e1"
                 : "text-ink-muted hover:text-ink"

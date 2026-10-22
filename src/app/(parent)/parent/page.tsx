@@ -79,6 +79,8 @@ export default function ParentDashboard() {
   const today = mode === "demo" ? DEMO_TODAY : new Date().toLocaleDateString("en-CA");
   // Only a mark for today is today's — not the last one taken.
   const todayStatus = attendance[0]?.date === today ? attendance[0]?.status : undefined;
+  const attendancePending = mode !== "loading" && !!child && !ready;
+  const noAttendance = ready && summary.total === 0;
 
   // Everything below reads from one child, so there is nothing to draw until
   // the roster has arrived — and a parent whose children haven't been linked
@@ -105,9 +107,13 @@ export default function ParentDashboard() {
         title={demoUser?.name ?? t("role.parent")}
         meta={[
           formatDay(today, language),
-          `${child.name.split(" ")[0]} ${t("common.was")} ${
-            todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
-          } ${t("common.today")}`,
+          attendancePending
+            ? ""
+            : noAttendance
+              ? t("common.noAttendanceYet")
+              : `${child.name.split(" ")[0]} ${t("common.was")} ${
+                  todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
+                } ${t("common.today")}`,
           countLabel(
             "{count} piece of work open|{count} pieces of work open",
             active.length,
@@ -125,7 +131,7 @@ export default function ParentDashboard() {
           </>
         }
         stats={[
-          { value: `${summary.rate}%`, label: t("common.attendanceStat") },
+          { value: noAttendance ? "—" : attendancePending ? "…" : `${summary.rate}%`, label: t("common.attendanceStat") },
           { value: `${memorisation}%`, label: t("common.memorised") },
           { value: active.length, label: t("common.openWork") },
           { value: done.length, label: t("assignment.completed") },
@@ -138,7 +144,7 @@ export default function ParentDashboard() {
 
       {/* Which child. A parent with one child never sees this. */}
       {children.length > 1 && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           <span className="eyebrow">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
@@ -154,14 +160,20 @@ export default function ParentDashboard() {
         <StatTile
           tone={3}
           icon={<IconCalendar size={18} />}
-          value={`${summary.rate}%`}
+          value={noAttendance ? "—" : attendancePending ? "…" : `${summary.rate}%`}
           label={t("common.attendanceStat")}
-          sub={countLabel(
-            "{present} of {count} days",
-            summary.total - summary.excused,
-            `${summary.present + summary.late} ${t("common.of")} ${summary.total - summary.excused} ${t("common.days")}`,
-            { present: summary.present + summary.late },
-          )}
+          sub={
+            noAttendance
+              ? t("common.noAttendanceYet")
+              : attendancePending
+                ? ""
+                : countLabel(
+                    "{present} of {count} days",
+                    summary.total - summary.excused,
+                    `${summary.present + summary.late} ${t("common.of")} ${summary.total - summary.excused} ${t("common.days")}`,
+                    { present: summary.present + summary.late },
+                  )
+          }
         />
         <StatTile
           tone={1}

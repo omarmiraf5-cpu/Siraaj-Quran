@@ -43,7 +43,7 @@ const NAV: { href: string; labelKey: string; icon: React.ReactNode; art: ArtName
   },
   {
     href: "/teacher/my-attendance",
-    labelKey: "nav.signIn",
+    labelKey: "nav.clockIn",
     // A clock face: signing in and out, and being on time.
     icon: <IconClock />,
     art: "clock",

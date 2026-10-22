@@ -220,7 +220,7 @@ export default function TeacherDashboard() {
               {t("common.assign")}
             </HeroButtonGhost>
             <HeroButtonGhost href="/teacher/my-attendance" icon={<ColorGlyph name="clock" size={18} />}>
-              {t("nav.signIn")}
+              {t("nav.clockIn")}
             </HeroButtonGhost>
           </>
         }
@@ -238,7 +238,7 @@ export default function TeacherDashboard() {
         items={[
           { href: "/teacher/attendance", art: "calendarCheck", label: t("common.register") },
           { href: "/teacher/quran-assignments", art: "pen", label: t("common.assign") },
-          { href: "/teacher/my-attendance", art: "clock", label: t("nav.signIn") },
+          { href: "/teacher/my-attendance", art: "clock", label: t("nav.clockIn") },
           { href: "/teacher/qaidah", art: "book", label: t("nav.qaidah") },
           { href: "/teacher/messages", art: "mail", label: t("nav.messages") },
           { href: "/teacher/class-work", art: "globe", label: t("nav.classWork") },

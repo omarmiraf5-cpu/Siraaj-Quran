@@ -266,7 +266,7 @@ export default function TeacherAttendancePage() {
 
       {/* One register per halaqa */}
       {halaqas && halaqas.length > 1 && (
-        <div role="tablist" aria-label={t("teacher.attendance.whichHalaqa")} className="flex gap-2 overflow-x-auto pb-1">
+        <div role="tablist" aria-label={t("teacher.attendance.whichHalaqa")} className="flex flex-wrap gap-2">
           {halaqas.map((h) => {
             const on = h.id === halaqaId;
             const kids = h.studentIds.filter((id) => students.some((s) => s.id === id));
@@ -278,11 +278,11 @@ export default function TeacherAttendancePage() {
                 role="tab"
                 aria-selected={on}
                 onClick={() => pickHalaqa(h.id)}
-                className={`flex-shrink-0 min-h-11 rounded-2xl border px-3.5 py-2 text-start transition-all duration-200 ${
+                className={`min-h-11 max-w-full min-w-0 rounded-2xl border px-3.5 py-2 text-start transition-all duration-200 ${
                   on ? "border-emerald-700 bg-emerald-700 text-white" : "border-surface-border bg-surface-card text-ink hover:border-emerald-700"
                 }`}
               >
-                <span className="block text-sm font-semibold whitespace-nowrap">
+                <span className="block text-sm font-semibold leading-snug break-words">
                   {h.label}
                   {pending && <span className={`ms-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle ${on ? "bg-white" : "bg-amber-500"}`} />}
                 </span>
@@ -352,11 +352,11 @@ export default function TeacherAttendancePage() {
                       onClick={() => mark(s.id, m.status)}
                       aria-label={`${t(`common.${m.status}`)} — ${s.name}`}
                       aria-pressed={active}
-                      className={`min-h-11 h-11 w-full md:w-11 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
+                      className={`min-h-11 w-full md:w-auto md:min-w-[4.75rem] px-1.5 py-2 rounded-xl text-[11px] font-bold leading-tight whitespace-normal break-words border-2 transition-all active:scale-95 ${
                         active ? m.on : `border-surface-border text-ink-muted ${m.off}`
                       }`}
                     >
-                      {t(m.letterKey)}
+                      {t(`common.${m.status}`)}
                     </button>
                   );
                 })}

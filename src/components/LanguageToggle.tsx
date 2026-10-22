@@ -31,13 +31,15 @@ export function LanguageToggle({ className = "", variant = "icon" }: LanguageTog
   };
 
   const current = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
+  const languageLabel = `${t("common.language")}: ${current.nativeLabel}`;
 
   if (variant === "pill") {
     return (
       <button
         onClick={cycle}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${className}`}
-        aria-label={t("common.language")}
+        aria-label={languageLabel}
+        title={languageLabel}
       >
         <GlobeIcon />
         {current.nativeLabel}
@@ -50,7 +52,8 @@ export function LanguageToggle({ className = "", variant = "icon" }: LanguageTog
       <button
         onClick={cycle}
         className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all ${className}`}
-        aria-label={t("common.language")}
+        aria-label={languageLabel}
+        title={languageLabel}
       >
         <span className="flex-shrink-0 opacity-80">
           <GlobeIcon />
@@ -64,8 +67,9 @@ export function LanguageToggle({ className = "", variant = "icon" }: LanguageTog
   return (
     <button
       onClick={cycle}
-      className={`w-8 h-8 rounded-full flex items-center justify-center transition ${className}`}
-      aria-label={t("common.language")}
+      className={`min-w-11 min-h-11 w-11 h-11 rounded-full flex items-center justify-center transition ${className}`}
+      aria-label={languageLabel}
+      title={languageLabel}
     >
       <GlobeIcon />
     </button>

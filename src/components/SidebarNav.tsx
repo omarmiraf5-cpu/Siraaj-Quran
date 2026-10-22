@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -102,6 +102,12 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const displayName = demoUser?.name ?? userName ?? role;
   const [moreOpen, setMoreOpen] = useState(false);
 
+  // The sheet lives in the layout, which stays mounted across pages. Close
+  // it whenever the route changes so a chosen item doesn't leave it open.
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
   const showOverflow = items.length > MAX_PRIMARY_TABS + 1;
   const primaryItems = showOverflow ? items.slice(0, MAX_PRIMARY_TABS) : items;
   const moreItems = showOverflow ? items.slice(MAX_PRIMARY_TABS) : [];
@@ -112,6 +118,11 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
     document.cookie = "demo_mode=; path=/; max-age=0";
     await supabase.auth.signOut();
     router.push("/login");
+  };
+
+  const confirmSignOut = () => {
+    if (!window.confirm(t("common.signOutConfirm"))) return;
+    void handleSignOut();
   };
 
   return (
@@ -132,9 +143,10 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           <LanguageToggle variant="icon" className="min-w-11 min-h-11 bg-brand-navy/5 text-ink hover:bg-brand-navy/10" />
           <ThemeToggle variant="pill" className="min-h-11 bg-brand-navy/5 text-ink hover:bg-brand-navy/10" />
           <button
-            onClick={handleSignOut}
+            onClick={confirmSignOut}
             className="w-11 h-11 rounded-full bg-brand-navy/5 flex items-center justify-center text-ink hover:bg-brand-navy/10 transition active:scale-95"
             aria-label={t("common.signOut")}
+            title={t("common.signOut")}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -285,7 +297,8 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
 
         {/* Sign out */}
         <button
-          onClick={handleSignOut}
+          onClick={confirmSignOut}
+          title={t("common.signOut")}
           className="flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium text-[#102A56] hover:bg-slate-100 transition-colors mt-2"
         >
           {items.some((item) => item.art || item.mark) ? <LogOut size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]"><IconSignOut size={20} /></span>}

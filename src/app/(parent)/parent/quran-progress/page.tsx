@@ -133,7 +133,7 @@ export default function ParentQuranProgressPage() {
       />
 
       {children.length > 1 && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           <span className="eyebrow">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}

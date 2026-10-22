@@ -61,11 +61,17 @@ export default function ParentAttendancePage() {
       <PortalHero
         eyebrow={t("nav.attendance")}
         title={firstName}
-        meta={[child.halaqa, lastDays, `${s.rate}% ${t("common.present").toLowerCase()}`]}
+        meta={
+          !ready
+            ? [child.halaqa]
+            : s.total === 0
+              ? [child.halaqa, t("common.noAttendanceYet")]
+              : [child.halaqa, lastDays, `${s.rate}% ${t("common.present").toLowerCase()}`]
+        }
       />
 
       {children.length > 1 && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           <span className="eyebrow">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
@@ -78,6 +84,14 @@ export default function ParentAttendancePage() {
 
       {!ready && <LoadingNote>{t("common.loadingAttendance")}</LoadingNote>}
 
+      {ready && s.total === 0 && (
+        <SectionCard title={t("common.overall")}>
+          <EmptyNote>{t("common.noAttendanceYet")}</EmptyNote>
+        </SectionCard>
+      )}
+
+      {ready && s.total > 0 && (
+        <>
       <SectionCard title={t("common.overall")} note={countLabel("{count} day|{count} days", s.total, `${s.total} ${t("common.days")}`)}>
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -126,6 +140,8 @@ export default function ParentAttendancePage() {
           ))}
         </ul>
       </SectionCard>
+        </>
+      )}
     </div>
   );
 }
