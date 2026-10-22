@@ -2081,4 +2081,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Tap Today's lesson and Homework together to give both, each with its own ayahs.": "اضغط درس اليوم والواجب معًا لإعطاء الاثنين، لكل منهما آياته.",
   "A device token and platform are required": "مطلوب رمز الجهاز والمنصة",
   "Couldn't save this phone": "تعذّر حفظ هذا الهاتف",
+  "Lessons": "الدروس",
 };

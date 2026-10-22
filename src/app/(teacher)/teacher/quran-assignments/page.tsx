@@ -33,7 +33,7 @@ import { Mushaf } from "@/components/Mushaf";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
+import { Modal, SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import {
@@ -337,6 +337,7 @@ export default function QuranAssignmentsPage() {
         setRealAssignments(
           ((assignmentData ?? []) as QuranicAssignment[]).filter((a) => !mine || mine.has(a.student_id))
         );
+        void loadRealLog();
       } catch (err) {
         console.error("Error loading data:", err);
         setLoadError(
@@ -584,6 +585,25 @@ export default function QuranAssignmentsPage() {
     );
     setPlanSummaries(summaries);
     setDemoPlanStudentIds(demoPlanStudents());
+  };
+
+  // What has been heard and graded, from the school's records, for each child's history.
+  const loadRealLog = async () => {
+    const { data } = await supabase.from("recitation_log").select("*").order("session_date");
+    setLog(
+      (data ?? []).map((r) => ({
+        id: r.id,
+        student_id: r.student_id,
+        portion: r.portion,
+        surah: r.surah,
+        ayah_start: r.ayah_start,
+        surah_end: r.surah_end ?? r.surah,
+        ayah_end: r.ayah_end,
+        rating: r.rating,
+        notes: r.notes,
+        date: r.session_date,
+      }))
+    );
   };
 
   const refreshAssignments = async () => {
@@ -909,7 +929,7 @@ export default function QuranAssignmentsPage() {
         // the yearly plan, the plan's own progress — so re-read both rather
         // than leaving the row on its old status and a behind-schedule
         // banner up that the lesson just cleared.
-        await Promise.all([refreshAssignments(), syncOneStudent(a.student_id)]);
+        await Promise.all([refreshAssignments(), syncOneStudent(a.student_id), loadRealLog()]);
       }
       setEditingId(null);
     } finally {
@@ -1684,23 +1704,25 @@ export default function QuranAssignmentsPage() {
               <button
                 type="button"
                 onClick={() => setOpenStudent(openStudent === st.id ? null : st.id)}
-                aria-expanded={openStudent === st.id}
-                className={`w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${openStudent === st.id ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
+                aria-haspopup="dialog"
+                className="w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors hover:bg-surface-bg-warm"
               >
                 <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
                   {initials(st.name)}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">{st.name}</p>
-                  <p className={`text-[11.5px] ${openStudent === st.id ? "text-white/80" : "text-ink-muted"}`}>
+                  <p className="text-[11.5px] text-ink-muted">
                     {tr("{count} piece of work|{count} pieces of work", { count: st.items.length })}
                     {st.items.some((x) => x.daily_rating === "not_recited") ? ` · ${DAILY_RATING_LABELS.not_recited}` : ""}
                   </p>
                 </div>
-                <RowChevron open={openStudent === st.id} />
+                <RowChevron open={false} />
               </button>
               {openStudent === st.id && (
-          <ul className="ms-3 border-s border-surface-border ps-3 divide-y divide-surface-border">
+              <Modal title={st.name} subtitle={placeOf[st.id] ?? undefined} badge={initials(st.name)} wide onClose={() => { setOpenStudent(null); setEditingId(null); }}>
+          <p className="eyebrow pb-1.5">{tr("Lessons")}</p>
+          <ul className="divide-y divide-surface-border">
           {st.items.map((a) => {
             const surah = getSurahById(a.surah);
             const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
@@ -1862,6 +1884,9 @@ export default function QuranAssignmentsPage() {
             );
           })}
           </ul>
+          <p className="eyebrow pt-5 pb-2">{tr("{value}'s history", { value: st.name.split(" ")[0] })}</p>
+          <RecitationHistory entries={recitationLogFor(st.id, log)} />
+              </Modal>
               )}
             </li>
           ))}
