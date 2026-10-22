@@ -255,7 +255,7 @@ export default function ParentMessagesPage() {
       />
 
       {children.length > 1 && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           <span className="eyebrow">{t("common.about")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
@@ -329,7 +329,7 @@ export default function ParentMessagesPage() {
         </button>
       )}
 
-      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 start-0 end-0 md:start-56 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-surface-card border-t border-surface-border z-30">
+      <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-0 start-0 end-0 md:start-60 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-surface-card border-t border-surface-border z-30">
         <div className="max-w-4xl mx-auto flex items-center gap-2">
           <input
             value={text}

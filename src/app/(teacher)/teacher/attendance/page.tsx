@@ -48,10 +48,10 @@ const MARKS: {
   dot: string;
   num: string;
 }[] = [
-  { status: "present", letterKey: "common.presentLetter", on: "bg-green-700 border-green-700 text-white", off: "hover:border-green-700 hover:text-green-800", dot: "bg-green-700", num: "text-green-800 dark:text-green-300" },
-  { status: "late", letterKey: "common.lateLetter", on: "bg-amber-600 border-amber-600 text-white", off: "hover:border-amber-600 hover:text-amber-700", dot: "bg-amber-600", num: "text-amber-700 dark:text-amber-300" },
-  { status: "absent", letterKey: "common.absentLetter", on: "bg-red-700 border-red-700 text-white", off: "hover:border-red-700 hover:text-red-800", dot: "bg-red-700", num: "text-red-800 dark:text-red-300" },
-  { status: "excused", letterKey: "common.excusedLetter", on: "bg-slate-600 border-slate-600 text-white", off: "hover:border-slate-600 hover:text-slate-700", dot: "bg-slate-500", num: "text-slate-700 dark:text-slate-300" },
+  { status: "present", letterKey: "common.presentLetter", on: "bg-attend-present border-attend-present text-white", off: "hover:border-attend-present hover:text-attend-present-ink", dot: "bg-attend-present", num: "text-attend-present-ink" },
+  { status: "late", letterKey: "common.lateLetter", on: "bg-attend-late border-attend-late text-white", off: "hover:border-attend-late hover:text-attend-late-ink", dot: "bg-attend-late", num: "text-attend-late-ink" },
+  { status: "absent", letterKey: "common.absentLetter", on: "bg-attend-absent border-attend-absent text-white", off: "hover:border-attend-absent hover:text-attend-absent-ink", dot: "bg-attend-absent", num: "text-attend-absent-ink" },
+  { status: "excused", letterKey: "common.excusedLetter", on: "bg-attend-excused border-attend-excused text-white", off: "hover:border-attend-excused hover:text-attend-excused-ink", dot: "bg-attend-excused", num: "text-attend-excused-ink" },
 ];
 
 /** Today on the teacher's own device — not toISOString(), which is the UTC
@@ -428,7 +428,7 @@ export default function TeacherAttendancePage() {
 
       {/* One register per halaqa */}
       {halaqas && halaqas.length > 1 && (
-        <div role="tablist" aria-label={t("teacher.attendance.whichHalaqa")} className="flex gap-2 overflow-x-auto pb-1">
+        <div role="tablist" aria-label={t("teacher.attendance.whichHalaqa")} className="flex flex-wrap gap-2">
           {halaqas.map((h) => {
             const on = h.id === halaqaId;
             const kids = h.studentIds.filter((id) => students.some((s) => s.id === id));
@@ -440,13 +440,11 @@ export default function TeacherAttendancePage() {
                 role="tab"
                 aria-selected={on}
                 onClick={() => pickHalaqa(h.id)}
-                className={`flex-shrink-0 max-w-[85%] sm:max-w-sm rounded-2xl border px-3 py-2 text-start transition-colors ${
+                className={`min-h-11 max-w-full min-w-0 rounded-2xl border px-3.5 py-2 text-start transition-all duration-200 ${
                   on ? "border-emerald-700 bg-emerald-700 text-white" : "border-surface-border bg-surface-card text-ink hover:border-emerald-700"
                 }`}
               >
-                {/* A long name (grade · campus · teacher) wraps rather than
-                    running past the edge of a phone. */}
-                <span className="block text-sm">
+                <span className="block text-sm font-semibold leading-snug break-words">
                   <HalaqaTitle label={h.label} onDark={on} />
                   {pending && <span className={`ms-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle ${on ? "bg-white" : "bg-amber-500"}`} />}
                 </span>
@@ -502,7 +500,7 @@ export default function TeacherAttendancePage() {
         </p>
         <button
           onClick={markAllPresent}
-          className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+          className="btn btn-ghost min-h-11 px-3 text-xs text-attend-present-ink"
         >
           {t("teacher.attendance.markAllPresent")}
         </button>
@@ -538,11 +536,11 @@ export default function TeacherAttendancePage() {
                       onClick={() => mark(s.id, m.status)}
                       aria-label={`${t(`common.${m.status}`)} — ${s.name}`}
                       aria-pressed={active}
-                      className={`flex-1 sm:flex-none h-10 sm:h-9 sm:w-9 rounded-full text-xs font-bold border-2 transition-all active:scale-95 ${
+                      className={`min-h-11 w-full md:w-auto md:min-w-[4.75rem] px-1.5 py-2 rounded-xl text-[11px] font-bold leading-tight whitespace-normal break-words border-2 transition-all active:scale-95 ${
                         active ? m.on : `border-surface-border text-ink-muted ${m.off}`
                       }`}
                     >
-                      {t(m.letterKey)}
+                      {t(`common.${m.status}`)}
                     </button>
                   );
                 })}
@@ -588,7 +586,7 @@ export default function TeacherAttendancePage() {
           tab bar renders after this one in the DOM with a higher z-index,
           it was winning the stacking fight and hiding all but a sliver of
           the button underneath it. */}
-      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 start-0 end-0 md:start-56 p-3 bg-surface-card border-t border-surface-border z-30">
+      <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-0 start-0 end-0 md:start-60 p-3 bg-surface-card border-t border-surface-border z-30">
         <PressButton
           onClick={saveAttendance}
           loading={saving}
