@@ -48,15 +48,15 @@ function StudentTabBar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-2xl transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-90"
+              className="flex-1 min-w-0 flex flex-col items-center justify-start gap-1 py-1.5 rounded-2xl transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-90"
             >
               <span
-                className={`h-8 flex items-center justify-center transition-all ${active ? "scale-110" : "opacity-55 grayscale"}`}
+                className={`h-8 flex items-center justify-center transition-all ${active ? "scale-110" : ""}`}
               >
                 <span className="text-xl" aria-hidden>{emoji}</span>
               </span>
               <span
-                className={`text-[11px] font-bold leading-none transition-colors ${
+                className={`text-[11px] font-bold leading-tight text-center transition-colors ${
                   active ? "text-subject-blue" : "text-ink-muted"
                 }`}
               >
