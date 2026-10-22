@@ -994,7 +994,9 @@ create table if not exists messages (
   kind          text not null default 'message' check (kind in ('message', 'absence')),
   body          text not null,
   absence_date  date,
-  created_at    timestamptz default now()
+  created_at    timestamptz default now(),
+  -- Who a teacher's message is for: the parent (default) or the student.
+  audience      text not null default 'parent' check (audience in ('parent', 'student'))
 );
 alter table messages enable row level security;
 
@@ -1016,6 +1018,12 @@ create policy "Parents can read and send messages for own children" on messages
   for all using (
     student_id in (select student_id from parent_students where parent_id = auth.uid())
     or author_id = auth.uid()
+  );
+drop policy if exists "Students can read notes sent to them" on messages;
+create policy "Students can read notes sent to them" on messages
+  for select using (
+    audience = 'student'
+    and student_id in (select id from students where profile_id = auth.uid())
   );
 drop policy if exists "Admins can read all messages" on messages;
 create policy "Admins can read all messages" on messages

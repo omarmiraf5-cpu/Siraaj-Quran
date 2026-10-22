@@ -569,6 +569,8 @@ export interface ThreadMessage {
   author: MessageAuthor;
   author_name: string;
   kind: MessageKind;
+  /** Who a teacher's message is for. Missing means the parent, as ever. */
+  audience?: "parent" | "student";
   body: string;
   /** ISO date, only set when kind is "absence". */
   absence_date?: string;

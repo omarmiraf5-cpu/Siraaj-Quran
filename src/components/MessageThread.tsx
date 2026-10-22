@@ -17,7 +17,7 @@ export function MessageThread({
       own messages align right like a familiar chat. */
   viewerRole: MessageAuthor;
 }) {
-  const { t, language } = useLanguage();
+  const { t, tr, language } = useLanguage();
 
   if (messages.length === 0) {
     return <EmptyNote>{t("messages.emptyThread")}</EmptyNote>;
@@ -57,6 +57,7 @@ export function MessageThread({
                 {m.body}
               </div>
               <p className="text-[10px] text-ink-muted mt-1 px-1">
+                {m.audience === "student" && `${tr("Note to the student")} · `}
                 {m.author_name} · {formatMessageTime(m.created_at)}
               </p>
             </div>

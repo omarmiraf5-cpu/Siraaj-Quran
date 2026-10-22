@@ -31,7 +31,7 @@ interface RosterStudent {
 
 export default function TeacherMessagesPage() {
   const supabase = createClient();
-  const { t, language } = useLanguage();
+  const { t, tr, language } = useLanguage();
   const [ready, setReady] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -47,6 +47,9 @@ export default function TeacherMessagesPage() {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [local, setLocal] = useState<ThreadMessage[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  // Which side of the family the open chat is going to.
+  const [to, setTo] = useState<"parent" | "student">("parent");
+  const [sendError, setSendError] = useState(false);
   const [query, setQuery] = useState("");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -65,7 +68,6 @@ export default function TeacherMessagesPage() {
       if (!user) {
         setIsDemo(true);
         setStudents(DEMO_STUDENTS);
-        setSelected(DEMO_STUDENTS[0].id);
         setLocal(readDemoStore(MESSAGES_KEY, []));
         return;
       }
@@ -90,7 +92,6 @@ export default function TeacherMessagesPage() {
         mine
       );
       setStudents(roster);
-      if (roster.length > 0) setSelected(roster[0].id);
 
       if (roster.length > 0) {
         const { data: rows } = await supabase
@@ -122,6 +123,7 @@ export default function TeacherMessagesPage() {
             author_name:
               nameById.get(r.author_id) ?? t(r.author_role === "teacher" ? "role.teacher" : "role.parent"),
             kind: r.kind as ThreadMessage["kind"],
+            audience: r.audience === "student" ? "student" : "parent",
             body: r.body,
             absence_date: r.absence_date ?? undefined,
             created_at: r.created_at,
@@ -137,11 +139,30 @@ export default function TeacherMessagesPage() {
     isDemo ? demoMessagesFor(studentId, local) : messages.filter((m) => m.student_id === studentId);
 
   const student = students.find((s) => s.id === selected);
-  const thread = selected ? messagesFor(selected) : [];
+  const thread = selected ? messagesFor(selected).filter((m) => (m.audience ?? "parent") === to) : [];
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [thread.length, selected]);
+  }, [thread.length, selected, to]);
+
+  const openChat = (id: string) => {
+    setSelected(id);
+    setTo("parent");
+    setText("");
+    setSendError(false);
+  };
+  const closeChat = () => setSelected(null);
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSelected(null);
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [selected]);
 
   const send = async () => {
     const body = text.trim();
@@ -154,6 +175,7 @@ export default function TeacherMessagesPage() {
         author: "teacher",
         author_name: t("common.demoTeacherName"),
         kind: "message",
+        audience: to,
         body,
         created_at: new Date().toISOString(),
       };
@@ -166,6 +188,7 @@ export default function TeacherMessagesPage() {
 
     if (!userId || !schoolId) return;
     setSending(true);
+    setSendError(false);
     const { data, error } = await supabase
       .from("messages")
       .insert({
@@ -175,11 +198,16 @@ export default function TeacherMessagesPage() {
         author_role: "teacher",
         kind: "message",
         body,
+        // Parents are the default; only a note to the child names its side.
+        ...(to === "student" ? { audience: "student" } : {}),
       })
       .select()
       .single();
     setSending(false);
-    if (error || !data) return;
+    if (error || !data) {
+      setSendError(true);
+      return;
+    }
 
     setMessages((m) => [
       ...m,
@@ -189,6 +217,7 @@ export default function TeacherMessagesPage() {
         author: "teacher",
         author_name: teacherName,
         kind: "message",
+        audience: to,
         body: data.body,
         created_at: data.created_at,
       },
@@ -243,9 +272,9 @@ export default function TeacherMessagesPage() {
           <EmptyNote>{t("teacher.messages.noStudents")}</EmptyNote>
         </div>
       ) : (
-        <div className="grid lg:grid-cols-[280px_1fr] gap-4 items-start">
+        <div className="max-w-3xl mx-auto">
           {/* Student list */}
-          <div className="card-quiet overflow-hidden lg:max-h-[34rem] lg:overflow-y-auto">
+          <div className="card-quiet overflow-hidden">
             <div className="p-3 border-b border-surface-border">
               <label htmlFor="student-search" className="sr-only">{t("teacher.messages.search")}</label>
               <input
@@ -261,13 +290,13 @@ export default function TeacherMessagesPage() {
               <p className="px-3 py-6 text-center text-[13px] text-ink-muted">{t("teacher.messages.noMatch")}</p>
             ) : null}
             {shown.map(({ student: s, last }) => {
-              const active = s.id === selected;
+              const active = false;
               const isAbsence = last?.kind === "absence";
               return (
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => setSelected(s.id)}
+                  onClick={() => openChat(s.id)}
                   className={`w-full flex items-center gap-3 px-3 py-3 text-start transition-colors ${
                     active ? "bg-surface-bg-warm" : "hover:bg-surface-bg-warm"
                   }`}
@@ -293,26 +322,78 @@ export default function TeacherMessagesPage() {
             })}
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Thread */}
-          {student && (
-            <div className="card-quiet flex flex-col h-[32rem]">
-              <div className="px-5 py-4 border-b border-surface-border flex-shrink-0">
-                <h2 className="page-title text-lg">{student.name}</h2>
-                <p className="text-[11px] text-ink-muted">{student.halaqa}</p>
+      {/* The chat opens over the list, so the box to type in is always in
+          view — nothing to scroll down to. */}
+      {student && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in-down" onClick={closeChat} aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={student.name}
+            className="relative w-full sm:max-w-lg h-[min(88svh,40rem)] flex flex-col bg-surface-card border border-surface-border rounded-t-[22px] sm:rounded-[18px] shadow-2xl animate-slide-up overflow-hidden"
+          >
+            <div className="gradient-navy px-5 pt-4 pb-3 flex-shrink-0 relative">
+              <button
+                type="button"
+                onClick={closeChat}
+                aria-label={t("common.close")}
+                className="absolute top-3 end-3 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+              <div className="flex items-center gap-3 pe-9">
+                <span className="w-11 h-11 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-[14px] font-bold text-white flex-shrink-0">
+                  {initials(student.name)}
+                </span>
+                <div className="min-w-0">
+                  <h2 className="page-title text-white text-lg [overflow-wrap:anywhere]">{student.name}</h2>
+                  <p className="text-[12px] text-white/60">{student.halaqa}</p>
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto px-5 py-4">
-                <MessageThread messages={thread} viewerRole="teacher" />
-                <div ref={endRef} />
+              <div className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-white/10 p-1" role="tablist" aria-label={tr("Who to message")}>
+                {(["parent", "student"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="tab"
+                    aria-selected={to === k}
+                    onClick={() => { setTo(k); setSendError(false); }}
+                    className={`rounded-full py-2 text-[13px] font-semibold transition-colors ${
+                      to === k ? "bg-white text-brand-navy" : "text-white/80"
+                    }`}
+                  >
+                    {k === "parent" ? tr("Parent") : tr("Student")}
+                  </button>
+                ))}
               </div>
-              <div className="flex-shrink-0 border-t border-surface-border p-3 flex items-center gap-2">
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+              {to === "student" && (
+                <p className="text-[12px] text-ink-muted mb-3 text-center">
+                  {tr("{name} will see this in their portal. Their parents can see it too.", { name: student.name.split(" ")[0] })}
+                </p>
+              )}
+              <MessageThread messages={thread} viewerRole="teacher" />
+              <div ref={endRef} />
+            </div>
+            <div className="flex-shrink-0 border-t border-surface-border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+              {sendError && (
+                <p role="alert" className="text-[12px] text-red-700 dark:text-red-300 mb-2 px-1">
+                  {tr("That didn't send. Please try again.")}
+                </p>
+              )}
+              <div className="flex items-center gap-2">
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") send();
                   }}
-                  placeholder={`${t("common.replyAbout")} ${student.name.split(" ")[0]}…`}
+                  placeholder={to === "student" ? `${tr("Message")} ${student.name.split(" ")[0]}…` : `${t("common.replyAbout")} ${student.name.split(" ")[0]}…`}
                   dir="auto"
                   className="flex-1 min-w-0 bg-surface-bg border border-surface-border rounded-pill px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy transition"
                 />
@@ -329,7 +410,7 @@ export default function TeacherMessagesPage() {
                 </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

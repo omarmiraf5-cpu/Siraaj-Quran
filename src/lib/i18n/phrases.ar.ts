@@ -2134,4 +2134,10 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Sign in again to carry on.": "سجّل الدخول مرة أخرى للمتابعة.",
   "Couldn't load your clock-in": "تعذّر تحميل تسجيل حضورك",
   "Browse all surahs": "تصفّح كل السور",
+  "Who to message": "لمن تريد المراسلة",
+  "{name} will see this in their portal. Their parents can see it too.": "سيرى {name} هذا في بوابته، ويراه أولياء أموره أيضًا.",
+  "That didn't send. Please try again.": "لم تُرسَل الرسالة. حاول مرة أخرى.",
+  "Message": "رسالة",
+  "Note to the student": "رسالة إلى الطالب",
+  "From your teacher": "من معلّمك",
 };

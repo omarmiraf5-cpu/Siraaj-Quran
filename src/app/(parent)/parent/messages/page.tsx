@@ -90,6 +90,7 @@ export default function ParentMessagesPage() {
           author_name:
             nameById.get(r.author_id) ?? t(r.author_role === "teacher" ? "role.teacher" : "role.parent"),
           kind: r.kind as ThreadMessage["kind"],
+          audience: r.audience === "student" ? "student" : "parent",
           body: r.body,
           absence_date: r.absence_date ?? undefined,
           created_at: r.created_at,
