@@ -265,6 +265,7 @@ export default function QuranAssignmentsPage() {
   const [demoPlanStudentIds, setDemoPlanStudentIds] = useState<Set<string>>(new Set());
   const [realAssignments, setRealAssignments] = useState<QuranicAssignment[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [listReady, setListReady] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   // Which student's pieces of work are showing: a tap on a name opens that child's day.
@@ -297,7 +298,13 @@ export default function QuranAssignmentsPage() {
   useEffect(() => {
     const loadStudents = async () => {
       try {
-        const user = await sessionUser(supabase);
+        let user: { id: string } | null = null;
+        try {
+          const demoOnly = !!localStorage.getItem("demo_user") && !document.cookie.includes("auth-token");
+          if (!demoOnly) user = await sessionUser(supabase);
+        } catch {
+          user = null;
+        }
 
         if (!user) {
           // Demo mode or no auth: use the sample roster, and remember that
@@ -414,6 +421,8 @@ export default function QuranAssignmentsPage() {
             ? tr("Couldn't load assignments: {message}", { message: err.message })
             : tr("Couldn't load assignments")
         );
+      } finally {
+        setListReady(true);
       }
     };
 
@@ -1187,10 +1196,17 @@ export default function QuranAssignmentsPage() {
       <PortalHero
         eyebrow={tr("Set work")}
         title={tr("Assignments")}
-        meta={[
-          tr("{count} student|{count} students", { count: students.length }),
-          tr("{count} set this term", { count: allAssignments.length }),
-        ]}
+        meta={
+          listReady
+            ? [
+                tr("{count} student|{count} students", { count: students.length }),
+                tr("{count} set this term", { count: allAssignments.length }),
+              ]
+            : [
+                <span key="students" className="inline-block h-3 w-24 rounded-full bg-white/30" aria-hidden />,
+                <span key="set" className="inline-block h-3 w-28 rounded-full bg-white/30" aria-label={tr("Loading…")} />,
+              ]
+        }
       />
 
       {Object.entries(planSummaries).flatMap(([studentId, summary]) => {
@@ -1355,7 +1371,7 @@ export default function QuranAssignmentsPage() {
             <label className="block text-sm font-semibold text-ink mb-2">
               {tr("Portion *")}
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {HIFZ_PORTIONS.map((p) => {
                 const active = portion === p;
                 return (
@@ -1368,29 +1384,33 @@ export default function QuranAssignmentsPage() {
                       setEndSurah("");
                     }}
                     aria-pressed={active}
-                    className={`rounded-2xl border px-2 py-2.5 text-center transition-all active:scale-[.98] ${
+                    className={`min-h-11 min-w-0 rounded-2xl border px-3 py-3 text-start transition-all active:scale-[.98] ${
                       active
                         ? "border-brand-navy bg-brand-navy text-white"
                         : "border-surface-border bg-surface-card text-ink hover:border-brand-navy/40"
                     }`}
                   >
-                    <span className="block text-[12px] font-semibold leading-tight">
+                    <span className="block text-[13px] font-semibold leading-snug break-words">
                       {PORTION_LABELS[p]}
                     </span>
-                    <span
-                      className={`block font-arabic text-[13px] mt-1 leading-tight ${
-                        active ? "text-white/70" : "text-ink-muted"
-                      }`}
-                      dir="rtl"
-                      lang="ar"
-                    >
-                      {PORTION_ARABIC[p]}
+                    {PORTION_ARABIC[p] ? (
+                      <span
+                        className={`block font-arabic text-[14px] mt-1 leading-snug break-words ${
+                          active ? "text-white/80" : "text-ink-muted"
+                        }`}
+                        dir="rtl"
+                        lang="ar"
+                      >
+                        {PORTION_ARABIC[p]}
+                      </span>
+                    ) : null}
+                    <span className={`block text-[12.5px] mt-1.5 leading-relaxed break-words ${active ? "text-white/80" : "text-ink-muted"}`}>
+                      {PORTION_BLURB[p]}
                     </span>
                   </button>
                 );
               })}
             </div>
-            <p className="text-xs text-ink-muted mt-2">{PORTION_BLURB[portion]}</p>
           </div>
 
           {/* The new lesson's mirror of the juz' quick-fill below: rather
@@ -1801,19 +1821,19 @@ export default function QuranAssignmentsPage() {
 
           <div>
             <p className="text-sm font-semibold text-ink mb-2">{tr("This is for")}</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {(["today", "homework", "not_recited"] as const).map((w) => (
                 <button
                   key={w}
                   type="button"
                   onClick={() => tapWhen(w)}
                   aria-pressed={forWhen === w || (w === "homework" && extras.some((x) => x.kind === "homework"))}
-                  className={`rounded-2xl border px-3 py-2.5 text-center transition ${
+                  className={`min-h-11 min-w-0 rounded-2xl border px-3 py-3 text-start transition ${
                     forWhen === w || (w === "homework" && extras.some((x) => x.kind === "homework")) ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
                   }`}
                 >
-                  <span className="block text-[13px] font-semibold leading-tight">{w === "today" ? tr("Today's lesson") : w === "homework" ? tr("Homework") : DAILY_RATING_LABELS.not_recited}</span>
-                  <span className="block text-[11px] leading-tight mt-0.5 opacity-70">{w === "today" ? tr("Done in class today") : w === "homework" ? tr("To do at home, by the due date") : tr("Set, but not recited today")}</span>
+                  <span className="block text-[13px] font-semibold leading-snug break-words">{w === "today" ? tr("Today's lesson") : w === "homework" ? tr("Homework") : DAILY_RATING_LABELS.not_recited}</span>
+                  <span className="block text-[12px] leading-snug mt-1 break-words opacity-80">{w === "today" ? tr("Done in class today") : w === "homework" ? tr("To do at home, by the due date") : tr("Set, but not recited today")}</span>
                 </button>
               ))}
             </div>
@@ -1960,12 +1980,25 @@ export default function QuranAssignmentsPage() {
           properly signed in, and adds a browser-local preview row otherwise. */}
       <SectionCard
         title={tr("Current assignments")}
-        note={tr("{count} across all students · tap to grade", { count: allAssignments.length })}
+        note={
+          listReady ? (
+            tr("{count} across all students · tap to grade", { count: allAssignments.length })
+          ) : (
+            <span className="inline-block h-3 w-16 rounded-full bg-surface-border align-middle" aria-hidden />
+          )
+        }
       >
         {loadError && (
           <p className="text-xs font-semibold text-red-700 dark:text-red-400 py-2">{loadError}</p>
         )}
-        {!loadError && allAssignments.length === 0 && (
+        {!listReady && !loadError && (
+          <div className="space-y-3 py-1" aria-busy="true">
+            <div className="skeleton w-full" />
+            <div className="skeleton w-5/6" />
+            <div className="skeleton w-2/3" />
+          </div>
+        )}
+        {listReady && !loadError && allAssignments.length === 0 && (
           <EmptyNote>{tr("No assignments yet — set the first one above.")}</EmptyNote>
         )}
         {groupNames.length > 1 && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
+import Link from "next/link";
 
 /**
  * Web port of the Abu Hureira gem tiles (QuickIcon GemTile + ColorGlyph Art).
@@ -527,5 +528,28 @@ export function ColorGlyph({ name, size = 18 }: { name: ArtName; size?: number }
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden className="shrink-0">
       <Art name={name} id={id} />
     </svg>
+  );
+}
+
+/** Quick-action row: gem tile, label, cream card. */
+export function QuickActions({
+  items,
+}: {
+  items: { href: string; art: ArtName; label: string }[];
+}) {
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className="gem-surface flex flex-col items-center gap-2 rounded-xl px-1.5 py-3 text-center min-h-11"
+          style={{ "--gem": gemGlow(item.art) } as React.CSSProperties}
+        >
+          <ColorTile name={item.art} size={44} />
+          <span className="text-[12px] font-semibold text-[#102A56] dark:text-ink leading-snug break-words">{item.label}</span>
+        </Link>
+      ))}
+    </div>
   );
 }

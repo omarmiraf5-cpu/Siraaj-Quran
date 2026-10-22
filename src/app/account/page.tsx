@@ -8,7 +8,6 @@ import { sessionUser } from "@/lib/supabase/sessionUser";
 import { SUPPORT_EMAIL } from "@/lib/site";
 import { StudentPinForm } from "@/components/StudentPinForm";
 import { WeeklyEmailsSwitch } from "@/components/WeeklyEmailsSwitch";
-import { LoadingNote } from "@/components/portal-ui";
 import { labels, phrase } from "@/lib/i18n/phrases";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -50,6 +49,17 @@ export default function AccountPage() {
 
   useEffect(() => {
     const load = async () => {
+      try {
+        const raw = localStorage.getItem("demo_user");
+        const demoOnly = !!raw && !document.cookie.includes("auth-token");
+        if (demoOnly) {
+          const d = JSON.parse(raw!);
+          if (d?.role) {
+            setDemo({ role: d.role, name: d.name ?? d.full_name ?? ROLE_LABEL[d.role as Info["role"]] });
+            return;
+          }
+        }
+      } catch { /* private mode — fall through to the session */ }
       const user = await sessionUser(supabase);
       if (!user) {
         // The sample portal signs people in without a real account.
@@ -129,7 +139,20 @@ export default function AccountPage() {
 
   return (
     <Shell back={role ? `/${role}` : "/login"}>
-      {!info && !demo && !error && <LoadingNote rows={2}>{tr("Loading your account…")}</LoadingNote>}
+      {!info && !demo && !error && (
+        <div className="space-y-3" aria-busy="true">
+          <section className="card-quiet p-5 space-y-3">
+            <div className="skeleton w-24" />
+            <div className="skeleton w-2/3" />
+            <div className="skeleton w-1/2" />
+          </section>
+          <section className="card-quiet p-5 space-y-3">
+            <div className="skeleton w-full" />
+            <div className="skeleton w-full" />
+            <div className="skeleton w-4/5" />
+          </section>
+        </div>
+      )}
       {error && !info && !demo && <p className="text-[13px] text-red-700 dark:text-red-300 text-center py-10">{error}</p>}
 
       {(info || demo) && (
@@ -157,8 +180,9 @@ export default function AccountPage() {
             </button>
           </section>
 
-          <section className="card-quiet p-5 space-y-3">
-            <p className="eyebrow text-red-700 dark:text-red-300">{tr("Delete account")}</p>
+          <section className="mt-10 rounded-2xl border border-dashed border-red-300/90 bg-red-50/50 dark:border-red-900/60 dark:bg-red-950/20 p-5 space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-red-800/80 dark:text-red-300/80">{tr("Danger zone")}</p>
+            <p className="text-[12.5px] text-ink-muted leading-relaxed">{tr("Delete account")}</p>
 
             {demo && (
               <p className="text-[13px] text-ink-muted leading-relaxed">

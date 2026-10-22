@@ -10,7 +10,7 @@ import {
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import { MessageThread } from "@/components/MessageThread";
-import { LoadingNote, EmptyNote } from "@/components/portal-ui";
+import { EmptyNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -47,13 +47,20 @@ export default function TeacherMessagesPage() {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [local, setLocal] = useState<ThreadMessage[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const load = async () => {
-      const user = await sessionUser(supabase);
+      let user: { id: string } | null = null;
+      try {
+        const demoOnly = !!localStorage.getItem("demo_user") && !document.cookie.includes("auth-token");
+        if (!demoOnly) user = await sessionUser(supabase);
+      } catch {
+        user = null;
+      }
 
       if (!user) {
         setIsDemo(true);
@@ -202,11 +209,23 @@ export default function TeacherMessagesPage() {
       const bt = b.last ? Date.parse(b.last.created_at) : 0;
       return bt - at;
     });
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? rows.filter(({ student: s }) => s.name.toLowerCase().includes(needle)) : rows;
 
   if (!ready) {
     return (
-      <div className="max-w-7xl mx-auto pt-10">
-        <LoadingNote>{t("teacher.messages.loadingMessages")}</LoadingNote>
+      <div className="max-w-7xl mx-auto space-y-4 pt-2" aria-busy="true">
+        <div className="card-quiet p-5 space-y-3">
+          <div className="skeleton w-24" />
+          <div className="skeleton w-1/2" />
+          <div className="skeleton w-full" />
+        </div>
+        <div className="card-quiet p-3 space-y-3">
+          <div className="skeleton w-full h-11 rounded-xl" />
+          <div className="skeleton w-full" />
+          <div className="skeleton w-5/6" />
+          <div className="skeleton w-2/3" />
+        </div>
       </div>
     );
   }
@@ -226,8 +245,22 @@ export default function TeacherMessagesPage() {
       ) : (
         <div className="grid lg:grid-cols-[280px_1fr] gap-4 items-start">
           {/* Student list */}
-          <div className="card-quiet divide-y divide-surface-border overflow-hidden lg:max-h-[34rem] lg:overflow-y-auto">
-            {rows.map(({ student: s, last }) => {
+          <div className="card-quiet overflow-hidden lg:max-h-[34rem] lg:overflow-y-auto">
+            <div className="p-3 border-b border-surface-border">
+              <label htmlFor="student-search" className="sr-only">{t("teacher.messages.search")}</label>
+              <input
+                id="student-search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("teacher.messages.search")}
+                className="w-full min-h-11 rounded-xl border border-surface-border bg-surface-bg px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30"
+              />
+            </div>
+            <div className="divide-y divide-surface-border">
+            {shown.length === 0 ? (
+              <p className="px-3 py-6 text-center text-[13px] text-ink-muted">{t("teacher.messages.noMatch")}</p>
+            ) : null}
+            {shown.map(({ student: s, last }) => {
               const active = s.id === selected;
               const isAbsence = last?.kind === "absence";
               return (
@@ -258,6 +291,7 @@ export default function TeacherMessagesPage() {
                 </button>
               );
             })}
+            </div>
           </div>
 
           {/* Thread */}

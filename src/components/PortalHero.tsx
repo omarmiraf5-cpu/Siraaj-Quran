@@ -1,16 +1,17 @@
-// The navy hero the teacher dashboard opens with, extracted so the parent and
-// student portals open the same way. Before this, each portal had its own
-// idea of a page header — a plain sans heading here, a teal gradient there —
-// and switching portals felt like switching products.
+// The navy hero every adult portal opens with. Greeting, the date, and the
+// numbers that matter sit on one deep panel so a home doesn't open as a
+// plain heading over a stack of boxes. Facts may carry a tone (green is
+// good, amber needs a look, red is a problem) without bringing back the
+// geometric pattern.
 
 import { isValidElement } from "react";
 
-/** A banner fact's colour. Warm ones carry meaning (green is good, amber needs a look, red is a problem); the rest are just to tell the facts apart. */
+/** A banner fact's colour. Warm ones carry meaning; the rest tell facts apart. */
 export type HeroTone = "plain" | "sky" | "teal" | "violet" | "green" | "amber" | "red" | "gold";
 export type HeroFact = React.ReactNode | { text: React.ReactNode; tone: HeroTone };
 
 const CHIP: Record<HeroTone, string> = {
-  plain: "bg-white/10 text-white/80",
+  plain: "bg-white/12 text-white/90",
   sky: "bg-sky-300/15 text-sky-100",
   teal: "bg-teal-300/15 text-teal-100",
   violet: "bg-violet-300/15 text-violet-100",
@@ -19,8 +20,6 @@ const CHIP: Record<HeroTone, string> = {
   red: "bg-red-400/25 text-red-100",
   gold: "bg-brand-gold/25 text-brand-gold-light",
 };
-// Facts without a tone of their own: the first plain, then a few cool colours.
-const BY_POSITION: HeroTone[] = ["plain", "sky", "teal", "violet"];
 
 function isToned(m: HeroFact): m is { text: React.ReactNode; tone: HeroTone } {
   return typeof m === "object" && m !== null && !isValidElement(m) && !Array.isArray(m) && "tone" in m && "text" in m;
@@ -36,55 +35,60 @@ export function PortalHero({
 }: {
   eyebrow: string;
   title: string;
-  /** Short facts under the title, joined with gold separators. */
+  /** Short facts under the title, each drawn as its own chip. */
   meta?: HeroFact[];
-  /** Key numbers, large in gold under the title: "7 total · 7 active". */
-  stats?: Array<{ value: React.ReactNode; label: string }>;
+  /** Key figures drawn inside the hero, not only in the cards below. */
+  stats?: { value: React.ReactNode; label: string }[];
   actions?: React.ReactNode;
   children?: React.ReactNode;
 }) {
+  const chips = (meta ?? []).filter((m) => {
+    if (m == null || m === "") return false;
+    if (isToned(m)) return m.text != null && m.text !== "";
+    return true;
+  });
   return (
-    <header className="gradient-navy rounded-[18px] px-7 py-6 relative overflow-hidden">
-      <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <header className="hero-frame gradient-navy relative overflow-hidden rounded-[24px] px-5 py-5 sm:px-7 sm:py-6 text-white">
+      <div className="hero-sheen pointer-events-none absolute inset-0" />
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="eyebrow text-white/45">{eyebrow}</p>
-          <h1 className="page-title text-white text-3xl mt-1.5">{title}</h1>
-          {meta && meta.length > 0 && (
-            <p className="flex flex-wrap items-center gap-1.5 mt-3">
-              {meta.map((m, i) => {
+          <p className="eyebrow text-brand-gold-light">{eyebrow}</p>
+          <h1 className="page-title text-white text-[2rem] sm:text-4xl mt-1 leading-[1.05]">{title}</h1>
+          {chips.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {chips.map((m, i) => {
                 const toned = isToned(m);
-                const tone = toned ? m.tone : BY_POSITION[i % BY_POSITION.length];
                 return (
-                  <span key={i} className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-medium leading-tight ${CHIP[tone]}`}>
+                  <span key={i} className={`hero-chip ${toned ? CHIP[m.tone] : ""}`}>
                     {toned ? m.text : m}
                   </span>
                 );
               })}
-            </p>
-          )}
-          {stats && stats.length > 0 && (
-            <dl className="flex flex-wrap gap-x-7 gap-y-3 mt-4">
-              {stats.map((x) => (
-                <div key={x.label}>
-                  <dt className="sr-only">{x.label}</dt>
-                  <dd className="text-[26px] font-bold leading-none tabular-nums text-brand-gold">{x.value}</dd>
-                  <dd className="text-[11.5px] text-white/60 mt-1">{x.label}</dd>
-                </div>
-              ))}
-            </dl>
+            </div>
           )}
         </div>
-        {actions && <div className="flex flex-wrap gap-2.5 flex-shrink-0">{actions}</div>}
+        {actions && <div className="flex flex-wrap gap-2 flex-shrink-0">{actions}</div>}
       </div>
+      {stats && stats.length > 0 && (
+        <div className="relative mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {stats.map((s) => (
+            <div key={s.label} className="hero-stat min-w-0">
+              <p className="font-display text-[1.65rem] font-semibold leading-none tabular-nums text-white">
+                <bdi dir="ltr">{s.value}</bdi>
+              </p>
+              <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-brand-gold-light break-words">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
       {children}
     </header>
   );
 }
 
-/** The gold pill's look, for a hero action that's a button rather than a link. */
+/** The amber pill's look, for a hero action that's a button rather than a link. */
 export const HERO_GOLD =
-  "inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition";
+  "btn btn-amber rounded-full px-4 text-[13px]";
 
 /** Gold pill — the primary action in a hero. */
 export function HeroButtonPrimary({
@@ -97,10 +101,7 @@ export function HeroButtonPrimary({
   children: React.ReactNode;
 }) {
   return (
-    <a
-      href={href}
-      className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition"
-    >
+    <a href={href} className="btn btn-amber rounded-full px-4 text-[13px]">
       {icon}
       {children}
     </a>
@@ -118,10 +119,7 @@ export function HeroButtonGhost({
   children: React.ReactNode;
 }) {
   return (
-    <a
-      href={href}
-      className="inline-flex items-center gap-2 rounded-full border border-white/25 px-4 py-2.5 text-[13px] font-semibold text-white/85 hover:bg-white/10 active:scale-[.98] transition"
-    >
+    <a href={href} className="btn hero-ghost rounded-full px-4 text-[13px]">
       {icon}
       {children}
     </a>
