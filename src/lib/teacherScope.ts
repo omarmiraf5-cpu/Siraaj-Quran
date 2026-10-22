@@ -1,5 +1,7 @@
 import type { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { gradeLabel } from "@/lib/grades";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
 import { loadCampuses } from "@/lib/schoolStructure";
 
 type Db = ReturnType<typeof createClient>;
@@ -23,7 +25,12 @@ export async function myHalaqaStudents(supabase: Db): Promise<Map<string, string
 export interface MyHalaqa {
   id: string;
   label: string;
+  /** The halaqa's own name as the office typed it — "Hifd · Ustadh Omar", say. */
+  name: string;
   studentIds: string[];
+  /** In a school kept in grades: the grade it's for, and its campus's name. */
+  grade?: number | null;
+  campus?: string | null;
 }
 
 /**
@@ -32,10 +39,52 @@ export interface MyHalaqa {
  * time. Empty for a teacher with no halaqa yet; null when nobody is signed in.
  */
 export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await sessionUser(supabase);
   if (!user) return null;
+  // Everything in one round of requests side by side: their school (and
+  // whether it keeps grades), the halaqas they lead and share, each with its
+  // children. Asked step by step instead, as below, that was four round
+  // trips one after another before a teacher's dashboard could show.
+  const COLS = "id, name, grade, campus_id, school_id, class_enrollments(student_id)";
+  type Row = { id: string; name: string; grade?: number; campus_id?: string | null; school_id: string; class_enrollments?: { student_id: string }[] };
+  const [meRes, leadRes, shareRes, campuses] = await Promise.all([
+    supabase.from("profiles").select("school_id, schools!profiles_school_id_fkey(organised_by_grade)").eq("id", user.id).maybeSingle(),
+    supabase.from("classes").select(COLS).eq("teacher_id", user.id),
+    supabase.from("class_teachers").select(`class_id, classes(${COLS})`).eq("teacher_id", user.id),
+    loadCampuses(supabase),
+  ]);
+  // A database from before the grades update can't answer this in one go.
+  if (meRes.error || leadRes.error || shareRes.error) return myHalaqasStepByStep(supabase, user.id);
+  const me = meRes.data as { school_id: string | null; schools: { organised_by_grade?: boolean } | { organised_by_grade?: boolean }[] | null } | null;
+  if (!me?.school_id) return null;
+  const schoolRow = Array.isArray(me.schools) ? me.schools[0] : me.schools;
+  const graded = schoolRow?.organised_by_grade === true;
+  const rows: Row[] = [
+    ...((leadRes.data ?? []) as unknown as Row[]),
+    ...((shareRes.data ?? []) as unknown as Array<{ classes: Row | Row[] | null }>).flatMap((x) => (Array.isArray(x.classes) ? x.classes : x.classes ? [x.classes] : [])),
+  ];
+  const groups = new Map<string, MyHalaqa>();
+  for (const h of rows) {
+    // Their halaqas at the school they're in now.
+    if (h.school_id !== me.school_id || groups.has(h.id)) continue;
+    const label = graded
+      ? [isProgramHalaqa(h.name) ? null : gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
+      : h.name;
+    groups.set(h.id, {
+      id: h.id,
+      label,
+      name: h.name,
+      studentIds: [...new Set((h.class_enrollments ?? []).map((e) => e.student_id))],
+      grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
+      campus: graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null,
+    });
+  }
+  return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+}
+
+/** The same, a step at a time — for a database that can't do it in one. */
+async function myHalaqasStepByStep(supabase: Db, userId: string): Promise<MyHalaqa[] | null> {
+  const user = { id: userId };
   const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
   if (!me?.school_id) return null;
   // Before the grades update there's no such column: a Qur'an school.
@@ -57,18 +106,20 @@ export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
     supabase.from("class_enrollments").select("class_id, student_id").in("class_id", ids),
     graded ? loadCampuses(supabase) : Promise.resolve([]),
   ]);
-  const where = new Map(
-    ((halaqas ?? []) as Array<{ id: string; name: string; grade?: number; campus_id?: string | null; school_id: string }>)
-      .filter((h) => h.school_id === me.school_id)
-      .map((h) => [
-        h.id,
-        graded
-          ? [gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
-          : h.name,
-      ])
-  );
   const groups = new Map<string, MyHalaqa>();
-  for (const [id, label] of where) groups.set(id, { id, label, studentIds: [] });
+  for (const h of (halaqas ?? []) as Array<{ id: string; name: string; grade?: number; campus_id?: string | null; school_id: string }>) {
+    if (h.school_id !== me.school_id) continue;
+    const campus = graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null;
+    groups.set(h.id, {
+      id: h.id,
+      name: h.name,
+      // A Hifd program isn't for one grade, whatever grade it's stored under.
+      label: graded ? [isProgramHalaqa(h.name) ? null : gradeLabel(h.grade as number), campus, h.name].filter(Boolean).join(" · ") : h.name,
+      studentIds: [],
+      grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
+      campus,
+    });
+  }
   for (const e of enrolments ?? []) {
     const g = groups.get(e.class_id as string);
     if (g && !g.studentIds.includes(e.student_id as string)) g.studentIds.push(e.student_id as string);
@@ -80,4 +131,24 @@ export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
 export function narrowToMine<T extends { id: string; halaqa: string }>(students: T[], mine: Map<string, string> | null): T[] {
   if (!mine) return students;
   return students.filter((s) => mine.has(s.id)).map((s) => ({ ...s, halaqa: mine.get(s.id)! }));
+}
+
+/**
+ * A halaqa's label without what the teacher already knows: their own name,
+ * and the campus when all their halaqas are at the same one. "Grade 3 · Al
+ * Faruq · Ustadh Omar Abdullahi" reads as "Grade 3" to Ustadh Omar, while a
+ * halaqa he shares with someone else keeps that teacher's name. Never empty:
+ * a label that would be is left whole.
+ */
+export function shortHalaqaLabel(h: MyHalaqa, all: MyHalaqa[], myName: string | null): string {
+  const norm = (x: string) => x.toLocaleLowerCase().replace(/^(ustadh|ustadha|ustaz|ustadhah|sheikh|shaykh|mr\.?|mrs\.?|ms\.?)\s+/i, "").trim();
+  const me = myName ? norm(myName) : null;
+  const campuses = new Set(all.map((x) => x.campus ?? ""));
+  const oneCampus = campuses.size <= 1;
+  const parts = h.label.split(" · ").filter((p) => {
+    if (oneCampus && h.campus && p === h.campus) return false;
+    if (me && norm(p) === me) return false;
+    return true;
+  });
+  return parts.length ? parts.join(" · ") : h.label;
 }

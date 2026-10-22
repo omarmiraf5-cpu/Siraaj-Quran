@@ -11,11 +11,13 @@ import {
   type AttendanceStatus,
 } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { StudentRecord } from "@/components/StudentRecord";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron, HalaqaTitle } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { GRADES, gradeLabel } from "@/lib/grades";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
 import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
 import { allRows } from "@/lib/rosterExport";
 import { addDays } from "@/lib/planDates";
@@ -80,13 +82,12 @@ export default function StudentAttendancePage() {
   const [halaqaFilter, setHalaqaFilter] = useState("");
   const [search, setSearch] = useState("");
   const [openHalaqa, setOpenHalaqa] = useState<string | null>(null);
+  const [record, setRecord] = useState<{ id: string; name: string; place: string } | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user) {
         // The sample school.
         setIsDemo(true);
@@ -168,7 +169,7 @@ export default function StudentAttendancePage() {
   const campusName = (id: string | null) => campuses.find((c) => c.id === id)?.name ?? null;
   const halaqaById = useMemo(() => new Map(halaqas.map((h) => [h.id, h])), [halaqas]);
   const halaqaLabel = (h: Halaqa, withGrade = true) =>
-    [withGrade && graded && h.grade !== null ? gradeLabel(h.grade) : null, campusName(h.campusId), h.name].filter(Boolean).join(" · ");
+    [withGrade && graded && h.grade !== null && !isProgramHalaqa(h.name) ? gradeLabel(h.grade) : null, campusName(h.campusId), h.name].filter(Boolean).join(" · ");
   const placeOf = (s: Student, withGrade = true) => {
     const h = s.halaqaId ? halaqaById.get(s.halaqaId) : undefined;
     return h
@@ -262,7 +263,7 @@ export default function StudentAttendancePage() {
       <PortalHero
         eyebrow={tr("Registers")}
         title={t("nav.studentAttendance")}
-        meta={[formatDay(day, language), tr("{count} student|{count} students", { count: shown.length }), unmarked > 0 ? tr("{count} not marked", { count: unmarked }) : tr("everyone marked")]}
+        meta={[formatDay(day, language), tr("{count} student|{count} students", { count: shown.length }), unmarked > 0 ? { text: tr("{count} not marked", { count: unmarked }), tone: "amber" as const } : { text: tr("everyone marked"), tone: "green" as const }]}
       />
 
       <div className="flex flex-wrap items-center gap-2" data-section="filters">
@@ -302,7 +303,7 @@ export default function StudentAttendancePage() {
       {/* The day */}
       <div className="flex items-center justify-between gap-3">
         <button type="button" onClick={() => setDay(addDays(day, -1))} aria-label={tr("Previous day")} className="w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink">
-          <span className="inline-block rtl:-scale-x-100">‹</span>
+          ‹
         </button>
         <div className="text-center">
           <p className="font-display text-lg font-bold text-ink leading-tight">{formatDay(day, language)}</p>
@@ -321,15 +322,15 @@ export default function StudentAttendancePage() {
           )}
         </div>
         <button type="button" onClick={() => setDay(addDays(day, 1))} disabled={day >= today} aria-label={tr("Next day")} className="w-9 h-9 rounded-full border border-surface-border bg-surface-card text-ink disabled:opacity-30">
-          <span className="inline-block rtl:-scale-x-100">›</span>
+          ›
         </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3" data-section="day-tally">
-        <StatTile value={dayTally.present} label={t("common.present")} sub={tr("on time")} />
-        <StatTile value={dayTally.late} label={t("common.late")} sub={tr("came late")} />
-        <StatTile value={dayTally.absent} label={t("common.absent")} sub={tr("not in")} />
-        <StatTile value={dayTally.excused} label={t("common.excused")} sub={tr("with a reason")} />
+        <StatTile status="present" value={dayTally.present} label={t("common.present")} sub={tr("on time")} />
+        <StatTile status="late" value={dayTally.late} label={t("common.late")} sub={tr("came late")} />
+        <StatTile status="absent" value={dayTally.absent} label={t("common.absent")} sub={tr("not in")} />
+        <StatTile status="excused" value={dayTally.excused} label={t("common.excused")} sub={tr("with a reason")} />
         <StatTile value={unmarked} label={tr("Not marked")} sub={tr("no register yet")} />
       </div>
 
@@ -349,16 +350,17 @@ export default function StudentAttendancePage() {
                     type="button"
                     onClick={() => setOpenHalaqa(isOpen ? null : g.key)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className={`group w-full flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">{g.label}</p>
-                      <p className="text-[11px] text-ink-muted truncate">
+                      <p className="text-[13px]"><HalaqaTitle label={g.label} onDark={isOpen} /></p>
+                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                         {g.teacher && g.teacher !== g.label.split(" · ").pop() ? `${g.teacher} · ` : ""}
                         {tr("{count} students", { count: g.kids.length })}
                       </p>
                     </div>
-                    <div className="text-end flex-shrink-0 text-[12px]">
+                    {/* Under the halaqa's name on a phone, beside it on wider screens. */}
+                    <div className={`order-last sm:order-none basis-full sm:basis-auto text-start sm:text-end sm:flex-shrink-0 text-[12px] ${isOpen ? "[&_span]:!text-white/90" : ""}`}>
                       {done === 0 ? (
                         <span className="font-semibold text-amber-700 dark:text-amber-300">{tr("Not taken")}</span>
                       ) : (
@@ -371,9 +373,7 @@ export default function StudentAttendancePage() {
                         </span>
                       )}
                     </div>
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
-                    </span>
+                    <RowChevron open={isOpen} />
                   </button>
                   {isOpen && (
                     <ul className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm px-3 py-1 divide-y divide-surface-border">
@@ -381,7 +381,7 @@ export default function StudentAttendancePage() {
                         const st = markOn.get(`${k.id}|${day}`);
                         return (
                           <li key={k.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
-                            <span className="text-ink truncate">{k.name}</span>
+                            <button type="button" onClick={() => setRecord({ id: k.id, name: k.name, place: g.label })} className="text-start text-ink font-medium hover:underline [overflow-wrap:anywhere]">{k.name}</button>
                             <span className={`font-semibold flex-shrink-0 ${STATUS_TEXT[st ?? "none"]}`}>{st ? t(`common.${st}`) : tr("Not marked")}</span>
                           </li>
                         );
@@ -419,7 +419,7 @@ export default function StudentAttendancePage() {
               {tr("Over {periodLabel}, most absences first. Attendance % counts present and late out of the days marked (excused days aren't counted).", { periodLabel })}
             </p>
             <div className="overflow-x-auto -mx-1">
-              <table className="w-full text-[13px]" data-section="by-student">
+              <table className="w-full min-w-[30rem] text-[13px]" data-section="by-student">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide text-ink-muted">
                     <th className="text-start font-semibold py-2 px-1">{tr("Student")}</th>
@@ -439,8 +439,8 @@ export default function StudentAttendancePage() {
                             {initials(s.name)}
                           </span>
                           <span className="min-w-0">
-                            <span className="block font-semibold text-ink truncate">{s.name}</span>
-                            <span className="block text-[11px] text-ink-muted truncate">{placeOf(s)}</span>
+                            <button type="button" onClick={() => setRecord({ id: s.id, name: s.name, place: placeOf(s) })} className="block text-start font-semibold text-ink hover:underline [overflow-wrap:anywhere]">{s.name}</button>
+                            <span className="block text-[11px] text-ink-muted [overflow-wrap:anywhere]">{placeOf(s)}</span>
                           </span>
                         </span>
                       </td>
@@ -463,6 +463,7 @@ export default function StudentAttendancePage() {
         )}
       </SectionCard>
       {isDemo && <p className="text-[11px] text-ink-muted">{tr("Sample school data.")}</p>}
+      {record && <StudentRecord studentId={record.id} name={record.name} halaqa={record.place} onClose={() => setRecord(null)} />}
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { SURAHS as QURAN, getSurahById } from "@/data/mushaf-index";
+import { useEffect, useState, useRef } from "react";
+import { SURAHS as QURAN, getSurahById, PAGE_STARTS, TOTAL_PAGES, HIZB_STARTS } from "@/data/mushaf-index";
+import { RUB_STARTS } from "@/data/hizb-quarters";
 import { JUZ_STARTS, getJuzRange } from "@/data/juz-index";
 import {
   DEMO_ASSIGNMENTS,
@@ -20,6 +21,7 @@ import {
   PORTION_BLURB,
   DAILY_RATING_ORDER,
   DAILY_RATING_LABELS,
+  DAILY_RATING_STYLES,
   withOverride,
   recitationLogFor,
   type AssignmentOverride,
@@ -28,11 +30,12 @@ import {
 import type { DemoStudent } from "@/data/demo";
 import type { HifzPortion, QuranicAssignment, DailyRating } from "@/hooks/useQuranicAssignments";
 import { Mushaf } from "@/components/Mushaf";
+import { SurahPicker } from "@/components/SurahPicker";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote } from "@/components/portal-ui";
+import { SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
-import { IconBook, IconArrow } from "@/components/icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import {
   demoConfirmSurah,
@@ -43,11 +46,17 @@ import {
 } from "@/lib/demoPlans";
 import { statusForRating } from "@/lib/planLessons";
 import { useLanguage } from "@/components/LanguageProvider";
-import { myHalaqaStudents } from "@/lib/teacherScope";
+import { myHalaqas, shortHalaqaLabel } from "@/lib/teacherScope";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
+import { loadSchoolShape } from "@/lib/schoolStructure";
+import { gradeLabel } from "@/lib/grades";
+import { readCache, writeCache } from "@/lib/pageCache";
+import { ColorTile } from "@/components/gem-icons";
 import {
   DIRECTION_HINT,
   DIRECTION_LABEL,
   formatPosition,
+  pageLabel,
   nextPosition,
   pageOfPosition,
   walk,
@@ -56,9 +65,15 @@ import {
 import { phrase } from "@/lib/i18n/phrases";
 import { translateAlert } from "@/lib/yearlyPlan";
 
+// Whether this school is kept in grades, from the last visit: the grade
+// buttons show at once rather than after the school is asked again.
+const GRADED_KEY = "assignments-graded";
+
 interface Student {
   id: string;
   full_name: string;
+  /** In a school kept in grades; null otherwise. */
+  grade?: number | null;
 }
 
 // Mirrors AutoAssignSummary in @/lib/autoAssignments — duplicated rather
@@ -104,6 +119,18 @@ const OVERRIDES_KEY = "demo_assignment_overrides";
 // Read by the parent portal too, for the same reason.
 const LOG_KEY = "demo_recitation_log_v1";
 
+type ExtraKind = "homework" | "recent" | "old";
+interface ExtraPiece {
+  kind: ExtraKind;
+  surah: string;
+  start: string;
+  end: string;
+  due: string;
+}
+const EXTRA_KINDS: ExtraKind[] = ["homework", "recent", "old"];
+// The student picker's "everyone in this group" choice.
+const EVERYONE = "__everyone__";
+
 export default function QuranAssignmentsPage() {
   const supabase = createClient();
   const { language, tr } = useLanguage();
@@ -113,6 +140,14 @@ export default function QuranAssignmentsPage() {
   // in the assignments list below — the dropdown above only needs id/name.
   const [roster, setRoster] = useState<DemoStudent[]>([]);
   const [selectedStudent, setSelectedStudent] = useState("");
+  // In a school kept in grades, the student list is narrowed to one grade
+  // at a time ("" is every grade), so a teacher with several grades isn't
+  // scrolling one long list of names.
+  const [graded, setGraded] = useState(() => readCache<boolean>(GRADED_KEY) ?? false);
+  const [gradeFilter, setGradeFilter] = useState("");
+  // The teacher's program halaqas (Hifd) — offered as chips beside the
+  // grades, since a Hifd class spans grades. A chip key of "p:<id>".
+  const [programs, setPrograms] = useState<{ id: string; name: string; studentIds: string[] }[]>([]);
   const [portion, setPortion] = useState<HifzPortion>("new");
   const [selectedSurah, setSelectedSurah] = useState("");
   const [ayahStart, setAyahStart] = useState("");
@@ -125,6 +160,52 @@ export default function QuranAssignmentsPage() {
   // Quick-fill for muraajah: pick a starting juz' and how many to cover,
   // and "Apply" fills in the surah/ayah fields above rather than requiring
   // the teacher to look up boundaries by hand.
+  // Or the range given as mushaf pages (Madinah mushaf, 1 to 604).
+  const [pageFrom, setPageFrom] = useState("");
+  const [pageTo, setPageTo] = useState("");
+  // What the preview follows: the surah and ayahs, or a page number being typed.
+  const [previewBy, setPreviewBy] = useState<"surah" | "page">("surah");
+  // A wide screen shows the preview beside the form; a phone opens it as a panel.
+  const [wide, setWide] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  // On a phone the preview opens by itself a moment after the ayahs or pages
+  // are set by hand (not when they're filled in for you) — each keystroke
+  // pushes it back, so it never jumps up mid-number.
+  const autoPreview = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queuePreview = (now = false) => {
+    if (wide) return;
+    if (autoPreview.current) clearTimeout(autoPreview.current);
+    autoPreview.current = setTimeout(() => setPreviewOpen(true), now ? 250 : 1100);
+  };
+  const cancelPreview = () => {
+    if (autoPreview.current) clearTimeout(autoPreview.current);
+    autoPreview.current = null;
+  };
+  useEffect(() => cancelPreview, []);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => {
+      setWide(mq.matches);
+      if (mq.matches) setPreviewOpen(false);
+    };
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  // The page behind the panel doesn't scroll along with it.
+  useEffect(() => {
+    if (!previewOpen) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = before;
+    };
+  }, [previewOpen]);
+  // Or in hizbs (a juz' is two), for muraajah.
+  const [hizbStart, setHizbStart] = useState("1");
+  const [hizbQuarter, setHizbQuarter] = useState("1"); // which quarter of that hizb it starts at
+  const [hizbCount, setHizbCount] = useState("1");
+  const [hizbUnit, setHizbUnit] = useState<"hizb" | "quarter">("hizb");
   const [juzStart, setJuzStart] = useState("1");
   const [juzCount, setJuzCount] = useState("1");
   // Which way this student works through the mushaf, and where they had
@@ -135,6 +216,8 @@ export default function QuranAssignmentsPage() {
   const [direction, setDirection] = useState<Direction>("hifz");
   const [directionKnown, setDirectionKnown] = useState(false);
   const [lastPosition, setLastPosition] = useState<{ surah: number; ayah: number } | null>(null);
+  // Whose position that is — so a lesson is never filled in from the child before.
+  const [positionFor, setPositionFor] = useState<string | null>(null);
   const [lastSurahName, setLastSurahName] = useState<string>("");
   const [nextCount, setNextCount] = useState("10");
   const [savingDirection, setSavingDirection] = useState(false);
@@ -145,13 +228,34 @@ export default function QuranAssignmentsPage() {
   // up, not picking them in the form below. Keyed by student_id; a
   // student missing from this map has no active anchored plan, not just
   // one still loading.
+  // Where each of the teacher's students sits — "Grade 3 · North · Halaqa A" — for grouping the list.
+  const [placeOf, setPlaceOf] = useState<Record<string, string>>({});
+  const [listGroup, setListGroup] = useState("");
   const [planSummaries, setPlanSummaries] = useState<Record<string, PlanSummaryDto>>({});
   const [confirmingSurah, setConfirmingSurah] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
+  // Whether it's for today's lesson, in class, or homework to do at home.
+  const [forWhen, setForWhen] = useState<"today" | "homework" | "not_recited">("today");
+  // More work given in the same save: homework, a recent revision, an old
+  // revision — each with its own surah, ayahs and due date. A hifz day is
+  // usually the three portions together.
+  const [extras, setExtras] = useState<ExtraPiece[]>([]);
+  const updateExtra = (kind: ExtraKind, patch: Partial<ExtraPiece>) =>
+    setExtras((list) => list.map((x) => (x.kind === kind ? { ...x, ...patch } : x)));
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  // What was just saved, for the "Saved · Undo" bar at the bottom.
+  const [saved, setSaved] = useState<{ ids: string[]; text: string; undoable: boolean; demo: boolean } | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The ways of filling in a range other than surah and ayah (pages, juz',
+  // hizb), and the note — tucked away for the new lesson until asked for.
+  const [moreWays, setMoreWays] = useState(false);
+  const [showNote, setShowNote] = useState(false);
+  // Whether the new lesson was filled in for them from where the child stopped.
+  const [autoFilledFor, setAutoFilledFor] = useState<string | null>(null);
   const [isDemo, setIsDemo] = useState(false);
   const [demoCreated, setDemoCreated] = useState<QuranicAssignment[]>([]);
   // The sample school's plan lessons, and which students have a plan — a
@@ -164,10 +268,32 @@ export default function QuranAssignmentsPage() {
   const [listReady, setListReady] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Which student's pieces of work are showing: a tap on a name opens that child's day.
+  const [openStudent, setOpenStudent] = useState<string | null>(null);
   const [draftRating, setDraftRating] = useState<DailyRating | null>(null);
   const [draftNotes, setDraftNotes] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [log, setLog] = useState<RecitationLogEntry[]>([]);
+
+  const isGradedSchool = async (userId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("school_id, schools!profiles_school_id_fkey(organised_by_grade)")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!error) {
+        const row = data as { schools: { organised_by_grade?: boolean } | { organised_by_grade?: boolean }[] | null } | null;
+        const school = Array.isArray(row?.schools) ? row?.schools[0] : row?.schools;
+        return school?.organised_by_grade === true;
+      }
+      // A database from before the grades update can't answer in one go.
+      const { data: me } = await supabase.from("profiles").select("school_id").eq("id", userId).maybeSingle();
+      return (await loadSchoolShape(supabase, me?.school_id ?? null)).graded;
+    } catch {
+      return false;
+    }
+  };
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -175,7 +301,7 @@ export default function QuranAssignmentsPage() {
         let user: { id: string } | null = null;
         try {
           const demoOnly = !!localStorage.getItem("demo_user") && !document.cookie.includes("auth-token");
-          if (!demoOnly) user = (await supabase.auth.getUser()).data.user;
+          if (!demoOnly) user = await sessionUser(supabase);
         } catch {
           user = null;
         }
@@ -193,9 +319,13 @@ export default function QuranAssignmentsPage() {
             readDemoStore(DEMO_STUDENT_OVERRIDES_KEY, {})
           );
           setRoster(fullRoster);
+          setPlaceOf(Object.fromEntries(fullRoster.filter((s) => s.halaqa).map((s) => [s.id, s.halaqa])));
           setStudents(
-            fullRoster.filter((s) => s.active !== false).map((s) => ({ id: s.id, full_name: s.name }))
+            fullRoster
+              .filter((s) => s.active !== false)
+              .map((s) => ({ id: s.id, full_name: s.name, grade: s.grade ?? null }))
           );
+          setGraded(fullRoster.some((s) => s.grade !== undefined));
           setDemoCreated(loadDemoCreated());
           setOverrides(readDemoStore(OVERRIDES_KEY, {}));
           setLog(readDemoStore(LOG_KEY, []));
@@ -205,15 +335,40 @@ export default function QuranAssignmentsPage() {
           return;
         }
 
-        const [{ data: allStudentData, error: studentError }, mine] = await Promise.all([
-          supabase.from("students").select("id, full_name").order("full_name"),
+        const [{ data: allStudentData, error: studentError }, myGroups, schoolGraded] = await Promise.all([
+          supabase.from("students").select("id, full_name, grade").order("full_name"),
           // Just the children of their own halaqas:
           // every one of a school's hundreds is synced below otherwise.
-          myHalaqaStudents(supabase),
+          myHalaqas(supabase),
+          // Whether this school is kept in grades — a Qur'an school's
+          // students carry an age grade too, which means nothing there.
+          // Asked alongside the students, so the grade buttons arrive
+          // with the list rather than a few seconds after it.
+          isGradedSchool(user.id),
         ]);
+        setGraded(schoolGraded);
+        writeCache(GRADED_KEY, schoolGraded);
+        // The same map myHalaqaStudents gives: each child and where they sit.
+        let mine: Map<string, string> | null = null;
+        if (myGroups) {
+          mine = new Map();
+          for (const h of myGroups) for (const id of h.studentIds) if (!mine.has(id)) mine.set(id, h.label);
+          // Known by the halaqa's own name ("Hifd · Ustadh Omar"), not its
+          // label, whose last part is often the teacher.
+          const { data: meRow } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+          const progs = myGroups
+            // In a school kept in grades, only the Hifd classes (the grades
+            // have chips already); in a Qur'an school, every halaqa.
+            .filter((h) => isProgramHalaqa(h.name) || !schoolGraded)
+            .map((h) => ({ id: h.id, name: shortHalaqaLabel(h, myGroups, meRow?.full_name ?? null), studentIds: h.studentIds }));
+          setPrograms(progs);
+          // A teacher whose halaqa is a Hifd class opens on it: that's who they set work for.
+          if (progs.length === 1) setGradeFilter((now) => now || `p:${progs[0].id}`);
+        }
         if (studentError) throw studentError;
         const studentData = mine ? (allStudentData ?? []).filter((s) => mine.has(s.id)) : allStudentData;
 
+        if (mine) setPlaceOf(Object.fromEntries(mine));
         if (studentData) {
           setStudents(studentData);
           // Real students weren't fed into `roster` at all here, which
@@ -275,6 +430,7 @@ export default function QuranAssignmentsPage() {
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
+    cancelPreview();
     e.preventDefault();
     setError(null);
     setSuccess(false);
@@ -303,37 +459,78 @@ export default function QuranAssignmentsPage() {
 
       const surahEndValue = parseInt(spansSurah && endSurah ? endSurah : selectedSurah);
 
+      // The lesson and anything given with it: each extra is checked, and the
+      // lesson is due today when others go with it.
+      const extraLabel: Record<ExtraKind, string> = { homework: phrase("homework"), recent: phrase("recent revision"), old: phrase("old revision") };
+      for (const x of extras) {
+        const need = [!x.surah && phrase("surah"), !x.start && phrase("starting ayah"), !x.end && phrase("ending ayah"), !x.due && phrase("due date")].filter(Boolean) as string[];
+        if (need.length > 0) throw new Error(phrase("Still needed for the {piece}: {fields}.", { piece: extraLabel[x.kind], fields: need.join(", ") }));
+        if (parseInt(x.end) < parseInt(x.start)) throw new Error(phrase("The {piece}'s last ayah comes before its first.", { piece: extraLabel[x.kind] }));
+      }
+      const lessonDue = extras.length > 0 ? dueDate || todayStr : dueDate;
+      const extraPieces = extras.map((x) => ({
+        portion: x.kind === "homework" ? portion : (x.kind as "recent" | "old"),
+        surah: parseInt(x.surah),
+        ayah_start: parseInt(x.start),
+        surah_end: parseInt(x.surah),
+        ayah_end: parseInt(x.end),
+        due_date: x.due,
+      }));
+
+      const createdIds: string[] = [];
+      // One child, or everyone under the chip that's on.
+      const inGroup = students.filter((s) => inFilter(s, gradeFilter));
+      const everyone = selectedStudent === EVERYONE && !gradeFilter.startsWith("p:");
+      const targets = everyone ? inGroup.map((s) => s.id) : [selectedStudent];
+      if (targets.length === 0) throw new Error(phrase("There's no one in this group yet."));
+      const groupName = chips.find((c) => c.key === gradeFilter)?.label ?? "";
+      const who = everyone
+        ? phrase("everyone in {group} ({count})", { group: groupName, count: targets.length })
+        : students.find((s) => s.id === selectedStudent)?.full_name ?? "";
+      const surahName = getSurahById(parseInt(selectedSurah))?.englishName ?? "";
+      const endName = surahEndValue !== parseInt(selectedSurah) ? `${getSurahById(surahEndValue)?.englishName ?? ""} ` : "";
+      const savedText =
+        phrase("{what} for {who}", { what: `${surahName} ${ayahStart}–${endName}${ayahEnd}`, who }) +
+        (extras.length ? ` ${phrase("+ {count} more", { count: extras.length })}` : "");
+      const undoable = forWhen !== "not_recited";
+
+      for (const sid of targets) {
       if (isDemo) {
         // No real session to write against — /api/quranic-assignments would
         // correctly 401 here, since it has no school or teacher row to
         // attach the row to. Simulate the write in the browser instead of
         // dead-ending the one workflow a prospective school would want to
         // try first.
-        const created: QuranicAssignment = {
+        const demoRow = (piece: { rating?: DailyRating; portion?: typeof portion; surah: number; ayah_start: number; surah_end: number; ayah_end: number; due_date: string }): QuranicAssignment => ({
           id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          student_id: selectedStudent,
+          student_id: sid,
           teacher_id: "t1",
-          surah: parseInt(selectedSurah),
-          ayah_start: parseInt(ayahStart),
-          surah_end: surahEndValue,
-          ayah_end: parseInt(ayahEnd),
-          portion,
+          surah: piece.surah,
+          ayah_start: piece.ayah_start,
+          surah_end: piece.surah_end,
+          ayah_end: piece.ayah_end,
+          portion: piece.portion ?? portion,
           // A plain date, not a full timestamp — formatDay elsewhere expects
           // "YYYY-MM-DD" the way every other assigned_at in the app is
           // shaped, and DEMO_TODAY rather than the real clock so a newly
           // created row reads as "today" on the same fixed timeline the
           // rest of the demo data uses instead of the real calendar date.
           assigned_at: DEMO_TODAY,
-          due_date: dueDate || null,
+          due_date: piece.due_date || null,
           status: "assigned",
           memorization_level: 0,
-          daily_rating: null,
+          daily_rating: piece.rating ?? null,
           teacher_notes: notes || null,
           student_notes: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        };
-        const next = [created, ...demoCreated];
+        });
+        const created = [
+          demoRow({ rating: forWhen === "not_recited" ? "not_recited" : undefined, surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue }),
+          ...extraPieces.map(demoRow),
+        ];
+        createdIds.push(...created.map((c) => c.id));
+        const next = [...created, ...demoCreated];
         setDemoCreated(next);
         try {
           localStorage.setItem(DEMO_CREATED_KEY, JSON.stringify(next));
@@ -342,24 +539,44 @@ export default function QuranAssignmentsPage() {
           // for this visit, it just won't survive a refresh.
         }
       } else {
-        const res = await fetch("/api/quranic-assignments", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            student_id: selectedStudent,
-            surah: parseInt(selectedSurah),
-            ayah_start: parseInt(ayahStart),
-            surah_end: surahEndValue,
-            ayah_end: parseInt(ayahEnd),
-            portion,
-            due_date: dueDate || null,
-            teacher_notes: notes || null,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || phrase("Failed to create assignment"));
+        const pieces = [
+          { portion, surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue },
+          ...extraPieces,
+        ];
+        for (const [i, piece] of pieces.entries()) {
+          const res = await fetch("/api/quranic-assignments", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              student_id: sid,
+              ...piece,
+              portion: piece.portion ?? portion,
+              due_date: piece.due_date || null,
+              teacher_notes: notes || null,
+            }),
+          });
+          const made = res.ok ? await res.json().catch(() => null) : null;
+          if (made?.id) createdIds.push(made.id);
+          if (res.ok && i === 0 && forWhen === "not_recited") {
+            // Set, but the child didn't recite it: graded straight away, so it is heard another day.
+            if (made?.id) {
+              await fetch(`/api/quranic-assignments/${made.id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ daily_rating: "not_recited", teacher_notes: notes || null }),
+              });
+              await fetch("/api/recitation-log", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ student_id: sid, ...piece, rating: "not_recited", notes: notes || null }),
+              });
+            }
+          }
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            // If the lesson went in and the homework didn't, say so rather than leave a half-done save.
+            throw new Error(i > 0 ? phrase("The first piece was saved, but another wasn't: {error}", { error: data.error || phrase("Failed to create assignment") }) : data.error || phrase("Failed to create assignment"));
+          }
         }
 
         // Re-read so the new assignment appears in the list below straight
@@ -374,9 +591,26 @@ export default function QuranAssignmentsPage() {
           .order("assigned_at", { ascending: false });
         setRealAssignments((refreshed ?? []) as QuranicAssignment[]);
       }
+      }
+
+      // Going through a class: with a group chosen, the next child in it is
+      // picked straight away, so the teacher moves down the list.
+      const order = inGroup.map((s) => s.id);
+      const after = everyone ? null : order[order.indexOf(selectedStudent) + 1] ?? null;
+      const nextName = after ? students.find((s) => s.id === after)?.full_name : null;
 
       setSuccess(true);
-      setSelectedStudent("");
+      setSaved({
+        ids: createdIds,
+        text: savedText + (nextName ? ` · ${phrase("Next: {name}", { name: nextName })}` : ""),
+        undoable,
+        demo: isDemo,
+      });
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setSaved(null), 10000);
+      setShowNote(false);
+      setAutoFilledFor(null);
+      setSelectedStudent(gradeFilter && after ? after : "");
       setPortion("new");
       setSelectedSurah("");
       setAyahStart("");
@@ -384,6 +618,8 @@ export default function QuranAssignmentsPage() {
       setSpansSurah(false);
       setEndSurah("");
       setDueDate("");
+      setForWhen("today");
+      setExtras([]);
       setNotes("");
 
       setTimeout(() => setSuccess(false), 3000);
@@ -407,7 +643,7 @@ export default function QuranAssignmentsPage() {
   const endSurahOptions = QURAN.filter((s) => s.id >= (parseInt(selectedSurah) || 0));
 
   useEffect(() => {
-    if (!selectedStudent || isDemo) {
+    if (!selectedStudent || selectedStudent === EVERYONE || isDemo) {
       setLastPosition(null);
       setDirectionKnown(false);
       return;
@@ -426,6 +662,7 @@ export default function QuranAssignmentsPage() {
         }
         if (b?.position) {
           setLastPosition(b.position);
+          setPositionFor(selectedStudent);
           setLastSurahName(getSurahById(b.position.surah)?.englishName ?? b.surah_name ?? "");
         }
       })
@@ -504,7 +741,7 @@ export default function QuranAssignmentsPage() {
 
   const saveDirection = async (next: Direction) => {
     setDirection(next);
-    if (!selectedStudent || isDemo) return;
+    if (!selectedStudent || selectedStudent === EVERYONE || isDemo) return;
     setSavingDirection(true);
     try {
       await fetch("/api/quran-position", {
@@ -534,6 +771,7 @@ export default function QuranAssignmentsPage() {
     const first = blocks[0];
     const last = blocks[blocks.length - 1];
     setSelectedSurah(String(first.from_surah));
+    setPreviewBy("surah");
     setAyahStart(String(first.from_ayah));
     setAyahEnd(String(last.to_ayah));
     // A portion that runs into a second surah has to say so, or the end
@@ -547,9 +785,86 @@ export default function QuranAssignmentsPage() {
     }
   };
 
+  // The new lesson fills itself in from where the child stopped, as soon as
+  // that's known — the teacher only changes it when today is different.
+  useEffect(() => {
+    if (portion !== "new" || !selectedStudent || positionFor !== selectedStudent || !resumeAt || selectedSurah || ayahStart) return;
+    applyNextPortion();
+    setAutoFilledFor(selectedStudent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portion, selectedStudent, positionFor, lastPosition, direction]);
+
+  // Pages to ayahs: from the first ayah of the first page to the last ayah
+  // of the last (the Madinah mushaf never splits an ayah across pages).
+  const applyPageRange = () => {
+    const first = Math.max(1, Math.min(TOTAL_PAGES, parseInt(pageFrom) || 0));
+    if (!parseInt(pageFrom)) return;
+    const last = Math.max(first, Math.min(TOTAL_PAGES, parseInt(pageTo) || first));
+    const [s1, a1] = PAGE_STARTS[first - 1];
+    let sEnd = 114;
+    let aEnd = getSurahById(114)?.ayahs ?? 6;
+    if (last < TOTAL_PAGES) {
+      const [ns, na] = PAGE_STARTS[last];
+      if (na > 1) {
+        sEnd = ns;
+        aEnd = na - 1;
+      } else {
+        sEnd = ns - 1;
+        aEnd = getSurahById(sEnd)?.ayahs ?? 1;
+      }
+    }
+    setPageFrom(String(first));
+    setPageTo(String(last));
+    setSelectedSurah(String(s1));
+    setPreviewBy("surah");
+    setAyahStart(String(a1));
+    setAyahEnd(String(aEnd));
+    if (sEnd !== s1) {
+      setSpansSurah(true);
+      setEndSurah(String(sEnd));
+    } else {
+      setSpansSurah(false);
+      setEndSurah("");
+    }
+  };
+
+  // Hizbs or quarters of a hizb to ayahs: from where the first begins to
+  // the ayah before the one after the last.
+  const applyHizbRange = () => {
+    const hizb = Math.max(1, Math.min(60, parseInt(hizbStart) || 1));
+    const startQuarter = (hizb - 1) * 4 + (Math.max(1, Math.min(4, parseInt(hizbQuarter) || 1)) - 1);
+    const wanted = Math.max(1, parseInt(hizbCount) || 1) * (hizbUnit === "hizb" ? 4 : 1);
+    const next = Math.min(240, startQuarter + wanted); // index of the quarter after the last one asked for
+    const [s1, a1] = RUB_STARTS[startQuarter];
+    let sEnd = 114;
+    let aEnd = getSurahById(114)?.ayahs ?? 6;
+    if (next < 240) {
+      const [ns, na] = RUB_STARTS[next];
+      if (na > 1) {
+        sEnd = ns;
+        aEnd = na - 1;
+      } else {
+        sEnd = ns - 1;
+        aEnd = getSurahById(sEnd)?.ayahs ?? 1;
+      }
+    }
+    setSelectedSurah(String(s1));
+    setPreviewBy("surah");
+    setAyahStart(String(a1));
+    setAyahEnd(String(aEnd));
+    if (sEnd !== s1) {
+      setSpansSurah(true);
+      setEndSurah(String(sEnd));
+    } else {
+      setSpansSurah(false);
+      setEndSurah("");
+    }
+  };
+
   const applyJuzRange = () => {
     const range = getJuzRange(parseInt(juzStart), parseInt(juzCount) || 1, (s) => getSurahById(s)?.ayahs ?? 0);
     setSelectedSurah(String(range.surahStart));
+    setPreviewBy("surah");
     setAyahStart(String(range.ayahStart));
     setAyahEnd(String(range.ayahEnd));
     if (range.surahEnd !== range.surahStart) {
@@ -561,7 +876,133 @@ export default function QuranAssignmentsPage() {
     }
   };
 
-  const canPreview = selectedSurah && ayahStart && ayahEnd;
+  // Today on this device (the sample school keeps its own fixed day).
+  const todayStr = isDemo ? DEMO_TODAY : new Date().toLocaleDateString("en-CA");
+  const dayAfter = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString("en-CA");
+  };
+  // Takes back what was just saved.
+  const undoSaved = async () => {
+    if (!saved) return;
+    setUndoing(true);
+    try {
+      if (saved.demo) {
+        const next = demoCreated.filter((a) => !saved.ids.includes(a.id));
+        setDemoCreated(next);
+        try {
+          localStorage.setItem(DEMO_CREATED_KEY, JSON.stringify(next));
+        } catch {
+          /* Still gone for this visit. */
+        }
+      } else {
+        for (const id of saved.ids) {
+          const res = await fetch(`/api/quranic-assignments/${id}`, { method: "DELETE" });
+          if (!res.ok) {
+            const b = await res.json().catch(() => ({}));
+            throw new Error(b.error ?? "Couldn't undo that. Please try again.");
+          }
+        }
+        setRealAssignments((list) => list.filter((a) => !saved.ids.includes(a.id)));
+      }
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      setSaved(null);
+    } catch (e) {
+      setSaved((now) => (now ? { ...now, text: e instanceof Error ? tr(e.message) : tr("Couldn't undo that. Please try again."), undoable: false } : now));
+    } finally {
+      setUndoing(false);
+    }
+  };
+
+  // Opened from My halaqas on one child (?student=…) or a whole halaqa
+  // (?group=…): pick them once the list has arrived.
+  const linked = useRef(false);
+  useEffect(() => {
+    if (linked.current || students.length === 0) return;
+    const q = new URLSearchParams(window.location.search);
+    const sid = q.get("student");
+    const group = q.get("group");
+    if (!sid && !group) {
+      linked.current = true;
+      return;
+    }
+    if (group?.startsWith("p:") && programs.length === 0) return; // still arriving
+    linked.current = true;
+    if (group) setGradeFilter(group);
+    if (sid && students.some((s) => s.id === sid)) {
+      setSelectedStudent(sid);
+      if (!group) {
+        // Under the chip that holds them: their Hifd class if they're in one.
+        const prog = programs.find((p) => p.studentIds.includes(sid));
+        setGradeFilter(prog ? `p:${prog.id}` : "");
+      }
+    }
+  }, [students, programs]);
+
+  // Adds a second piece to the same save — homework starts where today's lesson ends.
+  const addExtra = (k: ExtraKind) => {
+    const next = parseInt(ayahEnd) + 1;
+    const sameSurah = selectedSurah && !spansSurah;
+    setExtras((list) =>
+      list.some((x) => x.kind === k)
+        ? list
+        : [
+            ...list,
+            {
+              kind: k,
+              surah: k === "homework" ? selectedSurah : "",
+              start: k === "homework" && sameSurah && next && next <= (selectedSurahData?.ayahs ?? 0) ? String(next) : "",
+              end: "",
+              due: k === "homework" ? dayAfter(todayStr) : todayStr,
+            },
+          ]
+    );
+    if (!dueDate) setDueDate(todayStr);
+    setForWhen("today");
+  };
+  // Today's lesson and homework go together: with today's lesson on, Homework
+  // adds a homework piece beside it (and a second tap takes it away) rather
+  // than turning today's lesson off.
+  const tapWhen = (w: "today" | "homework" | "not_recited") => {
+    if (w === "homework" && forWhen === "today") {
+      if (extras.some((x) => x.kind === "homework")) setExtras((l) => l.filter((x) => x.kind !== "homework"));
+      else addExtra("homework");
+      return;
+    }
+    if (w !== "today") setExtras((l) => l.filter((x) => x.kind !== "homework"));
+    chooseWhen(w);
+  };
+  const chooseWhen = (w: "today" | "homework" | "not_recited") => {
+    setForWhen(w);
+    // Today's lesson is due today; homework is due a day on, unless a later day is already chosen.
+    setDueDate(w !== "homework" ? todayStr : dueDate && dueDate > todayStr ? dueDate : dayAfter(todayStr));
+  };
+  // What a set piece of work is: today's, homework, or overdue — read off its dates.
+  const whenOf = (a: QuranicAssignment): { text: string; tone: string } | null => {
+    if (a.status === "completed") return null;
+    const set = (a.assigned_at ?? "").slice(0, 10);
+    if (a.due_date) {
+      if (a.due_date === todayStr) return { text: tr("Today"), tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200" };
+      if (a.due_date > todayStr) return { text: tr("Homework"), tone: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200" };
+      return { text: tr("Overdue"), tone: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200" };
+    }
+    if (set === todayStr) return { text: tr("Today"), tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200" };
+    return set ? { text: tr("Set {day}", { day: formatDay(set, language) }), tone: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-200" } : null;
+  };
+
+  // The preview opens the moment there's something to show: a surah picked
+  // (on its first page, or the start ayah's page once that's in) or a page
+  // number typed. The highlight waits for both ayahs.
+  const typedPage = parseInt(pageFrom);
+  const previewPage =
+    previewBy === "page" && typedPage >= 1 && typedPage <= TOTAL_PAGES
+      ? typedPage
+      : selectedSurah
+        ? pageOfPosition({ surah: parseInt(selectedSurah), ayah: parseInt(ayahStart) || 1 })
+        : null;
+  const canPreview = previewPage !== null;
+  const canHighlight = Boolean(selectedSurah && ayahStart && ayahEnd);
 
   // Newest first, so an assignment just created shows at the top of the list
   // below rather than getting lost among the rest. The sample assignments
@@ -579,29 +1020,51 @@ export default function QuranAssignmentsPage() {
       : realAssignments
   ).map((a) => withOverride(a, overrides));
 
+  // The list, one group per halaqa (with its grade, where the school has them),
+  // so a teacher with several halaqas grades one at a time.
+  const NO_PLACE = "\u0000";
+  const groupNames = [...new Set(allAssignments.map((a) => placeOf[a.student_id] ?? NO_PLACE))].sort((x, y) =>
+    x === NO_PLACE ? 1 : y === NO_PLACE ? -1 : x.localeCompare(y, undefined, { numeric: true })
+  );
+  const groups = groupNames
+    .filter((g) => !listGroup || g === listGroup)
+    .map((g) => ({ name: g, items: allAssignments.filter((a) => (placeOf[a.student_id] ?? NO_PLACE) === g) }));
+
+  // One entry per child in a group, in name order, with their pieces of work.
+  const studentsOf = (items: QuranicAssignment[]) => {
+    const byStudent = new Map<string, QuranicAssignment[]>();
+    for (const a of items) byStudent.set(a.student_id, [...(byStudent.get(a.student_id) ?? []), a]);
+    return [...byStudent.entries()]
+      .map(([id, list]) => ({ id, name: studentName(id, roster), items: list }))
+      .sort((x, y) => x.name.localeCompare(y.name));
+  };
+
   const startEditing = (a: QuranicAssignment) => {
     setEditingId(a.id === editingId ? null : a.id);
     setDraftRating(a.daily_rating);
     setDraftNotes(a.teacher_notes ?? "");
   };
 
-  const saveEdit = async (a: QuranicAssignment) => {
+  // `quick` grades a piece straight from its row — "Did not recite" — leaving its note alone.
+  const saveEdit = async (a: QuranicAssignment, quick?: DailyRating) => {
+    const rating = quick !== undefined ? quick : draftRating;
+    const noteText = quick !== undefined ? a.teacher_notes ?? null : draftNotes.trim() || null;
     setSavingEdit(true);
     const patch: AssignmentOverride = {
-      daily_rating: draftRating,
-      teacher_notes: draftNotes.trim() || null,
+      daily_rating: rating,
+      teacher_notes: noteText,
     };
     try {
       if (isDemo && isDemoPlanLesson(a.id)) {
         // A plan lesson: rated the way the live site rates one, which also
         // carries it through to the student's yearly plan.
-        demoGradePlanLesson(a.id, draftRating, draftNotes.trim() || null);
+        demoGradePlanLesson(a.id, rating, noteText);
         refreshDemoPlans();
       } else if (isDemo) {
         // The rating settles the status too, the same as on the live site.
         const next = {
           ...overrides,
-          [a.id]: { ...overrides[a.id], ...patch, status: statusForRating(draftRating) },
+          [a.id]: { ...overrides[a.id], ...patch, status: statusForRating(rating) },
         };
         setOverrides(next);
         writeDemoStore(OVERRIDES_KEY, next);
@@ -610,7 +1073,7 @@ export default function QuranAssignmentsPage() {
         // A rating turns into today's entry in the history log — replacing
         // today's entry for this same portion if one already exists, rather
         // than piling up duplicates from re-grading the same session.
-        if (draftRating) {
+        if (rating) {
           const withoutToday = log.filter(
             (e) => !(e.student_id === a.student_id && e.portion === a.portion && e.date === DEMO_TODAY)
           );
@@ -624,8 +1087,8 @@ export default function QuranAssignmentsPage() {
               ayah_start: a.ayah_start,
               surah_end: a.surah_end,
               ayah_end: a.ayah_end,
-              rating: draftRating,
-              notes: draftNotes.trim() || null,
+              rating: rating,
+              notes: noteText,
               date: DEMO_TODAY,
             },
           ];
@@ -638,7 +1101,7 @@ export default function QuranAssignmentsPage() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify(patch),
         });
-        if (draftRating) {
+        if (rating) {
           await fetch("/api/recitation-log", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -649,8 +1112,8 @@ export default function QuranAssignmentsPage() {
               ayah_start: a.ayah_start,
               surah_end: a.surah_end,
               ayah_end: a.ayah_end,
-              rating: draftRating,
-              notes: draftNotes.trim() || null,
+              rating: rating,
+              notes: noteText,
             }),
           });
         }
@@ -665,6 +1128,68 @@ export default function QuranAssignmentsPage() {
       setSavingEdit(false);
     }
   };
+
+  // The grades among this teacher's students, lowest first — the chips
+  // above the student list, shown only when there's more than one.
+  const grades = graded
+    ? [...new Set(students.map((s) => s.grade).filter(isGradeNum))].sort((x, y) => x - y)
+    : [];
+  // Whether a student falls under the chip that's on: a grade, or a Hifd class.
+  const inFilter = (s: Student, key: string) => {
+    if (!key) return true;
+    if (key.startsWith("p:")) return programs.find((p) => `p:${p.id}` === key)?.studentIds.includes(s.id) ?? false;
+    return String(s.grade) === key;
+  };
+  const chips = [
+    ...grades.map((g) => ({ key: String(g), label: gradeLabel(g), count: students.filter((s) => s.grade === g).length })),
+    ...programs.map((p) => ({ key: `p:${p.id}`, label: p.name, count: students.filter((s) => p.studentIds.includes(s.id)).length })),
+  ];
+
+  // The preview's heading and the mushaf itself — shown beside the form on a
+  // wide screen, and in a full-screen panel on a phone.
+  const previewTitle = (
+    <>
+                {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
+                  ? `${selectedSurahData?.englishName ?? phrase("Preview")} – ${endSurahData.englishName}`
+                  : previewBy === "page" && previewPage
+                    ? tr("Page {page}", { page: previewPage })
+                    : (selectedSurahData?.englishName ?? tr("Preview"))}
+                {!(previewBy === "page" && !canHighlight) && selectedSurahData && (
+                  <span className="ms-3 font-arabic text-ink-muted font-normal">
+                    <bdi dir="rtl">
+                      {selectedSurahData.name}
+                      {spansSurah && endSurahData && endSurahData.id !== selectedSurahData.id ? ` – ${endSurahData.name}` : ""}
+                    </bdi>
+                  </span>
+                )}
+              </>
+  );
+  const previewMushaf = canPreview ? (
+    <Mushaf
+                // Open on the page the lesson starts on, and move there
+                // again when the starting ayah changes. Mushaf only reads
+                // initialPage when it mounts, so the key remounts it; the
+                // end ayah only redraws the highlight, which needs no jump.
+                key={`p${previewPage}`}
+                initialPage={previewPage ?? 1}
+                highlightedRange={
+                  canHighlight
+                    ? {
+                        surah: parseInt(selectedSurah),
+                        start: parseInt(ayahStart),
+                        surahEnd: effectiveEndSurahId,
+                        end: parseInt(ayahEnd),
+                      }
+                    : undefined
+                }
+              />
+  ) : null;
+  const previewRange =
+    canHighlight && selectedSurahData
+      ? `${selectedSurahData.englishName} ${ayahStart}–${spansSurah && endSurahData && endSurahData.id !== selectedSurahData.id ? `${endSurahData.englishName} ` : ""}${ayahEnd}`
+      : previewBy === "page" && previewPage
+        ? tr("Page {page}", { page: previewPage })
+        : selectedSurahData?.englishName ?? "";
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-4 pt-2">
@@ -718,15 +1243,17 @@ export default function QuranAssignmentsPage() {
               <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
                 {tr("Once {studentLabel} has recited all of {surah_name} to you, confirm it here. The next lesson won't be scheduled until you do.", { studentLabel, surah_name })}
               </p>
+              {/* Under the words rather than beside them, so on a phone the
+                  message keeps the card's full width. */}
+              <button
+                type="button"
+                onClick={() => confirmSurah(studentId, surah)}
+                disabled={confirmingSurah === key}
+                className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 border border-amber-600/40 rounded-full px-3 py-1.5"
+              >
+                {confirmingSurah === key ? tr("Saving…") : tr("Confirm tested")}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => confirmSurah(studentId, surah)}
-              disabled={confirmingSurah === key}
-              className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 flex-shrink-0 mt-0.5 whitespace-nowrap"
-            >
-              {confirmingSurah === key ? tr("Saving…") : tr("Confirm tested")}
-            </button>
           </div>
         );
       })}
@@ -738,18 +1265,104 @@ export default function QuranAssignmentsPage() {
             <label className="block text-sm font-semibold text-ink mb-2">
               {tr("Student *")}
             </label>
+            {chips.length > 1 && (
+              <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label={tr("Grade")}>
+                {[{ key: "", label: tr("All"), count: students.length }, ...chips].map((chip) => {
+                  const on = gradeFilter === chip.key;
+                  return (
+                    <button
+                      key={chip.key || "all"}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        setGradeFilter(chip.key);
+                        const picked = students.find((s) => s.id === selectedStudent);
+                        if (selectedStudent === EVERYONE || (chip.key && picked && !inFilter(picked, chip.key))) setSelectedStudent("");
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold border transition ${
+                        on
+                          ? "bg-brand-navy text-white border-brand-navy dark:bg-brand-gold dark:text-[#20180a] dark:border-brand-gold"
+                          : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                      }`}
+                    >
+                      {chip.label}
+                      <span className={on ? "opacity-70" : "text-ink-muted"}>{chip.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <select
               value={selectedStudent}
               onChange={(e) => setSelectedStudent(e.target.value)}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
               <option value="">{tr("Select a student")}</option>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name}
+              {/* Only for a grade, where the class learns the same surah together —
+                  never a Hifd class, where every child is at their own place. */}
+              {gradeFilter && !gradeFilter.startsWith("p:") && students.some((s) => inFilter(s, gradeFilter)) && (
+                <option value={EVERYONE}>
+                  {tr("Everyone in {group} ({count})", {
+                    group: chips.find((c) => c.key === gradeFilter)?.label ?? "",
+                    count: students.filter((s) => inFilter(s, gradeFilter)).length,
+                  })}
                 </option>
-              ))}
+              )}
+              {grades.length > 1 && !gradeFilter
+                ? [...grades, null].map((g) => {
+                    const inGrade = students.filter((s) => (g === null ? !isGradeNum(s.grade) : s.grade === g));
+                    return inGrade.length === 0 ? null : (
+                      <optgroup key={g ?? "none"} label={g === null ? tr("No grade") : gradeLabel(g)}>
+                        {inGrade.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.full_name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })
+                : students
+                    .filter((s) => inFilter(s, gradeFilter))
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.full_name}
+                      </option>
+                    ))}
             </select>
+            {/* Going down the class one child at a time. */}
+            {(() => {
+              if (!gradeFilter || !selectedStudent || selectedStudent === EVERYONE) return null;
+              const order = students.filter((s) => inFilter(s, gradeFilter));
+              const at = order.findIndex((s) => s.id === selectedStudent);
+              const next = order[at + 1];
+              return (
+                <div className="flex items-center justify-between gap-3 mt-2 text-[12.5px]">
+                  <span className="text-ink-muted tabular-nums">
+                    {tr("{n} of {count} in {group}", { n: at + 1, count: order.length, group: chips.find((c) => c.key === gradeFilter)?.label ?? "" })}
+                  </span>
+                  {next && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStudent(next.id);
+                        setSelectedSurah("");
+                        setAyahStart("");
+                        setAyahEnd("");
+                        setSpansSurah(false);
+                        setEndSurah("");
+                        setAutoFilledFor(null);
+                      }}
+                      className="font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                    >
+                      {tr("Skip to {name} →", { name: next.full_name })}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+            {selectedStudent === EVERYONE && (
+              <p className="text-[12px] text-ink-muted mt-2">{tr("The same work goes to every child in this group, each as their own assignment.")}</p>
+            )}
           </div>
 
           {/* Which of the three daily portions. Defaults to the new lesson,
@@ -804,7 +1417,7 @@ export default function QuranAssignmentsPage() {
               than a quantity of revision, it is "carry on from where they
               stopped". Which way that goes is the student's own setting,
               shared with the yearly plan. */}
-          {portion === "new" && !isDemo && selectedStudent && (
+          {portion === "new" && !isDemo && selectedStudent && selectedStudent !== EVERYONE && (
             <div className="rounded-2xl border border-brand-navy/25 bg-brand-navy/[.04] dark:bg-white/[.03] p-3.5">
               <p className="text-sm font-semibold text-ink mb-2">{tr("Continue from their last lesson")}</p>
 
@@ -845,7 +1458,10 @@ export default function QuranAssignmentsPage() {
                     </label>
                     <button
                       type="button"
-                      onClick={applyNextPortion}
+                      onClick={() => {
+                        applyNextPortion();
+                        queuePreview(true);
+                      }}
                       disabled={!resumeAt}
                       className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] disabled:opacity-40 transition-all"
                     >
@@ -865,6 +1481,11 @@ export default function QuranAssignmentsPage() {
                       tr(" · nothing follows it in this direction")
                     )}
                   </p>
+                  {autoFilledFor === selectedStudent && selectedSurah && (
+                    <p className="text-[12px] font-semibold text-emerald-700 dark:text-emerald-400 mt-1.5">
+                      {tr("✓ Today's lesson is filled in below from where they stopped. Change it if today is different.")}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-[11px] text-ink-muted mt-3">
@@ -874,6 +1495,72 @@ export default function QuranAssignmentsPage() {
                 </p>
               )}
             </div>
+          )}
+
+          {/* By mushaf pages, for any portion: "page 562 to 563" instead of
+              working out which surah and ayahs those are. For the new lesson
+              it waits behind a link: most days the surah and ayahs are
+              already filled in from where the child stopped. */}
+          {portion === "new" && !moreWays ? (
+            <button
+              type="button"
+              onClick={() => setMoreWays(true)}
+              className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+            >
+              {tr("+ Set by mushaf pages instead")}
+            </button>
+          ) : (
+          <div className="rounded-2xl border border-brand-navy/20 bg-brand-navy/5 dark:border-brand-gold/25 dark:bg-brand-gold/5 p-3.5">
+            <p className="text-sm font-semibold text-ink mb-2">{tr("Or set by pages")}</p>
+            <div className="flex items-end gap-2">
+              <label className="flex-1 min-w-0">
+                <span className="block text-[11px] text-ink-muted mb-1">{tr("From page")}</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={TOTAL_PAGES}
+                  value={pageFrom}
+                  onChange={(e) => {
+                    setPageFrom(e.target.value);
+                    queuePreview();
+                    setPreviewBy("page");
+                  }}
+                  placeholder="562"
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                />
+              </label>
+              <label className="flex-1 min-w-0">
+                <span className="block text-[11px] text-ink-muted mb-1">{tr("To page")}</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={TOTAL_PAGES}
+                  value={pageTo}
+                  onChange={(e) => {
+                    setPageTo(e.target.value);
+                    queuePreview();
+                    setPreviewBy("page");
+                  }}
+                  placeholder={pageFrom || "563"}
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                        applyPageRange();
+                        queuePreview(true);
+                      }}
+                disabled={!parseInt(pageFrom)}
+                className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] disabled:opacity-40 transition-all"
+              >
+                {tr("Apply")}
+              </button>
+            </div>
+            <p className="text-[11px] text-ink-muted mt-2">
+              {tr("Fills in the surah and ayahs below from the pages of the Madinah mushaf (1 to {total}). A page can start or end partway through a surah.", { total: TOTAL_PAGES })}
+            </p>
+          </div>
           )}
 
           {/* Muraajah is usually set as a quantity — a juz', two juz' —
@@ -912,7 +1599,10 @@ export default function QuranAssignmentsPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={applyJuzRange}
+                  onClick={() => {
+                        applyJuzRange();
+                        queuePreview(true);
+                      }}
                   className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] transition-all"
                 >
                   {tr("Apply")}
@@ -924,26 +1614,96 @@ export default function QuranAssignmentsPage() {
             </div>
           )}
 
+          {/* And in hizbs: half a juz', the other way muraajah is counted. */}
+          {portion !== "new" && (
+            <div className="rounded-2xl border border-teal-600/25 bg-teal-50/60 dark:bg-teal-950/20 p-3.5">
+              <p className="text-sm font-semibold text-ink mb-2">{tr("Or set by hizb or quarter")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="min-w-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Starting hizb")}</span>
+                  <select
+                    value={hizbStart}
+                    onChange={(e) => setHizbStart(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  >
+                    {HIZB_STARTS.map((_, i) => (
+                      <option key={i} value={i + 1}>
+                        {tr("Hizb {hizb} (Juz {juz})", { hizb: i + 1, juz: Math.floor(i / 2) + 1 })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="min-w-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Starting at")}</span>
+                  <select
+                    value={hizbQuarter}
+                    onChange={(e) => setHizbQuarter(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  >
+                    <option value="1">{tr("The start of the hizb")}</option>
+                    <option value="2">{tr("The 2nd quarter (¼ in)")}</option>
+                    <option value="3">{tr("The 3rd quarter (half way)")}</option>
+                    <option value="4">{tr("The 4th quarter (¾ in)")}</option>
+                  </select>
+                </label>
+              </div>
+              <div className="flex items-end gap-2 mt-2">
+                <label className="w-20 flex-shrink-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("How many")}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="240"
+                    value={hizbCount}
+                    onChange={(e) => setHizbCount(e.target.value)}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink text-center tabular-nums focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  />
+                </label>
+                <label className="flex-1 min-w-0">
+                  <span className="block text-[11px] text-ink-muted mb-1">{tr("Counted in")}</span>
+                  <select
+                    value={hizbUnit}
+                    onChange={(e) => setHizbUnit(e.target.value as "hizb" | "quarter")}
+                    className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
+                  >
+                    <option value="hizb">{tr("Hizbs")}</option>
+                    <option value="quarter">{tr("Quarters of a hizb")}</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                        applyHizbRange();
+                        queuePreview(true);
+                      }}
+                  className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-sm font-semibold hover:opacity-90 active:scale-[.98] transition-all"
+                >
+                  {tr("Apply")}
+                </button>
+              </div>
+              <p className="text-[11px] text-ink-muted mt-2">
+                {tr("Fills in the surah and ayahs below. A hizb is half a juz' and has four quarters.")}
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
               {tr("Surah *")}
             </label>
-            <select
+            {/* Type to find it — "mulk", "67", "الملك" — and the preview
+                opens on the surah straight away. */}
+            <SurahPicker
               value={selectedSurah}
-              onChange={(e) => {
-                setSelectedSurah(e.target.value);
+              onChange={(id) => {
+                setSelectedSurah(id);
                 setSpansSurah(false);
                 setEndSurah("");
+                setPreviewBy("surah");
+                // On a phone, the surah opens in the mushaf as soon as it's picked.
+                queuePreview(true);
               }}
-              className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
-            >
-              <option value="">{tr("Select a Surah")}</option>
-              {surahs.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {tr("{id}. {englishName} ({ayahs} Ayahs)", { id: s.id, englishName: s.englishName, ayahs: s.ayahs })}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -958,6 +1718,8 @@ export default function QuranAssignmentsPage() {
                 value={ayahStart}
                 onChange={(e) => {
                   setAyahStart(e.target.value);
+                  if (ayahEnd) queuePreview();
+                  setPreviewBy("surah");
                 }}
                 placeholder="1"
                 className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
@@ -974,6 +1736,7 @@ export default function QuranAssignmentsPage() {
                 value={ayahEnd}
                 onChange={(e) => {
                   setAyahEnd(e.target.value);
+                  if (e.target.value) queuePreview();
                 }}
                 placeholder={maxAyahsEnd.toString()}
                 className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
@@ -984,6 +1747,31 @@ export default function QuranAssignmentsPage() {
             <p className="text-xs text-ink-muted">
               {tr("This Surah has {maxAyahs} Ayahs", { maxAyahs })}
             </p>
+          )}
+          {selectedSurah && parseInt(ayahStart) > 0 && parseInt(ayahEnd) > 0 && effectiveEndSurahId > 0 && (
+            <p className="text-xs font-semibold text-brand-navy dark:text-brand-gold">
+              {pageLabel(
+                { surah: parseInt(selectedSurah), ayah: parseInt(ayahStart) },
+                { surah: effectiveEndSurahId, ayah: parseInt(ayahEnd) }
+              )}
+            </p>
+          )}
+
+          {/* On a phone the preview would sit below the whole form; this
+              opens it over the page instead, right where the ayahs are set. */}
+          {!wide && canPreview && (
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="w-full flex items-center gap-3 rounded-2xl border border-brand-navy/25 bg-brand-navy/[.05] dark:bg-white/[.04] px-4 py-3 text-start active:scale-[.99] transition"
+            >
+              <ColorTile name="rehal" size={34} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-semibold text-ink">{tr("See it in the mushaf")}</span>
+                <span className="block text-[12px] text-ink-muted truncate">{previewRange}</span>
+              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="text-ink-muted rtl:rotate-180"><path d="M9 18l6-6-6-6" /></svg>
+            </button>
           )}
 
           {/* Multiple surahs, manually: for a lesson or muraajah that
@@ -1013,7 +1801,7 @@ export default function QuranAssignmentsPage() {
                 >
                   {endSurahOptions.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {tr("{id}. {englishName} ({ayahs} Ayahs)", { id: s.id, englishName: s.englishName, ayahs: s.ayahs })}
+                      {tr("{id}. {englishName} ({ayahs} Ayahs)", { id: s.id, englishName: s.englishName, ayahs: s.ayahs })} · {s.name}
                     </option>
                   ))}
                 </select>
@@ -1032,17 +1820,98 @@ export default function QuranAssignmentsPage() {
             ))}
 
           <div>
+            <p className="text-sm font-semibold text-ink mb-2">{tr("This is for")}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {(["today", "homework", "not_recited"] as const).map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => tapWhen(w)}
+                  aria-pressed={forWhen === w || (w === "homework" && extras.some((x) => x.kind === "homework"))}
+                  className={`min-h-11 min-w-0 rounded-2xl border px-3 py-3 text-start transition ${
+                    forWhen === w || (w === "homework" && extras.some((x) => x.kind === "homework")) ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                  }`}
+                >
+                  <span className="block text-[13px] font-semibold leading-snug break-words">{w === "today" ? tr("Today's lesson") : w === "homework" ? tr("Homework") : DAILY_RATING_LABELS.not_recited}</span>
+                  <span className="block text-[12px] leading-snug mt-1 break-words opacity-80">{w === "today" ? tr("Done in class today") : w === "homework" ? tr("To do at home, by the due date") : tr("Set, but not recited today")}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label className="block text-sm font-semibold text-ink mb-2">
-              {tr("Due Date (optional)")}
+              {forWhen === "homework" ? tr("Due Date") : tr("Due Date (optional)")}
             </label>
             <input
               type="date"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(e) => {
+                setDueDate(e.target.value);
+                setForWhen(e.target.value && e.target.value > todayStr ? "homework" : "today");
+              }}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
 
+          {/* More work in the same save: homework, a recent revision, an old revision. */}
+          <div className="space-y-3">
+            {extras.map((x) => (
+              <div key={x.kind} className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-ink">
+                    {x.kind === "homework" ? tr("Homework") : x.kind === "recent" ? tr("Recent revision") : tr("Old revision")}
+                  </p>
+                  <button type="button" onClick={() => setExtras((l) => l.filter((y) => y.kind !== x.kind))} className="text-[12.5px] font-semibold text-ink-muted hover:text-ink">
+                    {tr("Remove")}
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Surah *")}</label>
+                  <SurahPicker value={x.surah} onChange={(id) => updateExtra(x.kind, { surah: id })} placeholder={tr("Choose…")} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah Start *")}</label>
+                    <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.start} onChange={(e) => updateExtra(x.kind, { start: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah End *")}</label>
+                    <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.end} onChange={(e) => updateExtra(x.kind, { end: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Due Date")} *</label>
+                  <input type="date" min={todayStr} value={x.due} onChange={(e) => updateExtra(x.kind, { due: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                </div>
+              </div>
+            ))}
+            {EXTRA_KINDS.some((k) => !extras.some((x) => x.kind === k)) && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="text-[12.5px] text-ink-muted">{tr("Also give:")}</span>
+                {EXTRA_KINDS.filter((k) => !extras.some((x) => x.kind === k) && !(k === "homework" && forWhen === "homework")).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => addExtra(k)}
+                    className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                  >
+                    {k === "homework" ? tr("+ Homework") : k === "recent" ? tr("+ Recent revision") : tr("+ Old revision")}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {!showNote && !notes ? (
+            <button
+              type="button"
+              onClick={() => setShowNote(true)}
+              className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+            >
+              {tr("+ Add a note for the student")}
+            </button>
+          ) : (
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
               {tr("Notes for student (optional)")}
@@ -1051,10 +1920,12 @@ export default function QuranAssignmentsPage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={tr("Add any instructions or tips...")}
-              rows={4}
+              rows={3}
+              autoFocus={showNote && !notes}
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition resize-none"
             />
           </div>
+          )}
 
           {error && (
             <div className="bg-red-50 dark:bg-red-950/25 border border-red-200 dark:border-red-800/40 rounded-2xl p-4">
@@ -1062,14 +1933,8 @@ export default function QuranAssignmentsPage() {
             </div>
           )}
 
-          {success && (
-            <div className="bg-green-50 dark:bg-green-950/25 border border-green-200 dark:border-green-800/40 rounded-2xl p-4">
-              <p className="text-sm text-green-700 dark:text-green-300">
-                {isDemo
-                  ? tr("Assignment added below — this preview saves in your browser only.")
-                  : tr("Assignment created.")}
-              </p>
-            </div>
+          {success && isDemo && (
+            <p className="text-[12px] text-ink-muted">{tr("Assignment added below — this preview saves in your browser only.")}</p>
           )}
 
           <button
@@ -1087,37 +1952,18 @@ export default function QuranAssignmentsPage() {
             setting it here rather than on paper, and a teacher shouldn't
             have to ask for it every time. It follows the fields live, so
             correcting an ayah number redraws it. */}
+        {wide && (
         <div className="lg:sticky lg:top-10 lg:self-start">
           {canPreview ? (
             <div className="card-quiet p-5 overflow-hidden">
-              <h2 className="page-title text-lg">
-                {spansSurah && endSurahData && endSurahData.id !== selectedSurahData?.id
-                  ? `${selectedSurahData?.englishName ?? phrase("Preview")} – ${endSurahData.englishName}`
-                  : (selectedSurahData?.englishName ?? tr("Preview"))}
-              </h2>
+              <h2 className="page-title text-lg">{previewTitle}</h2>
               <div className="gold-rule my-4" />
-              <Mushaf
-                // Open on the page the lesson starts on, and move there
-                // again when the starting ayah changes. Mushaf only reads
-                // initialPage when it mounts, so the key remounts it; the
-                // end ayah only redraws the highlight, which needs no jump.
-                key={`${selectedSurah}:${ayahStart}`}
-                initialPage={pageOfPosition({
-                  surah: parseInt(selectedSurah),
-                  ayah: parseInt(ayahStart) || 1,
-                })}
-                highlightedRange={{
-                  surah: parseInt(selectedSurah),
-                  start: parseInt(ayahStart),
-                  surahEnd: effectiveEndSurahId,
-                  end: parseInt(ayahEnd),
-                }}
-              />
+              {previewMushaf}
             </div>
           ) : (
             <div className="card-quiet card-feature p-8 text-center">
-              <span className="icon-tile mx-auto mb-4">
-                <IconBook size={19} />
+              <span className="mx-auto mb-4 inline-flex">
+                <ColorTile name="rehal" size={48} />
               </span>
               <h3 className="page-title text-lg mb-2">{tr("Mushaf preview")}</h3>
               <p className="text-[13px] text-ink-muted leading-relaxed max-w-xs mx-auto">
@@ -1126,6 +1972,7 @@ export default function QuranAssignmentsPage() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* What has already been set. Sample data until the school has its own
@@ -1154,8 +2001,58 @@ export default function QuranAssignmentsPage() {
         {listReady && !loadError && allAssignments.length === 0 && (
           <EmptyNote>{tr("No assignments yet — set the first one above.")}</EmptyNote>
         )}
+        {groupNames.length > 1 && (
+          <div role="group" aria-label={tr("Show")} className="flex flex-wrap gap-1.5 mb-3">
+            {[{ key: "", label: tr("All"), count: allAssignments.length }, ...groupNames.map((g) => ({
+              key: g,
+              label: g === NO_PLACE ? tr("Other students") : g,
+              count: allAssignments.filter((a) => (placeOf[a.student_id] ?? NO_PLACE) === g).length,
+            }))].map((chip) => (
+              <button
+                key={chip.key || "all"}
+                type="button"
+                onClick={() => setListGroup(chip.key)}
+                aria-pressed={listGroup === chip.key}
+                className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                  listGroup === chip.key ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                }`}
+              >
+                {chip.label} <span className="opacity-70 tabular-nums">{chip.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {groups.map((group) => (
+        <div key={group.name} className="mb-4 last:mb-0">
+          {groupNames.length > 1 && (
+            <p className="eyebrow px-1 pb-1.5">
+              {group.name === NO_PLACE ? tr("Other students") : group.name} · {group.items.length}
+            </p>
+          )}
         <ul className="divide-y divide-surface-border -my-1">
-          {allAssignments.map((a) => {
+          {studentsOf(group.items).map((st) => (
+            <li key={st.id}>
+              <button
+                type="button"
+                onClick={() => setOpenStudent(openStudent === st.id ? null : st.id)}
+                aria-expanded={openStudent === st.id}
+                className={`w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${openStudent === st.id ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
+              >
+                <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
+                  {initials(st.name)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">{st.name}</p>
+                  <p className={`text-[11.5px] ${openStudent === st.id ? "text-white/80" : "text-ink-muted"}`}>
+                    {tr("{count} piece of work|{count} pieces of work", { count: st.items.length })}
+                    {st.items.some((x) => x.daily_rating === "not_recited") ? ` · ${DAILY_RATING_LABELS.not_recited}` : ""}
+                  </p>
+                </div>
+                <RowChevron open={openStudent === st.id} />
+              </button>
+              {openStudent === st.id && (
+          <ul className="ms-3 border-s border-surface-border ps-3 divide-y divide-surface-border">
+          {st.items.map((a) => {
             const surah = getSurahById(a.surah);
             const surahEnd = a.surah_end !== a.surah ? getSurahById(a.surah_end) : null;
             const name = studentName(a.student_id, roster);
@@ -1173,28 +2070,53 @@ export default function QuranAssignmentsPage() {
                   type="button"
                   onClick={() => startEditing(a)}
                   aria-expanded={isOpen}
-                  className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                  className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                 >
                   <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
                     {initials(name)}
                   </span>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-ink leading-snug break-words">
+                    <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                       {name}
                       {" · "}
                       <span className="underline decoration-2 underline-offset-2">
                         {PORTION_LABELS[a.portion]}
                       </span>
+                      {(() => {
+                        const w = whenOf(a);
+                        return w ? (
+                          <span className={`ms-2 align-middle text-[10px] font-semibold px-2 py-0.5 rounded-full ${isOpen ? "bg-white/20 text-white" : w.tone}`}>{w.text}</span>
+                        ) : null;
+                      })()}
+                      {a.daily_rating === "not_recited" && (
+                        <span className={`ms-2 align-middle text-[10px] font-semibold px-2 py-0.5 rounded-full ${isOpen ? "bg-white/20 text-white" : DAILY_RATING_STYLES.not_recited}`}>
+                          {DAILY_RATING_LABELS.not_recited}
+                        </span>
+                      )}
                     </p>
-                    <p className="text-[11px] text-ink-muted leading-snug break-words">
+                    <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                       {rangeLabel}
+                      {surah && (
+                        <span className="mx-1 font-arabic text-[14px] text-ink">
+                          · <bdi dir="rtl">{surah.name}{surahEnd ? ` – ${surahEnd.name}` : ""}</bdi>
+                        </span>
+                      )}
                       {a.due_date ? tr(" · due {formatDay}", { formatDay: formatDay(a.due_date, language) }) : ""}
                     </p>
+                    {/* On the narrowest phones the rating sits under the
+                        details, leaving them the row's width. */}
+                    {a.daily_rating && (
+                      <span className="inline-block mt-1 min-[400px]:hidden">
+                        <RatingPill rating={a.daily_rating} />
+                      </span>
+                    )}
                   </div>
 
                   {a.daily_rating ? (
-                    <RatingPill rating={a.daily_rating} />
+                    <span className="hidden min-[400px]:inline-flex flex-shrink-0">
+                      <RatingPill rating={a.daily_rating} />
+                    </span>
                   ) : (
                     <div className="w-16 flex-shrink-0 hidden sm:block">
                       <ProgressBar value={a.memorization_level} />
@@ -1210,20 +2132,28 @@ export default function QuranAssignmentsPage() {
                     {ASSIGNMENT_LABELS[a.status]}
                   </span>
 
-                  <span
-                    className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}
-                  >
-                    <IconArrow size={14} />
-                  </span>
+                  <RowChevron open={isOpen} />
                 </button>
 
+                {!isOpen && a.daily_rating !== "not_recited" && (
+                  <div className="pb-2 ps-12">
+                    <button
+                      type="button"
+                      onClick={() => saveEdit(a, "not_recited")}
+                      disabled={savingEdit}
+                      className="text-[12px] font-semibold px-2.5 py-1 rounded-full border border-surface-border bg-surface-card text-ink-muted hover:text-ink hover:border-slate-400 disabled:opacity-50"
+                    >
+                      {DAILY_RATING_LABELS.not_recited}
+                    </button>
+                  </div>
+                )}
                 {isOpen && (
                   <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                     <div>
                       <p className="text-xs font-semibold text-ink mb-2">
                         {tr("Today's rating")}
                       </p>
-                      <div className="grid grid-cols-4 gap-1.5">
+                      <div className="grid grid-cols-2 min-[420px]:grid-cols-3 gap-1.5">
                         {DAILY_RATING_ORDER.map((r) => {
                           const active = draftRating === r;
                           return (
@@ -1287,8 +2217,79 @@ export default function QuranAssignmentsPage() {
               </li>
             );
           })}
+          </ul>
+              )}
+            </li>
+          ))}
         </ul>
+        </div>
+        ))}
       </SectionCard>
+
+      {/* Phone: a small button that stays in reach while scrolling the form. */}
+      {!wide && canPreview && !previewOpen && !saved && (
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="fixed z-30 end-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] flex items-center gap-2 rounded-full bg-brand-navy text-white shadow-lg ps-3 pe-4 py-2.5 text-[13px] font-semibold active:scale-95 transition"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+          {tr("Mushaf")}
+        </button>
+      )}
+
+      {/* Phone: the preview as a full-screen panel over the form. */}
+      {!wide && previewOpen && canPreview && (
+        <div className="fixed inset-0 z-50 flex flex-col" role="dialog" aria-modal="true" aria-label={tr("Mushaf preview")}>
+          <button type="button" aria-label={tr("Close")} onClick={() => setPreviewOpen(false)} className="h-6 flex-shrink-0 bg-black/40" />
+          <div className="flex-1 min-h-0 flex flex-col rounded-t-3xl bg-surface-bg shadow-2xl">
+            <div className="flex items-center gap-3 px-4 pt-3 pb-2 border-b border-surface-border">
+              <h2 className="page-title text-[17px] min-w-0 flex-1 truncate">{previewTitle}</h2>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="flex-shrink-0 rounded-full bg-surface-card border border-surface-border px-3.5 py-1.5 text-[13px] font-semibold text-ink"
+              >
+                {tr("Done")}
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-2 pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))]">{previewMushaf}</div>
+          </div>
+        </div>
+      )}
+
+      {/* What was just saved, with a way to take it back. Sits above the
+          phone tab bar; gone by itself after a few seconds. */}
+      {saved && (
+        <div
+          role="status"
+          className="fixed z-40 inset-x-4 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-6 md:min-w-[380px] max-w-xl flex items-center gap-3 rounded-2xl bg-[#14213d] text-white shadow-xl px-4 py-3"
+        >
+          <span aria-hidden className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
+          </span>
+          <p className="text-[13.5px] min-w-0 flex-1 [overflow-wrap:anywhere]">
+            <span className="font-semibold">{tr("Saved:")}</span> {saved.text}
+          </p>
+          {saved.undoable && saved.ids.length > 0 && (
+            <button
+              type="button"
+              onClick={undoSaved}
+              disabled={undoing}
+              className="flex-shrink-0 text-[13px] font-bold text-brand-gold hover:text-white px-2 py-1 rounded-lg disabled:opacity-50"
+            >
+              {undoing ? tr("Undoing…") : tr("Undo")}
+            </button>
+          )}
+          <button type="button" onClick={() => setSaved(null)} aria-label={tr("Close")} className="flex-shrink-0 text-white/60 hover:text-white px-1">
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+function isGradeNum(g: number | null | undefined): g is number {
+  return typeof g === "number";
 }

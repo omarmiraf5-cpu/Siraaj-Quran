@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   DEMO_STUDENTS,
   DEMO_ATTENDANCE,
@@ -11,6 +12,7 @@ import {
   dueLabel,
   initials,
   ASSIGNMENT_STYLES,
+  type AttendanceDay,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import {
@@ -27,26 +29,47 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
 
+/**
+ * One student at a glance: attendance and their work. In the sample school
+ * it reads the sample data; a real school's page passes what it has
+ * already loaded for the student (`real`), so opening it costs nothing.
+ */
 export function StudentDetailPanel({
   studentId,
   onClose,
+  real,
+  registerHref,
+  readOnly = false,
 }: {
   studentId: string;
   onClose: () => void;
+  real?: {
+    student: { id: string; name: string; halaqa: string };
+    attendance: AttendanceDay[];
+    assignments: QuranicAssignment[];
+  };
+  /** Where "Take attendance" goes — their halaqa's register. */
+  registerHref?: string;
+  /** Without the teacher's shortcuts (take attendance, assign): the office just reads the record. */
+  readOnly?: boolean;
 }) {
   const { t, language, tr } = useLanguage();
-  const student = DEMO_STUDENTS.find((s) => s.id === studentId);
+  const student = real ? real.student : DEMO_STUDENTS.find((s) => s.id === studentId);
   const [createdAssignments, setCreatedAssignments] = useState<QuranicAssignment[]>([]);
 
   useEffect(() => {
-    setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
-  }, []);
+    if (!real) setCreatedAssignments(readDemoStore(DEMO_CREATED_ASSIGNMENTS_KEY, []));
+  }, [real]);
 
   if (!student) return null;
 
-  const attendance = DEMO_ATTENDANCE[student.id] ?? [];
+  // Newest first, as the strip reads them.
+  const attendance = real
+    ? [...real.attendance].sort((a, b) => b.date.localeCompare(a.date))
+    : DEMO_ATTENDANCE[student.id] ?? [];
   const summary = summariseAttendance(attendance);
-  const assignments = demoAssignmentsFor(student.id, createdAssignments);
+  const assignments = real ? real.assignments.filter((a) => a.student_id === student.id) : demoAssignmentsFor(student.id, createdAssignments);
+  const open = assignments.filter((a) => a.status !== "completed").length;
 
   return (
     <Modal
@@ -56,6 +79,35 @@ export function StudentDetailPanel({
       onClose={onClose}
     >
       <div className="space-y-5">
+        {/* Three numbers first: how often they come, what's open, what's done. */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { value: `${summary.rate}%`, label: t("common.attendanceStat") },
+            { value: open, label: t("common.openWork") },
+            { value: assignments.length - open, label: t("assignment.completed") },
+          ].map((x) => (
+            <div key={x.label} className="rounded-2xl border border-surface-border bg-surface-bg-warm px-3 py-2.5">
+              <p className="text-[20px] font-bold text-ink tabular-nums leading-none">{x.value}</p>
+              <p className="text-[11px] text-ink-muted mt-1.5 leading-tight">{x.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {!readOnly && <div className="flex flex-wrap gap-2">
+          <Link
+            href={registerHref ?? "/teacher/attendance"}
+            className="inline-flex items-center rounded-full gradient-emerald text-white text-[12.5px] font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
+          >
+            {t("teacher.dashboard.takeRegister")}
+          </Link>
+          <Link
+            href="/teacher/quran-assignments"
+            className="inline-flex items-center rounded-full border border-surface-border text-ink text-[12.5px] font-semibold px-4 py-2 hover:border-brand-navy transition-colors"
+          >
+            {t("common.assign")}
+          </Link>
+        </div>}
+
         {/* Attendance */}
         <div>
           <div className="flex items-baseline justify-between">

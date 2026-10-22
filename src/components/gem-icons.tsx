@@ -26,7 +26,15 @@ export type ArtName =
   | "pen"
   | "mail"
   | "lock"
-  | "more";
+  | "more"
+  | "star"
+  | "badge"
+  | "track"
+  | "document"
+  | "building"
+  | "board"
+  | "letters"
+  | "rehal";
 
 type Palette = { sky: [string, string, string]; hue: string };
 
@@ -49,6 +57,15 @@ const PALETTES: Record<ArtName, Palette> = {
   mail: { sky: ["#0a1d48", "#153d7c", "#2d6db6"], hue: "#a9d2ff" },
   lock: { sky: ["#2f1a06", "#7a4510", "#c98426"], hue: "#ffdca0" },
   more: { sky: ["#141d2c", "#273750", "#43597a"], hue: "#c9d6ea" },
+  // Drawn for MyDiiwaan: the pages the original set had no picture for.
+  star: { sky: ["#2f1a06", "#7a4510", "#c98426"], hue: "#ffdca0" },
+  badge: { sky: ["#2a0d1c", "#6d1a36", "#bf3a52"], hue: "#ffb3bd" },
+  track: { sky: ["#1c1446", "#35287e", "#5a4cbc"], hue: "#c8bfff" },
+  document: { sky: ["#0a1d48", "#16407e", "#2f72b8"], hue: "#a9d2ff" },
+  building: { sky: ["#141d2c", "#273750", "#43597a"], hue: "#c9d6ea" },
+  board: { sky: ["#052a1c", "#0b5a3a", "#1b8f5c"], hue: "#a6f3c6" },
+  letters: { sky: ["#06263a", "#0c4f6a", "#178a9c"], hue: "#9fe8f2" },
+  rehal: { sky: ["#04261a", "#0a5236", "#168458"], hue: "#a6f3c6" },
 };
 
 /** Saturated sky stop used as the soft panel glow for that illustration. */
@@ -303,6 +320,98 @@ export function Art({ name, id }: { name: ArtName; id: string }): ReactNode {
           <circle cx="12" cy="21" r="2" fill="#ff7b9c" />
         </g>
       );
+    case "star":
+      return (
+        <g>
+          <defs>{lg(`${id}s`, ["#fff4cf", "#ffc95c", "#d98614"], 4, 3, 20, 21)}</defs>
+          <path d="M12 2.4l2.9 6.1 6.7.9-4.9 4.7 1.2 6.6L12 17.5l-5.9 3.2 1.2-6.6-4.9-4.7 6.7-.9z" fill={u("s")} stroke="#b86a0c" strokeWidth={0.7} strokeLinejoin="round" />
+          <path d="M8.6 8.8L11.2 5.2" stroke="#fffbe8" strokeOpacity={0.85} strokeWidth={1.2} strokeLinecap="round" />
+        </g>
+      );
+    case "badge":
+      return (
+        <g>
+          <defs>{lg(`${id}b`, ["#fff4cf", "#ffc95c", "#d98614"], 5, 2, 19, 16)}</defs>
+          <path d="M7.4 13.6L5.4 22l4.4-2.4 2.2 2.1" fill="#e8344e" />
+          <path d="M16.6 13.6L18.6 22l-4.4-2.4L12 21.7" fill="#b51d3a" />
+          <circle cx="12" cy="9" r="7" fill={u("b")} stroke="#b86a0c" strokeWidth={0.7} />
+          <path d="M12 5l1.3 2.7 3 .4-2.2 2.1.5 3L12 11.7l-2.6 1.5.5-3L7.7 8.1l3-.4z" fill="#fff8e4" />
+        </g>
+      );
+    case "track":
+      return (
+        <g>
+          <path d="M3 12h18" stroke="#d9d2ff" strokeWidth={2.4} strokeLinecap="round" />
+          <path d="M3 12h9" stroke="#6ff0a6" strokeWidth={2.4} strokeLinecap="round" />
+          <circle cx="5.2" cy="12" r="3" fill="#18a35a" stroke="#e6ffe9" strokeWidth={1.2} />
+          <path d="M3.9 12.1l1 1 1.6-2" stroke="#fff" strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <circle cx="12" cy="12" r="3" fill="#ffb627" stroke="#fff4cf" strokeWidth={1.2} />
+          <circle cx="18.8" cy="12" r="3" fill="#ffffff" stroke="#b6a8f5" strokeWidth={1.2} />
+        </g>
+      );
+    case "document":
+      return (
+        <g>
+          <defs>{lg(`${id}d`, ["#ffffff", "#d3e2f6"], 5, 2, 19, 22)}</defs>
+          <path d="M5.4 2.6h9.2l4.2 4.2v14a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6V4.2a1.6 1.6 0 0 1 1.6-1.6Z" fill={u("d")} />
+          <path d="M14.6 2.6v3.6a.6.6 0 0 0 .6.6h3.6Z" fill="#9db8e0" />
+          <path d="M7 11.2h9.6M7 14.4h9.6M7 17.6h5.6" stroke="#5b8fe0" strokeWidth={1.4} strokeLinecap="round" />
+          <circle cx="8" cy="7.2" r="1.5" fill="#ffb627" />
+        </g>
+      );
+    case "building":
+      return (
+        <g>
+          <defs>{lg(`${id}w`, ["#fffaf0", "#ead3a6"], 0, 9, 0, 22)}</defs>
+          <path d="M2.6 10.2L12 3.4l9.4 6.8Z" fill="#e8b04a" />
+          <rect x="4.2" y="10.2" width="15.6" height="10.8" rx="0.8" fill={u("w")} />
+          <rect x="6" y="12" width="3" height="3.2" rx="0.5" fill="#6a9ae0" />
+          <rect x="15" y="12" width="3" height="3.2" rx="0.5" fill="#6a9ae0" />
+          <path d="M10 21v-5a2 2 0 0 1 4 0v5Z" fill="#c9893a" />
+          <circle cx="12" cy="8" r="1.2" fill="#fff8e4" />
+        </g>
+      );
+    case "board":
+      return (
+        <g>
+          <defs>{lg(`${id}g`, ["#3fbf84", "#17795a"], 0, 4, 0, 17)}</defs>
+          <rect x="2.4" y="3.6" width="19.2" height="13.4" rx="1.8" fill="#b9792a" />
+          <rect x="3.9" y="5.1" width="16.2" height="10.4" rx="1" fill={u("g")} />
+          <path d="M6.4 8.4h6.4M6.4 11.4h9" stroke="#e9fff4" strokeWidth={1.2} strokeLinecap="round" />
+          <path d="M8 17v4.2M16 17v4.2" stroke="#b9792a" strokeWidth={1.6} strokeLinecap="round" />
+          <rect x="14.6" y="12.9" width="3.4" height="1.3" rx="0.6" fill="#ffd36b" />
+        </g>
+      );
+    case "rehal":
+      return (
+        <g>
+          <defs>
+            {lg(`${id}w`, ["#d99a4e", "#8a4a12"], 4, 12, 20, 22)}
+            {lg(`${id}c`, ["#2fb27a", "#0f6a43"], 0, 6, 0, 17)}
+          </defs>
+          {/* The wooden stand: two crossed boards under the book. */}
+          <path d="M5.6 21.8L16.6 12.8" stroke="#6b3a12" strokeWidth={3.4} strokeLinecap="round" />
+          <path d="M18.4 21.8L7.4 12.8" stroke="#6b3a12" strokeWidth={3.4} strokeLinecap="round" />
+          <path d="M5.6 21.8L16.6 12.8" stroke={u("w")} strokeWidth={2.2} strokeLinecap="round" />
+          <path d="M18.4 21.8L7.4 12.8" stroke={u("w")} strokeWidth={2.2} strokeLinecap="round" />
+          {/* The mushaf, open on it: green covers, two cream pages. */}
+          <path d="M1.4 6.4V15.6C5.2 14.4 8.8 14.7 12 16.6C15.2 14.7 18.8 14.4 22.6 15.6V6.4Z" fill={u("c")} />
+          <path d="M12 6.4C9.2 4.6 5.6 4.2 2.6 5.2V14C5.6 13 9.2 13.4 12 15.2Z" fill="#fff6e4" />
+          <path d="M12 6.4C14.8 4.6 18.4 4.2 21.4 5.2V14C18.4 13 14.8 13.4 12 15.2Z" fill="#f3dcb2" />
+          <path d="M4.8 8C6.4 7.6 8 7.7 9.6 8.4M4.8 10.4C6.4 10 8 10.1 9.6 10.8M14.4 8.4C16 7.7 17.6 7.6 19.2 8M14.4 10.8C16 10.1 17.6 10 19.2 10.4" stroke="#c98a3c" strokeWidth={1.1} strokeLinecap="round" fill="none" />
+          <circle cx="7.2" cy="12.6" r="0.9" fill="#d9a43a" />
+          <circle cx="16.8" cy="12.6" r="0.9" fill="#d9a43a" />
+        </g>
+      );
+    case "letters":
+      return (
+        <g>
+          <defs>{lg(`${id}l`, ["#ffffff", "#f0e2c4"], 4, 3, 20, 21)}</defs>
+          <rect x="3.2" y="3" width="17.6" height="18" rx="3" fill={u("l")} />
+          <text x="12" y="17.2" textAnchor="middle" fontSize="15" fontWeight="700" fill="#0c4f6a" style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', 'Geeza Pro', serif" }}>ب</text>
+          <rect x="6" y="19" width="12" height="1.2" rx="0.6" fill="#e0a43a" />
+        </g>
+      );
     case "more":
       return (
         <g>
@@ -422,7 +531,7 @@ export function ColorGlyph({ name, size = 18 }: { name: ArtName; size?: number }
   );
 }
 
-/** Quick-action row: gem tile, label, 12px radius, cream card. */
+/** Quick-action row: gem tile, label, cream card. */
 export function QuickActions({
   items,
 }: {
@@ -434,11 +543,11 @@ export function QuickActions({
         <Link
           key={item.href}
           href={item.href}
-          className="gem-surface flex flex-col items-center gap-2 rounded-xl px-1.5 py-3 text-center"
+          className="gem-surface flex flex-col items-center gap-2 rounded-xl px-1.5 py-3 text-center min-h-11"
           style={{ "--gem": gemGlow(item.art) } as React.CSSProperties}
         >
           <ColorTile name={item.art} size={44} />
-          <span className="text-[12px] font-semibold text-[#102A56] leading-tight line-clamp-2">{item.label}</span>
+          <span className="text-[12px] font-semibold text-[#102A56] dark:text-ink leading-snug break-words">{item.label}</span>
         </Link>
       ))}
     </div>

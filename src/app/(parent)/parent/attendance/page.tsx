@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   ATTENDANCE_STYLES,
   summariseAttendance,
   formatDay,
 } from "@/data/demo";
+import { useChosenChild } from "@/hooks/useChosenChild";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { PortalHero } from "@/components/PortalHero";
 import {
@@ -24,12 +24,7 @@ export default function ParentAttendancePage() {
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
-  const [childId, setChildId] = useState<string | null>(null);
-  const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
-
-  useEffect(() => {
-    if (!childId && children.length > 0) setChildId(children[0].id);
-  }, [children, childId]);
+  const { child, choose: setChildId, options: childChoices } = useChosenChild(children);
 
   const { attendance: days, ready } = useStudentRecord(child?.id ?? null, mode);
   const s = summariseAttendance(days);
@@ -72,12 +67,12 @@ export default function ParentAttendancePage() {
 
       {children.length > 1 && (
         <div className="flex flex-wrap items-center gap-3 min-w-0">
-          <span className="eyebrow">{t("common.viewing")}</span>
+          <span className="eyebrow flex-shrink-0">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
             value={child.id}
             onChange={setChildId}
-            options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+            options={childChoices}
           />
         </div>
       )}

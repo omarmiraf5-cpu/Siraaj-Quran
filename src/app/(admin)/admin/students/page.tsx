@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEMO_CREATED_STUDENTS_KEY,
   DEMO_STUDENT_OVERRIDES_KEY,
@@ -14,10 +14,9 @@ import {
   type HalaqaOverride,
 } from "@/data/demo";
 import type { DemoStudent, DemoHalaqa, DemoTeacher } from "@/data/demo";
-import { loadSchoolTeachers } from "@/lib/schoolTeachers";
+import { loadSchoolTeachers, saveOtherTeachers } from "@/lib/schoolTeachers";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote, avatarTone } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { SectionCard, EmptyNote, LoadingNote, RowChevron, OPEN_ROW, Avatar } from "@/components/portal-ui";
 import StudentImport from "@/components/StudentImport";
 import WeeklyReportsCard from "@/components/WeeklyReportsCard";
 import StudentPins from "@/components/StudentPins";
@@ -26,25 +25,51 @@ import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
 import { GRADES, gradeLabel } from "@/lib/grades";
-import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
+import { loadSchoolShape, halaqaCampusId, ONE_HALAQA_FROM_GRADE, type Campus } from "@/lib/schoolStructure";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
+import { StudentRecord } from "@/components/StudentRecord";
 import { loadRoster } from "@/lib/rosterExport";
 import { download, fileNameFor } from "@/lib/sheetTools";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
+import { useToast } from "@/components/Toast";
+import { readCache, patchCache } from "@/lib/pageCache";
 
 const bigField =
   "w-full min-h-11 bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/35 transition";
 const smallField =
   "w-full min-h-11 bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/35 transition";
 
+/** A button in a grade's heading, beside its student count. Undoes the
+ *  note's small capitals: these are actions, written as words. */
+const GRADE_ACTION =
+  "inline-flex items-center rounded-full border px-3 py-1 text-[12px] font-semibold normal-case tracking-normal not-italic whitespace-nowrap transition-colors";
+
+const SNAPSHOT_KEY = "admin-students";
+interface Snapshot {
+  students: DemoStudent[];
+  halaqas: DemoHalaqa[];
+  teachers: DemoTeacher[];
+  graded: boolean;
+  campuses: Campus[];
+  schoolId: string | null;
+  schoolSlug: string | null;
+  schoolName: string;
+  reportsReady: boolean;
+  studentCampusReady: boolean;
+}
+
 export default function AdminStudentsPage() {
   const { tr } = useLanguage();
+  const toast = useToast();
   const supabase = createClient();
+  // Last visit's list, shown at once while it's read again.
+  const seen = readCache<Partial<Snapshot>>(SNAPSHOT_KEY);
   const [isDemo, setIsDemo] = useState(false);
   // The code students type in the app (the school's slug), and whether the
   // sign-in link was just copied.
-  const [schoolSlug, setSchoolSlug] = useState<string | null>(null);
-  const [schoolName, setSchoolName] = useState("");
+  const [schoolSlug, setSchoolSlug] = useState<string | null>(seen?.schoolSlug ?? null);
+  const [schoolName, setSchoolName] = useState(seen?.schoolName ?? "");
   const [copied, setCopied] = useState(false);
   // Permanent deletion: which student's confirm box is open, what's been
   // typed into it, and any error from the attempt.
@@ -52,20 +77,23 @@ export default function AdminStudentsPage() {
   const [deleteText, setDeleteText] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [schoolId, setSchoolId] = useState<string | null>(null);
+  const [ready, setReady] = useState(Boolean(seen?.students));
+  const [schoolId, setSchoolId] = useState<string | null>(seen?.schoolId ?? null);
   // An academic school keeps its students in grades, and may have campuses.
-  const [graded, setGraded] = useState(false);
-  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [graded, setGraded] = useState(seen?.graded ?? false);
+  const [campuses, setCampuses] = useState<Campus[]>(seen?.campuses ?? []);
 
-  const [students, setStudents] = useState<DemoStudent[]>([]);
-  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
+  const [students, setStudents] = useState<DemoStudent[]>(seen?.students ?? []);
+  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(seen?.halaqas ?? []);
   const [created, setCreated] = useState<DemoStudent[]>([]);
   const [overrides, setOverrides] = useState<Record<string, StudentOverride>>({});
 
+  const [record, setRecord] = useState<{ id: string; name: string; place: string } | null>(null);
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [campusFilter, setCampusFilter] = useState("");
+  // Just the students still waiting for a teacher.
+  const [unplacedOnly, setUnplacedOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -79,11 +107,14 @@ export default function AdminStudentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftHalaqa, setDraftHalaqa] = useState("");
+  // In a school kept in grades: the teachers ticked on a student's own row —
+  // one, or two or more to share a halaqa.
+  const [draftTeachers, setDraftTeachers] = useState<string[]>([]);
   const [draftGrade, setDraftGrade] = useState("");
   const [draftActive, setDraftActive] = useState(true);
   const [draftReport, setDraftReport] = useState(true);
   // Whether the weekly reports update has been run, so each child has a switch.
-  const [reportsReady, setReportsReady] = useState(false);
+  const [reportsReady, setReportsReady] = useState(seen?.reportsReady ?? false);
   const [gradeBusy, setGradeBusy] = useState<number | null>(null);
   const [draftPin, setDraftPin] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
@@ -100,11 +131,11 @@ export default function AdminStudentsPage() {
   const [assignNote, setAssignNote] = useState<string | null>(null);
   // The school's teachers: students can be put with one straight from here,
   // and the campus of the halaqa made for them if they have none yet.
-  const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
+  const [teachers, setTeachers] = useState<DemoTeacher[]>(seen?.teachers ?? []);
   const [assignCampus, setAssignCampus] = useState("");
   // Whether students have a campus of their own (update 14), and a campus
   // for a new or edited student.
-  const [studentCampusReady, setStudentCampusReady] = useState(false);
+  const [studentCampusReady, setStudentCampusReady] = useState(seen?.studentCampusReady ?? false);
   const [newCampus, setNewCampus] = useState("");
   const [draftCampus, setDraftCampus] = useState("");
   const [campusBusy, setCampusBusy] = useState(false);
@@ -115,10 +146,18 @@ export default function AdminStudentsPage() {
     const { data } = first.error
       ? await supabase.from("classes").select("id, name, teacher_id, schedule, grade").order("name")
       : first;
+    // Each halaqa's other teachers, so one shared by two can be found by
+    // who teaches it. (A database without them answers with an error.)
+    const { data: shares } = await supabase.from("class_teachers").select("class_id, teacher_id");
+    const others = new Map<string, string[]>();
+    for (const r of (shares ?? []) as Array<{ class_id: string; teacher_id: string }>) {
+      others.set(r.class_id, [...(others.get(r.class_id) ?? []), r.teacher_id]);
+    }
     return ((data ?? []) as Array<{ id: string; name: string; teacher_id: string | null; schedule: string | null; grade: number; campus_id?: string | null }>).map((c) => ({
       id: c.id,
       name: c.name,
       teacherId: c.teacher_id,
+      coTeacherIds: others.get(c.id) ?? [],
       schedule: c.schedule ?? "",
       grade: c.grade,
       campusId: c.campus_id ?? null,
@@ -130,8 +169,15 @@ export default function AdminStudentsPage() {
   // it back down to one halaqa per student, by id as well as name, since a
   // name can repeat across an academic school's grades and campuses.
   const loadRealStudents = async () => {
+    // The students, their halaqas and their parents asked for together, not
+    // one after another: on a phone signal each round trip is felt.
+    const [withCampus, { data: enrollments }, parents] = await Promise.all([
+      supabase.from("students").select("id, full_name, active, grade, weekly_report, campus_id").order("full_name"),
+      supabase.from("class_enrollments").select("student_id, class_id, classes(name)"),
+      // Each student's parents, by name, in the same request as the links.
+      supabase.from("parent_students").select("student_id, profiles(full_name)"),
+    ]);
     // Each newer column asked for only once the database has it.
-    const withCampus = await supabase.from("students").select("id, full_name, active, grade, weekly_report, campus_id").order("full_name");
     setStudentCampusReady(!withCampus.error);
     const first = withCampus.error
       ? await supabase.from("students").select("id, full_name, active, grade, weekly_report").order("full_name")
@@ -140,48 +186,59 @@ export default function AdminStudentsPage() {
     const { data: studentRows } = first.error
       ? await supabase.from("students").select("id, full_name, active, grade").order("full_name")
       : first;
-    const { data: enrollments } = await supabase
-      .from("class_enrollments")
-      .select("student_id, class_id, classes(name)");
-    // Each student's parents, by name.
-    const { data: links } = await supabase.from("parent_students").select("parent_id, student_id");
-    const parentIds = [...new Set((links ?? []).map((l) => l.parent_id as string))];
-    const parentRows: Array<{ id: string; full_name: string }> = [];
-    for (let i = 0; i < parentIds.length; i += 200) {
-      const { data } = await supabase.from("profiles").select("id, full_name").in("id", parentIds.slice(i, i + 200));
-      parentRows.push(...((data ?? []) as Array<{ id: string; full_name: string }>));
+    // A database that won't join the two (it should) gets the old two steps.
+    if (parents.error) {
+      const { data: links } = await supabase.from("parent_students").select("parent_id, student_id");
+      const ids = [...new Set((links ?? []).map((l) => l.parent_id as string))];
+      const pages = await Promise.all(
+        Array.from({ length: Math.ceil(ids.length / 200) }, (_, i) =>
+          supabase.from("profiles").select("id, full_name").in("id", ids.slice(i * 200, i * 200 + 200))
+        )
+      );
+      const name = new Map(pages.flatMap((p) => (p.data ?? []) as Array<{ id: string; full_name: string }>).map((p) => [p.id, p.full_name]));
+      parents.data = (links ?? []).map((l) => ({ student_id: l.student_id, profiles: name.has(l.parent_id) ? { full_name: name.get(l.parent_id)! } : null })) as never;
     }
-    const parentName = new Map(parentRows.map((p) => [p.id, p.full_name]));
     const parentsOf = new Map<string, string[]>();
-    for (const l of links ?? []) {
-      const n = parentName.get(l.parent_id as string);
-      if (n) parentsOf.set(l.student_id as string, [...(parentsOf.get(l.student_id as string) ?? []), n]);
+    for (const l of (parents.data ?? []) as unknown as Array<{ student_id: string; profiles: { full_name: string } | { full_name: string }[] | null }>) {
+      const n = (Array.isArray(l.profiles) ? l.profiles[0] : l.profiles)?.full_name;
+      if (n) parentsOf.set(l.student_id, [...(parentsOf.get(l.student_id) ?? []), n]);
     }
+    // Their own halaqa, and any program (a Hifd program) beside it.
     const halaqaByStudent = new Map<string, { id: string; name: string }>();
+    const programsOf = new Map<string, Array<{ id: string; name: string }>>();
     for (const e of enrollments ?? []) {
       const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
-      if (className) halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
+      if (!className) continue;
+      if (isProgramHalaqa(className)) programsOf.set(e.student_id, [...(programsOf.get(e.student_id) ?? []), { id: e.class_id, name: className }]);
+      else halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
     }
-    setStudents(
-      ((studentRows ?? []) as Array<{ id: string; full_name: string; active: boolean; grade: number; weekly_report?: boolean; campus_id?: string | null }>).map((s) => ({
+    const list: DemoStudent[] = (
+      (studentRows ?? []) as Array<{ id: string; full_name: string; active: boolean; grade: number; weekly_report?: boolean; campus_id?: string | null }>
+    ).map((s) => ({
         id: s.id,
         name: s.full_name,
         halaqa: halaqaByStudent.get(s.id)?.name ?? "",
         halaqaId: halaqaByStudent.get(s.id)?.id,
+        programs: programsOf.get(s.id),
         grade: s.grade,
         active: s.active,
         weeklyReport: s.weekly_report !== false,
         parentNames: parentsOf.get(s.id) ?? [],
         campusId: s.campus_id ?? null,
-      }))
-    );
+      }));
+    setStudents(list);
+    patchCache<Snapshot>(SNAPSHOT_KEY, { students: list, reportsReady: !first.error, studentCampusReady: !withCampus.error });
   };
 
   useEffect(() => {
     const load = async () => {
+      // Who's signed in, from the session on this device rather than a round
+      // trip to the auth server; every query below is checked by the
+      // database's own policies all the same.
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
 
       if (!user) {
         setIsDemo(true);
@@ -199,32 +256,46 @@ export default function AdminStudentsPage() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("school_id")
-        .eq("id", user.id)
-        .single();
-      setSchoolId(profile?.school_id ?? null);
-      if (profile?.school_id) {
-        supabase
-          .from("schools")
-          .select("slug, name")
-          .eq("id", profile.school_id)
-          .single()
-          .then(({ data }) => {
-            setSchoolSlug(data?.slug ?? null);
-            setSchoolName(data?.name ?? "");
-          });
-      }
+      // The roster starts loading now; only the school's own details wait
+      // for its id.
+      const school = async () => {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("school_id")
+          .eq("id", user.id)
+          .single();
+        setSchoolId(profile?.school_id ?? null);
+        patchCache<Snapshot>(SNAPSHOT_KEY, { schoolId: profile?.school_id ?? null });
+        if (profile?.school_id) {
+          supabase
+            .from("schools")
+            .select("slug, name")
+            .eq("id", profile.school_id)
+            .single()
+            .then(({ data }) => {
+              setSchoolSlug(data?.slug ?? null);
+              setSchoolName(data?.name ?? "");
+              patchCache<Snapshot>(SNAPSHOT_KEY, { schoolSlug: data?.slug ?? null, schoolName: data?.name ?? "" });
+            });
+        }
+        const shape = await loadSchoolShape(supabase, profile?.school_id ?? null);
+        setGraded(shape.graded);
+        setCampuses(shape.campuses);
+        patchCache<Snapshot>(SNAPSHOT_KEY, { graded: shape.graded, campuses: shape.campuses });
+      };
       await Promise.all([
-        loadSchoolShape(supabase, profile?.school_id ?? null).then((shape) => {
-          setGraded(shape.graded);
-          setCampuses(shape.campuses);
-        }),
+        school(),
         loadRealStudents(),
-        loadRealHalaqas().then(setHalaqas),
+        loadRealHalaqas().then((h) => {
+          setHalaqas(h);
+          patchCache<Snapshot>(SNAPSHOT_KEY, { halaqas: h });
+        }),
         loadSchoolTeachers(supabase, { everyAdmin: true })
-          .then((t) => setTeachers(t.filter((x) => x.active !== false)))
+          .then((t) => {
+            const active = t.filter((x) => x.active !== false);
+            setTeachers(active);
+            patchCache<Snapshot>(SNAPSHOT_KEY, { teachers: active });
+          })
           .catch(() => {}),
       ]);
     };
@@ -236,14 +307,21 @@ export default function AdminStudentsPage() {
   // A halaqa as it reads in a grade's list: "North · Halaqa A".
   const halaqaInGrade = (h: DemoHalaqa) => [campusName(h.campusId), h.name].filter(Boolean).join(" · ");
   // The halaqas a student of this grade can be in: campus by campus.
+  // Never a program (a Hifd program): that's beside a student's halaqa, not it.
   const halaqasFor = (grade: string) =>
     graded
       ? grade === ""
         ? []
         : halaqas
-            .filter((h) => (h.grade ?? 0) === Number(grade))
+            .filter((h) => (h.grade ?? 0) === Number(grade) && !isProgramHalaqa(h.name))
             .sort((a, b) => (campusName(a.campusId) ?? "").localeCompare(campusName(b.campusId) ?? "") || a.name.localeCompare(b.name))
-      : halaqas;
+      : halaqas.filter((h) => !isProgramHalaqa(h.name));
+  // Out of whatever halaqa these students are in — but not a program.
+  const leaveHalaqas = (ids: string[]) => {
+    const programIds = halaqas.filter((h) => isProgramHalaqa(h.name)).map((h) => h.id);
+    const q = supabase.from("class_enrollments").delete().in("student_id", ids);
+    return programIds.length > 0 ? q.not("class_id", "in", `(${programIds.join(",")})`) : q;
+  };
   const studentHalaqa = (s: DemoStudent) =>
     isDemo ? halaqas.find((h) => h.name === s.halaqa) : s.halaqaId ? halaqaById(s.halaqaId) : undefined;
   // The campus a student attends: their own, or else their halaqa's.
@@ -343,6 +421,7 @@ export default function AdminStudentsPage() {
     setEditingId(s.id === editingId ? null : s.id);
     setDraftName(s.name);
     setDraftHalaqa(studentHalaqa(s)?.id ?? "");
+    setDraftTeachers(teachersOf(studentHalaqa(s)));
     setDraftGrade(String(s.grade ?? 0));
     setDraftCampus(campusOfStudent(s) ?? "");
     setDraftActive(s.active !== false);
@@ -399,7 +478,23 @@ export default function AdminStudentsPage() {
 
     setEditError(null);
     try {
-      const { error } = await supabase
+      // A teacher chosen rather than a halaqa: theirs in this grade, at the
+      // student's campus, made now if they have none.
+      const chosenCampus = draftCampus || campusOfStudent(s) || null;
+      const byTeachers = graded && !isDemo;
+      const made = byTeachers
+        ? await halaqaForTeachers(draftTeachers, Number(draftGrade), chosenCampus, studentHalaqa(s))
+        : draftHalaqa.startsWith("t:")
+          ? await halaqaForTeacher(draftHalaqa.slice(2), Number(draftGrade), chosenCampus)
+          : null;
+      const halaqaId = byTeachers ? made?.id ?? "" : made ? made.id : draftHalaqa;
+      const placedIn = made ?? halaqaById(halaqaId);
+      // The student's own campus: from Grade 3 up their halaqa may be at
+      // another (the main) campus, and they stay at theirs.
+      const campusId =
+        Number(draftGrade) >= ONE_HALAQA_FROM_GRADE ? draftCampus || s.campusId || null : placedIn?.campusId ?? (draftCampus || null);
+      // The student's details and their halaqa saved side by side.
+      const details = supabase
         .from("students")
         .update({
           full_name: draftName.trim() || s.name,
@@ -407,23 +502,44 @@ export default function AdminStudentsPage() {
           ...(graded ? { grade: Number(draftGrade) } : {}),
           ...(reportsReady ? { weekly_report: draftReport } : {}),
           // A halaqa's campus is its students'; without one, the campus chosen.
-          ...(studentCampusReady && campuses.length > 0 ? { campus_id: halaqaById(draftHalaqa)?.campusId ?? (draftCampus || null) } : {}),
+          ...(studentCampusReady && campuses.length > 0 ? { campus_id: campusId } : {}),
         })
         .eq("id", s.id);
-      if (error) throw error;
-
-      if (draftHalaqa !== (s.halaqaId ?? "")) {
-        await supabase.from("class_enrollments").delete().eq("student_id", s.id);
-        if (draftHalaqa) {
+      const enrolment = async () => {
+        if (halaqaId === (s.halaqaId ?? "")) return;
+        const { error: outError } = await leaveHalaqas([s.id]);
+        if (outError) throw outError;
+        if (halaqaId) {
           const { error: enrollError } = await supabase
             .from("class_enrollments")
-            .insert({ class_id: draftHalaqa, student_id: s.id });
+            .insert({ class_id: halaqaId, student_id: s.id });
           if (enrollError) throw enrollError;
         }
-      }
+      };
+      const [{ error }] = await Promise.all([details, enrolment()]);
+      if (error) throw error;
 
-      await loadRealStudents();
+      // Shown as saved straight away; the list is then read again quietly
+      // in the background to pick up anything else that changed.
+      setStudents((now) =>
+        now.map((x) =>
+          x.id === s.id
+            ? {
+                ...x,
+                name: draftName.trim() || s.name,
+                active: draftActive,
+                ...(graded ? { grade: Number(draftGrade) } : {}),
+                ...(reportsReady ? { weeklyReport: draftReport } : {}),
+                ...(studentCampusReady && campuses.length > 0 ? { campusId } : {}),
+                halaqa: placedIn?.name ?? "",
+                halaqaId: halaqaId || undefined,
+              }
+            : x
+        )
+      );
       setEditingId(null);
+      toast.success(tr("Saved {name}.", { name: draftName.trim() || s.name }));
+      void loadRealStudents();
     } catch (err) {
       setEditError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     }
@@ -450,7 +566,8 @@ export default function AdminStudentsPage() {
     (s) =>
       [s.name, ...(s.parentNames ?? [])].some((n) => n.toLowerCase().includes(search.trim().toLowerCase())) &&
       (!graded || gradeFilter === "" || (s.grade ?? 0) === Number(gradeFilter)) &&
-      (campusFilter === "" || (campusFilter === "none" ? !campusOfStudent(s) : campusOfStudent(s) === campusFilter))
+      (campusFilter === "" || (campusFilter === "none" ? !campusOfStudent(s) : campusOfStudent(s) === campusFilter)) &&
+      (!unplacedOnly || !studentHalaqa(s))
   );
   const activeCount = students.filter((s) => s.active !== false).length;
   // An academic school's students, by grade.
@@ -489,29 +606,121 @@ export default function AdminStudentsPage() {
   const teacherName = (id: string | null | undefined) => teachers.find((t) => t.id === id)?.name;
   // Choosing a teacher: their halaqa in this grade (at the chosen campus),
   // or a new one in their name when they don't have one yet.
-  const halaqaForTeacher = async (teacherId: string, grade: number, atCampus?: string | null): Promise<{ id: string; label: string }> => {
-    const campusId = campuses.length > 0 ? atCampus || assignCampus || campuses[0].id : null;
-    const theirs = halaqasFor(String(grade)).find(
-      (h) => h.teacherId === teacherId && (campuses.length === 0 || (h.campusId ?? null) === campusId)
-    );
-    if (theirs) return { id: theirs.id, label: halaqaInGrade(theirs) };
-    const name = teacherName(teacherId) ?? "New halaqa";
-    const { data, error } = await supabase
-      .from("classes")
-      .insert({
-        name,
-        subject: "Qur'an & Hifz",
-        grade,
-        schedule: "",
-        teacher_id: teacherId,
-        school_id: schoolId,
-        ...(campusId ? { campus_id: campusId } : {}),
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    setHalaqas(await loadRealHalaqas());
-    return { id: data.id as string, label: [campusName(campusId), name].filter(Boolean).join(" · ") };
+  const halaqaForTeacher = async (
+    teacherId: string,
+    grade: number,
+    atCampus?: string | null
+  ): Promise<{ id: string; label: string; name: string; campusId: string | null }> => {
+    // From Grade 3 up, one halaqa per teacher and grade, at the main campus.
+    const campusId = campuses.length > 0 ? halaqaCampusId(grade, atCampus || assignCampus || campuses[0].id, campuses) : null;
+    return once(`${teacherId}|${grade}|${campusId}`, async () => {
+      const theirs = halaqasFor(String(grade)).find(
+        (h) => h.teacherId === teacherId && (campuses.length === 0 || (h.campusId ?? null) === campusId)
+      );
+      if (theirs) return { id: theirs.id, label: halaqaInGrade(theirs), name: theirs.name, campusId: theirs.campusId ?? null };
+      // The list on screen can be behind — another pick a moment ago may have
+      // just made it — so the database is asked before a new one is made.
+      let ask = supabase
+        .from("classes")
+        .select("id, name, campus_id")
+        .eq("school_id", schoolId as string)
+        .eq("teacher_id", teacherId)
+        .eq("grade", grade);
+      ask = campuses.length === 0 ? ask : campusId ? ask.eq("campus_id", campusId) : ask.is("campus_id", null);
+      const { data: found } = await ask.order("created_at");
+      const existing = ((found ?? []) as Array<{ id: string; name: string; campus_id: string | null }>).filter((h) => !isProgramHalaqa(h.name));
+      if (existing[0]) {
+        const h = existing[0];
+        return { id: h.id, label: [campusName(h.campus_id), h.name].filter(Boolean).join(" · "), name: h.name, campusId: h.campus_id ?? null };
+      }
+      const name = teacherName(teacherId) ?? "New halaqa";
+      const { data, error } = await supabase
+        .from("classes")
+        .insert({
+          name,
+          subject: "Qur'an & Hifz",
+          grade,
+          schedule: "",
+          teacher_id: teacherId,
+          school_id: schoolId,
+          ...(campusId ? { campus_id: campusId } : {}),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      // Added here as made, rather than every halaqa asked for again.
+      setHalaqas((now) => [...now, { id: data.id as string, name, teacherId, schedule: "", grade, campusId }]);
+      return { id: data.id as string, label: [campusName(campusId), name].filter(Boolean).join(" · "), name, campusId };
+    });
+  };
+
+  // A halaqa being found or made, by teacher(s), grade and campus: picks made
+  // in quick succession share the one answer instead of each making another.
+  const pending = useRef(new Map<string, Promise<unknown>>());
+  const once = <T,>(key: string, make: () => Promise<T>): Promise<T> => {
+    const now = pending.current.get(key) as Promise<T> | undefined;
+    if (now) return now;
+    const p = make().finally(() => setTimeout(() => pending.current.delete(key), 3000));
+    pending.current.set(key, p);
+    return p;
+  };
+
+  /** Who teaches a halaqa: its lead first, then the rest. */
+  const teachersOf = (h: DemoHalaqa | undefined | null): string[] =>
+    h ? [...new Set([h.teacherId, ...(h.coTeacherIds ?? [])].filter((x): x is string => Boolean(x)))] : [];
+  const sameTeachers = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
+
+  // The halaqa for exactly these teachers in a grade (at the campus): the
+  // student's own if it already is, else one they share, else one made now —
+  // in the first one's name with the rest alongside, named after them all.
+  const halaqaForTeachers = async (
+    ids: string[],
+    grade: number,
+    atCampus: string | null,
+    current: DemoHalaqa | undefined
+  ): Promise<{ id: string; name: string; campusId: string | null } | null> => {
+    if (ids.length === 0) return null;
+    const campusId = campuses.length > 0 ? halaqaCampusId(grade, atCampus || campuses[0].id, campuses) : null;
+    const atHere = (h: DemoHalaqa) => campuses.length === 0 || (h.campusId ?? null) === campusId;
+    if (current && (current.grade ?? 0) === grade && atHere(current) && sameTeachers(teachersOf(current), ids)) {
+      return { id: current.id, name: current.name, campusId: current.campusId ?? null };
+    }
+    const shared = halaqasFor(String(grade)).find((h) => atHere(h) && sameTeachers(teachersOf(h), ids));
+    if (shared) return { id: shared.id, name: shared.name, campusId: shared.campusId ?? null };
+    if (ids.length === 1) return halaqaForTeacher(ids[0], grade, campusId);
+    return once(`${[...ids].sort().join("+")}|${grade}|${campusId}`, async () => {
+      // As for one teacher: the database is asked before a new one is made.
+      let ask = supabase.from("classes").select("id, name, campus_id, teacher_id").eq("school_id", schoolId as string).eq("grade", grade).in("teacher_id", ids);
+      ask = campuses.length === 0 ? ask : campusId ? ask.eq("campus_id", campusId) : ask.is("campus_id", null);
+      const { data: found } = await ask.order("created_at");
+      const leads = ((found ?? []) as Array<{ id: string; name: string; campus_id: string | null; teacher_id: string }>).filter((h) => !isProgramHalaqa(h.name));
+      if (leads.length > 0) {
+        const { data: rest } = await supabase.from("class_teachers").select("class_id, teacher_id").in("class_id", leads.map((l) => l.id as string));
+        const match = (leads as Array<{ id: string; name: string; campus_id: string | null; teacher_id: string }>).find((l) =>
+          sameTeachers([l.teacher_id, ...((rest ?? []) as Array<{ class_id: string; teacher_id: string }>).filter((r) => r.class_id === l.id).map((r) => r.teacher_id)], ids)
+        );
+        if (match) return { id: match.id, name: match.name, campusId: match.campus_id ?? null };
+      }
+      const name = ids.map((id) => teacherName(id) ?? "").filter(Boolean).join(" & ") || "New halaqa";
+      const { data, error } = await supabase
+        .from("classes")
+        .insert({
+          name,
+          subject: "Qur'an & Hifz",
+          grade,
+          schedule: "",
+          teacher_id: ids[0],
+          school_id: schoolId,
+          ...(campusId ? { campus_id: campusId } : {}),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      // The others through the office's server route: one may be an admin who teaches.
+      await saveOtherTeachers(data.id as string, ids.slice(1));
+      setHalaqas((now) => [...now, { id: data.id as string, name, teacherId: ids[0], coTeacherIds: ids.slice(1), schedule: "", grade, campusId }]);
+      return { id: data.id as string, name, campusId };
+    });
   };
 
   // Students into a halaqa, a teacher's ("t:<id>", made if need be at
@@ -519,7 +728,7 @@ export default function AdminStudentsPage() {
   const placeStudents = async (ids: string[], to: string, grade: number, atCampus?: string | null): Promise<string> => {
     const target = to.startsWith("t:") ? await halaqaForTeacher(to.slice(2), grade, atCampus) : null;
     const classId = target ? target.id : to;
-    const { error: outError } = await supabase.from("class_enrollments").delete().in("student_id", ids);
+    const { error: outError } = await leaveHalaqas(ids);
     if (outError) throw outError;
     if (classId !== "__none") {
       const { error: inError } = await supabase
@@ -527,13 +736,26 @@ export default function AdminStudentsPage() {
         .insert(ids.map((student_id) => ({ class_id: classId, student_id })));
       if (inError) throw inError;
     }
-    // They attend their teacher's campus.
+    // Below Grade 3 they attend their halaqa's campus; from Grade 3 up the
+    // halaqa is at the main campus and each child keeps their own.
     const placedAt =
-      classId !== "__none"
+      classId !== "__none" && grade < ONE_HALAQA_FROM_GRADE
         ? halaqas.find((h) => h.id === classId)?.campusId ?? (target && campuses.length > 0 ? atCampus || assignCampus || campuses[0].id : null)
         : null;
     if (studentCampusReady && placedAt) await setCampusFor(ids, placedAt);
     const h = halaqaById(classId);
+    // On screen now; the reload that follows only confirms it.
+    const moved = new Set(ids);
+    const placedName = target ? target.name : h?.name ?? "";
+    setStudents((now) =>
+      now.map((x) =>
+        moved.has(x.id)
+          ? classId === "__none"
+            ? { ...x, halaqa: "", halaqaId: undefined }
+            : { ...x, halaqa: placedName, halaqaId: classId, campusId: placedAt ?? x.campusId }
+          : x
+      )
+    );
     const where = target ? target.label : h ? halaqaInGrade(h) : "the halaqa";
     return classId === "__none"
       ? phrase("{count} student taken away from their teacher.|{count} students taken away from their teacher.", { count: ids.length })
@@ -546,8 +768,9 @@ export default function AdminStudentsPage() {
     setAssignNote(null);
     try {
       const said = await placeStudents([s.id], to || "__none", grade, campusOfStudent(s));
-      await loadRealStudents();
+      void loadRealStudents();
       setAssignNote(`${s.name}: ${said.replace(/^1 student /, "")}`);
+      toast.success(`${s.name}: ${said.replace(/^1 student /, "")}`);
     } catch (err) {
       setAssignNote(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
@@ -562,8 +785,9 @@ export default function AdminStudentsPage() {
     setAssignNote(null);
     try {
       const said = await placeStudents(ids, assignTo, assignGrade, assignCampus);
-      await loadRealStudents();
+      void loadRealStudents();
       setAssignNote(said);
+      toast.success(said);
       setPicked(new Set());
     } catch (err) {
       setAssignNote(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
@@ -590,6 +814,16 @@ export default function AdminStudentsPage() {
       }).filter((x) => x.students > 0 || x.halaqas > 0)
     : [];
 
+  // Teachers to offer on a student's own row: those without a halaqa in the
+  // grade at the student's campus yet (one who has one is listed by it).
+  const draftTeacherChoices = (() => {
+    const editing = students.find((x) => x.id === editingId);
+    if (!editing) return [];
+    const campusId = campuses.length > 0 ? draftCampus || campusOfStudent(editing) || campuses[0].id : null;
+    const inGrade = halaqasFor(draftGrade);
+    return teachers.filter((t) => !inGrade.some((h) => h.teacherId === t.id && (campuses.length === 0 || (h.campusId ?? null) === campusId)));
+  })();
+
   const halaqaOptions = (grade: string) =>
     halaqasFor(grade).map((h) => (
       <option key={h.id} value={h.id}>
@@ -607,21 +841,16 @@ export default function AdminStudentsPage() {
           type="button"
           onClick={() => startEditing(s)}
           aria-expanded={isOpen}
-          className="w-full flex items-center gap-3 py-3.5 text-start hover:bg-surface-bg-warm rounded-2xl -mx-1 px-2 transition-colors"
+          className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
         >
-          <span
-            className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-[12px] text-white flex-shrink-0 ${
-              inactive ? "bg-slate-400" : avatarTone(s.name)
-            }`}
-          >
-            {initials(s.name)}
-          </span>
+          <Avatar name={s.name} muted={inactive} onDark={isOpen} />
           <div className="flex-1 min-w-0">
-            <p className={`text-[13px] font-semibold truncate ${inactive ? "text-ink-muted" : "text-ink"}`}>
+            <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${isOpen ? "text-white" : inactive ? "text-ink-muted" : "text-ink"}`}>
               {s.name}
             </p>
-            <p className="text-[11px] text-ink-muted truncate">
+            <p className={`text-[11px] [overflow-wrap:anywhere] ${isOpen ? "text-white/75" : "text-ink-muted"}`}>
               {graded ? (halaqa ? halaqaInGrade(halaqa) : [campusName(s.campusId), phrase("No teacher yet")].filter(Boolean).join(" · ")) : s.halaqa}
+              {s.programs?.map((p) => ` · ${p.name}`).join("")}
               {s.parentNames && s.parentNames.length > 0 && <>{" "}{tr("· Parent: {names}|· Parents: {names}", { n: s.parentNames.length, names: s.parentNames.join(", ") })}</>}
             </p>
           </div>
@@ -635,13 +864,18 @@ export default function AdminStudentsPage() {
               {tr("Inactive")}
             </span>
           )}
-          <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-            <IconArrow size={14} />
-          </span>
+          <RowChevron open={isOpen} />
         </button>
 
         {isOpen && (
           <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+            <button
+              type="button"
+              onClick={() => setRecord({ id: s.id, name: s.name, place: s.halaqa })}
+              className="inline-flex items-center gap-2 rounded-full border border-brand-navy/30 text-brand-navy dark:text-brand-gold dark:border-brand-gold/40 text-[12.5px] font-semibold px-3.5 py-1.5 hover:bg-brand-navy/5 transition-colors"
+            >
+              {tr("View record")}
+            </button>
             <div>
               <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Full name")}</label>
               <input value={draftName} onChange={(e) => setDraftName(e.target.value)} className={smallField} />
@@ -688,13 +922,78 @@ export default function AdminStudentsPage() {
                   </select>
                 </label>
               )}
+              {graded && !isDemo ? (
+                <fieldset className="block">
+                  <legend className="block text-xs font-semibold text-ink mb-1.5">{tr("Teachers")}</legend>
+                  {teachers.length === 0 ? (
+                    <span className="block text-[12px] text-ink-muted">
+                      {tr("No teachers yet.")}{" "}
+                      <Link href="/admin/teachers" className="font-semibold text-ink underline underline-offset-2">
+                        {tr("Add a teacher")}
+                      </Link>
+                    </span>
+                  ) : (
+                    <>
+                      {/* One teacher, or two or more to share a halaqa: saving
+                          puts the student in the halaqa they teach together
+                          in this grade, made if there isn't one. */}
+                      <div className="max-h-56 overflow-y-auto rounded-xl border border-surface-border bg-surface-card divide-y divide-surface-border">
+                        {teachers.map((t) => {
+                          const on = draftTeachers.includes(t.id);
+                          return (
+                            <label key={t.id} className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-ink cursor-pointer hover:bg-surface-bg-warm">
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                onChange={() =>
+                                  setDraftTeachers((now) => (on ? now.filter((x) => x !== t.id) : [...now, t.id]))
+                                }
+                                className="w-4 h-4 flex-shrink-0"
+                              />
+                              <span className="[overflow-wrap:anywhere]">{t.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <span className="block text-[11.5px] text-ink-muted mt-1.5">
+                        {draftTeachers.length === 0
+                          ? tr("No teacher yet. Tick one, or two to share a halaqa.")
+                          : draftTeachers.length === 1
+                            ? tr("Tick another teacher to share the halaqa.")
+                            : tr("They'll share one halaqa in this grade.")}
+                      </span>
+                    </>
+                  )}
+                </fieldset>
+              ) : (
               <label className="block">
                 <span className="block text-xs font-semibold text-ink mb-1.5">{graded ? tr("Teacher") : tr("Halaqa")}</span>
                 <select value={draftHalaqa} onChange={(e) => setDraftHalaqa(e.target.value)} className={smallField}>
                   {(graded || !draftHalaqa) && <option value="">{graded ? tr("No teacher yet") : tr("Select a halaqa")}</option>}
                   {halaqaOptions(draftGrade)}
+                  {/* A grade with no halaqas yet still has teachers to choose:
+                      saving makes the teacher's halaqa for this grade, the way
+                      "Assign to a teacher" does. */}
+                  {graded && !isDemo && draftTeacherChoices.length > 0 && (
+                    <optgroup label={tr("Teachers")}>
+                      {draftTeacherChoices.map((t) => (
+                        <option key={t.id} value={`t:${t.id}`}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+                {graded && !isDemo && teachers.length === 0 && halaqasFor(draftGrade).length === 0 && (
+                  <span className="block text-[12px] text-ink-muted mt-1.5">
+                    {tr("No teachers yet.")}{" "}
+                    <Link href="/admin/teachers" className="font-semibold text-ink underline underline-offset-2">
+                      {tr("Add a teacher")}
+                    </Link>
+                  </span>
+                )}
               </label>
+              )}
             </div>
             <label className="flex items-center gap-2 text-sm text-ink">
               <input
@@ -866,7 +1165,7 @@ export default function AdminStudentsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={tr("Search students or parents…")}
-          className="flex-1 min-w-[180px] min-h-11 bg-surface-card border border-surface-border rounded-2xl px-4 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/40 transition"
+          className="basis-full sm:basis-auto flex-1 min-w-[180px] min-h-11 bg-surface-card border border-surface-border rounded-2xl px-4 text-sm text-ink focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-gold/40 transition"
         />
         {!isDemo && (
           <button
@@ -928,6 +1227,18 @@ export default function AdminStudentsPage() {
               <option value="none">{studentCampusReady ? tr("No campus yet") : tr("No teacher yet")}</option>
             </select>
           )}
+          <button
+            type="button"
+            aria-pressed={unplacedOnly}
+            onClick={() => setUnplacedOnly((v) => !v)}
+            className={`rounded-xl border px-3 py-2 text-[13px] font-semibold transition-colors ${
+              unplacedOnly
+                ? "border-amber-700 bg-amber-700 text-white"
+                : "border-surface-border bg-surface-card text-ink hover:border-amber-700"
+            }`}
+          >
+            {tr("Without a teacher only")}
+          </button>
         </div>
       )}
 
@@ -1071,9 +1382,9 @@ export default function AdminStudentsPage() {
       {graded && ready && gradeSummary.length > 0 && (
         <SectionCard
           title={tr("Grades")}
-          note={`${gradeSummary.reduce((n, g) => n + g.unplaced, 0)} without a teacher`}
+          note={tr("{unplaced} without a teacher", { unplaced: gradeSummary.reduce((n, g) => n + g.unplaced, 0) })}
         >
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" data-section="grades">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2" data-section="grades">
             {gradeSummary.map((g) => {
               const on = gradeFilter === String(g.grade);
               return (
@@ -1087,8 +1398,12 @@ export default function AdminStudentsPage() {
                   }`}
                 >
                   <span className="block text-[13.5px] font-semibold">{gradeLabel(g.grade)}</span>
-                  <span className={`block text-[11px] ${on ? "text-white/80" : "text-ink-muted"}`}>
-                    {tr("{count} student|{count} students", { count: g.students })}{" · "}{tr("{count} teacher|{count} teachers", { count: g.halaqas })}
+                  {/* One fact to a line: a narrow card never breaks "0 teachers" in two. */}
+                  <span className={`block text-[11px] whitespace-nowrap ${on ? "text-white/80" : "text-ink-muted"}`}>
+                    {tr("{count} student|{count} students", { count: g.students })}
+                  </span>
+                  <span className={`block text-[11px] whitespace-nowrap ${on ? "text-white/80" : "text-ink-muted"}`}>
+                    {tr("{count} teacher|{count} teachers", { count: g.halaqas })}
                   </span>
                   {g.unplaced > 0 && (
                     <span className={`block text-[11px] font-semibold ${on ? "text-amber-200" : "text-amber-700 dark:text-amber-300"}`}>
@@ -1113,7 +1428,7 @@ export default function AdminStudentsPage() {
         </SectionCard>
       ) : filtered.length === 0 ? (
         <SectionCard title={tr("All students")} note={tr("0 shown")}>
-          <EmptyNote>{students.length === 0 ? tr("No students yet.") : tr("No students match that search.")}</EmptyNote>
+          <EmptyNote>{students.length === 0 ? tr("No students yet.") : unplacedOnly && !search.trim() ? tr("Every student here has a teacher.") : tr("No students match that search.")}</EmptyNote>
         </SectionCard>
       ) : byGrade ? (
         byGrade.map(({ grade, students: inGrade }) => (
@@ -1121,20 +1436,25 @@ export default function AdminStudentsPage() {
             key={grade}
             title={gradeLabel(grade)}
             note={
-              <>
+              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-2">
                 {tr("{count} student|{count} students", { count: inGrade.length })}
+                {/* The grade's actions as buttons, not the note's small capitals. */}
                 {!isDemo && (
                   <>
-                    {" · "}
                     {halaqasFor(String(grade)).length === 0 && teachers.length === 0 ? (
-                      <Link href="/admin/halaqas" className="underline underline-offset-2 hover:text-ink font-bold italic">
+                      <Link href="/admin/halaqas" className={`${GRADE_ACTION} border-brand-navy text-brand-navy dark:border-brand-gold dark:text-brand-gold hover:bg-brand-navy hover:text-white`}>
                         {tr("Add teachers for this grade")}
                       </Link>
                     ) : (
                       <button
                         type="button"
                         onClick={() => startAssigning(assignGrade === grade ? null : grade)}
-                        className="underline underline-offset-2 hover:text-ink font-bold italic"
+                        aria-pressed={assignGrade === grade}
+                        className={`${GRADE_ACTION} ${
+                          assignGrade === grade
+                            ? "border-brand-navy bg-brand-navy text-white"
+                            : "border-brand-navy text-brand-navy dark:border-brand-gold dark:text-brand-gold hover:bg-brand-navy hover:text-white dark:hover:bg-brand-gold dark:hover:text-brand-navy"
+                        }`}
                       >
                         {assignGrade === grade ? tr("Done") : tr("Assign to a teacher")}
                       </button>
@@ -1143,18 +1463,17 @@ export default function AdminStudentsPage() {
                 )}
                 {reportsReady && (
                   <>
-                    {" · "}
                     <button
                       type="button"
                       onClick={() => setGradeReports(grade, !gradeAllOn(grade))}
                       disabled={gradeBusy !== null}
-                      className="underline underline-offset-2 hover:text-ink font-bold italic disabled:opacity-50"
+                      className={`${GRADE_ACTION} border-surface-border text-ink-muted hover:text-ink hover:border-ink-muted disabled:opacity-50`}
                     >
                       {gradeBusy === grade ? tr("Saving…") : gradeAllOn(grade) ? tr("Weekly reports off for this grade") : tr("Weekly reports on for this grade")}
                     </button>
                   </>
                 )}
-              </>
+              </span>
             }
           >
             {assignGrade === grade ? (
@@ -1163,7 +1482,7 @@ export default function AdminStudentsPage() {
                     screen so one teacher can be given to all of them without
                     scrolling back up a long grade. */}
                 {picked.size > 0 && (
-                  <div className="fixed inset-x-0 bottom-16 md:bottom-0 z-40 md:start-60 px-3 pb-3 pointer-events-none" data-section="bulk-bar">
+                  <div className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-0 z-40 md:start-60 px-3 pb-3 pointer-events-none" data-section="bulk-bar">
                     <div className="max-w-3xl mx-auto pointer-events-auto rounded-2xl border border-emerald-500/50 bg-surface-card shadow-2xl p-3 flex flex-wrap items-center gap-2">
                       <span className="text-[12.5px] font-semibold text-ink">
                         {tr("{count} ticked", { count: picked.size })}
@@ -1324,7 +1643,7 @@ export default function AdminStudentsPage() {
                             className="w-4 h-4 accent-emerald-700 flex-shrink-0"
                           />
                           <span className="flex-1 min-w-0">
-                            <span className={`block text-[13px] font-semibold truncate ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
+                            <span className={`block text-[13px] font-semibold [overflow-wrap:anywhere] ${s.active === false ? "text-ink-muted" : "text-ink"}`}>{s.name}</span>
                             <span className={`block text-[11px] ${h ? "text-ink-muted" : "text-amber-700 dark:text-amber-300 font-semibold"}`}>
                               {h ? halaqaInGrade(h) : [campusName(s.campusId), phrase("No teacher yet")].filter(Boolean).join(" · ")}
                               {s.parentNames && s.parentNames.length > 0 && <span className="font-normal text-ink-muted"> · {s.parentNames.join(", ")}</span>}
@@ -1368,6 +1687,7 @@ export default function AdminStudentsPage() {
           <ul className="divide-y divide-surface-border -my-1">{filtered.map(renderStudent)}</ul>
         </SectionCard>
       )}
+      {record && <StudentRecord studentId={record.id} name={record.name} halaqa={record.place} onClose={() => setRecord(null)} />}
     </div>
   );
 }

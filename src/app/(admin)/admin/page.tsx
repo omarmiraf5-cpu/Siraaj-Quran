@@ -34,33 +34,64 @@ import { IconArrow } from "@/components/icons";
 import { QuickActions } from "@/components/gem-icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
+import { readCache, writeCache } from "@/lib/pageCache";
 import { loadSchoolTeachers } from "@/lib/schoolTeachers";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { AgreementsBanner } from "@/components/AgreementsBanner";
+import { GetStartedCard } from "@/components/GetStartedCard";
+import { Users, GraduationCap, BookOpen, CalendarCheck } from "lucide-react";
 
 type ReviewItem = { id: string; halaqaName: string };
 type AbsenceItem = { id: string; body: string; authorName: string; absenceDate: string | null };
+
+const SNAPSHOT_KEY = "admin-dashboard";
+interface AdminSnapshot {
+  today: string;
+  school: { name: string; city: string | null; province: string | null };
+  studentCount: number;
+  activeStudentCount: number;
+  teachers: DemoTeacher[];
+  halaqas: DemoHalaqa[];
+  reviewItems: ReviewItem[];
+  absenceItems: AbsenceItem[];
+  attendanceRate: number | null;
+}
 
 export default function AdminDashboard() {
   const supabase = createClient();
   const { t, language } = useLanguage();
   const { mode: noticeMode, api: noticeApi } = useAttendanceApi("admin");
-  const [ready, setReady] = useState(false);
+  // Last visit's dashboard, shown at once while it's read again.
+  const seen = readCache<AdminSnapshot>(SNAPSHOT_KEY);
+  const [ready, setReady] = useState(Boolean(seen));
 
   // Unknown until it's loaded: starting from the sample school's name put
   // "Siraaj Academy" on a real school's dashboard for the moment that took.
-  const [school, setSchool] = useState<{ name: string; city: string | null; province: string | null } | null>(null);
-  const [today, setToday] = useState(DEMO_TODAY);
-  const [isDemoSchool, setIsDemoSchool] = useState(true);
-  const [studentCount, setStudentCount] = useState(0);
-  const [activeStudentCount, setActiveStudentCount] = useState(0);
-  const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
-  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
-  const [attendanceRate, setAttendanceRate] = useState<number | null>(null);
-  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
-  const [absenceItems, setAbsenceItems] = useState<AbsenceItem[]>([]);
+  const [school, setSchool] = useState<{ name: string; city: string | null; province: string | null } | null>(seen?.school ?? null);
+  const [today, setToday] = useState(seen?.today ?? DEMO_TODAY);
+  const [isDemoSchool, setIsDemoSchool] = useState(!seen);
+  const [studentCount, setStudentCount] = useState(seen?.studentCount ?? 0);
+  const [activeStudentCount, setActiveStudentCount] = useState(seen?.activeStudentCount ?? 0);
+  const [teachers, setTeachers] = useState<DemoTeacher[]>(seen?.teachers ?? []);
+  const [halaqas, setHalaqas] = useState<DemoHalaqa[]>(seen?.halaqas ?? []);
+  const [attendanceRate, setAttendanceRate] = useState<number | null>(seen?.attendanceRate ?? null);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>(seen?.reviewItems ?? []);
+  const [absenceItems, setAbsenceItems] = useState<AbsenceItem[]>(seen?.absenceItems ?? []);
+
+  const showSnapshot = (x: AdminSnapshot) => {
+    setToday(x.today);
+    setSchool(x.school);
+    setStudentCount(x.studentCount);
+    setActiveStudentCount(x.activeStudentCount);
+    setTeachers(x.teachers);
+    setHalaqas(x.halaqas);
+    setReviewItems(x.reviewItems);
+    setAbsenceItems(x.absenceItems);
+    setAttendanceRate(x.attendanceRate);
+  };
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
     const [{ data }, { data: others }] = await Promise.all([
@@ -118,18 +149,21 @@ export default function AdminDashboard() {
     }));
   };
 
+  // Counted by the database rather than every mark downloaded and counted
+  // here: two numbers come back instead of thousands of rows (which were
+  // also cut off at 1,000, so a big school's rate was off).
   const loadRealAttendanceRate = async (): Promise<number | null> => {
-    const { data } = await supabase.from("attendance").select("status");
-    if (!data || data.length === 0) return null;
-    const present = data.filter((a) => a.status === "present" || a.status === "late").length;
-    return Math.round((present / data.length) * 100);
+    const [all, present] = await Promise.all([
+      supabase.from("attendance").select("student_id", { count: "exact", head: true }),
+      supabase.from("attendance").select("student_id", { count: "exact", head: true }).in("status", ["present", "late"]),
+    ]);
+    if (!all.count) return null;
+    return Math.round(((present.count ?? 0) / all.count) * 100);
   };
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setSchool({ name: DEMO_SCHOOL.name, city: DEMO_SCHOOL.city, province: DEMO_SCHOOL.province });
@@ -174,34 +208,43 @@ export default function AdminDashboard() {
         return;
       }
 
-      setToday(new Date().toLocaleDateString("en-CA"));
       setIsDemoSchool(false);
       // The school they're signed in to, by its id: an admin can see more
       // than one school (a teacher's other school), so "the one school I
       // can see" isn't a question with one answer.
-      const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
-      const { data: schoolRow } = me?.school_id
-        ? await supabase.from("schools").select("name, city, province").eq("id", me.school_id).maybeSingle()
-        : { data: null };
-      setSchool(schoolRow ?? { name: "", city: null, province: null });
-
-      const { data: studentRows } = await supabase.from("students").select("active");
-      setStudentCount(studentRows?.length ?? 0);
-      setActiveStudentCount((studentRows ?? []).filter((s) => s.active !== false).length);
-
-      const [realTeachers, realHalaqas, realReview, realAbsences, realAttendance] =
+      // Everything at once: only the school's name waits for its id. The
+      // students are counted by the database, not downloaded to be counted.
+      const schoolDetails = async () => {
+        const { data: me } = await supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle();
+        const { data } = me?.school_id
+          ? await supabase.from("schools").select("name, city, province").eq("id", me.school_id).maybeSingle()
+          : { data: null };
+        return data ?? { name: "", city: null, province: null };
+      };
+      const [schoolRow, allCount, activeCount, realTeachers, realHalaqas, realReview, realAbsences, realAttendance] =
         await Promise.all([
+          schoolDetails(),
+          supabase.from("students").select("id", { count: "exact", head: true }),
+          supabase.from("students").select("id", { count: "exact", head: true }).neq("active", false),
           loadSchoolTeachers(supabase),
           loadRealHalaqas(),
           loadRealReviewItems(),
           loadRealAbsences(),
           loadRealAttendanceRate(),
         ]);
-      setTeachers(realTeachers);
-      setHalaqas(realHalaqas);
-      setReviewItems(realReview);
-      setAbsenceItems(realAbsences);
-      setAttendanceRate(realAttendance);
+      const snapshot: AdminSnapshot = {
+        today: new Date().toLocaleDateString("en-CA"),
+        school: schoolRow,
+        studentCount: allCount.count ?? 0,
+        activeStudentCount: activeCount.count ?? 0,
+        teachers: realTeachers,
+        halaqas: realHalaqas,
+        reviewItems: realReview,
+        absenceItems: realAbsences,
+        attendanceRate: realAttendance,
+      };
+      showSnapshot(snapshot);
+      writeCache(SNAPSHOT_KEY, snapshot);
     };
     load().finally(() => setReady(true));
   }, []);
@@ -212,7 +255,7 @@ export default function AdminDashboard() {
   if (!school) {
     return (
       <div className="max-w-7xl mx-auto pt-10">
-        <LoadingNote>{t("common.loadingDashboard")}</LoadingNote>
+        <LoadingNote stats rows={5}>{t("common.loadingDashboard")}</LoadingNote>
       </div>
     );
   }
@@ -240,6 +283,7 @@ export default function AdminDashboard() {
       />
 
       <AgreementsBanner enabled={!isDemoSchool} />
+      {ready && !isDemoSchool && <GetStartedCard teachers={teachers.length} halaqas={halaqas.length} students={studentCount} />}
 
       {/* Notices the portal raised on its own — a child absent five school
           days running, a teacher reporting an absence. */}
@@ -257,10 +301,10 @@ export default function AdminDashboard() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile art="person" accent="navy" value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
-        <StatTile art="book" accent="gold" value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
-        <StatTile art="mosque" accent="navy" value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
-        <StatTile art="check" accent="green" value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
+        <StatTile icon={Users} art="person" tone="navy" value={activeStudentCount} label={t("nav.students")} sub={countLabel("{count} inactive|{count} inactive", studentCount - activeStudentCount, `${studentCount - activeStudentCount} ${t("common.inactive").toLowerCase()}`)} />
+        <StatTile icon={GraduationCap} art="board" tone="gold" value={activeTeachers.length} label={t("nav.teachers")} sub={countLabel("{count} halaqa|{count} halaqas", halaqas.length, `${halaqas.length} ${t("nav.halaqas").toLowerCase()}`)} />
+        <StatTile icon={BookOpen} art="rehal" tone="green" value={halaqas.length} label={t("nav.halaqas")} sub={unassignedHalaqas.length ? countLabel("{count} unassigned|{count} unassigned", unassignedHalaqas.length, `${unassignedHalaqas.length} ${t("common.unassigned")}`) : t("common.allAssigned")} />
+        <StatTile icon={CalendarCheck} art="calendarCheck" tone="amber" value={attendanceRate == null ? "—" : `${attendanceRate}%`} label={t("common.attendanceStat")} sub={t("common.schoolWide")} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
@@ -303,8 +347,8 @@ export default function AdminDashboard() {
             return (
               <li key={teacher.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{teacher.name}</p>
-                  <p className="text-[11px] text-ink-muted truncate">
+                  <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{teacher.name}</p>
+                  <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                     {theirHalaqas.length > 0
                       ? theirHalaqas.map((h) => h.name).join(", ")
                       : t("common.noHalaqaAssigned")}

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { halaqaCampusId, ONE_HALAQA_FROM_GRADE } from "@/lib/schoolStructure";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse, after } from "next/server";
 import { randomBytes } from "crypto";
@@ -75,14 +76,14 @@ export async function POST(req: NextRequest) {
         admin.from("schools").select("name").eq("id", schoolId).maybeSingle(),
         admin.from("schools").select("organised_by_grade").eq("id", schoolId).maybeSingle(),
         admin.from("campuses").select("id, name").eq("school_id", schoolId),
-        admin.from("classes").select("id, name, grade, campus_id").eq("school_id", schoolId),
+        admin.from("classes").select("id, name, grade, campus_id, teacher_id").eq("school_id", schoolId),
         admin.from("students").select("id, full_name, grade").eq("school_id", schoolId),
       ]);
     if (studentsError) throw studentsError;
     const byGrade = graded?.organised_by_grade === true;
     const campusesReady = !campusList.error;
     const campuses = (campusList.data ?? []) as Array<{ id: string; name: string }>;
-    const halaqas = ((halaqaList.data ?? []) as Array<{ id: string; name: string; grade: number; campus_id?: string | null }>).map((h) => ({
+    const halaqas = ((halaqaList.data ?? []) as Array<{ id: string; name: string; grade: number; campus_id?: string | null; teacher_id?: string | null }>).map((h) => ({
       ...h,
       campus_id: h.campus_id ?? null,
     }));
@@ -129,7 +130,14 @@ export async function POST(req: NextRequest) {
           (campuses.length === 0 || h.campus_id === campusId)
       );
       if (found) return found;
+      // A teacher's own halaqa in that grade, at that campus, whatever it's
+      // called now — so a renamed one isn't made again beside it.
       const teacher = teacherCalled(name);
+      const theirs =
+        byGrade && teacher
+          ? halaqas.find((h) => h.teacher_id === teacher.id && h.grade === grade && (campuses.length === 0 || h.campus_id === campusId))
+          : undefined;
+      if (theirs) return theirs;
       const { data, error } = await admin
         .from("classes")
         .insert({
@@ -144,7 +152,7 @@ export async function POST(req: NextRequest) {
         .select("id, name, grade")
         .single();
       if (error) throw error;
-      const made = { ...data, campus_id: campusId };
+      const made = { ...data, campus_id: campusId, teacher_id: teacher?.id ?? null };
       halaqas.push(made);
       return made;
     };
@@ -174,7 +182,10 @@ export async function POST(req: NextRequest) {
           results.push({ status: "failed", name, reason: "Which campus? The school has more than one — fill in the Campus column" });
           continue;
         }
-        const halaqa = halaqaName ? await halaqaFor(halaqaName, grade as number, campus?.id ?? null) : null;
+        // From Grade 3 up a teacher's halaqa is one per grade, at the main
+        // campus, whatever campus the child is at.
+        const halaqaCampus = byGrade ? halaqaCampusId(grade as number, campus?.id, campuses) : campus?.id ?? null;
+        const halaqa = halaqaName ? await halaqaFor(halaqaName, grade as number, halaqaCampus) : null;
         const place = [campus?.name && campuses.length > 0 ? campus.name : null, byGrade ? gradeLabel(grade as number) : null, halaqa?.name]
           .filter(Boolean)
           .join(" · ");
@@ -199,7 +210,7 @@ export async function POST(req: NextRequest) {
         // database without the column yet takes them without it.
         let { data: student, error: studentError } = await admin
           .from("students")
-          .insert({ ...studentRow, ...(campus ? { campus_id: halaqa?.campus_id ?? campus.id } : {}) })
+          .insert({ ...studentRow, ...(campus ? { campus_id: byGrade && (grade as number) >= ONE_HALAQA_FROM_GRADE ? campus.id : halaqa?.campus_id ?? campus.id } : {}) })
           .select("id")
           .single();
         if (studentError && campus && /campus_id/.test(studentError.message ?? "")) {
@@ -236,7 +247,9 @@ export async function POST(req: NextRequest) {
             if (parent.id) {
               const { error } = await admin.from("parent_students").insert({ parent_id: parent.id, student_id: student.id });
               if (error && error.code !== "23505") throw error;
-              welcomes.find((w) => w.userId === parent.id)?.children?.push(name);
+              const welcome = welcomes.find((w) => w.userId === parent.id);
+              welcome?.children?.push(name);
+              if (welcome) (welcome.childPins ??= []).push({ name, pin });
             }
             result.parent = {
               email: parent.email,

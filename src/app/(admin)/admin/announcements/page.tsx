@@ -13,13 +13,16 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
+import { useToast } from "@/components/Toast";
 
 const AUDIENCES: AnnouncementAudience[] = ["all", "parents", "teachers", "students"];
 
 export default function AdminAnnouncementsPage() {
   const { tr } = useLanguage();
+  const toast = useToast();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
@@ -60,9 +63,7 @@ export default function AdminAnnouncementsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);
@@ -125,6 +126,7 @@ export default function AdminAnnouncementsPage() {
     }
     await loadReal();
     resetForm();
+    toast.success(tr("Announcement posted."));
   };
 
   const resetForm = () => {

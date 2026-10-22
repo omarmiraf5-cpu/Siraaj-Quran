@@ -1,8 +1,10 @@
 "use client";
 
+import { QaidahWorkspace } from "@/components/QaidahWorkspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { demoClassWorkFetch, type ClassWorkRole } from "@/lib/demoClassWork";
 import { DEMO_TODAY, formatDay } from "@/data/demo";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -47,9 +49,8 @@ type Mode = "loading" | "demo" | "real";
 export function useClassWorkApi(role: ClassWorkRole): { mode: Mode; api: Api } {
   const [mode, setMode] = useState<Mode>("loading");
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data: { user } }) => setMode(user ? "real" : "demo"))
+    sessionUser(createClient())
+      .then((user) => setMode(user ? "real" : "demo"))
       .catch(() => setMode("demo"));
   }, []);
   const api = useCallback<Api>(
@@ -173,7 +174,7 @@ function FileChips({ files, onRemove }: { files: FileRef[]; onRemove?: (i: numbe
               </span>
             )}
             <span className="min-w-0 text-start">
-              <span className="block text-[12.5px] font-semibold text-ink truncate max-w-[170px]" dir="auto">
+              <span className="block text-[12.5px] font-semibold text-ink [overflow-wrap:anywhere] max-w-[170px]" dir="auto">
                 {f.name}
               </span>
               <span className="block text-[11px] text-ink-muted">{fileSize(f.size)}</span>
@@ -420,6 +421,10 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
   const [subject, setSubject] = useState<Subject | "all">("all");
   const [composing, setComposing] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // The page has two parts: the written work, and the Qa'idah (?tab=qaidah).
+  const [tab, setTab] = useState<"work" | "qaidah">(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "qaidah" ? "qaidah" : "work"
+  );
 
   const load = useCallback(async () => {
     try {
@@ -453,20 +458,41 @@ export function StaffClassWork({ role }: { role: "teacher" | "admin" }) {
         title={t("cw.title")}
         meta={data ? [countLabel("{count} assignment|{count} assignments", data.assignments.length, `${data.assignments.length} ${t("nav.assignments").toLowerCase()}`), countLabel("{count} submitted|{count} submitted", waiting, `${waiting} ${t("cw.status.submitted").toLowerCase()}`)] : []}
         actions={
-          <button
-            type="button"
-            onClick={() => setComposing(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition"
-          >
-            <IconPen />
-            {t("cw.new")}
-          </button>
+          tab === "work" ? (
+            <button
+              type="button"
+              onClick={() => setComposing(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-semibold text-[#20180a] hover:brightness-105 active:scale-[.98] transition"
+            >
+              <IconPen />
+              {t("cw.new")}
+            </button>
+          ) : undefined
         }
       />
 
-      {error && <ErrorLine>{error}</ErrorLine>}
+      <SegmentedSwitch
+        label={t("cw.title")}
+        value={tab}
+        onChange={(v) => {
+          setTab(v);
+          try {
+            window.history.replaceState(null, "", v === "qaidah" ? "?tab=qaidah" : window.location.pathname);
+          } catch {
+            /* a preview that won't let the address change */
+          }
+        }}
+        options={[
+          { value: "work", label: tr("Assignments") },
+          { value: "qaidah", label: tr("Qa'idah") },
+        ]}
+      />
 
-      {data && (
+      {tab === "qaidah" && <QaidahWorkspace />}
+
+      {error && tab === "work" && <ErrorLine>{error}</ErrorLine>}
+
+      {data && tab === "work" && (
         <>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <SegmentedSwitch
@@ -991,7 +1017,7 @@ function AssignmentDetail({ id, api, today, onClose }: { id: string; api: Api; t
                   className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm/60 px-1 rounded-lg transition"
                 >
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13.5px] font-semibold text-ink truncate">{s.student_name}</span>
+                    <span className="block text-[13.5px] font-semibold text-ink [overflow-wrap:anywhere]">{s.student_name}</span>
                     {s.status === "graded" && s.score !== null && (
                       <span className="block text-[12px] text-ink-muted tabular-nums">
                         {scoreLine(s.score, a.max_points)} · {percentOf(s.score, a.max_points)}%
@@ -1075,7 +1101,7 @@ function MarkingView({
       </button>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="page-title text-[18px] truncate">{submission.student_name}</p>
+          <p className="page-title text-[18px] [overflow-wrap:anywhere]">{submission.student_name}</p>
           {submission.submitted_at && (
             <p className="text-[12px] text-ink-muted">
               {t("cw.status.submitted")} {new Date(submission.submitted_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}

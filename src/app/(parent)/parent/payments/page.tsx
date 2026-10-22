@@ -18,6 +18,7 @@ import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { balanceFor, balancesByStudent } from "@/lib/balances";
@@ -33,9 +34,7 @@ export default function ParentPaymentsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         const c = readDemoStore<DemoFee[]>(DEMO_CREATED_FEES_KEY, []);
@@ -95,12 +94,12 @@ export default function ParentPaymentsPage() {
         title={t("nav.payments")}
         meta={
           outstanding > 0
-            ? [`${money(outstanding)} ${t("common.outstanding").toLowerCase()}`]
-            : [t("common.allPaidUp")]
+            ? [{ text: `${money(outstanding)} ${t("common.outstanding").toLowerCase()}`, tone: "amber" as const }]
+            : [{ text: t("common.allPaidUp"), tone: "green" as const }]
         }
       />
 
-      <div className="grid grid-cols-3 gap-3" data-section="balances">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" data-section="balances">
         <StatTile value={money(balance.old)} label={t("parent.payments.oldBalance")} sub={t("parent.payments.fromEarlierMonths")} />
         <StatTile value={money(balance.monthOwed)} label={t("parent.payments.monthlyBalance")} sub={t("parent.payments.owedThisMonth")} />
         <StatTile value={money(balance.outstanding)} label={t("parent.payments.outstandingBalance")} sub={t("parent.payments.oldPlusMonthly")} />
@@ -115,7 +114,7 @@ export default function ParentPaymentsPage() {
           <ul className="divide-y divide-surface-border -my-1" data-section="by-child">
             {perChild.map((b) => (
               <li key={b.studentId} className="py-3 flex items-center justify-between gap-3">
-                <p className="text-[13px] font-semibold text-ink truncate">{childName(b.studentId)}</p>
+                <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{childName(b.studentId)}</p>
                 <p className="text-[12px] text-ink-muted text-end" dir="ltr">
                   {t("parent.payments.oldBalance")} {money(b.old)} · {t("parent.payments.monthlyBalance")} {money(b.monthOwed)} ·{" "}
                   <span className={`font-semibold ${b.outstanding > 0 ? "text-red-800 dark:text-red-300" : "text-ink"}`}>
@@ -140,8 +139,8 @@ export default function ParentPaymentsPage() {
               return (
                 <li key={f.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-ink truncate">{f.description}</p>
-                    <p className="text-[11px] text-ink-muted truncate">
+                    <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{f.description}</p>
+                    <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                       {childName(f.studentId)} · {t("common.due").toLowerCase()} {formatDay(f.dueDate, language)}
                     </p>
                   </div>

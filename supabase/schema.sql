@@ -630,7 +630,7 @@ create table if not exists quranic_assignments (
   memorization_level   int not null default 0 check (memorization_level between 0 and 100),
   -- How the teacher graded today's recitation. Parents read this before any
   -- percentage, so it is set independently of memorization_level.
-  daily_rating         text check (daily_rating in ('excellent', 'very_good', 'good', 'weak')),
+  daily_rating         text check (daily_rating in ('excellent', 'very_good', 'good', 'weak', 'not_recited')),
   teacher_notes        text,
   student_notes        text,
   created_at           timestamptz default now(),
@@ -662,7 +662,7 @@ begin
   ) then
     alter table quranic_assignments
       add constraint quranic_assignments_daily_rating_check
-      check (daily_rating in ('excellent', 'very_good', 'good', 'weak'));
+      check (daily_rating in ('excellent', 'very_good', 'good', 'weak', 'not_recited'));
   end if;
 end $$;
 alter table quranic_assignments
@@ -1043,7 +1043,7 @@ create table if not exists recitation_log (
   -- for the common single-surah case.
   surah_end     int not null check (surah_end between surah and 114),
   ayah_end      int not null check (ayah_end >= ayah_start),
-  rating        text not null check (rating in ('excellent', 'very_good', 'good', 'weak')),
+  rating        text not null check (rating in ('excellent', 'very_good', 'good', 'weak', 'not_recited')),
   notes         text,
   -- The day the session was heard, distinct from created_at (when the row
   -- was written) so a teacher can log yesterday's session without it
@@ -1478,6 +1478,11 @@ create index if not exists idx_classes_teacher   on classes(teacher_id);
 create index if not exists idx_enrollments_student on class_enrollments(student_id);
 create index if not exists idx_attendance_date   on attendance(class_date);
 create index if not exists idx_attendance_student on attendance(student_id);
+create index if not exists idx_attendance_school_date on attendance(school_id, class_date desc);
+create index if not exists idx_attendance_student_date on attendance(student_id, class_date desc);
+create index if not exists idx_attendance_teacher on attendance(teacher_id);
+create index if not exists idx_parent_students_student on parent_students(student_id);
+create index if not exists idx_students_profile on students(profile_id);
 create index if not exists idx_lessons_school    on lessons(school_id);
 create index if not exists idx_fees_student      on fees(student_id);
 create index if not exists idx_grades_student    on subject_grades(student_id);
@@ -1781,7 +1786,7 @@ end $$;
 -- to remove).
 alter table notifications drop constraint if exists notifications_kind_check;
 alter table notifications add constraint notifications_kind_check
-  check (kind in ('absence_streak', 'staff_absence_report', 'account_deleted', 'deletion_request'));
+  check (kind in ('absence_streak', 'staff_absence_report', 'account_deleted', 'deletion_request', 'milestone'));
 
 -- ══════════════════════════════════════
 -- Islamic Studies & Arabic assignments
@@ -2445,3 +2450,40 @@ end $$;
 
 -- Supabase's API reads the tables afresh, new ones included.
 notify pgrst, 'reload schema';
+create table if not exists qaidah_page_assignments (
+  id          uuid primary key default gen_random_uuid(),
+  student_id  uuid not null references students(id) on delete cascade,
+  school_id   uuid not null references schools(id) on delete cascade,
+  teacher_id  uuid references profiles(id) on delete set null,
+  book        text not null check (book in ('ahsanul_qawaid', 'nuraniyah', 'baghdadiyah')),
+  page_start  int  not null check (page_start between 1 and 999),
+  page_end    int  not null check (page_end between 1 and 999),
+  portion     text not null default 'new' check (portion in ('new', 'recent', 'old')),
+  due_date    date,
+  note        text check (char_length(note) <= 500),
+  status      text not null default 'assigned' check (status in ('assigned', 'passed', 'repeat')),
+  assigned_at timestamptz not null default now(),
+  passed_at   timestamptz,
+  updated_at  timestamptz not null default now(),
+  check (page_end >= page_start)
+);
+alter table qaidah_page_assignments enable row level security;
+create index if not exists idx_qaidah_pages_student on qaidah_page_assignments(student_id, assigned_at desc);
+create index if not exists idx_qaidah_pages_school on qaidah_page_assignments(school_id, assigned_at desc);
+
+-- The same rules as a child's Qa'idah lessons: the school's teachers and
+-- office set and read them; a child reads their own, a parent their children's.
+drop policy if exists "School staff manage Qaidah pages" on qaidah_page_assignments;
+create policy "School staff manage Qaidah pages" on qaidah_page_assignments
+  for all using (
+    school_id = my_school_id() and my_role() in ('admin', 'teacher')
+  ) with check (
+    school_id = my_school_id() and my_role() in ('admin', 'teacher')
+    and student_school_id(student_id) = school_id
+  );
+drop policy if exists "Students read their own Qaidah pages" on qaidah_page_assignments;
+create policy "Students read their own Qaidah pages" on qaidah_page_assignments
+  for select using (student_id in (select id from students where profile_id = auth.uid()));
+drop policy if exists "Parents read their children's Qaidah pages" on qaidah_page_assignments;
+create policy "Parents read their children's Qaidah pages" on qaidah_page_assignments
+  for select using (student_id in (select my_children_student_ids()));

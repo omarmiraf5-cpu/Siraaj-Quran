@@ -1,6 +1,7 @@
 "use client";
 
 import { getAllTajweedRules } from "@/lib/tajweed-rules";
+import { StudentPageHeader } from "@/components/student-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 
 export default function TajweedReferencePage() {
@@ -9,18 +10,13 @@ export default function TajweedReferencePage() {
 
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
-      <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="relative">
-          <p className="eyebrow text-white/45">{tr("Reference")}</p>
-          <h1 className="page-title text-white text-3xl mt-1.5">{tr("Tajweed")}</h1>
-          <p className="text-[13px] text-white/55 mt-2.5">
-            {tr("{count} rules", { count: rules.length })}
-            <span className="text-white/25 mx-2">·</span>
-            {tr("the colours in your Mushaf and what each one means")}
-          </p>
-        </div>
-      </header>
+      <StudentPageHeader
+        emoji="🌈"
+        eyebrow={tr("Reference")}
+        title={tr("Tajweed")}
+        back={{ href: "/student/learn", label: tr("Learn") }}
+        subtitle={<>{tr("{count} rules", { count: rules.length })} · {tr("the colours in your Mushaf and what each one means")}</>}
+      />
 
       <section className="card-quiet p-5">
         <p className="text-[14px] text-ink-body leading-relaxed">

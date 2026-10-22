@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/data/demo";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
-import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { MonthBar, field, label, primary, ghost } from "@/components/financeUi";
 import {
   EXPENSE_CATEGORIES,
@@ -25,6 +25,7 @@ import {
 } from "@/lib/finance";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
+import { useToast } from "@/components/Toast";
 
 // The month's spending: what, how much, to whom, by category.
 
@@ -56,6 +57,7 @@ const blankDraft = (): Draft => ({ spentOn: todayIso(), category: "supplies", de
 
 export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; schoolId: string | null; userId: string | null }) {
   const { tr } = useLanguage();
+  const toast = useToast();
   const supabase = createClient();
   const thisMonth = monthOf(todayIso());
   const [month, setMonth] = useState(thisMonth);
@@ -151,6 +153,7 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
     }
     setBusy(false);
     setDraft(null);
+    toast.success(tr("Expense saved: {amount}.", { amount: money(row.amount) }));
     // To the month it was spent in, so it's there to see.
     if (monthOf(row.spentOn) !== month) setMonth(monthOf(row.spentOn));
     else await load(month);
@@ -279,17 +282,18 @@ export function ExpensesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                     type="button"
                     onClick={() => setOpenId(isOpen ? null : e.id)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <span className="w-12 text-center flex-shrink-0 text-[11px] font-semibold text-ink-muted">{shortDate(e.spentOn)}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">{e.description}</p>
-                      <p className="text-[11px] text-ink-muted truncate">
+                      <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{e.description}</p>
+                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                         {EXPENSE_CATEGORY_LABELS[e.category]}
                         {e.paidTo ? ` · ${e.paidTo}` : ""} · {PAY_METHOD_LABELS[e.method]}
                       </p>
                     </div>
                     <p className="text-[13px] font-semibold text-ink flex-shrink-0">{money(e.amount)}</p>
+                    <RowChevron open={isOpen} />
                   </button>
                   {isOpen && (
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-3 flex items-center justify-between gap-3">

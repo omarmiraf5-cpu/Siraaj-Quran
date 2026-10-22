@@ -107,7 +107,7 @@ function HadithCard({
 
         <span className="flex-1 min-w-0">
           <span className="flex items-center gap-2">
-            <span className="page-title text-[16px] truncate">{tr(hadith.theme)}</span>
+            <span className="page-title text-[16px] [overflow-wrap:anywhere]">{tr(hadith.theme)}</span>
             {hadith.qudsi && (
               <span
                 className={`${ILLUM_CLASS.saffron} inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide flex-shrink-0`}
@@ -117,7 +117,7 @@ function HadithCard({
               </span>
             )}
           </span>
-          <span className="block text-[12px] text-ink-muted mt-0.5 truncate">
+          <span className="block text-[12px] text-ink-muted mt-0.5 [overflow-wrap:anywhere]">
             {tr(hadith.narrator)} · {tr(hadith.source)}
           </span>
         </span>

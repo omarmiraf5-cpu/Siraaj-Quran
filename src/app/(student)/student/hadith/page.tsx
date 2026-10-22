@@ -2,31 +2,21 @@
 
 import { ARBAEEN } from "@/data/arbaeen";
 import { ArbaeenBook, ArbaeenSummary } from "@/components/ArbaeenBook";
+import { StudentPageHeader } from "@/components/student-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 
 export default function StudentHadithPage() {
   const { tr } = useLanguage();
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
-      <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="relative">
-          <p className="eyebrow text-white/45">{tr("Forty Hadith")}</p>
-          <h1 className="page-title text-white text-[30px] mt-1 leading-tight">{tr("An-Nawawi")}</h1>
-          <p
-            className="font-calligraphy text-[26px] text-brand-gold-light mt-1.5 leading-tight"
-            dir="rtl"
-            lang="ar"
-          >
-            الْأَرْبَعُونَ النَّوَوِيَّةُ
-          </p>
-          <p className="text-[13px] text-white/55 mt-2.5">
-            {tr("{count} hadith", { count: ARBAEEN.length })}
-            <span className="text-white/25 mx-2">·</span>
-            {tr("Arabic and English")}
-          </p>
-        </div>
-      </header>
+      <StudentPageHeader
+        emoji="📜"
+        eyebrow={tr("Forty Hadith")}
+        title={tr("An-Nawawi")}
+        arabic="الْأَرْبَعُونَ النَّوَوِيَّةُ"
+        back={{ href: "/student/learn", label: tr("Learn") }}
+        subtitle={<>{tr("{count} hadith", { count: ARBAEEN.length })} · {tr("Arabic and English")}</>}
+      />
 
       <ArbaeenSummary />
       <ArbaeenBook />

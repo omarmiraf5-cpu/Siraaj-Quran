@@ -20,10 +20,12 @@ import {
 } from "@/data/demo";
 import type { DemoHalaqa, DemoTeacher, DemoStudent } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { SectionCard, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
+import { isProgramHalaqa } from "@/lib/programHalaqa";
+import { ColorTile } from "@/components/gem-icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { loadSchoolTeachers, saveOtherTeachers, splitTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
 import { GRADES, gradeLabel } from "@/lib/grades";
 import { loadCampuses, loadSchoolShape, type Campus } from "@/lib/schoolStructure";
@@ -91,6 +93,8 @@ function PlaceFields({
   campusId,
   onGrade,
   onCampus,
+  program,
+  onProgram,
   small,
 }: {
   graded: boolean;
@@ -99,6 +103,9 @@ function PlaceFields({
   campusId: string;
   onGrade: (grade: string) => void;
   onCampus: (campusId: string) => void;
+  /** A Hifd program sits beside a child's grade halaqa, so it has no grade of its own. */
+  program: boolean;
+  onProgram: (program: boolean) => void;
   small?: boolean;
 }) {
   const { tr } = useLanguage();
@@ -119,7 +126,7 @@ function PlaceFields({
           </select>
         </label>
       )}
-      {graded && (
+      {graded && !program && (
         <label className="block">
           <span className={label}>{tr("Grade *")}</span>
           <select value={grade} onChange={(e) => onGrade(e.target.value)} className={small ? smallField : bigField}>
@@ -130,6 +137,15 @@ function PlaceFields({
               </option>
             ))}
           </select>
+        </label>
+      )}
+      {graded && (
+        <label className="col-span-2 flex items-start gap-2.5 text-[13px] text-ink">
+          <input type="checkbox" checked={program} onChange={(e) => onProgram(e.target.checked)} className="mt-0.5 w-4 h-4 accent-emerald-700 flex-shrink-0" />
+          <span>
+            <span className="font-semibold">{tr("This is a Hifd program")}</span>
+            <span className="block text-ink-muted text-[12px]">{tr("It isn't tied to a grade: a child stays in their own grade's halaqa and joins it as well.")}</span>
+          </span>
         </label>
       )}
     </div>
@@ -158,6 +174,7 @@ export default function AdminHalaqasPage() {
   const [newSchedule, setNewSchedule] = useState("");
   const [newTeacherIds, setNewTeacherIds] = useState<string[]>([]);
   const [newGrade, setNewGrade] = useState("");
+  const [newProgram, setNewProgram] = useState(false);
   const [newCampusId, setNewCampusId] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -169,12 +186,15 @@ export default function AdminHalaqasPage() {
   const [draftSchedule, setDraftSchedule] = useState("");
   const [draftTeacherIds, setDraftTeacherIds] = useState<string[]>([]);
   const [draftGrade, setDraftGrade] = useState("");
+  const [draftProgram, setDraftProgram] = useState(false);
   const [draftCampusId, setDraftCampusId] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
   const [newCampus, setNewCampus] = useState("");
   const [campusBusy, setCampusBusy] = useState(false);
+  const [merging, setMerging] = useState(false);
+  const [mergeName, setMergeName] = useState("");
   const [campusError, setCampusError] = useState<string | null>(null);
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
@@ -213,25 +233,28 @@ export default function AdminHalaqasPage() {
     const { data: enrollments } = await supabase
       .from("class_enrollments")
       .select("student_id, class_id, classes(name)");
+    // Their own halaqa, and any program (a Hifd program) beside it.
     const halaqaByStudent = new Map<string, { id: string; name: string }>();
+    const programsOf = new Map<string, Array<{ id: string; name: string }>>();
     for (const e of enrollments ?? []) {
       const className = (e as unknown as { classes: { name: string } | null }).classes?.name;
-      if (className) halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
+      if (!className) continue;
+      if (isProgramHalaqa(className)) programsOf.set(e.student_id, [...(programsOf.get(e.student_id) ?? []), { id: e.class_id, name: className }]);
+      else halaqaByStudent.set(e.student_id, { id: e.class_id, name: className });
     }
     return (studentRows ?? []).map((s) => ({
       id: s.id,
       name: s.full_name,
       halaqa: halaqaByStudent.get(s.id)?.name ?? "",
       halaqaId: halaqaByStudent.get(s.id)?.id,
+      programs: programsOf.get(s.id),
       active: s.active,
     }));
   };
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);
@@ -278,12 +301,16 @@ export default function AdminHalaqasPage() {
   }, []);
 
   // A grade and campus, as the database keeps them, when the school has them.
-  const placeOf = (grade: string, campusId: string) => ({
-    ...(graded ? { grade: Number(grade) } : {}),
+  // A Hifd program has no grade of its own; the database wants one, so it keeps a placeholder.
+  const PROGRAM_GRADE = 5;
+  const placeOf = (grade: string, campusId: string, program = false) => ({
+    ...(graded ? { grade: program ? PROGRAM_GRADE : Number(grade) } : {}),
     ...(campuses.length > 0 ? { campus_id: campusId || null } : {}),
   });
-  const placeMissing = (grade: string, campusId: string) =>
-    (graded && grade === "") || (campuses.length > 0 && !campusId);
+  const placeMissing = (grade: string, campusId: string, program = false) =>
+    (graded && !program && grade === "") || (campuses.length > 0 && !campusId);
+  // A graded school's halaqa is called after its teacher; a program's name says it is one.
+  const nameFor = (teacher: string, program: boolean) => (program && teacher ? `Hifd program · ${teacher}` : teacher);
 
   // In an academic school the teacher is the halaqa: it's called by its
   // (first) teacher's name, and changes name when its teacher changes.
@@ -291,8 +318,8 @@ export default function AdminHalaqasPage() {
   const addHalaqa = async (e: React.FormEvent) => {
     e.preventDefault();
     const { lead, others } = splitTeachers(newTeacherIds, null);
-    const name = graded ? teacherNameOf(lead) : newName.trim();
-    if (!name || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId)) return;
+    const name = graded ? nameFor(teacherNameOf(lead), newProgram) : newName.trim();
+    if (!name || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId, newProgram)) return;
 
     if (isDemo) {
       const halaqa: DemoHalaqa = {
@@ -329,7 +356,7 @@ export default function AdminHalaqasPage() {
           schedule: newSchedule.trim(),
           teacher_id: lead,
           school_id: schoolId,
-          ...placeOf(newGrade, newCampusId),
+          ...placeOf(newGrade, newCampusId, newProgram),
         })
         .select("id")
         .single();
@@ -355,14 +382,41 @@ export default function AdminHalaqasPage() {
     setDraftSchedule(h.schedule);
     setDraftTeacherIds(halaqaTeacherIds(h));
     setDraftGrade(h.grade != null ? String(h.grade) : "");
+    setDraftProgram(isProgramHalaqa(h.name));
     setDraftCampusId(h.campusId ?? "");
     setEditError(null);
+  };
+
+  // Removes a halaqa. Its students stay on the school's list, just out of it;
+  // their past attendance and lessons stay too, no longer tied to a halaqa.
+  const deleteHalaqa = async (h: DemoHalaqa) => {
+    if (isDemo) return;
+    const n = studentsOf(h).length;
+    const question = n
+      ? tr("Delete {name}? Its {count} students stay at the school but are no longer in it, and their past records are kept. This can't be undone.", { name: h.name, count: n })
+      : tr("Delete {name}? This can't be undone.", { name: h.name });
+    if (!window.confirm(question)) return;
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const { error } = await supabase.from("classes").delete().eq("id", h.id);
+      if (error) throw error;
+      const [list, roster] = await Promise.all([loadRealHalaqas(), loadRealStudents()]);
+      setHalaqas(list);
+      setStudents(roster);
+      setEditingId(null);
+      staffRolesChanged();
+    } catch (err) {
+      setEditError(err instanceof Error ? tr(err.message) : tr("Couldn't delete it. Please try again."));
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const saveEdit = async (h: DemoHalaqa) => {
     const { lead, others } = splitTeachers(draftTeacherIds, h.teacherId);
     // A graded school's halaqa follows its teacher's name.
-    const editedName = graded ? teacherNameOf(lead) || h.name : draftName.trim() || h.name;
+    const editedName = graded ? nameFor(teacherNameOf(lead), draftProgram) || h.name : draftName.trim() || h.name;
     if (isDemo) {
       const patch: HalaqaOverride = {
         name: editedName,
@@ -378,7 +432,7 @@ export default function AdminHalaqasPage() {
       return;
     }
 
-    if (placeMissing(draftGrade, draftCampusId)) {
+    if (placeMissing(draftGrade, draftCampusId, draftProgram)) {
       setEditError(graded ? tr("Choose its grade and campus.") : tr("Choose its campus."));
       return;
     }
@@ -391,7 +445,7 @@ export default function AdminHalaqasPage() {
           name: editedName,
           schedule: draftSchedule.trim() || h.schedule,
           teacher_id: lead,
-          ...placeOf(draftGrade, draftCampusId),
+          ...placeOf(draftGrade, draftCampusId, draftProgram),
         })
         .eq("id", h.id);
       if (error) throw error;
@@ -439,12 +493,71 @@ export default function AdminHalaqasPage() {
     setCampusBusy(false);
   };
 
+  const mergeCampuses = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = mergeName.trim();
+    if (!name) return;
+    setCampusBusy(true);
+    setCampusError(null);
+    try {
+      const res = await fetch("/api/admin/campuses/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Couldn't merge the campuses. Please try again.");
+      const [fresh, list] = await Promise.all([loadCampuses(supabase), loadRealHalaqas()]);
+      setCampuses(fresh);
+      setHalaqas(list);
+      setMerging(false);
+      setMergeName("");
+    } catch (err) {
+      setCampusError(err instanceof Error ? tr(err.message) : tr("Couldn't merge the campuses. Please try again."));
+    } finally {
+      setCampusBusy(false);
+    }
+  };
+
   // How many children are in a halaqa: by its id where names repeat across
   // grades and campuses; by name in the sample school, which has no ids.
   // A halaqa's students, by name.
   const studentsOf = (h: DemoHalaqa) =>
-    (isDemo ? studentsInHalaqa(h.name, students) : students.filter((s) => s.halaqaId === h.id)).sort((a, b) => a.name.localeCompare(b.name));
+    (isDemo
+      ? [...studentsInHalaqa(h.name, students), ...students.filter((s) => s.programs?.some((p) => p.id === h.id))]
+      : students.filter((s) => s.halaqaId === h.id || s.programs?.some((p) => p.id === h.id))
+    ).sort((a, b) => a.name.localeCompare(b.name));
   const countOf = (h: DemoHalaqa) => studentsOf(h).length;
+
+  // A Hifd program is beside a student's own halaqa, so students are put in it
+  // and taken out of it from here, without touching the halaqa they're in.
+  const [programSearch, setProgramSearch] = useState("");
+  const [programNote, setProgramNote] = useState<string | null>(null);
+  const addToProgram = async (h: DemoHalaqa, s: DemoStudent) => {
+    setProgramNote(null);
+    try {
+      if (!isDemo) {
+        const { error } = await supabase.from("class_enrollments").insert({ class_id: h.id, student_id: s.id });
+        if (error && error.code !== "23505") throw error;
+      }
+      setStudents((now) => now.map((x) => (x.id === s.id ? { ...x, programs: [...(x.programs ?? []).filter((p) => p.id !== h.id), { id: h.id, name: h.name }] } : x)));
+      setProgramSearch("");
+    } catch {
+      setProgramNote(tr("Couldn't add them. Please try again."));
+    }
+  };
+  const removeFromProgram = async (h: DemoHalaqa, s: DemoStudent) => {
+    setProgramNote(null);
+    try {
+      if (!isDemo) {
+        const { error } = await supabase.from("class_enrollments").delete().eq("class_id", h.id).eq("student_id", s.id);
+        if (error) throw error;
+      }
+      setStudents((now) => now.map((x) => (x.id === s.id ? { ...x, programs: (x.programs ?? []).filter((p) => p.id !== h.id) } : x)));
+    } catch {
+      setProgramNote(tr("Couldn't take them off. Please try again."));
+    }
+  };
   const placed = isDemo ? students.length : students.filter((s) => s.halaqaId).length;
 
   // An academic school's halaqas: by campus (when it has them), then grade.
@@ -462,11 +575,16 @@ export default function AdminHalaqasPage() {
       .map((p) => ({
         ...p,
         grades: graded
-          ? GRADES.map((g) => ({ grade: g as number | null, halaqas: p.halaqas.filter((h) => (h.grade ?? 0) === g) })).filter((x) => x.halaqas.length > 0)
-          : [{ grade: null, halaqas: p.halaqas }],
+          ? [
+              // A Hifd program isn't for one grade: it has a group of its own.
+              { grade: null as number | null, program: true, halaqas: p.halaqas.filter((h) => isProgramHalaqa(h.name)) },
+              ...GRADES.map((g) => ({ grade: g as number | null, program: false, halaqas: p.halaqas.filter((h) => !isProgramHalaqa(h.name) && (h.grade ?? 0) === g) })),
+            ].filter((x) => x.halaqas.length > 0)
+          : [{ grade: null, program: false, halaqas: p.halaqas }],
       }));
   })();
 
+  const campusName = (id: string | null | undefined) => campuses.find((c) => c.id === id)?.name;
   const renderHalaqa = (h: DemoHalaqa) => {
     const isOpen = editingId === h.id;
     const count = countOf(h);
@@ -476,15 +594,27 @@ export default function AdminHalaqasPage() {
           type="button"
           onClick={() => startEditing(h)}
           aria-expanded={isOpen}
-          className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+          className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
         >
-          <span className="w-9 h-9 rounded-xl bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex items-center justify-center font-bold text-[11px] flex-shrink-0">
-            {count}
-          </span>
+          <ColorTile name="rehal" size={38} />
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-ink truncate">{h.name}</p>
-            <p className="text-[11px] text-ink-muted truncate">
-              {[halaqaTeacherNames(h, teachers), h.schedule].filter(Boolean).join(" · ")}
+            <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{h.name}</p>
+            {/* A halaqa named for its teacher doesn't say the name twice: the
+                teacher shows only when it's someone else, then the campus,
+                the students and the schedule as chips. */}
+            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
+              {halaqaTeacherNames(h, teachers) && halaqaTeacherNames(h, teachers) !== h.name && (
+                <span className={isOpen ? "text-white/80" : "text-ink-muted"}>{halaqaTeacherNames(h, teachers)}</span>
+              )}
+              {graded && campusName(h.campusId) && (
+                <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200"}`}>{campusName(h.campusId)}</span>
+              )}
+              <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"}`}>
+                {tr("{count} student|{count} students", { count })}
+              </span>
+              {h.schedule && (
+                <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"}`}>{h.schedule}</span>
+              )}
             </p>
           </div>
           {halaqaTeacherIds(h).length === 0 && (
@@ -492,9 +622,7 @@ export default function AdminHalaqasPage() {
               {tr("Unassigned")}
             </span>
           )}
-          <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-            <IconArrow size={14} />
-          </span>
+          <RowChevron open={isOpen} />
         </button>
 
         {isOpen && (
@@ -512,6 +640,8 @@ export default function AdminHalaqasPage() {
               campusId={draftCampusId}
               onGrade={setDraftGrade}
               onCampus={setDraftCampusId}
+              program={draftProgram}
+              onProgram={setDraftProgram}
               small
             />
             <div>
@@ -531,20 +661,72 @@ export default function AdminHalaqasPage() {
                 {tr("{count} student in this halaqa|{count} students in this halaqa", { count })}
               </p>
               {count === 0 ? (
-                <p className="text-[11.5px] text-ink-muted">{tr("None yet. Put students in a halaqa from the Students page.")}</p>
+                <p className="text-[11.5px] text-ink-muted">
+                  {isProgramHalaqa(h.name) ? tr("None yet. Add students below.") : tr("None yet. Put students in a halaqa from the Students page.")}
+                </p>
               ) : (
                 <ul className="flex flex-wrap gap-1.5">
                   {studentsOf(h).map((s) => (
                     <li
                       key={s.id}
-                      className={`text-[12px] rounded-full border border-surface-border bg-surface-card px-2.5 py-1 ${
-                        s.active === false ? "text-ink-muted line-through" : "text-ink"
-                      }`}
+                      className={`text-[12px] rounded-full border border-surface-border bg-surface-card ps-2.5 py-1 inline-flex items-center gap-1 ${
+                        isProgramHalaqa(h.name) ? "pe-1" : "pe-2.5"
+                      } ${s.active === false ? "text-ink-muted line-through" : "text-ink"}`}
                     >
                       {s.name}
+                      {isProgramHalaqa(h.name) && (
+                        <button
+                          type="button"
+                          onClick={() => removeFromProgram(h, s)}
+                          aria-label={tr("Take {name} off", { name: s.name })}
+                          className="w-5 h-5 rounded-full text-ink-muted hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950/40 flex items-center justify-center text-[13px] leading-none"
+                        >
+                          ×
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
+              )}
+              {isProgramHalaqa(h.name) && (
+                <div className="mt-3 rounded-xl border border-surface-border bg-surface-card p-3">
+                  <p className="text-xs font-semibold text-ink mb-1.5">{tr("Add students")}</p>
+                  <input
+                    value={programSearch}
+                    onChange={(e) => setProgramSearch(e.target.value)}
+                    placeholder={tr("Search a student…")}
+                    className={smallField}
+                  />
+                  <p className="text-[11px] text-ink-muted mt-1.5">{tr("They stay in their own halaqa too.")}</p>
+                  {programSearch.trim().length > 0 && (
+                    <ul className="mt-2 divide-y divide-surface-border max-h-60 overflow-y-auto">
+                      {students
+                        .filter(
+                          (s) =>
+                            s.active !== false &&
+                            !studentsOf(h).some((x) => x.id === s.id) &&
+                            s.name.toLowerCase().includes(programSearch.trim().toLowerCase())
+                        )
+                        .slice(0, 12)
+                        .map((s) => (
+                          <li key={s.id} className="flex items-center justify-between gap-3 py-2">
+                            <span className="min-w-0">
+                              <span className="block text-[13px] text-ink [overflow-wrap:anywhere]">{s.name}</span>
+                              {s.halaqa && <span className="block text-[11px] text-ink-muted [overflow-wrap:anywhere]">{s.halaqa}</span>}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addToProgram(h, s)}
+                              className="flex-shrink-0 rounded-full gradient-emerald text-white text-[12px] font-semibold px-3.5 py-1.5 hover:opacity-90 active:scale-95 transition"
+                            >
+                              {tr("Add")}
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                  {programNote && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{programNote}</p>}
+                </div>
               )}
             </div>
             {editError && <p className="text-xs text-red-600 dark:text-red-400">{editError}</p>}
@@ -565,6 +747,16 @@ export default function AdminHalaqasPage() {
                 {tr("Cancel")}
               </button>
             </div>
+            {!isDemo && (
+              <button
+                type="button"
+                onClick={() => deleteHalaqa(h)}
+                disabled={savingEdit}
+                className="text-[12.5px] font-semibold text-red-700 dark:text-red-400 hover:underline disabled:opacity-50"
+              >
+                {tr("Delete this halaqa")}
+              </button>
+            )}
           </div>
         )}
       </li>
@@ -639,6 +831,47 @@ export default function AdminHalaqasPage() {
               </button>
             </form>
           </div>
+          {campuses.length > 1 &&
+            (merging ? (
+              <form onSubmit={mergeCampuses} className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+                <p className="text-[13px] font-semibold text-ink">{tr("Make {count} campuses into one", { count: campuses.length })}</p>
+                <p className="text-[12.5px] text-ink-muted">
+                  {tr("Every halaqa and student moves to the one campus, and the others are removed. Staff then sign in at that campus's pin and place — check it under Staff attendance afterwards.")}
+                </p>
+                <label className="block">
+                  <span className="text-[12px] text-ink-muted">{tr("Name of the one campus")}</span>
+                  <input
+                    value={mergeName}
+                    onChange={(e) => setMergeName(e.target.value.slice(0, 60))}
+                    placeholder={tr("e.g. Main campus")}
+                    className="mt-1 w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[14px] text-ink focus:outline-none focus:border-emerald-600"
+                  />
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={!mergeName.trim() || campusBusy}
+                    className="gradient-emerald text-white text-[13.5px] font-semibold px-4 py-2 rounded-xl disabled:opacity-40"
+                  >
+                    {campusBusy ? tr("Merging…") : tr("Merge into one campus")}
+                  </button>
+                  <button type="button" onClick={() => setMerging(false)} className="text-[13px] font-semibold text-ink-muted hover:text-ink">
+                    {tr("Cancel")}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMergeName(campuses[0]?.name ?? "");
+                  setMerging(true);
+                }}
+                className="text-[12.5px] font-semibold text-ink-muted hover:text-ink underline underline-offset-2"
+              >
+                {tr("Make these one campus")}
+              </button>
+            ))}
           {campusError && <p className="text-xs text-red-600 dark:text-red-400">{campusError}</p>}
         </section>
       )}
@@ -666,6 +899,8 @@ export default function AdminHalaqasPage() {
             campusId={newCampusId}
             onGrade={setNewGrade}
             onCampus={setNewCampusId}
+            program={newProgram}
+            onProgram={setNewProgram}
           />
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
@@ -688,7 +923,7 @@ export default function AdminHalaqasPage() {
           {formError && <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>}
           <button
             type="submit"
-            disabled={(graded ? newTeacherIds.length === 0 : !newName.trim()) || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId) || saving}
+            disabled={(graded ? newTeacherIds.length === 0 : !newName.trim()) || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId, newProgram) || saving}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
             {saving ? tr("Adding…") : tr("Add halaqa")}
@@ -716,12 +951,26 @@ export default function AdminHalaqasPage() {
             note={`${tr("{count} halaqa|{count} halaqas", { count: section.halaqas.length })} · ${tr("{count} student|{count} students", { count: section.halaqas.reduce((n, h) => n + countOf(h), 0) })}`}
           >
             <div className="space-y-4 -my-1">
-              {section.grades.map(({ grade, halaqas: inGrade }) => (
-                <div key={grade ?? "all"}>
+              {section.grades.map(({ grade, program, halaqas: inGrade }) => (
+                <div key={program ? "hifd" : grade ?? "all"}>
+                  {program && (
+                    <p className="flex flex-wrap items-center gap-1.5 pt-1 text-[11.5px] font-semibold">
+                      <span className="rounded-full px-2.5 py-1 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">{tr("Hifd programs")}</span>
+                      <span className="rounded-full px-2.5 py-1 bg-brand-navy/10 text-brand-navy dark:bg-brand-gold/15 dark:text-brand-gold">{tr("Every grade")}</span>
+                      <span className="rounded-full px-2.5 py-1 bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
+                        {tr("{count} student|{count} students", { count: inGrade.reduce((n, h) => n + countOf(h), 0) })}
+                      </span>
+                    </p>
+                  )}
                   {grade != null && (
-                    <p className="eyebrow pt-1">
-                      {gradeLabel(grade)} · {tr("{count} halaqa|{count} halaqas", { count: inGrade.length })} ·{" "}
-                      {tr("{count} student|{count} students", { count: inGrade.reduce((n, h) => n + countOf(h), 0) })}
+                    <p className="flex flex-wrap items-center gap-1.5 pt-1 text-[11.5px] font-semibold">
+                      <span className="rounded-full px-2.5 py-1 bg-brand-navy/10 text-brand-navy dark:bg-brand-gold/15 dark:text-brand-gold">{gradeLabel(grade)}</span>
+                      <span className="rounded-full px-2.5 py-1 bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200">
+                        {tr("{count} halaqa|{count} halaqas", { count: inGrade.length })}
+                      </span>
+                      <span className="rounded-full px-2.5 py-1 bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
+                        {tr("{count} student|{count} students", { count: inGrade.reduce((n, h) => n + countOf(h), 0) })}
+                      </span>
                     </p>
                   )}
                   <ul className="divide-y divide-surface-border">{inGrade.map(renderHalaqa)}</ul>

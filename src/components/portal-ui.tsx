@@ -6,12 +6,9 @@
 // serif one on another, bars in four different heights — which is what made
 // the product read as three products.
 
-import { useEffect, useMemo, useState } from "react";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { StatCard } from "@/components/StatCard";
-import type { IconTone } from "@/components/IconBadge";
-import type { ArtName } from "@/components/gem-icons";
+import { pillSpring } from "@/lib/motion-config";
 import {
   ATTENDANCE_DOT,
   DAILY_RATING_DOT,
@@ -26,8 +23,13 @@ import {
   type RecitationLogEntry,
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
+import { IconArrow } from "@/components/icons";
 import type { DailyRating } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
+import { SkeletonRows, SkeletonStats } from "@/components/Skeleton";
+import { IconBadge, type IconTone } from "@/components/IconBadge";
+import { ColorTile, type ArtName } from "@/components/gem-icons";
+import type { LucideIcon } from "lucide-react";
 import { countLabel } from "@/lib/i18n/phrases";
 
 // DAILY_RATING_LABELS keys are snake_case (very_good); translation keys are
@@ -37,6 +39,7 @@ const RATING_KEY: Record<DailyRating, string> = {
   very_good: "rating.veryGood",
   good: "rating.good",
   weak: "rating.weak",
+  not_recited: "rating.notRecited",
 };
 
 /* ── Modal ─────────────────────────────────────────────────────────────
@@ -88,7 +91,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`modal-elevate relative w-full ${wide ? "max-w-4xl" : "max-w-md"} max-h-[85vh] overflow-y-auto bg-surface-card border border-surface-border rounded-[18px] shadow-2xl animate-slide-up`}
+        className={`relative w-full ${wide ? "max-w-4xl" : "max-w-md"} max-h-[85vh] overflow-y-auto bg-surface-card border border-surface-border rounded-[18px] shadow-2xl animate-slide-up`}
       >
         <div className="gradient-navy rounded-t-[18px] px-6 py-5 relative overflow-hidden sticky top-0 z-10">
           <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
@@ -102,20 +105,20 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label={t("common.close")}
-            className="absolute top-3 end-3 z-20 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition active:scale-95"
+            className="absolute top-4 end-4 z-20 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
-          <div className="relative flex items-center gap-3.5 pe-12">
+          <div className="relative flex items-center gap-3.5 pe-8">
             {badge && (
               <span className="w-12 h-12 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-[15px] font-bold text-white flex-shrink-0">
                 {badge}
               </span>
             )}
             <div className="min-w-0">
-              <h2 className="page-title text-white text-lg truncate">{title}</h2>
+              <h2 className="page-title text-white text-lg [overflow-wrap:anywhere]">{title}</h2>
               {subtitle && <p className="text-[12px] text-white/55">{subtitle}</p>}
             </div>
           </div>
@@ -140,10 +143,17 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={`card-quiet card-lift gem-surface gem-list p-5 ${className}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="page-title text-lg">{title}</h2>
-        {note && <span className="eyebrow flex-shrink-0">{note}</span>}
+    <section className={`card-quiet sec-card p-5 ${className}`}>
+      {/* Wraps on a phone: a long note drops under the title instead of
+          running off the edge of the card. Each section on a page has its own
+          colour (see .sec-card in globals.css): a bar by the title, the
+          title itself and the note. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 className="page-title text-lg sec-title flex items-center gap-2.5">
+          <span aria-hidden className="sec-bar inline-block w-1.5 h-5 rounded-full flex-shrink-0" />
+          {title}
+        </h2>
+        {note && <span className="eyebrow sec-note rounded-full px-2.5 py-1">{note}</span>}
       </div>
       <div className="gold-rule my-4" />
       {children}
@@ -151,122 +161,65 @@ export function SectionCard({
   );
 }
 
+const STATUS_VALUE = {
+  present: "text-green-700 dark:text-green-300",
+  late: "text-amber-600 dark:text-amber-300",
+  absent: "text-red-700 dark:text-red-300",
+  excused: "text-slate-500 dark:text-slate-300",
+};
+const STATUS_DOT = {
+  present: "bg-green-600",
+  late: "bg-amber-500",
+  absent: "bg-red-600",
+  excused: "bg-slate-400",
+};
+
 /* ── Stat tile ─────────────────────────────────────────────────────────
    A number that carries the context making it mean something. Renders as a
    button when given an onClick, so a stat can lead somewhere. */
-function useCountUp(value: string | number) {
-  const raw = String(value);
-  const match = raw.match(/^(\d+)(.*)$/);
-  const target = match ? Number(match[1]) : null;
-  const suffix = match ? match[2] : "";
-  const [shown, setShown] = useState(target ?? 0);
-
-  useEffect(() => {
-    if (target == null) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce || target === 0) {
-      setShown(target);
-      return;
-    }
-    const start = performance.now();
-    const from = 0;
-    const dur = 680;
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / dur);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setShown(Math.round(from + (target - from) * eased));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target]);
-
-  if (target == null) return raw;
-  return `${shown}${suffix}`;
-}
-
-function MiniRing({ value }: { value: number }) {
-  const r = 15;
-  const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(100, value));
-  return (
-    <svg width="40" height="40" viewBox="0 0 40 40" className="shrink-0 -rotate-90" aria-hidden>
-      <circle cx="20" cy="20" r={r} fill="none" className="stroke-surface-border" strokeWidth="3.5" />
-      <circle
-        cx="20"
-        cy="20"
-        r={r}
-        fill="none"
-        className="stroke-brand-gold"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - pct / 100)}
-      />
-    </svg>
-  );
-}
-
-export const AVATAR_TONES = [
-  "bg-[#0e2347]",
-  "bg-[#0e7a48]",
-  "bg-[#9a6200]",
-  "bg-[#3e5278]",
-  "bg-[#834272]",
-  "bg-[#1a6b8a]",
-];
-
-export function avatarTone(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i) * (i + 1)) % AVATAR_TONES.length;
-  return AVATAR_TONES[h];
-}
-
 export function StatTile({
   value,
   label,
   sub,
-  icon,
-  mark,
-  art,
-  accent = "navy",
   onClick,
+  icon,
+  art,
+  tone = "navy",
+  status,
 }: {
   value: string | number;
   label: string;
   sub?: string;
-  icon?: React.ReactNode;
-  /** Lucide glyph drawn in a toned badge. Replaces the gold medallion. */
-  mark?: LucideIcon;
-  /** Illustrated gem. Preferred over mark. */
-  art?: ArtName;
-  /** Kept so older call sites that passed a palette index still typecheck. */
-  tone?: number;
-  accent?: IconTone;
   onClick?: () => void;
+  /** An attendance figure's colour, the same as its marks elsewhere: green present, amber late, red absent, grey excused. */
+  status?: "present" | "late" | "absent" | "excused";
+  /** A badge above the figure, for the headline tiles at the top of a home page. */
+  icon?: LucideIcon;
+  /** The tile's picture, drawn as a gem; the plain `icon` stands in without one. */
+  art?: ArtName;
+  tone?: IconTone;
 }) {
-  const reduce = useReducedMotion();
-  const display = useCountUp(value);
-  if (art || mark) {
-    return <StatCard icon={mark} art={art} tone={accent} value={display} label={label} pill={sub} onClick={onClick} />;
-  }
-  const pct = typeof value === "string" && value.endsWith("%") ? Number(value.replace("%", "")) : null;
   const body = (
-    <div className="flex items-start gap-3">
-      <span className="icon-badge icon-badge-lg">
-        {icon ?? <span className="w-2.5 h-2.5 rounded-full bg-brand-gold" />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-display text-[30px] font-semibold text-ink tabular-nums leading-none tracking-tight"><bdi dir="ltr">{display}</bdi></p>
-        <p className="eyebrow mt-2">{label}</p>
-        {sub && <p className="text-[12px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
-        {pct == null && <div className="mt-3 h-1 w-10 rounded-full bg-brand-gold" />}
-      </div>
-      {pct != null && !Number.isNaN(pct) && <MiniRing value={pct} />}
-    </div>
+    <>
+      {icon && (
+        <span className="block mb-3">
+          {art ? <ColorTile name={art} size={40} /> : <IconBadge icon={icon} tone={tone} size={34} />}
+        </span>
+      )}
+      <p
+        className={`text-[26px] font-bold tabular-nums leading-none ${
+          status ? (Number(value) === 0 ? "text-slate-400 dark:text-slate-500" : STATUS_VALUE[status]) : "text-ink"
+        }`}
+      >
+        <bdi dir="ltr">{value}</bdi>
+      </p>
+      <p className="eyebrow mt-2 flex items-center gap-1.5">
+        {status && <span aria-hidden className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[status]}`} />}
+        {label}
+      </p>
+      {sub && <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
+    </>
   );
-  const spring = reduce ? { duration: 0 } : { type: "spring" as const, stiffness: 380, damping: 16 };
 
   // min-w-0 matters here: these tiles sit in a CSS grid, where a grid
   // item's default min-width is auto, not 0. A translated label longer
@@ -275,22 +228,16 @@ export function StatTile({
   // out the grid — and with it the page's horizontal scroll — instead
   // of just wrapping to a second line.
   if (!onClick) {
-    return (
-      <motion.div whileHover={reduce || !mark ? undefined : { scale: 1.02 }} transition={spring} className="card-quiet card-lift gem-surface gem-list px-4 py-4 min-w-0 rounded-[22px]">
-        {body}
-      </motion.div>
-    );
+    return <div className="card-quiet card-lift gem-surface px-4 py-4 min-w-0 rounded-[22px]">{body}</div>;
   }
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onClick}
-      whileHover={reduce || !mark ? undefined : { scale: 1.05 }}
-      transition={spring}
-      className="card-quiet card-lift gem-surface gem-list px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start cursor-pointer"
+      className="card-quiet card-lift gem-surface px-4 py-4 min-w-0 min-h-11 rounded-[22px] text-start cursor-pointer active:scale-[.98]"
     >
       {body}
-    </motion.button>
+    </button>
   );
 }
 
@@ -310,17 +257,17 @@ export function ProgressBar({
       : tone === "emerald"
         ? "bg-brand-emerald"
         : value >= 95
-          ? "bg-attend-present"
+          ? "bg-green-600"
           : value >= 70
             ? "bg-brand-emerald"
             : value >= 40
-              ? "bg-attend-late"
-              : "bg-attend-absent";
+              ? "bg-amber-500"
+              : "bg-red-600";
 
   return (
-    <div className="h-2 bg-surface-bg rounded-full overflow-hidden">
+    <div className="h-1.5 bg-surface-bg rounded-full overflow-hidden">
       <div
-        className={`progress-fill h-full rounded-full transition-[width] duration-700 ease-out ${fill}`}
+        className={`h-full rounded-full transition-[width] duration-700 ease-out ${fill}`}
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>
@@ -398,9 +345,25 @@ export function SegmentedSwitch<T extends string>({
   onChange: (v: T) => void;
   label: string;
 }) {
+  const reduce = useReducedMotion();
+  const group = useId();
+  const strip = useRef<HTMLDivElement>(null);
+  // Four or five children don't fit a phone's width: the row scrolls
+  // sideways, and the chosen one is brought into view.
+  useEffect(() => {
+    // Only the strip scrolls — never the page under it.
+    const box = strip.current;
+    const el = box?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!box || !el || box.scrollWidth <= box.clientWidth) return;
+    const a = el.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const by = a.left < b.left ? a.left - b.left - 8 : a.right > b.right ? a.right - b.right + 8 : 0;
+    if (by) box.scrollBy({ left: by, behavior: reduce ? "auto" : "smooth" });
+  }, [value, reduce]);
   if (options.length < 2) return null;
   return (
     <div
+      ref={strip}
       role="tablist"
       aria-label={label}
       className="flex w-full min-w-0 max-w-full flex-wrap p-1 gap-1 rounded-2xl bg-surface-bg-warm border border-surface-border"
@@ -413,13 +376,19 @@ export function SegmentedSwitch<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`min-h-11 min-w-0 max-w-full px-4 py-2 rounded-full text-[13px] font-semibold leading-snug whitespace-normal break-words text-center transition-all duration-200 ease-out ${
-              active
-                ? "bg-brand-navy-dark text-white shadow-e1"
-                : "text-ink-muted hover:text-ink"
+            className={`relative min-h-11 min-w-0 max-w-full px-4 py-2 rounded-full text-[13px] font-semibold leading-snug whitespace-normal break-words text-center transition-colors ${
+              active ? "text-white" : "text-ink-muted hover:text-ink"
             }`}
           >
-            {o.label}
+            {/* The navy pill slides to the chosen child. */}
+            {active && (
+              <motion.span
+                layoutId={`switch-${group}`}
+                className="absolute inset-0 rounded-full bg-brand-navy shadow-sm"
+                transition={reduce ? { duration: 0 } : pillSpring}
+              />
+            )}
+            <span className="relative break-words">{o.label}</span>
           </button>
         );
       })}
@@ -427,14 +396,83 @@ export function SegmentedSwitch<T extends string>({
   );
 }
 
+/** A row that opens, while it's open: navy like a chosen card, so it's
+ *  clear which one the panel under it belongs to. */
+export const OPEN_ROW = "row-open bg-brand-navy text-white hover:bg-brand-navy";
+
+/* ── Row chevron ───────────────────────────────────────────────────────
+   The arrow at the end of a row that opens: in a soft round frame that
+   darkens with the row's hover (the row carries `group`), turning to point
+   down when open — in either reading direction. An open row is navy (see
+   OPEN_ROW), so the open chevron is white. */
+export function RowChevron({ open }: { open: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+        open
+          ? "rotate-90 rtl:-rotate-90 bg-white/15 text-white"
+          : "bg-surface-bg-warm text-ink-muted group-hover:bg-brand-navy/10 group-hover:text-ink dark:group-hover:bg-white/10"
+      }`}
+    >
+      <IconArrow size={13} />
+    </span>
+  );
+}
+
+/* ── Avatar ────────────────────────────────────────────────────────────
+   A person's initials on a soft colour of their own, the same colour every
+   time (worked out from the name), so a long list can be scanned by eye.
+   Tinted backgrounds with dark text of the same hue: white text on a light
+   pastel is too faint to read. */
+const AVATAR_TONES = [
+  "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200",
+  "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200",
+  "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200",
+  "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200",
+  "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200",
+  "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200",
+  "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
+  "bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-200",
+];
+function toneFor(name: string): string {
+  let h = 0;
+  for (const ch of name.trim().toLowerCase()) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
+  return AVATAR_TONES[h % AVATAR_TONES.length];
+}
+function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return words.map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+}
+export function Avatar({ name, muted, onDark }: { name: string; muted?: boolean; onDark?: boolean }) {
+  const tone = onDark ? "bg-white/15 text-white" : muted ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500" : toneFor(name);
+  return (
+    <span aria-hidden className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${tone}`}>
+      {initialsOf(name)}
+    </span>
+  );
+}
+
+/* ── Status pill ─────────────────────────────────────────────────────── */
+export function StatusPill({ on, onLabel, offLabel }: { on: boolean; onLabel: string; offLabel: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${
+        on
+          ? "bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300"
+          : "bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300"
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-green-600" : "bg-slate-400"}`} />
+      {on ? onLabel : offLabel}
+    </span>
+  );
+}
+
 /* ── Empty state ───────────────────────────────────────────────────────
    Quiet rather than an alert box; nothing here is a problem. */
 export function EmptyNote({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[13px] text-ink-muted text-center leading-relaxed py-6 px-3 rounded-xl border border-dashed border-surface-border bg-surface-bg-warm/70">
-      {children}
-    </p>
-  );
+  return <p className="text-[13px] text-ink-muted py-2">{children}</p>;
 }
 
 /* ── Loading state ─────────────────────────────────────────────────────
@@ -443,13 +481,17 @@ export function EmptyNote({ children }: { children: React.ReactNode }) {
    the space while that answer is in flight — the alternative, rendering the
    demo roster first and swapping it out a moment later, briefly shows one
    school somebody else's names. */
-export function LoadingNote({ children = "Loading…" }: { children?: React.ReactNode }) {
+/** While a list or section loads: placeholder rows in its shape, with the
+ *  words for screen readers. */
+export function LoadingNote({ children, rows = 3, stats = false }: { children?: React.ReactNode; rows?: number; stats?: boolean }) {
+  const { tr } = useLanguage();
   return (
-    <div aria-live="polite" className="py-2 space-y-2.5">
-      <div className="skeleton w-2/3" />
-      <div className="skeleton w-full" />
-      <div className="skeleton w-5/6" />
-      <p className="text-[13px] text-ink-muted pt-1">{children}</p>
+    <div className="py-1 space-y-4" aria-live="polite" aria-busy="true">
+      <span className="sr-only">{children ?? tr("Loading…")}</span>
+      {stats && <SkeletonStats />}
+      <div className="card-quiet p-5">
+        <SkeletonRows count={rows} />
+      </div>
     </div>
   );
 }
@@ -484,7 +526,7 @@ function LogEntryRow({ entry, showDate }: { entry: RecitationLogEntry; showDate?
             {t(`portion.${entry.portion}`)}
           </span>
         </p>
-        <p className="text-[11px] text-ink-muted truncate">
+        <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
           {surah ? surah.englishName : tr("Surah {surah}", { surah: entry.surah })}{" "}{tr("· ayahs {ayah_start}–{ayah_end}", { ayah_start: entry.ayah_start, ayah_end: entry.ayah_end })}
         </p>
         {entry.notes && (
@@ -694,4 +736,38 @@ export function TeacherNote({ children }: { children: React.ReactNode }) {
       <p className="text-[13px] text-ink-body font-serif italic leading-snug">{children}</p>
     </div>
   );
+}
+
+/* ── Halaqa title ──────────────────────────────────────────────────────
+   "Grade 5 · North Campus · Hifd program - Shaykh Ismail" as it's read: the
+   grade, the campus and the halaqa each their own colour instead of one
+   grey-black run, with a Hifd program marked. On a navy (open) row the
+   colours give way to white. */
+export function HalaqaTitle({ label, onDark = false, className = "" }: { label: string; onDark?: boolean; className?: string }) {
+  const parts = label.split(" · ");
+  const name = parts[parts.length - 1];
+  const gradeFirst = parts.length > 1 && /\d|Pre-K|Kindergarten|الصف|تمهيدي|روضة/i.test(parts[0]);
+  const grade = gradeFirst ? parts[0] : null;
+  const campus = parts.length >= (gradeFirst ? 3 : 2) ? parts[gradeFirst ? 1 : 0] : null;
+  const pill = "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-tight whitespace-nowrap";
+  const program = /\bhif(?:d|z|dh)\b/i.test(name);
+  return (
+    <span className={`inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 ${className}`}>
+      {grade && (
+        <span className={`${pill} ${onDark ? "bg-white/20 text-white" : "bg-brand-navy/10 text-brand-navy dark:bg-brand-gold/15 dark:text-brand-gold"}`}>{grade}</span>
+      )}
+      {campus && (
+        <span className={`${pill} ${onDark ? "bg-white/15 text-white" : "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200"}`}>{campus}</span>
+      )}
+      {program && (
+        <span className={`${pill} ${onDark ? "bg-amber-300/30 text-amber-100" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"}`}>Hifd</span>
+      )}
+      <span className={`font-semibold [overflow-wrap:anywhere] ${onDark ? "text-white" : "text-ink"}`}>{name}</span>
+    </span>
+  );
+}
+
+/** Class string for a name's avatar colour. Same colour every time. */
+export function avatarTone(name: string) {
+  return toneFor(name);
 }

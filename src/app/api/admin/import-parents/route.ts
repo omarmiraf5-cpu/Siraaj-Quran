@@ -48,11 +48,11 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   try {
     // The school's students, a thousand at a time, and the halaqas they're in.
-    const students: Array<{ id: string; full_name: string }> = [];
+    const students: Array<{ id: string; full_name: string; pin?: string | null }> = [];
     for (let i = 0; ; i += 1000) {
       const { data, error } = await admin
         .from("students")
-        .select("id, full_name")
+        .select("id, full_name, pin")
         .eq("school_id", schoolId)
         .eq("active", true)
         .order("id")
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       students.push(...((data ?? []) as typeof students));
       if ((data ?? []).length < 1000) break;
     }
-    const byName = new Map<string, Array<{ id: string; full_name: string }>>();
+    const byName = new Map<string, Array<{ id: string; full_name: string; pin?: string | null }>>();
     for (const s of students) byName.set(key(s.full_name), [...(byName.get(key(s.full_name)) ?? []), s]);
 
     let halaqaOf: Map<string, string[]> | null = null;
@@ -118,7 +118,9 @@ export async function POST(req: NextRequest) {
         const { error: linkError } = await admin.from("parent_students").insert({ parent_id: parent.id, student_id: student.id });
         const already = linkError?.code === "23505";
         if (linkError && !already) throw linkError;
-        parents.welcomes.find((w) => w.userId === parent.id)?.children?.push(student.full_name);
+        const welcome = parents.welcomes.find((w) => w.userId === parent.id);
+        welcome?.children?.push(student.full_name);
+        if (welcome && student.pin) (welcome.childPins ??= []).push({ name: student.full_name, pin: String(student.pin) });
         results.push({
           child,
           student: student.full_name,

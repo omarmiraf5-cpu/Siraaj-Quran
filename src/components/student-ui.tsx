@@ -16,6 +16,7 @@ import {
   IconBadge,
 } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useStudentTheme } from "@/hooks/useStudentTheme";
 
 /* ── Illumination colours ──────────────────────────────────────────────
    Six, assigned to a surah by its number so the same surah is always the
@@ -154,7 +155,7 @@ export function StreakBadge({ days }: { days: number }) {
   const { tr } = useLanguage();
   if (days < 2) return null;
   return (
-    <span className="shine inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-gold-light to-brand-gold px-3 py-1.5 text-[12px] font-bold text-[#20180a]">
+    <span className="shine inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-gold-light to-brand-gold px-3 py-1 text-[12px] leading-[1.9] whitespace-nowrap font-bold text-[#20180a]">
       <IconFlame size={13} />
       {tr("{days} days in a row", { days })}
     </span>
@@ -193,7 +194,7 @@ export function SurahTile({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="page-title text-[17px] truncate">{title}</h3>
+            <h3 className="page-title text-[17px] [overflow-wrap:anywhere]">{title}</h3>
             {status.done && (
               <span className={`${ILLUM_CLASS.verdigris} w-6 h-6 rounded-full flex-shrink-0`}>
                 <IconCheck size={13} />
@@ -355,7 +356,7 @@ export function UpNextCard({
         <span className="block text-[11px] font-bold uppercase tracking-wider text-white/75">
           {eyebrow}
         </span>
-        <span className="block page-title text-white text-[17px] truncate mt-0.5">
+        <span className="block page-title text-white text-[17px] [overflow-wrap:anywhere] mt-0.5">
           {title}
         </span>
         <span className="block text-[12px] text-white/70 mt-0.5">{detail}</span>
@@ -421,7 +422,7 @@ export function SurahGridTile({
       )}
       {arabic && (
         <span
-          className="relative block font-arabic text-[12px] text-white/60 mb-2 leading-tight truncate w-full"
+          className="relative block font-arabic text-[12px] text-white/60 mb-2 leading-tight [overflow-wrap:anywhere] w-full"
           dir="rtl"
           lang="ar"
         >
@@ -456,7 +457,7 @@ export function SurahGridTile({
         </span>
       </span>
 
-      <span className="relative block text-white font-bold text-[13px] mt-2.5 leading-tight truncate w-full">
+      <span className="relative block text-white font-bold text-[13px] mt-2.5 leading-tight [overflow-wrap:anywhere] w-full">
         {name}
       </span>
       <span className="relative block text-white/70 text-[11px] mt-0.5">{detail}</span>
@@ -712,5 +713,64 @@ export function FriendlyEmpty({
       <p className="page-title text-[15px] mt-2.5">{title}</p>
       <p className="text-[12px] text-ink-muted mt-1">{sub}</p>
     </div>
+  );
+}
+
+/**
+ * The blue card at the top of every student page: a big emoji, what the page
+ * is, and — on a page inside another — a way back. Same on every page, so a
+ * child always knows where they are. `aside` is for a figure on the right (a
+ * ring); `children` for anything under the title.
+ */
+export function StudentPageHeader({
+  emoji,
+  eyebrow,
+  title,
+  arabic,
+  subtitle,
+  back,
+  aside,
+  children,
+  compact = false,
+}: {
+  emoji: string;
+  eyebrow?: string;
+  title: string;
+  arabic?: string;
+  subtitle?: React.ReactNode;
+  back?: { href: string; label: string };
+  aside?: React.ReactNode;
+  children?: React.ReactNode;
+  compact?: boolean;
+}) {
+  const theme = useStudentTheme();
+  return (
+    <header className={`${theme.hero} rounded-3xl ${compact ? "px-4 py-3" : "px-5 py-5"} text-white relative overflow-hidden shadow-lg animate-rise`}>
+      {back && (
+        <a href={back.href} className="inline-flex items-center gap-1 text-[12px] font-semibold text-white/80 hover:text-white mb-2.5">
+          <span aria-hidden className="rtl:-scale-x-100">‹</span> {back.label}
+        </a>
+      )}
+      <div className="flex items-center gap-4">
+        <span
+          className={`${compact ? "w-10 h-10 text-2xl" : "w-14 h-14 text-3xl"} rounded-2xl bg-white/20 backdrop-blur-sm border border-white/25 flex items-center justify-center flex-shrink-0`}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+        <div className="min-w-0 flex-1">
+          {eyebrow && <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/75">{eyebrow}</p>}
+          <h1 className={`font-bold leading-tight [overflow-wrap:anywhere] ${compact ? "text-lg" : "text-2xl"}`}>{title}</h1>
+          {arabic && (
+            <p className="font-calligraphy text-[24px] text-yellow-200 leading-tight mt-0.5" dir="rtl" lang="ar">
+              {arabic}
+            </p>
+          )}
+          {subtitle && <p className="text-[13px] text-white/80 mt-1">{subtitle}</p>}
+        </div>
+        {aside}
+      </div>
+      {children}
+    </header>
   );
 }

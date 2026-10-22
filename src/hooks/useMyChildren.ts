@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 
 /**
  * Whether the signed-in teacher or admin is also a parent of a child at the
@@ -14,9 +15,7 @@ export function useMyChildren(): { hasChildren: boolean; role: string | null } {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user) return;
       const [{ data: me }, { data: links }] = await Promise.all([
         supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
@@ -33,9 +32,7 @@ export function useMyChildren(): { hasChildren: boolean; role: string | null } {
 
 /** The children linked to the signed-in person as their parent. */
 export async function myChildIds(supabase: ReturnType<typeof createClient>): Promise<string[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await sessionUser(supabase);
   if (!user) return [];
   const { data } = await supabase.from("parent_students").select("student_id").eq("parent_id", user.id);
   return (data ?? []).map((l) => l.student_id as string);

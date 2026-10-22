@@ -20,6 +20,7 @@ import {
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 
@@ -63,9 +64,12 @@ const TIER_KEY: Record<string, string> = {
 export function AchievementsCard({
   studentId,
   studentFirstName,
+  bonusStars = 0,
 }: {
   studentId: string;
   studentFirstName?: string;
+  /** Stars earned by the work itself, counted with the teachers'. */
+  bonusStars?: number;
 }) {
   const { t } = useLanguage();
   const [stars, setStars] = useState<DemoStar[]>([]);
@@ -76,9 +80,7 @@ export function AchievementsCard({
     const supabase = createClient();
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setStars(allStars(readDemoStore(DEMO_CREATED_STARS_KEY, [])).filter((s) => s.studentId === studentId));
@@ -123,7 +125,7 @@ export function AchievementsCard({
     load().finally(() => setReady(true));
   }, [studentId]);
 
-  const count = stars.length;
+  const count = stars.length + bonusStars;
   const tier = tierFor(count);
   const next = nextTier(count);
   const percent = tierPercent(count);

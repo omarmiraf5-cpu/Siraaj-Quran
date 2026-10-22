@@ -124,7 +124,7 @@ export interface NewNotification {
   school_id: string;
   recipient_id: string;
   student_id?: string | null;
-  kind: "absence_streak" | "staff_absence_report" | "account_deleted" | "deletion_request";
+  kind: "absence_streak" | "staff_absence_report" | "account_deleted" | "deletion_request" | "milestone";
   title: string;
   body: string;
   dedupe_key: string;

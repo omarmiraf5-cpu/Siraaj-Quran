@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Clock3, Flag, UserCheck, UserX } from "lucide-react";
 import dynamic from "next/dynamic";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, StatTile, EmptyNote } from "@/components/portal-ui";
@@ -183,10 +184,10 @@ export default function StaffAttendancePage() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile art="check" accent="green" value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
-        <StatTile art="clock" accent="amber" value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
-        <StatTile art="pin" accent="red" value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
-        <StatTile art="megaphone" accent="navy" value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
+        <StatTile icon={UserCheck} art="check" tone="green" value={`${inToday}/${data.teachers.length}`} label={tr("In today")} sub={lateToday ? tr("{lateToday} late", { lateToday }) : tr("Nobody late")} />
+        <StatTile icon={Clock3} art="clock" tone="amber" status="late" value={totals.late} label={tr("Late arrivals")} sub={tr("Last 4 weeks")} />
+        <StatTile icon={UserX} art="pin" tone="red" status="absent" value={totals.absent} label={tr("Absences")} sub={tr("Not reported")} />
+        <StatTile icon={Flag} art="megaphone" tone="navy" status="excused" value={totals.reported} label={tr("Reported")} sub={tr("Told the office")} />
       </div>
 
       <SectionCard title={tr("Today")} note={tr("Staff due {formatClock} · {grace_minutes} min grace", { formatClock: formatClock(data.settings.start_time), grace_minutes: data.settings.grace_minutes })}>
@@ -197,8 +198,8 @@ export default function StaffAttendancePage() {
             {data.teachers.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{t.name}</p>
-                  <p className="text-[11.5px] text-ink-muted truncate">
+                  <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{t.name}</p>
+                  <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                     {timesLine(t.today) ||
                       (t.today.report
                         ? `${REASON_LABEL[t.today.report.reason]}${t.today.report.note ? ` — ${t.today.report.note}` : ""}`
@@ -379,7 +380,7 @@ function TeacherDays({
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold text-ink">{formatDay(d.date, language)}</p>
-                <p className="text-[11.5px] text-ink-muted truncate">
+                <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                   {[timesLine(d), d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : "", d.note ? `Office: ${d.note}` : ""]
                     .filter(Boolean)
                     .join(" · ") || tr("No sign-in")}

@@ -282,19 +282,34 @@ export default function LoginPage() {
         if (!res || !res.ok) {
           setLoading(false);
           setError(
-            res?.status === 429
-              ? t("login.pinResting").replace("{minutes}", String(body.locked_minutes ?? 15))
-              : typeof body.tries_left === "number" && body.tries_left <= 2
-                ? t("login.pinTriesLeft").replace("{n}", String(body.tries_left))
-                : t("login.pinDidntWork")
+            !res
+              ? t("login.pinOffline")
+              : res.status === 429 && typeof body.locked_minutes === "number"
+                ? t("login.pinResting").replace("{minutes}", String(body.locked_minutes ?? 15))
+                : res.status === 429 || res.status >= 500
+                  ? t("login.pinBusy")
+                  : body.code === "not_ready"
+                    ? t("login.pinNotReady")
+                    : typeof body.tries_left === "number" && body.tries_left <= 2
+                      ? t("login.pinTriesLeft").replace("{n}", String(body.tries_left))
+                      : t("login.pinDidntWork")
           );
           setPin("");
           return;
         }
-        const { error } = await supabase.auth.signInWithPassword({ email: body.email, password: body.password });
+        // The right PIN, then this device signs in. Whole classrooms signing
+        // in on one school connection can be told to slow down (429), which
+        // is not a wrong PIN: it's tried again once or twice before saying so.
+        let signedIn = await supabase.auth.signInWithPassword({ email: body.email, password: body.password });
+        for (let attempt = 0; signedIn.error && attempt < 2 && (signedIn.error.status === 429 || signedIn.error.status === undefined || signedIn.error.status >= 500); attempt++) {
+          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          signedIn = await supabase.auth.signInWithPassword({ email: body.email, password: body.password });
+        }
+        const { error } = signedIn;
         setLoading(false);
         if (error) {
-          setError(t("login.pinDidntWork"));
+          console.error("Student sign-in failed after a right PIN:", error.status, error.message);
+          setError(error.status === 429 ? t("login.pinBusy") : error.status === undefined ? t("login.pinOffline") : t("login.pinNotReady"));
           setPin("");
           return;
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ColorGlyph, ColorTile } from "@/components/gem-icons";
 import Link from "next/link";
 import { useDemoUser } from "@/hooks/useDemoUser";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/data/demo";
 import { getSurahById } from "@/data/mushaf-index";
 import { ASSIGNMENT_STATUS_KEY } from "@/lib/i18n/translations";
+import { useChosenChild } from "@/hooks/useChosenChild";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { useQaidahLessons } from "@/hooks/useQaidahLessons";
 import { useQaidahRecordings } from "@/hooks/useQaidahRecordings";
@@ -29,13 +30,18 @@ import {
   LoadingNote,
   TeacherNote,
 } from "@/components/portal-ui";
-import { IconBook, IconChart, IconCalendar, IconArrow, IconCheck, IconUsers } from "@/components/icons";
+import { IconArrow } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
+import { FeesDueLine } from "@/components/FeesDueLine";
+import { MilestoneBanner } from "@/components/MilestoneBanner";
+import { ChildPinCard } from "@/components/ChildPinCard";
+import { autoStars } from "@/lib/progress";
 import { ByLanguage } from "@/components/ByLanguage";
+import { CalendarCheck, BookOpen, ClipboardList, Award } from "lucide-react";
 
 export default function ParentDashboard() {
   const demoUser = useDemoUser();
@@ -45,14 +51,7 @@ export default function ParentDashboard() {
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
-  const [childId, setChildId] = useState<string | null>(null);
-  const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
-
-  // Until the roster arrives there is no child to pick, so the first one
-  // becomes the selection as soon as there is one.
-  useEffect(() => {
-    if (!childId && children.length > 0) setChildId(children[0].id);
-  }, [children, childId]);
+  const { child, choose: setChildId, options: childChoices } = useChosenChild(children);
 
   const { attendance, assignments, ready } = useStudentRecord(child?.id ?? null, mode);
   // Each child's Qa'idah lesson, where their teacher has set one.
@@ -108,24 +107,30 @@ export default function ParentDashboard() {
         meta={[
           formatDay(today, language),
           attendancePending
-            ? ""
+            ? { text: "…", tone: "plain" as const }
             : noAttendance
-              ? t("common.noAttendanceYet")
-              : `${child.name.split(" ")[0]} ${t("common.was")} ${
-                  todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
-                } ${t("common.today")}`,
-          countLabel(
-            "{count} piece of work open|{count} pieces of work open",
-            active.length,
-            active.length === 1 ? t("common.pieceOfWorkOpenOne") : `${active.length} ${t("common.pieceOfWorkOpenOther")}`,
-          ),
+              ? { text: t("common.noAttendanceYet"), tone: "plain" as const }
+              : {
+                  text: `${child.name.split(" ")[0]} ${t("common.was")} ${
+                    todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
+                  } ${t("common.today")}`,
+                  tone: todayStatus === "present" ? ("green" as const) : todayStatus === "late" ? ("amber" as const) : todayStatus === "absent" ? ("red" as const) : ("plain" as const),
+                },
+          {
+            text: countLabel(
+              "{count} piece of work open|{count} pieces of work open",
+              active.length,
+              active.length === 1 ? t("common.pieceOfWorkOpenOne") : `${active.length} ${t("common.pieceOfWorkOpenOther")}`,
+            ),
+            tone: active.length > 0 ? ("amber" as const) : ("green" as const),
+          },
         ]}
         actions={
           <>
-            <HeroButtonPrimary href="/parent/quran-progress" icon={<IconChart />}>
+            <HeroButtonPrimary href="/parent/quran-progress" icon={<ColorGlyph name="check" size={22} />}>
               {t("nav.progress")}
             </HeroButtonPrimary>
-            <HeroButtonGhost href="/parent/attendance" icon={<IconCalendar />}>
+            <HeroButtonGhost href="/parent/attendance" icon={<ColorGlyph name="calendarCheck" size={22} />}>
               {t("nav.attendance")}
             </HeroButtonGhost>
           </>
@@ -141,16 +146,18 @@ export default function ParentDashboard() {
       {/* The school's notices for this family — a child absent five school
           days in a row — until the parent dismisses them. */}
       {noticeMode !== "loading" && <NoticesPanel api={noticeApi} />}
+      <FeesDueLine />
+      <MilestoneBanner studentId={child.id} assignments={assignments} firstName={child.name.split(" ")[0]} />
 
       {/* Which child. A parent with one child never sees this. */}
       {children.length > 1 && (
         <div className="flex flex-wrap items-center gap-3 min-w-0">
-          <span className="eyebrow">{t("common.viewing")}</span>
+          <span className="eyebrow flex-shrink-0">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
             value={child?.id ?? ""}
             onChange={setChildId}
-            options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+            options={childChoices}
           />
         </div>
       )}
@@ -158,8 +165,9 @@ export default function ParentDashboard() {
       {/* At a glance, in the parent's terms rather than the school's. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
-          tone={3}
-          icon={<IconCalendar size={18} />}
+          icon={CalendarCheck}
+          art="calendarCheck"
+          tone="gold"
           value={noAttendance ? "—" : attendancePending ? "…" : `${summary.rate}%`}
           label={t("common.attendanceStat")}
           sub={
@@ -176,8 +184,9 @@ export default function ParentDashboard() {
           }
         />
         <StatTile
-          tone={1}
-          icon={<IconBook size={18} />}
+          icon={BookOpen}
+          art="rehal"
+          tone="green"
           value={`${memorisation}%`}
           label={t("common.memorised")}
           sub={countLabel(
@@ -187,24 +196,27 @@ export default function ParentDashboard() {
           )}
         />
         <StatTile
-          tone={2}
-          icon={<IconUsers size={18} />}
+          icon={ClipboardList}
+          art="pen"
           value={active.length}
           label={t("common.openWork")}
           sub={nextDue ? `${t("common.nextDue")} ${formatDay(nextDue, language)}` : t("common.nothingDue")}
         />
         <StatTile
-          tone={0}
-          icon={<IconCheck size={18} />}
+          icon={Award}
+          art="badge"
+          tone="gold"
           value={done.length}
           label={t("assignment.completed")}
           sub={done.length ? t("common.wellDone") : t("common.noneYet")}
         />
       </div>
 
-      <AchievementsCard studentId={child.id} studentFirstName={child.name.split(" ")[0]} />
+      <AchievementsCard studentId={child.id} studentFirstName={child.name.split(" ")[0]} bonusStars={autoStars(assignments)} />
 
       <AnnouncementsFeed audience="parents" />
+
+      <ChildPinCard key={child.id} studentId={child.id} firstName={child.name.split(" ")[0]} demo={mode === "demo"} />
 
       <ChildQaidahCard
         rows={qaidahRows.filter((r) => r.student_id === child.id)}
@@ -235,7 +247,7 @@ export default function ParentDashboard() {
                         <p className="eyebrow underline decoration-2 underline-offset-2 text-ink">
                           {t(`portion.${a.portion}`)}
                         </p>
-                        <p className="text-[13px] font-semibold text-ink truncate mt-0.5">
+                        <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere] mt-0.5">
                           {surahEnd ? (
                             `${surah?.englishName ?? `Surah ${a.surah}`} ${a.ayah_start} – ${surahEnd.englishName} ${a.ayah_end}`
                           ) : (
@@ -363,9 +375,7 @@ export default function ParentDashboard() {
         href="/parent/mushaf"
         className="card-quiet card-feature group flex items-center gap-3.5 px-5 py-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
       >
-        <span className="icon-tile flex-shrink-0">
-          <IconBook size={19} />
-        </span>
+        <ColorTile name="rehal" size={42} />
         <span className="flex-1 min-w-0">
           <span className="block page-title text-[15px]">{t("nav.mushaf")}</span>
           <span className="block text-[12px] text-ink-muted">

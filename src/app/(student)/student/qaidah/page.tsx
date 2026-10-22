@@ -7,6 +7,7 @@ import { usePortalRoster } from "@/hooks/usePortalRoster";
 import { useQaidahLessons } from "@/hooks/useQaidahLessons";
 import { currentLessons, passedLessons } from "@/lib/qaidahLessons";
 import { useQaidahRecordings } from "@/hooks/useQaidahRecordings";
+import { StudentPageHeader } from "@/components/student-ui";
 import {
   QaidahBookTabs,
   QaidahLessons,
@@ -14,6 +15,8 @@ import {
   useQaidahBookChoice,
 } from "@/components/QaidahBook";
 import { MyQaidahLesson } from "@/components/QaidahLessonCard";
+import { MyQaidahPages } from "@/components/MyQaidahPages";
+import { useQaidahPages } from "@/hooks/useQaidahPages";
 import { useLanguage } from "@/components/LanguageProvider";
 
 export default function StudentQaidahPage() {
@@ -23,6 +26,7 @@ export default function StudentQaidahPage() {
   const { mode, students } = usePortalRoster([DEMO_CURRENT_STUDENT]);
   const me = students[0] ?? null;
   const { rows, ready } = useQaidahLessons(mode, me ? [me.id] : []);
+  const pages = useQaidahPages(mode, me ? [me.id] : []);
   const mine = me ? (currentLessons(rows).get(me.id) ?? null) : null;
 
   const [bookId, setBookId] = useQaidahBookChoice();
@@ -54,27 +58,17 @@ export default function StudentQaidahPage() {
 
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
-      <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="relative">
-          <p className="eyebrow text-white/45">{tr("Learning to read")}</p>
-          <h1 className="page-title text-white text-[30px] mt-1 leading-tight">{tr("Qa'idah")}</h1>
-          <p
-            className="font-calligraphy text-[26px] text-brand-gold-light mt-1.5 leading-tight"
-            dir="rtl"
-            lang="ar"
-          >
-            {book.arabicName}
-          </p>
-          <p className="text-[13px] text-white/55 mt-2.5">
-            {tr("{count} lessons", { count: book.lessons.length })}
-            <span className="text-white/25 mx-2">·</span>
-            {book.name}
-          </p>
-        </div>
-      </header>
+      <StudentPageHeader
+        emoji="📘"
+        eyebrow={tr("Learning to read")}
+        title={tr("Qa'idah")}
+        arabic={book.arabicName}
+        back={{ href: "/student/learn", label: tr("Learn") }}
+        subtitle={<>{tr("{count} lessons", { count: book.lessons.length })} · {book.name}</>}
+      />
 
       {mine && <MyQaidahLesson row={mine} onOpen={openMine} />}
+      <MyQaidahPages rows={pages.rows} />
 
       <QaidahBookTabs value={bookId} onChange={setBookId} />
       <QaidahSummary book={book} />

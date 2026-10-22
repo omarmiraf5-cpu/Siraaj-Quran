@@ -3,8 +3,8 @@
 import { QAIDAH_BOOKS } from "@/data/qaidah";
 import { ARBAEEN } from "@/data/arbaeen";
 import { getAllTajweedRules } from "@/lib/tajweed-rules";
-import { GRAD_CLASS } from "@/components/student-ui";
-import { IconArrow, IconBookOpen, IconPalette, IconStar } from "@/components/icons";
+import { StudentPageHeader } from "@/components/student-ui";
+import { IconArrow } from "@/components/icons";
 import { useLanguage } from "@/components/LanguageProvider";
 
 // The three things to study that are not the Mushaf itself. They were going to
@@ -13,8 +13,8 @@ import { useLanguage } from "@/components/LanguageProvider";
 const SHELF = [
   {
     href: "/student/qaidah",
-    colour: "verdigris" as const,
-    icon: <IconBookOpen size={22} />,
+    gradient: "student-gradient-blue",
+    icon: "📘",
     title: "Qa'idah",
     arabic: "الْقَاعِدَةُ",
     sub: "Learn to read Arabic from the letters up: Ahsanul Qawaid, the Noorani Qaida or the Baghdadi Qaida.",
@@ -22,8 +22,8 @@ const SHELF = [
   },
   {
     href: "/student/tajweed",
-    colour: "aubergine" as const,
-    icon: <IconPalette size={22} />,
+    gradient: "student-gradient-indigo",
+    icon: "🌈",
     title: "Tajweed",
     arabic: "التَّجْوِيدُ",
     sub: "The colours in your Mushaf and what each one means.",
@@ -31,8 +31,8 @@ const SHELF = [
   },
   {
     href: "/student/hadith",
-    colour: "lapis" as const,
-    icon: <IconStar size={22} />,
+    gradient: "student-gradient-cyan",
+    icon: "📜",
     title: "Forty Hadith",
     arabic: "الْأَرْبَعُونَ النَّوَوِيَّةُ",
     sub: "Imam an-Nawawi's collection, in Arabic and English.",
@@ -44,27 +44,24 @@ export default function StudentLearnPage() {
   const { tr, language } = useLanguage();
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
-      <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="relative">
-          <p className="eyebrow text-white/45">{tr("Your books")}</p>
-          <h1 className="page-title text-white text-[30px] mt-1 leading-tight">{tr("Learn")}</h1>
-          <p className="text-[13px] text-white/55 mt-2.5">
-            {tr("Everything to study alongside the Mushaf.")}
-          </p>
-        </div>
-      </header>
+      <StudentPageHeader
+        emoji="🎨"
+        eyebrow={tr("Your books")}
+        title={tr("Learn")}
+        subtitle={tr("Everything to study alongside the Mushaf.")}
+      />
 
       <div className="space-y-3">
         {SHELF.map((item, i) => (
           <a
             key={item.href}
             href={item.href}
-            className="card-quiet card-feature group flex items-center gap-4 p-4 animate-rise transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[.99]"
+            className="bg-surface-card rounded-3xl border border-surface-border shadow-card group flex items-center gap-4 p-4 animate-rise transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[.99]"
             style={{ animationDelay: `${60 + i * 70}ms` }}
           >
             <span
-              className={`${GRAD_CLASS[item.colour]} w-14 h-14 rounded-2xl flex items-center justify-center text-white flex-shrink-0 shadow-sm`}
+              className={`${item.gradient} w-14 h-14 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 shadow-md`}
+              aria-hidden
             >
               {item.icon}
             </span>
@@ -73,7 +70,7 @@ export default function StudentLearnPage() {
               <span className="flex items-baseline justify-between gap-2">
                 <span className="page-title text-[17px]">{tr(item.title)}</span>
                 {language !== "ar" && <span
-                  className="font-arabic text-[15px] text-ink-muted flex-shrink-0 truncate"
+                  className="font-arabic text-[15px] text-ink-muted flex-shrink-0 [overflow-wrap:anywhere]"
                   dir="rtl"
                   lang="ar"
                 >

@@ -18,7 +18,7 @@ export interface StudentTheme {
 // sees the same. What stays personal is only the hero gradient.
 const THEMES: Record<StudentGender, StudentTheme> = {
   boy: { gender: "boy", hero: "student-hero-boy" },
-  girl: { gender: "girl", hero: "student-hero-girl" },
+  girl: { gender: "girl", hero: "student-hero-boy" },
 };
 
 // Demo-only heuristic. Real enrolment should store this on the student record.

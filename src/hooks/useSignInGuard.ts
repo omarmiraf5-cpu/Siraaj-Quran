@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { verifiedUser } from "@/lib/supabase/sessionUser";
 import { SHOW_DEMO_LOGINS } from "@/lib/demoMode";
 import { homeOf, mayOpen, portalOf } from "@/lib/portalAccess";
 
@@ -40,7 +41,7 @@ export function useSignInGuard(): { blocked: boolean } {
         if (!session) return toSignIn();
         // A login Supabase refuses — run out for good, or signed out
         // elsewhere — is no login at all. (A blip just keeps the one here.)
-        const { data, error } = await supabase.auth.getUser();
+        const { data, error } = await verifiedUser(supabase);
         const status = (error as { status?: number } | null)?.status;
         if (!cancelled && !data.user && (status === 401 || status === 403)) {
           await supabase.auth.signOut({ scope: "local" }).catch(() => {});

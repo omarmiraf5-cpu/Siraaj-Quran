@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 import { createProvisionedUser } from "@/lib/accountProvisioning";
 import { sendAccountWelcomes, sendPasswordResetLink, sendSchoolJoined } from "@/lib/accountWelcome";
 import { addSchool } from "@/lib/schoolMemberships";
-import { ACCOUNT_ROLES, requireAdmin, schoolAccount, type AccountRole } from "@/lib/adminAccounts";
+import { CREATABLE_ROLES, requireAdmin, schoolAccount, type CreatableRole } from "@/lib/adminAccounts";
 
 // Accounts are made with a temporary password the admin can hand over, so
 // the person can sign in straight away. They're also emailed a welcome with
@@ -15,8 +15,8 @@ function generateTempPassword() {
   return randomBytes(9).toString("base64url");
 }
 
-const ALLOWED_ROLES = ACCOUNT_ROLES;
-type AllowedRole = AccountRole;
+const ALLOWED_ROLES = CREATABLE_ROLES;
+type AllowedRole = CreatableRole;
 
 /**
  * Why an email that already signs in to MyDiiwaan can't have a second login,
@@ -43,7 +43,9 @@ async function loginInTheWay(
   if (holder.id === callerId) {
     return role === "teacher"
       ? "That's your own login, and you can teach with it — there's no second login to make. Tick yourself as a teacher on your halaqa, under Halaqas."
-      : "That's your own login, which runs the school. A parent needs a login of their own — use another email.";
+      : role === "admin"
+        ? "That's your own login, which already runs the school."
+        : "That's your own login, which runs the school. A parent needs a login of their own — use another email.";
   }
   if (holder.role === role) {
     return `${name} is already one of your ${role}s.`;
@@ -51,7 +53,7 @@ async function loginInTheWay(
   if (holder.role === "admin") {
     return role === "teacher"
       ? `${name} is an admin here and can teach with that same login — tick them as a teacher on the halaqa, under Halaqas.`
-      : `${email} is ${name}'s admin login here. A parent needs a login of their own — use another email.`;
+      : `${email} is ${name}'s admin login here. A ${role} needs a login of their own — use another email.`;
   }
   return `${email} is ${name}'s ${holder.role} login here. One login can't be both, so use another email for this ${role}.`;
 }
@@ -285,13 +287,16 @@ export async function PATCH(req: NextRequest) {
     const { caller, user } = auth;
 
     const admin = createAdminClient();
-    const found = await schoolAccount(admin, caller, user_id);
+    // An admin's login can be emailed (a welcome, or a link to choose a new
+    // password) but never reset to a temporary password from here.
+    const emailing = by === "email" || by === "welcome";
+    const found = await schoolAccount(admin, caller, user_id, emailing ? ["admin"] : []);
     if (found.error) return found.error;
     const { target } = found;
 
     // Or the office emails them a link to choose a new one themselves,
     // leaving their current password as it is until they do.
-    if (by === "email") {
+    if (by === "email" || by === "welcome") {
       if (target.active === false) {
         return NextResponse.json(
           { error: `${target.full_name || "This account"} is switched off. Switch them back on first.` },
@@ -302,10 +307,17 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "This account has no email to send to." }, { status: 400 });
       }
       const { data: school } = await admin.from("schools").select("name").eq("id", caller.school_id).maybeSingle();
-      const sent = await sendPasswordResetLink(
-        { userId: target.id, name: target.full_name ?? "", email: target.email },
-        { name: school?.name ?? "Your school", replyTo: user.email }
-      );
+      // The welcome, as sent when a login is made, again; or a link to choose a new password.
+      const sent =
+        by === "welcome"
+          ? await sendAccountWelcomes(
+              [{ userId: target.id, name: target.full_name ?? "", email: target.email, role: target.role as AllowedRole }],
+              { name: school?.name ?? "Your school", replyTo: user.email }
+            )
+          : await sendPasswordResetLink(
+              { userId: target.id, name: target.full_name ?? "", email: target.email },
+              { name: school?.name ?? "Your school", replyTo: user.email }
+            );
       if (!sent.ok) {
         return NextResponse.json({ error: `The email didn't send: ${sent.reason}` }, { status: 502 });
       }

@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     const { data: students } = await admin
       .from("students")
-      .select("id, full_name, avatar_initials, avatar_color, pin")
+      .select("id, full_name, avatar_initials, avatar_color, pin, profile_id")
       .eq("school_id", school.id)
       .eq("active", true)
       .order("full_name");
@@ -41,10 +41,16 @@ export async function GET(req: NextRequest) {
       // rest are left off rather than shown as dead ends. The PIN itself
       // never leaves the server.
       students: (students ?? [])
-        .filter((s) => s.pin)
+        .filter((s) => s.pin && s.profile_id)
         .map((s) => ({
           id: s.id,
-          first_name: (s.full_name ?? "").split(" ")[0],
+          // First name and the first letter of the last, so two Mohameds in
+          // a big school aren't the same button.
+          first_name: (() => {
+            const parts = (s.full_name ?? "").trim().split(/\s+/);
+            const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+            return last ? `${parts[0]} ${last.toUpperCase()}.` : parts[0];
+          })(),
           initials: s.avatar_initials,
           colour: s.avatar_color,
         })),

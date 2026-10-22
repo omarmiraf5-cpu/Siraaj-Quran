@@ -12,6 +12,7 @@ import {
 import { SectionCard, EmptyNote, LoadingNote } from "@/components/portal-ui";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 
@@ -33,9 +34,7 @@ export function AnnouncementsFeed({
     const supabase = createClient();
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         const created = readDemoStore<DemoAnnouncement[]>(DEMO_CREATED_ANNOUNCEMENTS_KEY, []);
@@ -89,7 +88,7 @@ export function AnnouncementsFeed({
                     {t("common.pinned")}
                   </span>
                 )}
-                <p className="text-[13px] font-semibold text-ink truncate">
+                <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                   {a.titleKey ? t(a.titleKey) : a.title}
                 </p>
               </div>

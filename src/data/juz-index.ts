@@ -10,6 +10,11 @@
 // caught an error in this table (juz 15 was originally mistyped as 16:51;
 // it is really 17:1, the opening of Al-Isra).
 //
+// Juz 4 opens at 3:93 and juz 11 at 9:93, where the print sets the ۞ that
+// begins them — the same as HIZB_STARTS. (The King Fahd Complex data files
+// number juz by page header instead, which puts 3:92 in juz 4 and 9:93 in
+// juz 10.)
+//
 // This table only carries juz-level (whole-juz) precision. The finer
 // rub' al-hizb (quarter) subdivisions within many later juz' are not
 // reliably present in the source mushaf data, so a hizb/quarter-level
@@ -24,7 +29,7 @@ export const JUZ_STARTS: JuzStart[] = [
   { juz: 1, surah: 1, ayah: 1 },
   { juz: 2, surah: 2, ayah: 142 },
   { juz: 3, surah: 2, ayah: 253 },
-  { juz: 4, surah: 3, ayah: 92 },
+  { juz: 4, surah: 3, ayah: 93 },
   { juz: 5, surah: 4, ayah: 24 },
   { juz: 6, surah: 4, ayah: 148 },
   { juz: 7, surah: 5, ayah: 82 },

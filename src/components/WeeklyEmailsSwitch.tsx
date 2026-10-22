@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 
 /** A parent turning the Friday progress emails off or on again, for themselves. */
@@ -15,9 +16,7 @@ export function WeeklyEmailsSwitch() {
 
   useEffect(() => {
     (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user) return;
       setUserId(user.id);
       // Before update 12 there's no such setting: the switch stays hidden.

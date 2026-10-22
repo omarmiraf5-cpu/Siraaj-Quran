@@ -11,9 +11,11 @@ export interface NewAccount {
   userId: string;
   name: string;
   email: string;
-  role: "teacher" | "parent";
+  role: "teacher" | "parent" | "admin";
   /** A parent's children, as their names were entered. */
   children?: string[];
+  /** Each child's sign-in PIN, for the parent to give them. */
+  childPins?: Array<{ name: string; pin: string }>;
 }
 
 const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] ?? "";
@@ -37,8 +39,9 @@ function childrensPossessive(children: string[]): string {
 export function accountWelcomeEmail(args: {
   name: string;
   email: string;
-  role: "teacher" | "parent";
+  role: "teacher" | "parent" | "admin";
   children?: string[];
+  childPins?: Array<{ name: string; pin: string }>;
   schoolName: string;
   link: string;
   /** Whether a reply reaches the school's office (or else MyDiiwaan). */
@@ -48,19 +51,25 @@ export function accountWelcomeEmail(args: {
   const firstName = greetingName(args.name);
   const greeting = firstName ? `${SALAM}, ${firstName},` : `${SALAM},`;
   const children = args.children ?? [];
-  const added = `${school} has added you to MyDiiwaan as a ${args.role}.`;
+  const added = `${school} has added you to MyDiiwaan as ${args.role === "admin" ? "an admin" : `a ${args.role}`}.`;
   const what =
-    args.role === "teacher"
-      ? "MyDiiwaan is where you'll take the register, set each child's Qur'an lessons, follow their progress and message their parents."
-      : `MyDiiwaan is where you'll follow ${childrensPossessive(children)} Qur'an lessons, attendance and progress, and message their teacher.`;
+    args.role === "admin"
+      ? "MyDiiwaan is where you'll run the school: its students, teachers and parents, attendance, payments and announcements."
+      : args.role === "teacher"
+        ? "MyDiiwaan is where you'll take attendance, set each child's Qur'an lessons, follow their progress and message their parents."
+        : `MyDiiwaan is where you'll follow ${childrensPossessive(children)} Qur'an lessons, attendance and progress, and message their teacher.`;
+  const pins = args.role === "parent" ? (args.childPins ?? []) : [];
+  const pinIntro = `Your ${pins.length > 1 ? "children sign" : "child signs"} in on the school's login screen with ${pins.length > 1 ? "their own four-digit PIN" : "this four-digit PIN"}:`;
   const signIn = `You'll sign in with ${args.email}. The link works once, for ${WELCOME_LINK_DAYS} days. After that, tap "Forgot your password?" on the sign-in page, or ask your school for your temporary password.`;
   const questions = args.repliesToSchool
     ? "Questions? Reply to this email and it goes to your school."
     : "Questions? Just reply to this email.";
   const dua =
-    args.role === "teacher"
-      ? "May Allah put barakah in your teaching."
-      : `May Allah put barakah in your ${children.length > 1 ? "children's" : "child's"} learning.`;
+    args.role === "admin"
+      ? "May Allah put barakah in your work for the school."
+      : args.role === "teacher"
+        ? "May Allah put barakah in your teaching."
+        : `May Allah put barakah in your ${children.length > 1 ? "children's" : "child's"} learning.`;
 
   const text = [
     greeting,
@@ -78,6 +87,7 @@ export function accountWelcomeEmail(args: {
     "",
     signIn,
     "",
+    ...(pins.length > 0 ? [pinIntro, ...pins.map((c) => `${c.name}: ${c.pin}`), "Please keep it private.", ""] : []),
     questions,
     "",
     dua,
@@ -103,7 +113,16 @@ export function accountWelcomeEmail(args: {
     <p style="${para}">${escapeHtml(what)}</p>
     <div style="margin-top:18px;">${emailButton(args.link, "Choose your password")}</div>
     <p style="${small}margin-top:14px;">${escapeHtml(signIn)}</p>
-  </td></tr>
+  </td></tr>${
+    pins.length > 0
+      ? `
+  <tr><td style="padding:18px 28px 0;">
+    <p style="${para}">${escapeHtml(pinIntro)}</p>
+    ${pins.map((c) => `<p style="${para}margin-top:8px;"><strong>${escapeHtml(c.name)}</strong> &nbsp; <span style="font-family:'Courier New',monospace;font-size:18px;letter-spacing:3px;color:#0e2347;">${escapeHtml(c.pin)}</span></p>`).join("")}
+    <p style="${small}">Please keep it private.</p>
+  </td></tr>`
+      : ""
+  }
   <tr><td style="padding:22px 28px 28px;">
     <p style="${para}">${questions}</p>
     <p style="${para}margin-top:14px;">${escapeHtml(dua)}</p>

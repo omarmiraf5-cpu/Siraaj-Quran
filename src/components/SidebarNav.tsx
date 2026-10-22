@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -9,13 +9,14 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { SchoolSwitcher } from "@/components/SchoolSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useDemoUser } from "@/hooks/useDemoUser";
+import { useMyName } from "@/hooks/useMyName";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/useSchoolBranding";
 import { useRecordVisit } from "@/hooks/useRecordVisit";
 import { useSwitchedOffGuard } from "@/hooks/useSwitchedOffGuard";
 import type { LucideIcon } from "lucide-react";
 import { LogOut } from "lucide-react";
-import { IconSignOut } from "@/components/icons";
-import { Sidebar } from "@/components/Sidebar";
+import { motion, useReducedMotion } from "motion/react";
+import { pillSpring } from "@/lib/motion-config";
 import { ColorTile, type ArtName } from "@/components/gem-icons";
 
 interface NavItem {
@@ -23,10 +24,12 @@ interface NavItem {
   /** Key into the translation dictionary, e.g. "nav.dashboard" — not literal text. */
   labelKey: string;
   icon?: React.ReactNode;
-  /** A distinct Lucide glyph. When set, this replaces the gold medallion. */
+  /** A distinct Lucide glyph. When set, this replaces a plain icon. */
   mark?: LucideIcon;
   /** Illustrated gem tile. Preferred over mark and icon. */
   art?: ArtName;
+  /** The heading this item sits under in the sidebar, in English (translated with tr). */
+  section?: string;
 }
 
 interface SidebarNavProps {
@@ -48,9 +51,18 @@ interface SidebarNavProps {
 // handles it.
 const MAX_PRIMARY_TABS = 4;
 
+function NavIcon({ item, size, glow = false }: { item: NavItem; size: number; glow?: boolean }) {
+  if (item.art) return <ColorTile name={item.art} size={size} glow={glow} />;
+  if (item.mark) {
+    const Icon = item.mark;
+    return <Icon size={Math.max(18, size - 10)} strokeWidth={1.75} color="#102A56" aria-hidden />;
+  }
+  return <span className="text-[#102A56] dark:text-ink">{item.icon}</span>;
+}
+
 // A school's own name replaces the platform wordmark wholesale; only the
 // MyDiiwaan default gets the two-tone "My"/"Diiwaan" split.
-function Wordmark({ branding, className, onDark = true }: { branding: SchoolBranding; className: string; onDark?: boolean }) {
+function Wordmark({ branding, className, onDark = false }: { branding: SchoolBranding; className: string; onDark?: boolean }) {
   return (
     <span className={className}>
       {branding.isCustom ? (
@@ -95,11 +107,13 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
   const supabase = createClient();
   const demoUser = useDemoUser();
   const branding = useSchoolBranding();
-  const { t } = useLanguage();
+  const { t, tr } = useLanguage();
+  const reduce = useReducedMotion();
   useRecordVisit();
   useSwitchedOffGuard();
   const role = t(roleKey);
-  const displayName = demoUser?.name ?? userName ?? role;
+  const myName = useMyName();
+  const displayName = demoUser?.name ?? myName ?? userName ?? role;
   const [moreOpen, setMoreOpen] = useState(false);
 
   // The sheet lives in the layout, which stays mounted across pages. Close
@@ -129,16 +143,18 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
     <>
       {/* ── MOBILE TOP BAR ── */}
       <header className="md:hidden fixed top-[env(safe-area-inset-top)] start-0 end-0 z-50 bg-white/80 dark:bg-[#101722]/85 backdrop-blur-xl flex items-center justify-between px-3 h-14 border-b border-black/5 dark:border-white/10">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <Crest
             branding={branding}
             size={32}
             className="w-8 h-8 rounded-xl overflow-hidden ring-1 ring-brand-gold/50 flex-shrink-0"
           />
-          <Wordmark branding={branding} onDark={false} className="font-display text-sm font-bold tracking-tight truncate" />
-          <span className="text-ink-muted text-xs font-medium flex-shrink-0">· {role}</span>
+          <div className="min-w-0 leading-tight">
+            <Wordmark branding={branding} onDark={false} className="block font-display text-sm font-bold tracking-tight truncate" />
+            <span className="block text-ink-muted text-[11px] font-medium truncate">{demoUser?.name ?? myName ?? role}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <SchoolSwitcher variant="topbar" enabled={!demoUser} />
           <LanguageToggle variant="icon" className="min-w-11 min-h-11 bg-brand-navy/5 text-ink hover:bg-brand-navy/10" />
           <ThemeToggle variant="pill" className="min-h-11 bg-brand-navy/5 text-ink hover:bg-brand-navy/10" />
@@ -171,13 +187,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
               }`}
             >
               <span style={{ opacity: active ? 1 : 0.66 }}>
-                {item.art ? (
-                  <ColorTile name={item.art} size={28} glow={active} />
-                ) : item.mark ? (
-                  <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden />
-                ) : (
-                  <span className="text-[#102A56]">{item.icon}</span>
-                )}
+                <NavIcon item={item} size={28} glow={active} />
               </span>
               {t(item.labelKey)}
             </Link>
@@ -222,13 +232,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                   }`}
                 >
                   <span style={{ opacity: active ? 1 : 0.66 }}>
-                    {item.art ? (
-                      <ColorTile name={item.art} size={28} glow={active} />
-                    ) : item.mark ? (
-                      <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden />
-                    ) : (
-                      <span className="text-[#102A56]">{item.icon}</span>
-                    )}
+                    <NavIcon item={item} size={28} glow={active} />
                   </span>
                   {t(item.labelKey)}
                 </Link>
@@ -239,8 +243,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
       )}
 
       {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="hidden md:flex flex-col w-60 min-h-screen sticky top-0 h-screen overflow-y-auto bg-[#F9F8F3] dark:bg-[#101722] text-ink p-3 gap-1 flex-shrink-0 border-e border-[#E4E2DC] dark:border-white/10">
-        {/* Logo + branding */}
+      <aside className="hidden md:flex flex-col w-60 h-screen h-[100dvh] sticky top-0 self-start overflow-y-auto no-scrollbar bg-[#F9F8F3] dark:bg-[#101722] text-ink p-3 gap-1 flex-shrink-0 border-e border-[#E4E2DC] dark:border-white/10">
         <div className="hidden md:flex flex-col items-center gap-3 px-2 pt-6 pb-4 mb-1">
           <Crest
             branding={branding}
@@ -261,16 +264,14 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           </div>
         </div>
 
-        {/* User info */}
         <div className="hidden md:block px-2 mb-1">
           <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">{role}</p>
-          <p className="text-sm font-semibold text-ink truncate">{displayName}</p>
+          <p className="text-sm font-semibold text-ink [overflow-wrap:anywhere]">{displayName}</p>
         </div>
         <div className="hidden md:block">
           <SchoolSwitcher variant="sidebar" enabled={!demoUser} />
         </div>
 
-        {/* Dark mode + language toggles — top of nav */}
         <div className="hidden md:block border-t border-black/5 dark:border-white/10 pt-3 pb-1 space-y-0.5">
           <ThemeToggle
             variant="labeled"
@@ -282,26 +283,48 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
           />
         </div>
 
-        <div className="border-t border-black/5 dark:border-white/10 pt-3">
-          <Sidebar
-            activeHref={pathname}
-            items={items.map((item) => ({
-              href: item.href,
-              label: t(item.labelKey),
-              art: item.art,
-              mark: item.art ? undefined : item.mark,
-              glyph: item.art || item.mark ? undefined : <span className="text-[#102A56]">{item.icon}</span>,
-            }))}
-          />
-        </div>
+        <nav className="space-y-0.5 border-t border-black/5 dark:border-white/10 pt-3">
+          {items.map((item, i) => {
+            const active = pathname === item.href;
+            const heading = item.section && item.section !== items[i - 1]?.section ? item.section : null;
+            const gap = !item.section && items[i - 1]?.section;
+            return (
+              <Fragment key={item.href}>
+                {heading && (
+                  <p className={`text-[10.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted px-3 pb-1 ${i === 0 ? "pt-0.5" : "pt-3"}`}>{tr(heading)}</p>
+                )}
+                {gap && <div aria-hidden className="border-t border-black/5 dark:border-white/10 my-2" />}
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`group relative flex items-center gap-3 min-h-12 px-2.5 rounded-xl text-sm font-semibold text-[#102A56] dark:text-ink ${
+                    active ? "bg-[#F3EFE3] dark:bg-white/10" : "hover:bg-[#F4F1E8] dark:hover:bg-white/5"
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="sidebar-accent"
+                      aria-hidden
+                      className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-[#c6a15a]"
+                      transition={reduce ? { duration: 0 } : pillSpring}
+                    />
+                  )}
+                  <span className="flex-shrink-0 inline-flex" style={{ opacity: active ? 1 : 0.9 }}>
+                    <NavIcon item={item} size={32} glow={active} />
+                  </span>
+                  <span className="leading-snug break-words">{t(item.labelKey)}</span>
+                </Link>
+              </Fragment>
+            );
+          })}
+        </nav>
 
-        {/* Sign out */}
         <button
           onClick={confirmSignOut}
           title={t("common.signOut")}
-          className="flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium text-[#102A56] hover:bg-slate-100 transition-colors mt-2"
+          className="flex items-center gap-3 min-h-11 px-3 rounded-xl text-sm font-medium text-[#102A56] dark:text-ink hover:bg-slate-100 dark:hover:bg-white/5 transition-colors mt-2"
         >
-          {items.some((item) => item.art || item.mark) ? <LogOut size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]"><IconSignOut size={20} /></span>}
+          <LogOut size={20} strokeWidth={1.75} aria-hidden />
           <span>{t("common.signOut")}</span>
         </button>
 
@@ -314,7 +337,7 @@ export function SidebarNav({ items, roleKey, userName, portalLinks }: SidebarNav
                 href={item.href}
                 className="flex items-center gap-3 px-3 py-2 rounded-2xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-brand-navy/5 transition-all"
               >
-                {item.mark ? <item.mark size={20} strokeWidth={1.75} color="#102A56" aria-hidden /> : <span className="text-[#102A56]">{item.icon}</span>}
+                <NavIcon item={item} size={24} />
                 {t(item.labelKey)}
               </Link>
             ))}

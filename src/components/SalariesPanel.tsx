@@ -13,8 +13,7 @@ import {
   type TeacherOverride,
 } from "@/data/demo";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
-import { SectionCard, StatTile, EmptyNote, LoadingNote } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { MonthBar, field, label, primary, ghost } from "@/components/financeUi";
 import {
   PAY_METHOD_LABELS,
@@ -31,6 +30,7 @@ import {
 } from "@/lib/finance";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
+import { useToast } from "@/components/Toast";
 
 // The month's salaries: every admin and teacher with their usual monthly
 // pay, who's been paid and who hasn't, and anyone else the school pays.
@@ -74,6 +74,7 @@ export function demoSalaryPayments(thisMonth: string): SalaryPayment[] {
 
 export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; schoolId: string | null; userId: string | null }) {
   const { tr } = useLanguage();
+  const toast = useToast();
   const supabase = createClient();
   const thisMonth = monthOf(todayIso());
   const [month, setMonth] = useState(thisMonth);
@@ -243,6 +244,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
     }
     await loadPayments(month);
     setBusy(false);
+    toast.success(tr("Payment saved: {amount} to {name}.", { amount: money(row.amount), name: row.payeeName }));
     return true;
   };
 
@@ -353,17 +355,17 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                     type="button"
                     onClick={() => open(s)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 py-3 text-start hover:bg-surface-bg-warm rounded-xl -mx-2 px-2 transition-colors"
+                    className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 bg-brand-navy/10 text-brand-navy dark:text-brand-gold">
                       {initials(s.name)}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ink truncate">
+                      <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                         {s.name}
                         {s.admin && <span className="ms-1.5 text-[10px] font-semibold text-ink-muted uppercase tracking-wide">{tr("Admin")}</span>}
                       </p>
-                      <p className="text-[11px] text-ink-muted truncate">
+                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
                         {rates[s.id] ? tr("{amount} a month", { amount: money(rates[s.id]) }) : tr("No salary set")}
                       </p>
                     </div>
@@ -381,9 +383,7 @@ export function SalariesPanel({ isDemo, schoolId, userId }: { isDemo: boolean; s
                         </span>
                       )}
                     </div>
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
-                    </span>
+                    <RowChevron open={isOpen} />
                   </button>
 
                   {isOpen && (

@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { demoAttendanceFetch, type DemoRole } from "@/lib/demoAttendance";
 import { formatClock, type StaffDay } from "@/lib/attendanceRules";
 import { PlanAlertBanner } from "@/components/yearly-plan-ui";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
 import { translateNotice } from "@/lib/noticeText";
+import { useToast } from "@/components/Toast";
+import { readCache, writeCache } from "@/lib/pageCache";
 
 /* ── Which portal is this ──────────────────────────────────────────── */
 
@@ -23,18 +26,14 @@ export type Api = (input: string, init?: RequestInit) => Promise<Response>;
 export function useAttendanceApi(role: DemoRole): { mode: "loading" | "demo" | "real"; api: Api } {
   const [mode, setMode] = useState<"loading" | "demo" | "real">("loading");
   useEffect(() => {
-    // The sample portal has no Supabase session. Skipping that round trip
-    // keeps the clock-in page from sitting on a skeleton while a placeholder
-    // host times out.
     try {
       if (localStorage.getItem("demo_user") && !document.cookie.includes("auth-token")) {
         setMode("demo");
         return;
       }
     } catch { /* private mode — fall through to the session check */ }
-    createClient()
-      .auth.getUser()
-      .then(({ data: { user } }) => setMode(user ? "real" : "demo"))
+    sessionUser(createClient())
+      .then((user) => setMode(user ? "real" : "demo"))
       .catch(() => setMode("demo"));
   }, []);
   const api = useCallback<Api>(
@@ -61,7 +60,7 @@ export async function currentPosition(): Promise<Fix> {
   if (Capacitor.isNativePlatform()) return nativePosition();
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      reject(new Error(phrase("This device can't share its location, so it can't be used to sign in. Try your phone.")));
+      reject(new Error(phrase("This device can't share its location, so it can't be used to clock in. Try your phone.")));
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -108,11 +107,11 @@ async function nativePosition(): Promise<Fix> {
 /* ── A day's status ────────────────────────────────────────────────── */
 
 const STATUS_STYLE: Record<StaffDay["status"], string> = {
-  present: "bg-attend-present-bg text-attend-present-ink",
-  late: "bg-attend-late-bg text-attend-late-ink",
-  absent: "bg-attend-absent-bg text-attend-absent-ink",
+  present: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  late: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  absent: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
   reported: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300",
-  excused: "bg-attend-excused-bg text-attend-excused-ink",
+  excused: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300",
   pending: "bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300",
   off: "bg-transparent text-ink-muted",
 };
@@ -160,9 +159,16 @@ interface MyDay {
  * The location is read from the phone only when they tap, and sent to the
  * server, which makes the actual on-the-premises decision.
  */
+const SIGN_IN_KEY = "staff-sign-in";
+
 export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void }) {
   const { tr } = useLanguage();
-  const [data, setData] = useState<MyDay | null>(null);
+  // Today's answer from the last visit, shown at once while it's asked
+  // again — rather than a line of "Checking…" every time the page opens.
+  const [data, setData] = useState<MyDay | null>(() => {
+    const seen = readCache<MyDay>(SIGN_IN_KEY);
+    return seen && seen.today === new Date().toLocaleDateString("en-CA") ? seen : null;
+  });
   const [busy, setBusy] = useState<"" | "locating" | "saving">("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -170,8 +176,10 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
   const load = useCallback(async () => {
     const res = await api("/api/staff-attendance");
     const body = await res.json();
-    if (res.ok) setData(body);
-    else setError(tr(body.error ?? "Could not load today's clock-in"));
+    if (res.ok) {
+      setData(body);
+      writeCache(SIGN_IN_KEY, body);
+    } else setError(tr(body.error ?? "Could not load today's clock-in"));
   }, [api]);
 
   useEffect(() => {
@@ -206,9 +214,19 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
   };
 
   if (!data) {
+    // The first time it's asked: the card's own shape, quietly, so nothing
+    // jumps when the answer comes.
     return (
-      <section className="card-quiet p-5">
-        <p className="text-[13px] text-ink-muted">{error ?? tr("Checking today's clock-in…")}</p>
+      <section className="card-quiet p-5" aria-busy={!error}>
+        {error ? (
+          <p className="text-[13px] text-ink-muted">{error}</p>
+        ) : (
+          <div className="space-y-2.5" aria-label={tr("Checking today's clock-in…")}>
+            <div className="skeleton h-3 w-36 rounded-full" />
+            <div className="skeleton h-5 w-56 max-w-full rounded-full" />
+            <div className="skeleton h-3 w-80 max-w-full rounded-full" />
+          </div>
+        )}
       </section>
     );
   }
@@ -252,7 +270,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
               type="button"
               onClick={() => act("sign_in")}
               disabled={busy !== ""}
-              className="btn btn-accent"
+              className="gradient-emerald text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-50 active:scale-[.98] transition-all"
             >
               {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Clocking in…") : tr("Clock in")}
             </button>
@@ -262,7 +280,7 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
               type="button"
               onClick={() => act("sign_out")}
               disabled={busy !== ""}
-              className="btn btn-primary"
+              className="bg-brand-navy text-white text-[13px] font-semibold py-2.5 px-5 rounded-xl disabled:opacity-50 active:scale-[.98] transition-all"
             >
               {busy === "locating" ? tr("Checking your location…") : busy === "saving" ? tr("Clocking out…") : tr("Clock out")}
             </button>
@@ -276,15 +294,15 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
         </p>
       )}
       {!settings.configured && (
-        <div className="mt-4 rounded-2xl border border-amber-300/80 bg-amber-50 px-4 py-3.5 dark:border-amber-700/40 dark:bg-amber-950/25">
-          <p className="text-[14px] font-semibold text-ink">{tr("Clock in isn't available yet")}</p>
-          <p className="text-[13px] text-ink-body mt-1.5 leading-relaxed">
+        <div className="mt-3 rounded-2xl border border-amber-300/80 bg-amber-50/80 dark:border-amber-800/50 dark:bg-amber-950/25 px-4 py-3">
+          <p className="text-[13px] font-semibold text-amber-950 dark:text-amber-100">{tr("Clock in isn't available yet")}</p>
+          <p className="text-[12.5px] text-amber-900 dark:text-amber-200 mt-1 leading-relaxed">
             {tr("The school location hasn't been set, so the portal can't confirm you're at the school. Ask your school office — an admin — to set it under Staff attendance. Once they save the location, you can clock in from your phone while you're there.")}
           </p>
         </div>
       )}
       {settings.demo && (
-        <p className="text-[11.5px] text-ink-muted mt-3 leading-relaxed">
+        <p className="text-[11.5px] text-ink-muted mt-3">
           {tr("Sample portal: the location check and times are simulated. On your school's portal, clocking in and out only works at the school.")}
         </p>
       )}
@@ -300,9 +318,11 @@ export function SignInCard({ api, onChange }: { api: Api; onChange?: () => void 
 
 /* ── Notices ───────────────────────────────────────────────────────── */
 
+const NOTICES_SHOWN = 2;
+
 interface Notice {
   id: string;
-  kind: "absence_streak" | "staff_absence_report" | "account_deleted" | "deletion_request";
+  kind: "absence_streak" | "staff_absence_report" | "account_deleted" | "deletion_request" | "milestone";
   title: string;
   body: string;
   created_at: string;
@@ -316,8 +336,11 @@ interface Notice {
  * sit at the top of a dashboard without leaving a gap.
  */
 export function NoticesPanel({ api }: { api: Api }) {
+  const { tr } = useLanguage();
+  const toast = useToast();
   const [items, setItems] = useState<Notice[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     api("/api/notifications")
@@ -329,22 +352,35 @@ export function NoticesPanel({ api }: { api: Api }) {
   const dismiss = async (id: string) => {
     setBusy(id);
     try {
-      await api("/api/notifications", {
+      const res = await api("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
+      if (!res.ok) throw new Error();
       setItems((list) => list.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
+    } catch {
+      // Left on screen: a notice that vanished without being dismissed
+      // would come back on the next visit with no explanation.
+      toast.error(tr("Couldn't dismiss that notice. Check your connection and try again."));
     } finally {
       setBusy(null);
     }
   };
 
-  const unread = items.filter((n) => !n.read_at);
+  // A child missing school comes before anything for information, newest
+  // first within each. Several at once — a family of four after a bout of
+  // flu — would push the dashboard off the screen, so two show and the
+  // rest wait behind a link.
+  const unread = items
+    .filter((n) => !n.read_at)
+    .sort((a, b) => Number(b.kind === "absence_streak") - Number(a.kind === "absence_streak") || b.created_at.localeCompare(a.created_at));
   if (unread.length === 0) return null;
+  const shown = showAll ? unread : unread.slice(0, NOTICES_SHOWN);
+  const hidden = unread.length - shown.length;
   return (
     <div className="space-y-2.5">
-      {unread.map((n) => (
+      {shown.map((n) => (
         <PlanAlertBanner
           key={n.id}
           level={n.kind === "absence_streak" ? "critical" : "info"}
@@ -354,6 +390,16 @@ export function NoticesPanel({ api }: { api: Api }) {
           busy={busy === n.id}
         />
       ))}
+      {unread.length > NOTICES_SHOWN && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className="text-[12px] font-semibold text-ink-muted hover:text-ink underline underline-offset-2"
+        >
+          {showAll ? tr("Show fewer notices") : tr("{count} more notice|{count} more notices", { count: hidden })}
+        </button>
+      )}
     </div>
   );
 }

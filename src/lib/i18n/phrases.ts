@@ -1,6 +1,6 @@
 import { Fragment, createElement, type ReactNode } from "react";
 import type { Language } from "@/lib/i18n/translations";
-import { AR_PHRASES, type Plural } from "@/lib/i18n/phrases.ar";
+import type { Plural } from "@/lib/i18n/phrases.ar";
 import { currentLanguage } from "@/lib/i18n/current";
 
 /*
@@ -20,7 +20,14 @@ import { currentLanguage } from "@/lib/i18n/current";
 export type PhraseVars = Record<string, ReactNode>;
 export type Translated<V> = V extends Record<string, string | number | null | undefined> | undefined ? string : ReactNode;
 
-const DICTS: Partial<Record<Language, Record<string, string | Plural>>> = { ar: AR_PHRASES };
+// Filled when Arabic is chosen: the dictionary is the biggest part of the
+// app's text, and most readers never need it downloaded.
+const DICTS: Partial<Record<Language, Record<string, string | Plural>>> = {};
+
+/** Makes a language's phrases ready before it's shown. */
+export async function loadPhrases(language: Language): Promise<void> {
+  if (language === "ar" && !DICTS.ar) DICTS.ar = (await import("@/lib/i18n/phrases.ar")).AR_PHRASES;
+}
 
 const rules = new Map<Language, Intl.PluralRules>();
 function countOf(vars: PhraseVars | undefined): number {

@@ -111,16 +111,16 @@ export default function MyAttendancePage() {
 
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatTile value={data.tally.present} label={tr("On time")} sub={tr("of {schoolDays} school days", { schoolDays: data.tally.schoolDays })} />
-          <StatTile value={data.tally.late} label={tr("Late")} sub={data.tally.late ? tr("{minutesLate} min in all", { minutesLate: data.tally.minutesLate }) : tr("None")} />
-          <StatTile value={data.tally.absent} label={tr("Absent")} sub={tr("Not reported")} />
-          <StatTile value={data.tally.reported + data.tally.excused} label={tr("Reported")} sub={tr("Or excused by the office")} />
+          <StatTile status="present" value={data.tally.present} label={tr("On time")} sub={tr("of {schoolDays} school days", { schoolDays: data.tally.schoolDays })} />
+          <StatTile status="late" value={data.tally.late} label={tr("Late")} sub={data.tally.late ? tr("{minutesLate} min in all", { minutesLate: data.tally.minutesLate }) : tr("None")} />
+          <StatTile status="absent" value={data.tally.absent} label={tr("Absent")} sub={tr("Not reported")} />
+          <StatTile status="excused" value={data.tally.reported + data.tally.excused} label={tr("Reported")} sub={tr("Or excused by the office")} />
         </div>
       )}
 
       <SectionCard title={tr("Report an absence")} note={tr("The office is told straight away")}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="block">
+          <label className="block min-w-0">
             <span className="eyebrow block mb-1.5">{tr("First day away")}</span>
             <input
               type="date"
@@ -130,7 +130,7 @@ export default function MyAttendancePage() {
               className={input}
             />
           </label>
-          <label className="block">
+          <label className="block min-w-0">
             <span className="eyebrow block mb-1.5">{tr("Last day away")}</span>
             <input
               type="date"
@@ -189,7 +189,7 @@ export default function MyAttendancePage() {
                 <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-ink">{when(r)}</p>
-                    <p className="text-[11.5px] text-ink-muted truncate">
+                    <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                       {REASON_LABEL[r.reason]}
                       {r.note ? ` — ${r.note}` : ""}
                     </p>
@@ -225,7 +225,7 @@ export default function MyAttendancePage() {
               <li key={d.date} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-ink">{formatDay(d.date, language)}</p>
-                  <p className="text-[11.5px] text-ink-muted truncate">
+                  <p className="text-[11.5px] text-ink-muted [overflow-wrap:anywhere]">
                     {timesLine(d) ||
                       (d.report ? `${REASON_LABEL[d.report.reason]}${d.report.note ? ` — ${d.report.note}` : ""}` : d.note ?? tr("No clock-in"))}
                   </p>

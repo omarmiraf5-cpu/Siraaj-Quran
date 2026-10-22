@@ -8,6 +8,7 @@ import { SectionCard, SegmentedSwitch, EmptyNote, LoadingNote } from "@/componen
 import { MessageThread } from "@/components/MessageThread";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { phrase } from "@/lib/i18n/phrases";
@@ -51,9 +52,7 @@ export default function ParentMessagesPage() {
     }
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
       if (!user || children.length === 0) return;
 
       const { data: profile } = await supabase
@@ -330,7 +329,7 @@ export default function ParentMessagesPage() {
         </button>
       )}
 
-      <div className="fixed bottom-20 md:bottom-0 start-0 end-0 md:start-60 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-surface-card border-t border-surface-border z-30">
+      <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-0 start-0 end-0 md:start-60 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-surface-card border-t border-surface-border z-30">
         <div className="max-w-4xl mx-auto flex items-center gap-2">
           <input
             value={text}

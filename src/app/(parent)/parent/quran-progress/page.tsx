@@ -14,6 +14,7 @@ import {
   type AssignmentOverride,
   type RecitationLogEntry,
 } from "@/data/demo";
+import { useChosenChild } from "@/hooks/useChosenChild";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { PortalHero } from "@/components/PortalHero";
 import {
@@ -26,8 +27,9 @@ import {
   TeacherNote,
   RatingPill,
   RecitationHistory,
+  OPEN_ROW,
+  RowChevron,
 } from "@/components/portal-ui";
-import { IconArrow } from "@/components/icons";
 import { readDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -45,16 +47,11 @@ export default function ParentQuranProgressPage() {
   // RLS narrows this to the signed-in parent's own children; in demo mode
   // it's the two sample ones.
   const { mode, students: children } = usePortalRoster(undefined, { myChildren: true });
-  const [childId, setChildId] = useState<string | null>(null);
-  const child = children.find((c) => c.id === childId) ?? children[0] ?? null;
+  const { child, choose: setChildId, options: childChoices } = useChosenChild(children);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, AssignmentOverride>>({});
   const [demoLog, setDemoLog] = useState<RecitationLogEntry[]>([]);
   const [realLog, setRealLog] = useState<RecitationLogEntry[]>([]);
-
-  useEffect(() => {
-    if (!childId && children.length > 0) setChildId(children[0].id);
-  }, [children, childId]);
 
   const { assignments: baseAssignments, ready } = useStudentRecord(child?.id ?? null, mode);
 
@@ -134,7 +131,7 @@ export default function ParentQuranProgressPage() {
 
       {children.length > 1 && (
         <div className="flex flex-wrap items-center gap-3 min-w-0">
-          <span className="eyebrow">{t("common.viewing")}</span>
+          <span className="eyebrow flex-shrink-0">{t("common.viewing")}</span>
           <SegmentedSwitch
             label={t("common.selectChild")}
             value={child.id}
@@ -142,7 +139,7 @@ export default function ParentQuranProgressPage() {
               setChildId(v);
               setExpanded(null);
             }}
-            options={children.map((c) => ({ value: c.id, label: c.name.split(" ")[0] }))}
+            options={childChoices}
           />
         </div>
       )}
@@ -186,7 +183,7 @@ export default function ParentQuranProgressPage() {
                     type="button"
                     onClick={() => setExpanded(isOpen ? null : a.id)}
                     aria-expanded={isOpen}
-                    className="w-full text-start rounded-xl px-2 py-3 -mx-2 hover:bg-surface-bg-warm transition-colors"
+                    className={`group w-full text-start rounded-xl px-2 py-3 -mx-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -202,7 +199,7 @@ export default function ParentQuranProgressPage() {
                             {PORTION_ARABIC[a.portion]}
                           </span>
                         </p>
-                        <p className="text-[14px] font-semibold text-ink truncate mt-0.5">
+                        <p className="text-[14px] font-semibold text-ink [overflow-wrap:anywhere] mt-0.5">
                           {surahEnd ? (
                             rangeLabel
                           ) : (
@@ -219,7 +216,7 @@ export default function ParentQuranProgressPage() {
                               <span className="mx-1.5">·</span>
                               <span
                                 className={
-                                  due.urgent ? "text-red-700 dark:text-red-300 font-semibold" : ""
+                                  due.urgent ? (isOpen ? "font-semibold" : "text-red-700 dark:text-red-300 font-semibold") : ""
                                 }
                               >
                                 {due.text}
@@ -234,11 +231,7 @@ export default function ParentQuranProgressPage() {
                         >
                           {t(ASSIGNMENT_STATUS_KEY[a.status])}
                         </span>
-                        <span
-                          className={`text-ink-muted transition-transform ${isOpen ? "rotate-90" : ""}`}
-                        >
-                          <IconArrow size={14} />
-                        </span>
+                        <RowChevron open={isOpen} />
                       </div>
                     </div>
 

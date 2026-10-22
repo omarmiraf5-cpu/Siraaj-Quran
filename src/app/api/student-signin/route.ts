@@ -26,8 +26,13 @@ export async function POST(req: NextRequest) {
     .select("id, pin, profile_id, active")
     .eq("id", studentId)
     .maybeSingle();
-  if (!student || student.active === false || !student.pin || !student.profile_id) {
+  if (!student || student.active === false) {
     return NextResponse.json({ error: "That PIN didn't work" }, { status: 401 });
+  }
+  // On the list, so a PIN was given, but the login behind it was never made.
+  if (!student.pin || !student.profile_id) {
+    console.error("Student sign-in: PIN or login missing for", studentId, { hasPin: Boolean(student.pin), hasLogin: Boolean(student.profile_id) });
+    return NextResponse.json({ error: "Your sign-in isn't ready yet", code: "not_ready" }, { status: 409 });
   }
 
   // The count of wrong PINs. Before the database has its table, there is

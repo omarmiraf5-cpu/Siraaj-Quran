@@ -104,7 +104,7 @@ function StudentList({ onSelect }: { onSelect: (id: string) => void }) {
                 <Row key={s.id} onClick={() => onSelect(s.id)}>
                   <Avatar name={s.name} />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-semibold text-ink truncate">
+                    <span className="block text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                       {s.name}
                     </span>
                     <span className="block text-[11px] text-ink-muted">
@@ -148,7 +148,7 @@ function AttendanceList({ onSelect }: { onSelect: (id: string) => void }) {
             <div className="flex items-center gap-3">
               <Avatar name={student.name} />
               <span className="flex-1 min-w-0">
-                <span className="block text-[13px] font-semibold text-ink truncate">
+                <span className="block text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                   {student.name}
                 </span>
                 <span className="block text-[11px] text-ink-muted">{student.halaqa}</span>
@@ -209,7 +209,7 @@ function AssignmentList({
               <div className="flex items-start gap-3">
                 <Avatar name={name} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">
+                  <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">
                     {name}
                     <span className="font-normal text-ink-muted">
                       {" · "}

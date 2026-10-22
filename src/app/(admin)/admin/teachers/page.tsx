@@ -1,5 +1,6 @@
 "use client";
 
+import { GraduationCap, Users, BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -12,18 +13,17 @@ import {
   allTeachers,
   allHalaqas,
   halaqaTeacherIds,
-  initials,
   type TeacherOverride,
   type HalaqaOverride,
 } from "@/data/demo";
 import type { DemoTeacher, DemoHalaqa } from "@/data/demo";
-import { PortalHero } from "@/components/PortalHero";
-import { SectionCard, EmptyNote } from "@/components/portal-ui";
-import { MotionList, MotionRow, SkeletonRows, StatusBadge, useToast } from "@/components/motion-ui";
-import { motion, useReducedMotion } from "motion/react";
-import { IconArrow } from "@/components/icons";
+import { PortalHero, HERO_GOLD } from "@/components/PortalHero";
+import { SectionCard, StatTile, EmptyNote, LoadingNote, Avatar, StatusPill, RowChevron, OPEN_ROW } from "@/components/portal-ui";
+import { loadSchoolShape } from "@/lib/schoolStructure";
+import { gradeLabel } from "@/lib/grades";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { welcomeNote } from "@/lib/welcomeNote";
 import { DeleteAccount, deleteAccount, saveAccount } from "@/components/DeleteAccount";
 import { loadSchoolTeachers, saveHalaqaTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
@@ -75,14 +75,13 @@ function HalaqaChips({
 }
 
 export default function AdminTeachersPage() {
-  const { tr } = useLanguage();
-  const toast = useToast();
-  const reduce = useReducedMotion();
+  const { tr, language } = useLanguage();
   const supabase = createClient();
   const [isDemo, setIsDemo] = useState(false);
   const [ready, setReady] = useState(false);
 
   const [teachers, setTeachers] = useState<DemoTeacher[]>([]);
+  const [search, setSearch] = useState("");
   const [halaqas, setHalaqas] = useState<DemoHalaqa[]>([]);
   const [created, setCreated] = useState<DemoTeacher[]>([]);
   const [overrides, setOverrides] = useState<Record<string, TeacherOverride>>({});
@@ -90,6 +89,9 @@ export default function AdminTeachersPage() {
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  // An office admin who doesn't teach: a login to run the school, not a teacher's.
+  const [asAdmin, setAsAdmin] = useState(false);
+  const [officeAdmins, setOfficeAdmins] = useState<Array<{ id: string; name: string; email: string; active: boolean }>>([]);
   const [inviting, setInviting] = useState(false);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
 
@@ -102,6 +104,10 @@ export default function AdminTeachersPage() {
   const myHalaqaIds = (list: DemoHalaqa[]) => (me ? list.filter((h) => halaqaTeacherIds(h).includes(me.id)).map((h) => h.id) : []);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Each halaqa's children, and whether the school keeps grades: for the
+  // line under each teacher's name.
+  const [kidsOf, setKidsOf] = useState<Map<string, string[]>>(new Map());
+  const [graded, setGraded] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftEmail, setDraftEmail] = useState("");
   const [draftActive, setDraftActive] = useState(true);
@@ -113,30 +119,43 @@ export default function AdminTeachersPage() {
   // Real halaqas, for showing each teacher's assignment(s) — kept as a
   // separate loader so the demo path can reuse it unchanged.
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
-    const [{ data }, { data: others }] = await Promise.all([
-      supabase.from("classes").select("id, name, teacher_id, schedule").order("name"),
+    const [{ data }, { data: others }, { data: enrolled }] = await Promise.all([
+      supabase.from("classes").select("id, name, teacher_id, schedule, grade").order("name"),
       supabase.from("class_teachers").select("class_id, teacher_id"),
+      // Who's in each, to say how many children a teacher has.
+      supabase.from("class_enrollments").select("class_id, student_id"),
     ]);
     const othersOf = new Map<string, string[]>();
     for (const o of others ?? []) othersOf.set(o.class_id, [...(othersOf.get(o.class_id) ?? []), o.teacher_id]);
+    const kids = new Map<string, string[]>();
+    for (const e of (enrolled ?? []) as Array<{ class_id: string; student_id: string }>) kids.set(e.class_id, [...(kids.get(e.class_id) ?? []), e.student_id]);
+    setKidsOf(kids);
     return (data ?? []).map((c) => ({
       id: c.id,
       name: c.name,
       teacherId: c.teacher_id,
       coTeacherIds: othersOf.get(c.id) ?? [],
       schedule: c.schedule ?? "",
+      grade: c.grade,
     }));
   };
 
   const loadRealTeachers = async () => {
-    setTeachers(await loadSchoolTeachers(supabase));
+    const list = await loadSchoolTeachers(supabase);
+    setTeachers(list);
+    // The school's admins who don't teach, so a new one is seen to be there.
+    const { data: admins } = await supabase.from("profiles").select("id, full_name, email, active").eq("role", "admin").order("full_name");
+    const listed = new Set(list.map((t) => t.id));
+    setOfficeAdmins(
+      ((admins ?? []) as Array<{ id: string; full_name: string; email: string | null; active: boolean }>)
+        .filter((a) => !listed.has(a.id))
+        .map((a) => ({ id: a.id, name: a.full_name, email: a.email ?? "", active: a.active !== false }))
+    );
   };
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await sessionUser(supabase);
 
       if (!user) {
         setIsDemo(true);
@@ -154,9 +173,13 @@ export default function AdminTeachersPage() {
         return;
       }
 
-      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+      const { data: profile } = await supabase.from("profiles").select("full_name, school_id").eq("id", user.id).maybeSingle();
       setMe({ id: user.id, email: user.email ?? "", name: profile?.full_name ?? "" });
-      await Promise.all([loadRealTeachers(), loadRealHalaqas().then(setHalaqas)]);
+      await Promise.all([
+        loadRealTeachers(),
+        loadRealHalaqas().then(setHalaqas),
+        loadSchoolShape(supabase, profile?.school_id ?? null).then((shape) => setGraded(shape.graded)),
+      ]);
     };
     load().finally(() => setReady(true));
   }, []);
@@ -243,7 +266,7 @@ export default function AdminTeachersPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          role: "teacher",
+          role: asAdmin ? "admin" : "teacher",
           full_name: newName.trim(),
           email: newEmail.trim(),
         }),
@@ -253,6 +276,7 @@ export default function AdminTeachersPage() {
       await loadRealTeachers();
       setNewName("");
       setNewEmail("");
+      setAsAdmin(false);
       setShowForm(false);
       setInviteNote(
         data.joined
@@ -287,7 +311,6 @@ export default function AdminTeachersPage() {
     try {
       await saveMyTeaching(mine, draftName);
       setEditingId(null);
-      toast.success(tr("Done"));
     } catch (err) {
       setSaveError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
@@ -318,6 +341,26 @@ export default function AdminTeachersPage() {
       );
     } catch (err) {
       setResetNote(err instanceof Error ? tr(err.message) : tr("Couldn't reset the password"));
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  // An office admin's welcome, sent again: the email with the button to choose a password.
+  const sendWelcome = async (a: { id: string; name: string }) => {
+    setResetting(true);
+    setInviteNote(null);
+    try {
+      const res = await fetch("/api/admin/accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: a.id, by: "welcome" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || phrase("Couldn't send the email"));
+      setInviteNote(tr("Sent a welcome email to {email}, with a button to choose their password. It works once, for 14 days.", { email: data.email }));
+    } catch (err) {
+      setInviteNote(err instanceof Error ? tr(err.message) : tr("Couldn't send the email"));
     } finally {
       setResetting(false);
     }
@@ -362,7 +405,6 @@ export default function AdminTeachersPage() {
       writeDemoStore(DEMO_TEACHER_OVERRIDES_KEY, next);
       setTeachers(allTeachers(created, next));
       setEditingId(null);
-      toast.success(tr("Done"));
       return;
     }
 
@@ -375,11 +417,8 @@ export default function AdminTeachersPage() {
       await saveAccount(t.id, { full_name: draftName.trim() || t.name, active: draftActive });
       await loadRealTeachers();
       setEditingId(null);
-      toast.success(tr("Done"));
     } catch (err) {
-      const message = err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again.");
-      setSaveError(message);
-      if (typeof message === "string") toast.error(message);
+      setSaveError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
     } finally {
       setSavingEdit(false);
     }
@@ -387,18 +426,33 @@ export default function AdminTeachersPage() {
 
   const activeCount = teachers.filter((t) => t.active !== false).length;
 
+  /** "Grades 5, 7 · 23 students", or "Halaqa A, Halaqa B · 14 students". */
+  const teachingSummary = (theirs: DemoHalaqa[]): string => {
+    if (theirs.length === 0) return tr("No halaqa yet");
+    const comma = language === "ar" ? "، " : ", ";
+    const grades = [...new Set(theirs.map((h) => h.grade).filter((g): g is number => typeof g === "number"))].sort((a, b) => a - b);
+    const what =
+      graded && grades.length > 0
+        ? grades.length === 1
+          ? gradeLabel(grades[0])
+          : tr("Grades {list}", { list: grades.map((g) => (g <= 0 ? gradeLabel(g) : String(g))).join(comma) })
+        : [...new Set(theirs.map((h) => h.name))].join(comma);
+    const children = new Set(theirs.flatMap((h) => kidsOf.get(h.id) ?? [])).size;
+    return isDemo ? what : `${what} · ${tr("{count} student|{count} students", { count: children })}`;
+  };
+
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-4 pt-2">
       <PortalHero
         eyebrow={tr("Staff")}
         title={tr("Teachers")}
-        meta={[tr("{count} total", { count: teachers.length }), tr("{count} active", { count: activeCount })]}
+        meta={[
+          tr("{count} total", { count: teachers.length }),
+          { text: tr("{count} active", { count: activeCount }), tone: "green" as const },
+          tr("{count} halaqa|{count} halaqas", { count: halaqas.length }),
+        ]}
         actions={
-          <button
-            type="button"
-            onClick={() => setShowForm((v) => !v)}
-            className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all active:scale-95"
-          >
+          <button type="button" onClick={() => setShowForm((v) => !v)} className={HERO_GOLD}>
             {showForm ? tr("Cancel") : tr("+ Add teacher")}
           </button>
         }
@@ -435,7 +489,16 @@ export default function AdminTeachersPage() {
               <HalaqaChips halaqas={halaqas} selected={mine} onChange={setMine} />
               {teachError && <p className="text-xs text-red-600 dark:text-red-400">{teachError}</p>}
             </div>
-          ) : (
+          ) : isDemo ? null : (
+            <label className="flex items-start gap-2.5 rounded-2xl border border-surface-border bg-surface-bg-warm p-3 cursor-pointer">
+              <input type="checkbox" checked={asAdmin} onChange={(e) => setAsAdmin(e.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-700" />
+              <span className="text-sm text-ink leading-snug">
+                <span className="font-semibold">{tr("Office admin, not a teacher")}</span>
+                <span className="block text-xs text-ink-muted mt-0.5">{tr("They run the school (students, teachers, payments, announcements) and don't teach a halaqa.")}</span>
+              </span>
+            </label>
+          )}
+          {!isSelf && (
             <p className="text-xs text-ink-muted">
               {isDemo
                 ? tr("New teachers start without a halaqa — assign one from the Halaqas page.")
@@ -448,7 +511,7 @@ export default function AdminTeachersPage() {
             disabled={isSelf ? inviting || halaqas.length === 0 : !newName.trim() || !newEmail.trim() || inviting}
             className="w-full gradient-emerald text-white font-semibold py-3 rounded-2xl disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all"
           >
-            {isSelf ? (inviting ? tr("Saving…") : tr("Teach with my login")) : isDemo ? tr("Add teacher") : inviting ? tr("Creating…") : tr("Create login")}
+            {isSelf ? (inviting ? tr("Saving…") : tr("Teach with my login")) : isDemo ? tr("Add teacher") : inviting ? tr("Creating…") : asAdmin ? tr("Create admin login") : tr("Create login")}
           </button>
         </form>
       )}
@@ -459,43 +522,49 @@ export default function AdminTeachersPage() {
         </div>
       )}
 
+      {/* The same shape as Student attendance: figures first, then a search. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatTile icon={GraduationCap} art="board" tone="gold" value={teachers.length} label={tr("Teachers")} sub={tr("{count} total", { count: teachers.length })} />
+        <StatTile icon={Users} art="check" tone="green" status="present" value={activeCount} label={tr("Active")} sub={tr("can sign in")} />
+        <StatTile icon={Users} art="lock" tone="navy" status="excused" value={teachers.length - activeCount} label={tr("Switched off")} sub={tr("can't sign in")} />
+        <StatTile icon={BookOpen} art="rehal" tone="green" value={halaqas.length} label={tr("Halaqas")} sub={tr("{count} with no teacher", { count: halaqas.filter((h) => halaqaTeacherIds(h).length === 0).length })} />
+      </div>
+
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={tr("Search a teacher…")}
+        className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[13px] text-ink"
+      />
+
       <SectionCard title={tr("All teachers")} note={tr("{count} total", { count: teachers.length })}>
         {!ready ? (
-          <div aria-busy="true">
-            <SkeletonRows />
-          </div>
+          <LoadingNote />
         ) : teachers.length === 0 ? (
           <EmptyNote>{tr("No teachers yet.")}</EmptyNote>
         ) : (
-          <MotionList className="divide-y divide-surface-border -my-1">
-            {teachers.map((t) => {
+          <ul className="divide-y divide-surface-border -my-1">
+            {teachers.filter((t) => !search.trim() || `${t.name} ${t.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())).map((t) => {
               const isOpen = editingId === t.id;
               const inactive = t.active === false;
               const theirHalaqas = halaqas.filter((h) => halaqaTeacherIds(h).includes(t.id));
               return (
-                <MotionRow key={t.id} className="teacher-row list-none flex items-center gap-2 py-2 px-1">
-                  <motion.button
+                <li key={t.id}>
+                  <button
                     type="button"
                     onClick={() => startEditing(t)}
                     aria-expanded={isOpen}
-                    className="flex-1 min-w-0 flex items-center gap-3 py-2 text-start rounded-xl px-2"
+                    className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                   >
-                    <span
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
-                        inactive
-                          ? "bg-slate-100 dark:bg-slate-800/40 text-slate-500"
-                          : "bg-brand-navy/10 text-brand-navy dark:text-brand-gold"
-                      }`}
-                    >
-                      {initials(t.name)}
-                    </span>
+                    <Avatar name={t.name} muted={inactive} onDark={isOpen} />
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] font-semibold truncate ${inactive ? "text-ink-muted" : "text-ink"}`}>
+                      <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${isOpen ? "text-white" : inactive ? "text-ink-muted" : "text-ink"}`}>
                         {t.name}
                       </p>
-                      <p className="text-[11px] text-ink-muted truncate">
-                        {t.email}
-                        {theirHalaqas.length > 0 && ` · ${theirHalaqas.map((h) => h.name).join(", ")}`}
+                      {/* What they teach in a few words — grades, or their
+                          halaqas' names once each — and how many children. */}
+                      <p className={`text-[11px] [overflow-wrap:anywhere] ${isOpen ? "text-white/75" : "text-ink-muted"}`}>
+                        {[t.email, teachingSummary(theirHalaqas)].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     {t.admin && (
@@ -503,31 +572,15 @@ export default function AdminTeachersPage() {
                         {t.id === me?.id ? tr("You · admin") : tr("Admin")}
                       </span>
                     )}
-                    {inactive ? (
-                      <StatusBadge tip={tr("Inactive")}>{tr("Inactive")}</StatusBadge>
-                    ) : (
-                      <StatusBadge tip={tr("Active")}>{tr("Active")}</StatusBadge>
-                    )}
-                    <span className={`text-ink-muted transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}>
-                      <IconArrow size={14} />
+                    <span className="hidden sm:inline-flex">
+                      <StatusPill on={!inactive} onLabel={tr("Active")} offLabel={tr("Switched off")} />
                     </span>
-                  </motion.button>
-                  <button
-                    type="button"
-                    className="link-secondary hidden sm:inline"
-                    onClick={() => {
-                      const note = tr("Welcome email sent to {email}.", { email: t.email });
-                      toast.success(typeof note === "string" ? note : tr("Done"));
-                    }}
-                  >
-                    {tr("Send welcome email")}
-                  </button>
-                  <button
-                    type="button"
-                    className="delete-badge"
-                    onClick={() => toast.error(tr("That didn't save. Please try again."))}
-                  >
-                    {tr("Delete")}
+                    {inactive && (
+                      <span className="sm:hidden">
+                        <StatusPill on={false} onLabel={tr("Active")} offLabel={tr("Switched off")} />
+                      </span>
+                    )}
+                    <RowChevron open={isOpen} />
                   </button>
 
                   {isOpen && t.admin && (
@@ -687,12 +740,39 @@ export default function AdminTeachersPage() {
                       )}
                     </div>
                   )}
-                </MotionRow>
+                </li>
               );
             })}
-          </MotionList>
+          </ul>
         )}
       </SectionCard>
+
+      {!isDemo && officeAdmins.length > 0 && (
+        <SectionCard title={tr("Office admins")} note={tr("{count} total", { count: officeAdmins.length })}>
+          <ul className="divide-y divide-surface-border -my-1">
+            {officeAdmins.map((a) => (
+              <li key={a.id} className="flex items-center gap-3 py-3">
+                <Avatar name={a.name} muted={!a.active} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{a.name}</p>
+                  <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">{a.email}</p>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-brand-navy/10 text-brand-navy dark:text-brand-gold flex-shrink-0">{a.id === me?.id ? tr("You · admin") : tr("Admin")}</span>
+                {a.id !== me?.id && a.active && (
+                  <button
+                    type="button"
+                    onClick={() => sendWelcome(a)}
+                    disabled={resetting}
+                    className="flex-shrink-0 rounded-full border border-brand-navy/30 text-brand-navy dark:text-brand-gold dark:border-brand-gold/40 text-[11.5px] font-semibold px-3 py-1.5 hover:bg-brand-navy/5 disabled:opacity-50 transition-colors"
+                  >
+                    {tr("Send welcome email")}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
     </div>
   );
 }

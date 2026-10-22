@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { verifiedUser } from "@/lib/supabase/sessionUser";
 
 // The login page already redirects here the moment a temporary password is
 // used, but that only fires at the instant of signing in — an already-open
@@ -14,7 +15,7 @@ export function useRequirePasswordChange() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    verifiedUser(supabase).then(({ data: { user } }) => {
       if (user?.user_metadata?.must_change_password) {
         router.replace("/change-password");
       }

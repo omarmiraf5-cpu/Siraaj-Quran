@@ -21,6 +21,9 @@ export interface DemoStudent {
   /** In a real school: the halaqa's own id, where its name may repeat
       across a school's grades and campuses. */
   halaqaId?: string;
+  /** In a real school: the program halaqas (a Hifd program) they're in as
+      well as their own halaqa — see programHalaqa.ts. */
+  programs?: Array<{ id: string; name: string }>;
   /** In a school kept in grades: the grade they're in (0 is Kindergarten). */
   grade?: number;
   /** Whether their parents get the Friday report; false when the office has switched it off. */
@@ -378,13 +381,14 @@ export function demoAssignmentsFor(
 
 // ── Daily rating ─────────────────────────────────────────────────────────
 // What a teacher grades today's recitation as, read before any percentage.
-export const DAILY_RATING_ORDER: DailyRating[] = ["excellent", "very_good", "good", "weak"];
+export const DAILY_RATING_ORDER: DailyRating[] = ["excellent", "very_good", "good", "weak", "not_recited"];
 
 export const DAILY_RATING_LABELS: Record<DailyRating, string> = {
   excellent: "Excellent",
   very_good: "Very good",
   good: "Good",
   weak: "Weak",
+  not_recited: "Did not recite",
 };
 
 export const DAILY_RATING_STYLES: Record<DailyRating, string> = {
@@ -392,6 +396,7 @@ export const DAILY_RATING_STYLES: Record<DailyRating, string> = {
   very_good: "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300",
   good: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300",
   weak: "bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300",
+  not_recited: "bg-slate-200 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300",
 };
 
 // Solid fills for the calendar dots, where a tinted pill would disappear.
@@ -400,6 +405,7 @@ export const DAILY_RATING_DOT: Record<DailyRating, string> = {
   very_good: "bg-emerald-500",
   good: "bg-amber-500",
   weak: "bg-red-600",
+  not_recited: "bg-slate-400",
 };
 
 /**
@@ -743,7 +749,7 @@ export function recitationLogFor(
 }
 
 export function tallyRatings(entries: RecitationLogEntry[]): Record<DailyRating, number> {
-  const tally: Record<DailyRating, number> = { excellent: 0, very_good: 0, good: 0, weak: 0 };
+  const tally: Record<DailyRating, number> = { excellent: 0, very_good: 0, good: 0, weak: 0, not_recited: 0 };
   for (const e of entries) tally[e.rating]++;
   return tally;
 }

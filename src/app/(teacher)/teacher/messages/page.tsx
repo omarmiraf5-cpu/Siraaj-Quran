@@ -13,6 +13,7 @@ import { MessageThread } from "@/components/MessageThread";
 import { EmptyNote } from "@/components/portal-ui";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
 import { countLabel } from "@/lib/i18n/phrases";
 import { myHalaqaStudents, narrowToMine } from "@/lib/teacherScope";
@@ -56,7 +57,7 @@ export default function TeacherMessagesPage() {
       let user: { id: string } | null = null;
       try {
         const demoOnly = !!localStorage.getItem("demo_user") && !document.cookie.includes("auth-token");
-        if (!demoOnly) user = (await supabase.auth.getUser()).data.user;
+        if (!demoOnly) user = await sessionUser(supabase);
       } catch {
         user = null;
       }
@@ -275,8 +276,8 @@ export default function TeacherMessagesPage() {
                     {initials(s.name)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-ink truncate">{s.name}</p>
-                    <p className="text-[11px] text-ink-muted truncate" dir="auto">
+                    <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{s.name}</p>
+                    <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]" dir="auto">
                       {isAbsence
                         ? `${t("common.absence")} · ${formatDay(last.absence_date!, language)}`
                         : last

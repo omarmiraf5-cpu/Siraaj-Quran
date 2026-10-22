@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { sessionUser } from "@/lib/supabase/sessionUser";
 import { SUPPORT_EMAIL } from "@/lib/site";
 import { StudentPinForm } from "@/components/StudentPinForm";
 import { WeeklyEmailsSwitch } from "@/components/WeeklyEmailsSwitch";
@@ -58,10 +59,8 @@ export default function AccountPage() {
             return;
           }
         }
-      } catch { /* fall through to the session check */ }
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      } catch { /* private mode — fall through to the session */ }
+      const user = await sessionUser(supabase);
       if (!user) {
         // The sample portal signs people in without a real account.
         try {
@@ -269,7 +268,7 @@ function Row({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} className="flex items-center justify-between px-5 py-3.5 text-[14px] font-semibold text-ink hover:bg-surface-bg-warm transition">
       {label}
-      <span aria-hidden className="text-ink-muted inline-block rtl:-scale-x-100">›</span>
+      <span aria-hidden className="text-ink-muted">›</span>
     </Link>
   );
 }

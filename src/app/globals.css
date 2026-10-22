@@ -1365,3 +1365,45 @@ body {
   .row-lift, .card-quiet, .field-glow, .gem-surface, .hero-frame { transition: none; }
   .row-lift:hover, .card-lift:hover, .teacher-row:hover { transform: none; }
 }
+
+/* Main-only pieces kept alongside the design system. */
+.spin-ring {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+.toast-dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.4rem;
+  border-radius: 9999px;
+}
+.toast-ok .toast-dot { background: #10b981; }
+.toast-bad .toast-dot { background: #dc2626; }
+@media (prefers-reduced-motion: reduce) {
+  .spin-ring { animation: none; }
+}
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.row-open .text-ink,
+.row-open .text-ink-body { color: #fff; }
+.row-open .text-ink-muted,
+.row-open .eyebrow { color: rgb(255 255 255 / 0.75); }
+.row-open .bg-brand-navy\/10 { background-color: rgb(255 255 255 / 0.15); color: #fff; }
+.sec-card { --sec: #1e3f7a; --sec-ink: #1e3f7a; }
+.sec-card:nth-of-type(8n+2) { --sec: #0f8a7a; --sec-ink: #0b6b5f; }
+.sec-card:nth-of-type(8n+3) { --sec: #7c5cd6; --sec-ink: #5b3fb0; }
+.sec-card:nth-of-type(8n+4) { --sec: #d98a14; --sec-ink: #9a5a05; }
+.sec-card:nth-of-type(8n+5) { --sec: #d6406a; --sec-ink: #b4234a; }
+.sec-card:nth-of-type(8n+6) { --sec: #1f9d57; --sec-ink: #15803d; }
+.sec-card:nth-of-type(8n+7) { --sec: #1b8fd0; --sec-ink: #0369a1; }
+.sec-card:nth-of-type(8n+8) { --sec: #e0662a; --sec-ink: #c2410c; }
+.dark .sec-card { --sec-ink: color-mix(in srgb, var(--sec) 55%, #ffffff); }
+.sec-bar { background: var(--sec); }
+.sec-title { color: var(--sec-ink); }
+.sec-note { background: color-mix(in srgb, var(--sec) 12%, transparent); color: var(--sec-ink); }

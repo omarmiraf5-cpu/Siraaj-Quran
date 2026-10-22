@@ -23,7 +23,8 @@ import type { Milestone, MilestoneStatus, ProgressEntry } from "@/lib/yearlyPlan
 /** What a rating says about a lesson: heard and passed, or heard and to be
  *  repeated. No rating at all means it has not been heard yet. */
 export function statusForRating(rating: string | null): "completed" | "needs_review" | "assigned" {
-  if (rating == null) return "assigned";
+  // Not heard at all — "didn't recite" — leaves the lesson as it was, to be heard another day.
+  if (rating == null || rating === "not_recited") return "assigned";
   return rating === "weak" ? "needs_review" : "completed";
 }
 

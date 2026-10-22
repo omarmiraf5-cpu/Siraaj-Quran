@@ -21,6 +21,7 @@ import {
   FriendlyEmpty,
   ILLUM_CLASS,
   GRAD_CLASS,
+  StudentPageHeader,
   STATUS_COLOUR,
   surahColour,
   type IllumColour,
@@ -94,23 +95,19 @@ export default function StudentAssignmentsPage() {
 
   return (
     <div className="px-4 pt-4 pb-4 space-y-5">
-      <header className="gradient-navy rounded-[22px] px-6 py-6 relative overflow-hidden animate-rise">
-        <div className="pattern-lattice absolute inset-0 opacity-40 pointer-events-none" />
-        <div className="relative flex items-center gap-5">
-          <div className="min-w-0 flex-1">
-            <p className="eyebrow text-white/45">{tr("Today's three")}</p>
-            <h1 className="page-title text-white text-[30px] mt-1 leading-tight">{tr("My work")}</h1>
-            <p className="text-[13px] text-white/55 mt-1.5">
-              {tr("{done} of {count} finished", { done, count: all.length })}
-            </p>
-          </div>
-          <div className="flex-shrink-0 rounded-full bg-white/10 p-2 backdrop-blur-sm">
+      <StudentPageHeader
+        emoji="📝"
+        eyebrow={tr("Today's three")}
+        title={tr("My work")}
+        subtitle={tr("{done} of {count} finished", { done, count: all.length })}
+        aside={
+          <div className="flex-shrink-0 rounded-full bg-white/15 p-2 backdrop-blur-sm">
             <div className="rounded-full bg-surface-card p-1.5">
               <ProgressRing value={overall} colour="saffron" size={72} label={tr("learnt")} />
             </div>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <StudentWorkSwitch current="quran" />
 
@@ -194,7 +191,7 @@ export default function StudentAssignmentsPage() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="page-title text-[19px] truncate">
+                          <h3 className="page-title text-[19px] [overflow-wrap:anywhere]">
                             {surahEnd
                               ? `${surah?.englishName ?? `Surah ${a.surah}`} – ${surahEnd.englishName}`
                               : (surah ? surah.englishName : tr("Surah {surah}", { surah: a.surah }))}

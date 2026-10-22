@@ -15,7 +15,7 @@ export type HifzPortion = "new" | "recent" | "old";
  * this word before anything else — it is how a maktab actually talks about
  * a session, ahead of any percentage.
  */
-export type DailyRating = "excellent" | "very_good" | "good" | "weak";
+export type DailyRating = "excellent" | "very_good" | "good" | "weak" | "not_recited";
 
 export interface QuranicAssignment {
   id: string;

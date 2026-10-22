@@ -35,6 +35,12 @@ export function translateNotice<N extends { title: string; body: string }>(n: N)
     title = phrase("{name} has missed {count} school days in a row", { name: m[1], count: Number(m[2]) });
   } else if ((m = n.title.match(/^(.+): absent (\d+) school days in a row$/))) {
     title = phrase("{name}: absent {count} school days in a row", { name: m[1], count: Number(m[2]) });
+  } else if ((m = n.title.match(/^(.+) finished Surah (.+)$/))) {
+    title = phrase("{name} finished Surah {surah}", { name: m[1], surah: m[2] });
+  } else if ((m = n.title.match(/^(.+) completed Juz' (\d+)$/))) {
+    title = phrase("{name} completed Juz' {juz}", { name: m[1], juz: Number(m[2]) });
+  } else if ((m = n.title.match(/^(.+) is almost halfway through Juz' (\d+)$/))) {
+    title = phrase("{name} is almost halfway through Juz' {juz}", { name: m[1], juz: Number(m[2]) });
   } else if ((m = n.title.match(/^(.+) reported an absence$/))) {
     title = phrase("{name} reported an absence", { name: m[1] });
   }
@@ -49,5 +55,7 @@ export function translateNotice<N extends { title: string; body: string }>(n: N)
     const when = m[2] ? `${day(m[1])} – ${day(m[2])}` : day(m[1]);
     body = `${when} · ${phrase(m[3])}${m[4] ? ` — ${m[4]}` : ""}`;
   }
+  const kind = (n as { kind?: string }).kind;
+  if (kind === "milestone") body = phrase(n.body);
   return { ...n, title, body };
 }
