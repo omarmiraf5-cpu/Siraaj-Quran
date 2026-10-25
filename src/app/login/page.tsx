@@ -14,6 +14,11 @@ import type { Role } from "@/lib/types";
 import { homeOf, mayOpen } from "@/lib/portalAccess";
 import { safeNextPath } from "@/lib/safeNextPath";
 import { ByLanguage } from "@/components/ByLanguage";
+import { Capacitor } from "@capacitor/core";
+
+// Shown once Google has been switched on in Supabase and this is set on the
+// deployment, so the button never appears before it can work.
+const GOOGLE_SIGNIN = process.env.NEXT_PUBLIC_GOOGLE_SIGNIN === "true";
 
 const ROLES: { key: Role; labelKey: string; portalKey: string }[] = [
   { key: "parent",  labelKey: "role.parent",  portalKey: "login.portal.parent"  },
@@ -87,6 +92,9 @@ export default function LoginPage() {
   const router   = useRouter();
   const supabase = createClient();
   const { t }    = useLanguage();
+  // Google refuses to sign anyone in from inside an app's own web view.
+  const [native, setNative] = useState(false);
+  useEffect(() => { setNative(Capacitor.isNativePlatform()); }, []);
 
   const [role,            setRole]            = useState<Role>("parent");
   const [email,           setEmail]           = useState("");
@@ -146,6 +154,16 @@ export default function LoginPage() {
     let cancelled = false;
     // Sent back here by a portal that found the account switched off.
     if (new URLSearchParams(window.location.search).get("off") === "1") setError(t("welcome.accountOff"));
+    // Back from Google without getting in.
+    const googleBack = new URLSearchParams(window.location.search).get("google");
+    if (googleBack) {
+      setError(
+        googleBack === "none" ? tr("That Google account isn't linked to a school here. Ask your school office to add your email, then try again.")
+        : googleBack === "off" ? t("welcome.accountOff")
+        : googleBack === "student" ? tr("Students sign in with their PIN.")
+        : tr("Google sign-in didn't work. Please try again, or use your password.")
+      );
+    }
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user || cancelled) return;
       const { data: profile } = await supabase.from("profiles").select("role, active").eq("id", user.id).single();
@@ -191,6 +209,15 @@ export default function LoginPage() {
   };
   const forgetRememberedSchool = () => {
     try { localStorage.removeItem(SCHOOL_KEY); } catch { /* private mode */ }
+  };
+
+  const googleSignIn = async () => {
+    setError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback`, queryParams: { prompt: "select_account" } },
+    });
+    if (error) setError(tr("Google sign-in didn't work. Please try again, or use your password."));
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -641,6 +668,22 @@ export default function LoginPage() {
               >
                 {loading ? t("login.signingIn") : `${t("login.signInTo")} ${t(ROLES.find((r) => r.key === role)?.portalKey ?? "")}`}
               </button>
+
+              {GOOGLE_SIGNIN && !native && (
+                <>
+                  <div className="flex items-center gap-3 text-white/45 text-xs" aria-hidden="true">
+                    <span className="flex-1 h-px bg-white/15" />{tr("or")}<span className="flex-1 h-px bg-white/15" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={googleSignIn}
+                    className="w-full flex items-center justify-center gap-3 bg-white text-[#1f1f1f] font-semibold py-3.5 rounded-card hover:bg-white/95 active:scale-[.98] transition-all"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+                    {tr("Continue with Google")}
+                  </button>
+                </>
+              )}
 
               {/* Hands over whatever email is already typed, so it's there
                   waiting on the reset page — through sessionStorage rather

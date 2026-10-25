@@ -2140,4 +2140,9 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Message": "رسالة",
   "Note to the student": "رسالة إلى الطالب",
   "From your teacher": "من معلّمك",
+  "That Google account isn't linked to a school here. Ask your school office to add your email, then try again.": "حساب Google هذا غير مرتبط بأي مدرسة هنا. اطلب من مكتب مدرستك إضافة بريدك الإلكتروني ثم حاول مجددًا.",
+  "Students sign in with their PIN.": "يسجّل الطلاب الدخول برمزهم السري.",
+  "Google sign-in didn't work. Please try again, or use your password.": "لم ينجح تسجيل الدخول عبر Google. حاول مجددًا أو استخدم كلمة المرور.",
+  "or": "أو",
+  "Continue with Google": "المتابعة عبر Google",
 };
