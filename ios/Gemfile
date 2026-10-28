@@ -1,0 +1,4 @@
+source "https://rubygems.org"
+
+# Pinned loosely so CI can take a current 2.x. Gemfile.lock fixes the exact version.
+gem "fastlane", "~> 2.225"
