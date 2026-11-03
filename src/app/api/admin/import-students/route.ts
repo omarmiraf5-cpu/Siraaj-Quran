@@ -93,6 +93,14 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
       halaqas.push(...((data ?? []) as Array<{ id: string; name: string; grade: number }>).map((h) => ({ ...h, campus_id: null })));
     }
+    // Halaqas that take more than one grade (Grades 8 and 9 together). Asked
+    // apart, so a database without the column imports as it always did.
+    const alsoOf = new Map<string, number[]>();
+    {
+      const { data: alsoRows, error: alsoError } = await admin.from("classes").select("id, also_grades").eq("school_id", schoolId);
+      if (!alsoError) for (const r of (alsoRows ?? []) as Array<{ id: string; also_grades: number[] | null }>) if (r.also_grades?.length) alsoOf.set(r.id, r.also_grades);
+    }
+    const takesGrade = (h: { id: string; grade: number }, grade: number) => h.grade === grade || (alsoOf.get(h.id) ?? []).includes(grade);
     const halaqaOfStudent = new Map<string, string>();
     if (halaqas.length > 0) {
       const { data: enrolments, error } = await admin
@@ -126,7 +134,7 @@ export async function POST(req: NextRequest) {
       const found = halaqas.find(
         (h) =>
           (byGrade ? nameKey(h.name) === nameKey(name) : key(h.name) === key(name)) &&
-          (!byGrade || h.grade === grade) &&
+          (!byGrade || takesGrade(h, grade)) &&
           (campuses.length === 0 || h.campus_id === campusId)
       );
       if (found) return found;
@@ -135,7 +143,7 @@ export async function POST(req: NextRequest) {
       const teacher = teacherCalled(name);
       const theirs =
         byGrade && teacher
-          ? halaqas.find((h) => h.teacher_id === teacher.id && h.grade === grade && (campuses.length === 0 || h.campus_id === campusId))
+          ? halaqas.find((h) => h.teacher_id === teacher.id && takesGrade(h, grade) && (campuses.length === 0 || h.campus_id === campusId))
           : undefined;
       if (theirs) return theirs;
       const { data, error } = await admin

@@ -1,8 +1,8 @@
 import type { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
-import { gradeLabel } from "@/lib/grades";
+import { gradeLabel, gradesLabel } from "@/lib/grades";
 import { isProgramHalaqa } from "@/lib/programHalaqa";
-import { loadCampuses } from "@/lib/schoolStructure";
+import { loadAlsoGrades, loadCampuses } from "@/lib/schoolStructure";
 
 type Db = ReturnType<typeof createClient>;
 
@@ -30,6 +30,8 @@ export interface MyHalaqa {
   studentIds: string[];
   /** In a school kept in grades: the grade it's for, and its campus's name. */
   grade?: number | null;
+  /** Other grades it takes as well (a halaqa of Grades 8 and 9). */
+  alsoGrades?: number[];
   campus?: string | null;
 }
 
@@ -47,11 +49,12 @@ export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
   // trips one after another before a teacher's dashboard could show.
   const COLS = "id, name, grade, campus_id, school_id, class_enrollments(student_id)";
   type Row = { id: string; name: string; grade?: number; campus_id?: string | null; school_id: string; class_enrollments?: { student_id: string }[] };
-  const [meRes, leadRes, shareRes, campuses] = await Promise.all([
+  const [meRes, leadRes, shareRes, campuses, also] = await Promise.all([
     supabase.from("profiles").select("school_id, schools!profiles_school_id_fkey(organised_by_grade)").eq("id", user.id).maybeSingle(),
     supabase.from("classes").select(COLS).eq("teacher_id", user.id),
     supabase.from("class_teachers").select(`class_id, classes(${COLS})`).eq("teacher_id", user.id),
     loadCampuses(supabase),
+    loadAlsoGrades(supabase),
   ]);
   // A database from before the grades update can't answer this in one go.
   if (meRes.error || leadRes.error || shareRes.error) return myHalaqasStepByStep(supabase, user.id);
@@ -68,7 +71,7 @@ export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
     // Their halaqas at the school they're in now.
     if (h.school_id !== me.school_id || groups.has(h.id)) continue;
     const label = graded
-      ? [isProgramHalaqa(h.name) ? null : gradeLabel(h.grade as number), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
+      ? [isProgramHalaqa(h.name) ? null : gradesLabel(h.grade as number, also.get(h.id)), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
       : h.name;
     groups.set(h.id, {
       id: h.id,
@@ -76,6 +79,7 @@ export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
       name: h.name,
       studentIds: [...new Set((h.class_enrollments ?? []).map((e) => e.student_id))],
       grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
+      alsoGrades: graded && !isProgramHalaqa(h.name) ? also.get(h.id) ?? [] : [],
       campus: graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null,
     });
   }

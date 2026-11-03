@@ -2512,3 +2512,7 @@ alter table push_devices enable row level security;
 create index if not exists idx_push_devices_user on push_devices(user_id);
 grant all on public.push_devices to service_role;
 
+
+-- A halaqa can take more than one grade (Grades 8 and 9 together): its own
+-- grade is the lowest, and these are the others.
+alter table classes add column if not exists also_grades int[] not null default '{}';

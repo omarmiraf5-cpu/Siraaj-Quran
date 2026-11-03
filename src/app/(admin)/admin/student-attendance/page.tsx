@@ -16,9 +16,9 @@ import { SectionCard, StatTile, EmptyNote, LoadingNote, OPEN_ROW, RowChevron, Ha
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { useLanguage } from "@/components/LanguageProvider";
-import { GRADES, gradeLabel } from "@/lib/grades";
+import { GRADES, gradeLabel, gradesLabel, coversGrade } from "@/lib/grades";
 import { isProgramHalaqa } from "@/lib/programHalaqa";
-import { loadSchoolShape, type Campus } from "@/lib/schoolStructure";
+import { loadSchoolShape, loadAlsoGrades, type Campus } from "@/lib/schoolStructure";
 import { allRows } from "@/lib/rosterExport";
 import { addDays } from "@/lib/planDates";
 import { download, fileNameFor } from "@/lib/sheetTools";
@@ -42,6 +42,7 @@ interface Halaqa {
   id: string;
   name: string;
   grade: number | null;
+  alsoGrades?: number[];
   campusId: string | null;
   teacher: string | null;
 }
@@ -114,7 +115,7 @@ export default function StudentAttendancePage() {
         const fourWeeks = addDays(t0, -27);
         return monthStart < fourWeeks ? monthStart : fourWeeks;
       })();
-      const [shape, school, studentRows, classRows, enrolments, markRows] = await Promise.all([
+      const [shape, school, studentRows, classRows, alsoGrades, enrolments, markRows] = await Promise.all([
         loadSchoolShape(supabase, me?.school_id ?? null),
         mySchool<{ name: string }>(supabase, "name"),
         // A student's own campus, where the database has it (update 14).
@@ -125,6 +126,7 @@ export default function StudentAttendancePage() {
           .limit(5000)
           .then(async (r) => (r.error ? await supabase.from("students").select("id, full_name, grade, active").order("full_name").limit(5000) : r)),
         supabase.from("classes").select("id, name, grade, campus_id, teacher_id").order("name"),
+        loadAlsoGrades(supabase),
         allRows<{ student_id: string; class_id: string }>((a, b) => supabase.from("class_enrollments").select("student_id, class_id").range(a, b)),
         allRows<Mark>((a, b) =>
           supabase.from("attendance").select("student_id, class_date, status").gte("class_date", from).order("class_date").range(a, b)
@@ -142,6 +144,7 @@ export default function StudentAttendancePage() {
         id: c.id,
         name: c.name,
         grade: c.grade ?? null,
+        alsoGrades: alsoGrades.get(c.id) ?? [],
         campusId: (c.campus_id as string | null) ?? null,
         teacher: c.teacher_id ? teacherName.get(c.teacher_id) ?? null : null,
       }));
@@ -169,7 +172,7 @@ export default function StudentAttendancePage() {
   const campusName = (id: string | null) => campuses.find((c) => c.id === id)?.name ?? null;
   const halaqaById = useMemo(() => new Map(halaqas.map((h) => [h.id, h])), [halaqas]);
   const halaqaLabel = (h: Halaqa, withGrade = true) =>
-    [withGrade && graded && h.grade !== null && !isProgramHalaqa(h.name) ? gradeLabel(h.grade) : null, campusName(h.campusId), h.name].filter(Boolean).join(" · ");
+    [withGrade && graded && h.grade !== null && !isProgramHalaqa(h.name) ? gradesLabel(h.grade, h.alsoGrades) : null, campusName(h.campusId), h.name].filter(Boolean).join(" · ");
   const placeOf = (s: Student, withGrade = true) => {
     const h = s.halaqaId ? halaqaById.get(s.halaqaId) : undefined;
     return h
@@ -247,7 +250,7 @@ export default function StudentAttendancePage() {
 
   const select = "bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-[13px] text-ink";
   const halaqaChoices = halaqas.filter(
-    (h) => (!graded || gradeFilter === "" || h.grade === Number(gradeFilter)) && (campusFilter === "" || h.campusId === campusFilter)
+    (h) => (!graded || gradeFilter === "" || coversGrade(h.grade, h.alsoGrades, Number(gradeFilter))) && (campusFilter === "" || h.campusId === campusFilter)
   );
 
   if (!ready) {

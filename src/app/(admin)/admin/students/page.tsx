@@ -24,8 +24,8 @@ import { LongInactiveCard } from "@/components/LongInactiveCard";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { mySchool } from "@/lib/mySchool";
 import { createClient } from "@/lib/supabase/client";
-import { GRADES, gradeLabel } from "@/lib/grades";
-import { loadSchoolShape, halaqaCampusId, ONE_HALAQA_FROM_GRADE, type Campus } from "@/lib/schoolStructure";
+import { GRADES, gradeLabel, coversGrade } from "@/lib/grades";
+import { loadSchoolShape, loadAlsoGrades, halaqaCampusId, ONE_HALAQA_FROM_GRADE, type Campus } from "@/lib/schoolStructure";
 import { isProgramHalaqa } from "@/lib/programHalaqa";
 import { StudentRecord } from "@/components/StudentRecord";
 import { loadRoster } from "@/lib/rosterExport";
@@ -141,6 +141,7 @@ export default function AdminStudentsPage() {
   const [campusBusy, setCampusBusy] = useState(false);
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
+    const also = await loadAlsoGrades(supabase);
     const first = await supabase.from("classes").select("id, name, teacher_id, schedule, grade, campus_id").order("name");
     // Before the grades update, there's no campus to ask for.
     const { data } = first.error
@@ -160,6 +161,7 @@ export default function AdminStudentsPage() {
       coTeacherIds: others.get(c.id) ?? [],
       schedule: c.schedule ?? "",
       grade: c.grade,
+      alsoGrades: also.get(c.id) ?? [],
       campusId: c.campus_id ?? null,
     }));
   };
@@ -313,7 +315,7 @@ export default function AdminStudentsPage() {
       ? grade === ""
         ? []
         : halaqas
-            .filter((h) => (h.grade ?? 0) === Number(grade) && !isProgramHalaqa(h.name))
+            .filter((h) => coversGrade(h.grade ?? 0, h.alsoGrades, Number(grade)) && !isProgramHalaqa(h.name))
             .sort((a, b) => (campusName(a.campusId) ?? "").localeCompare(campusName(b.campusId) ?? "") || a.name.localeCompare(b.name))
       : halaqas.filter((h) => !isProgramHalaqa(h.name));
   // Out of whatever halaqa these students are in — but not a program.

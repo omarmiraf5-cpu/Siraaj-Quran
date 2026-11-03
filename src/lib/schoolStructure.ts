@@ -81,3 +81,18 @@ export function halaqaCampusId(
   if (grade >= ONE_HALAQA_FROM_GRADE) return mainCampusId(campuses);
   return childCampusId || null;
 }
+
+/**
+ * The extra grades each halaqa takes (a halaqa for Grades 8 and 9 together),
+ * by halaqa id. Asked on its own so a database without the column simply
+ * answers with none, and everything else still loads.
+ */
+export async function loadAlsoGrades(supabase: Db): Promise<Map<string, number[]>> {
+  const { data, error } = await supabase.from("classes").select("id, also_grades");
+  const map = new Map<string, number[]>();
+  if (error) return map;
+  for (const r of (data ?? []) as Array<{ id: string; also_grades: number[] | null }>) {
+    if (r.also_grades && r.also_grades.length > 0) map.set(r.id, r.also_grades);
+  }
+  return map;
+}

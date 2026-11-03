@@ -2155,4 +2155,9 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Tick all shown": "تحديد كل الظاهر",
   "Add {count}": "إضافة {count}",
   "Choose the grades that go together, tick the children, then add them. They stay in their own halaqa too.": "اختر الصفوف التي تجتمع معًا، وعلّم على الأطفال ثم أضفهم. يبقون في حلقتهم أيضًا.",
+  "Grades {from} to {to}": "الصفوف من {from} إلى {to}",
+  "Grades {list} and {last}": "الصفوف {list} و{last}",
+  "Grades *": "الصفوف *",
+  "Tap every grade it takes.": "اضغط على كل صفّ تقبله.",
+  "Grade {grade} only": "الصف {grade} فقط",
 };

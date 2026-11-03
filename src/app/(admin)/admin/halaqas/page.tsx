@@ -27,8 +27,8 @@ import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { loadSchoolTeachers, saveOtherTeachers, splitTeachers, staffRolesChanged } from "@/lib/schoolTeachers";
-import { GRADES, gradeLabel } from "@/lib/grades";
-import { loadCampuses, loadSchoolShape, type Campus } from "@/lib/schoolStructure";
+import { GRADES, gradeLabel, gradesLabel, gradesOf } from "@/lib/grades";
+import { loadAlsoGrades, loadCampuses, loadSchoolShape, type Campus } from "@/lib/schoolStructure";
 import { useLanguage } from "@/components/LanguageProvider";
 import { phrase } from "@/lib/i18n/phrases";
 
@@ -127,17 +127,29 @@ function PlaceFields({
         </label>
       )}
       {graded && !program && (
-        <label className="block">
-          <span className={label}>{tr("Grade *")}</span>
-          <select value={grade} onChange={(e) => onGrade(e.target.value)} className={small ? smallField : bigField}>
-            <option value="">{tr("Choose…")}</option>
-            {GRADES.map((g) => (
-              <option key={g} value={g}>
-                {gradeLabel(g)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="col-span-2">
+          <span className={label}>{tr("Grades *")}</span>
+          <div role="group" aria-label={tr("Grades *")} className="flex flex-wrap gap-1.5">
+            {GRADES.map((g) => {
+              const picked = grade ? grade.split(",").map(Number) : [];
+              const on = picked.includes(g);
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onGrade((on ? picked.filter((x) => x !== g) : [...picked, g]).sort((x, y) => x - y).join(","))}
+                  className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                    on ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                  }`}
+                >
+                  {gradeLabel(g)}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-ink-muted text-[12px] mt-1.5">{tr("Tap every grade it takes.")}</p>
+        </div>
       )}
       {graded && (
         <label className="col-span-2 block">
@@ -202,11 +214,12 @@ export default function AdminHalaqasPage() {
   const [campusError, setCampusError] = useState<string | null>(null);
 
   const loadRealHalaqas = async (): Promise<DemoHalaqa[]> => {
-    const [first, { data: others }] = await Promise.all([
+    const [first, { data: others }, also] = await Promise.all([
       supabase.from("classes").select("id, name, teacher_id, schedule, grade, campus_id").order("name"),
       // A database without class_teachers yet answers with an error here;
       // the halaqas still load, each with its one teacher.
       supabase.from("class_teachers").select("class_id, teacher_id"),
+      loadAlsoGrades(supabase),
     ]);
     // Before the grades update, there's no campus to ask for.
     const { data, error } = first.error
@@ -225,6 +238,7 @@ export default function AdminHalaqasPage() {
       coTeacherIds: othersOf.get(c.id) ?? [],
       schedule: c.schedule ?? "",
       grade: c.grade,
+      alsoGrades: also.get(c.id) ?? [],
       campusId: c.campus_id ?? null,
     }));
   };
@@ -308,10 +322,17 @@ export default function AdminHalaqasPage() {
   // A grade and campus, as the database keeps them, when the school has them.
   // A Hifd program has no grade of its own; the database wants one, so it keeps a placeholder.
   const PROGRAM_GRADE = 5;
-  const placeOf = (grade: string, campusId: string, program: ProgramKind = "") => ({
-    ...(graded ? { grade: program ? PROGRAM_GRADE : Number(grade) } : {}),
-    ...(campuses.length > 0 ? { campus_id: campusId || null } : {}),
-  });
+  const placeOf = (grade: string, campusId: string, program: ProgramKind = "", hadAlso = false) => {
+    // "8,9": the lowest is its grade, the rest are the others it takes.
+    const picked = grade.split(",").filter(Boolean).map(Number);
+    return {
+      ...(graded ? { grade: program ? PROGRAM_GRADE : picked[0] } : {}),
+      // Only written when there is something to write (or to clear), so a
+      // database without the column keeps working for single-grade halaqas.
+      ...(graded && (picked.length > 1 || hadAlso) ? { also_grades: program ? [] : picked.slice(1) } : {}),
+      ...(campuses.length > 0 ? { campus_id: campusId || null } : {}),
+    };
+  };
   const placeMissing = (grade: string, campusId: string, program: ProgramKind = "") =>
     (graded && !program && grade === "") || (campuses.length > 0 && !campusId);
   // A graded school's halaqa is called after its teacher; a program's name says it is one.
@@ -387,7 +408,7 @@ export default function AdminHalaqasPage() {
     setDraftName(h.name);
     setDraftSchedule(h.schedule);
     setDraftTeacherIds(halaqaTeacherIds(h));
-    setDraftGrade(h.grade != null ? String(h.grade) : "");
+    setDraftGrade(isProgramHalaqa(h.name) ? (h.grade != null ? String(h.grade) : "") : gradesOf(h.grade, h.alsoGrades).join(","));
     setDraftProgram(programKind(h.name));
     setDraftCampusId(h.campusId ?? "");
     setEditError(null);
@@ -451,7 +472,7 @@ export default function AdminHalaqasPage() {
           name: editedName,
           schedule: draftSchedule.trim() || h.schedule,
           teacher_id: lead,
-          ...placeOf(draftGrade, draftCampusId, draftProgram),
+          ...placeOf(draftGrade, draftCampusId, draftProgram, (h.alsoGrades?.length ?? 0) > 0),
         })
         .eq("id", h.id);
       if (error) throw error;
@@ -638,6 +659,9 @@ export default function AdminHalaqasPage() {
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
               {halaqaTeacherNames(h, teachers) && halaqaTeacherNames(h, teachers) !== h.name && (
                 <span className={isOpen ? "text-white/80" : "text-ink-muted"}>{halaqaTeacherNames(h, teachers)}</span>
+              )}
+              {graded && !isProgramHalaqa(h.name) && gradesOf(h.grade, h.alsoGrades).length > 1 && (
+                <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"}`}>{gradesLabel(h.grade, h.alsoGrades)}</span>
               )}
               {graded && campusName(h.campusId) && (
                 <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200"}`}>{campusName(h.campusId)}</span>

@@ -131,6 +131,8 @@ export interface DemoHalaqa {
   schedule: string;
   /** In a school kept in grades: the grade it's for (0 is Kindergarten). */
   grade?: number;
+  /** Other grades it takes as well, e.g. [9] for a halaqa of Grades 8 and 9. */
+  alsoGrades?: number[];
   /** The campus it meets at, when the school has more than one. */
   campusId?: string | null;
 }

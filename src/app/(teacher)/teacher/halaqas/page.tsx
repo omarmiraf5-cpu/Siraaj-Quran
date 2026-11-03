@@ -8,7 +8,7 @@ import { sessionUser } from "@/lib/supabase/sessionUser";
 import { readCache, writeCache } from "@/lib/pageCache";
 import { myHalaqas, shortHalaqaLabel, type MyHalaqa } from "@/lib/teacherScope";
 import { useMyName } from "@/hooks/useMyName";
-import { gradeLabel } from "@/lib/grades";
+import { gradeLabel, gradesLabel, gradesOf } from "@/lib/grades";
 import { useLanguage } from "@/components/LanguageProvider";
 import Link from "next/link";
 
@@ -155,11 +155,11 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
     const needle = query.trim().toLocaleLowerCase();
     const narrow = typeof halaqa.grade === "number" && !allGrades && !needle;
     return (detail?.candidates ?? [])
-      .filter((c) => (!needle || c.name.toLocaleLowerCase().includes(needle)) && (!narrow || c.grade === halaqa.grade))
+      .filter((c) => (!needle || c.name.toLocaleLowerCase().includes(needle)) && (!narrow || (typeof c.grade === "number" && gradesOf(halaqa.grade, halaqa.alsoGrades).includes(c.grade))))
       // Children with no halaqa yet come first: they are the ones who need one.
       .sort((a, b) => Number(Boolean(a.elsewhere)) - Number(Boolean(b.elsewhere)) || a.name.localeCompare(b.name))
       .slice(0, 40);
-  }, [detail, query, allGrades, halaqa.grade]);
+  }, [detail, query, allGrades, halaqa.grade, halaqa.alsoGrades]);
   const gradeOnly = typeof halaqa.grade === "number" && !allGrades && !query.trim();
 
   return (
@@ -249,7 +249,7 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
                           allGrades === all ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
                         }`}
                       >
-                        {all ? tr("All grades") : tr("{grade} only", { grade: gradeLabel(halaqa.grade as number) })}
+                        {all ? tr("All grades") : tr("{grade} only", { grade: gradesLabel(halaqa.grade as number, halaqa.alsoGrades) })}
                       </button>
                     ))}
                   </div>
