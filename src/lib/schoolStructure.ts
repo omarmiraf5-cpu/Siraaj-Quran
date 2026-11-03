@@ -96,3 +96,16 @@ export async function loadAlsoGrades(supabase: Db): Promise<Map<string, number[]
   }
   return map;
 }
+
+/**
+ * Which teacher has each child in a halaqa several teachers share, keyed
+ * "halaqaId:studentId". Asked on its own so a database without the column
+ * answers with none, and every teacher then sees the whole halaqa as before.
+ */
+export async function loadAssignedTeachers(supabase: Db): Promise<Map<string, string>> {
+  const { data, error } = await supabase.from("class_enrollments").select("class_id, student_id, teacher_id").not("teacher_id", "is", null);
+  const map = new Map<string, string>();
+  if (error) return map;
+  for (const r of (data ?? []) as Array<{ class_id: string; student_id: string; teacher_id: string }>) map.set(`${r.class_id}:${r.student_id}`, r.teacher_id);
+  return map;
+}

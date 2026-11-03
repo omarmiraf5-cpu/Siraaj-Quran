@@ -2516,3 +2516,7 @@ grant all on public.push_devices to service_role;
 -- A halaqa can take more than one grade (Grades 8 and 9 together): its own
 -- grade is the lowest, and these are the others.
 alter table classes add column if not exists also_grades int[] not null default '{}';
+
+-- In a halaqa several teachers share, which of them has each child. Empty
+-- means nobody yet, and then every teacher of the halaqa sees the child.
+alter table class_enrollments add column if not exists teacher_id uuid references profiles(id) on delete set null;

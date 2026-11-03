@@ -2171,4 +2171,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "This deletes these {count} sign-ins for good: {names}. The register, lessons and messages they recorded stay with the school without their name, and a halaqa they teach alone will need another teacher. A teacher who also teaches at another school only leaves yours. To keep someone but stop them signing in, untick Active on their row instead.": "سيؤدي هذا إلى حذف {count} حسابات دخول نهائيًا: {names}. يبقى ما سجّلوه من حضور ودروس ورسائل لدى المدرسة بلا أسمائهم، وستحتاج أي حلقة يدرّسها أحدهم وحده إلى معلم آخر. المعلم الذي يدرّس أيضًا في مدرسة أخرى يغادر مدرستك فقط. وللإبقاء على أحدهم مع منعه من الدخول، ألغِ تحديد «نشط» في صفّه بدلًا من ذلك.",
   "Delete {count}": "حذف {count}",
   "An admin login can't be deleted from here.": "لا يمكن حذف حساب مدير من هنا.",
+  "Not given to a teacher yet": "لم يُسنَد إلى معلم بعد",
+  "No children yet.": "لا أطفال بعد.",
+  "Give them to": "أسندهم إلى",
 };

@@ -248,9 +248,11 @@ export default function AdminHalaqasPage() {
       .from("students")
       .select("id, full_name, active, grade")
       .order("full_name");
-    const { data: enrollments } = await supabase
-      .from("class_enrollments")
-      .select("student_id, class_id, classes(name)");
+    // Which of a shared halaqa's teachers has each child, where the database has it.
+    const withTeacher = await supabase.from("class_enrollments").select("student_id, class_id, teacher_id, classes(name)");
+    const { data: enrollments } = withTeacher.error ? await supabase.from("class_enrollments").select("student_id, class_id, classes(name)") : withTeacher;
+    const assignedIn = new Map<string, string | null>();
+    for (const e of (enrollments ?? []) as unknown as Array<{ student_id: string; class_id: string; teacher_id?: string | null }>) assignedIn.set(`${e.class_id}:${e.student_id}`, e.teacher_id ?? null);
     // Their own halaqa, and any program (a Hifd program) beside it.
     const halaqaByStudent = new Map<string, { id: string; name: string }>();
     const programsOf = new Map<string, Array<{ id: string; name: string }>>();
@@ -268,6 +270,7 @@ export default function AdminHalaqasPage() {
       programs: programsOf.get(s.id),
       active: s.active,
       grade: typeof s.grade === "number" ? s.grade : undefined,
+      assignedTo: halaqaByStudent.get(s.id) ? assignedIn.get(`${halaqaByStudent.get(s.id)!.id}:${s.id}`) ?? null : null,
     }));
   };
 
@@ -415,6 +418,7 @@ export default function AdminHalaqasPage() {
     setDraftTeacherIds(halaqaTeacherIds(h));
     setProgramPick(new Set());
     setProgramSearch("");
+    setGiveTo("");
     setProgramGrades(isProgramHalaqa(h.name) ? new Set() : new Set(gradesOf(h.grade, h.alsoGrades)));
     setDraftGrade(isProgramHalaqa(h.name) ? (h.grade != null ? String(h.grade) : "") : gradesOf(h.grade, h.alsoGrades).join(","));
     setDraftProgram(programKind(h.name));
@@ -584,6 +588,8 @@ export default function AdminHalaqasPage() {
   // Several at once: tick the children, then add them in one go.
   const [programPick, setProgramPick] = useState<Set<string>>(new Set());
   const [programBusy, setProgramBusy] = useState(false);
+  // In a halaqa several teachers share: who the children being added go to ("" is nobody yet).
+  const [giveTo, setGiveTo] = useState("");
   // Grades to show together, e.g. 8 and 9; empty shows everyone.
   const [programGrades, setProgramGrades] = useState<Set<number>>(new Set());
   const addManyToProgram = async (h: DemoHalaqa, picked: DemoStudent[]) => {
@@ -602,7 +608,10 @@ export default function AdminHalaqasPage() {
         }
         const { error } = await supabase
           .from("class_enrollments")
-          .upsert(picked.map((s) => ({ class_id: h.id, student_id: s.id })), { onConflict: "class_id,student_id", ignoreDuplicates: true });
+          .upsert(
+            picked.map((s) => ({ class_id: h.id, student_id: s.id, ...(ordinary && giveTo ? { teacher_id: giveTo } : {}) })),
+            { onConflict: "class_id,student_id", ignoreDuplicates: true }
+          );
         if (error) throw error;
       }
       const ids = new Set(picked.map((s) => s.id));
@@ -611,7 +620,7 @@ export default function AdminHalaqasPage() {
           !ids.has(x.id)
             ? x
             : ordinary
-              ? { ...x, halaqa: h.name, halaqaId: h.id }
+              ? { ...x, halaqa: h.name, halaqaId: h.id, assignedTo: giveTo || null }
               : { ...x, programs: [...(x.programs ?? []).filter((p) => p.id !== h.id), { id: h.id, name: h.name }] }
         )
       );
@@ -633,6 +642,20 @@ export default function AdminHalaqasPage() {
       setStudents((now) => now.map((x) => (x.id === s.id ? { ...x, programs: (x.programs ?? []).filter((p) => p.id !== h.id) } : x)));
     } catch {
       setProgramNote(tr("Couldn't take them off. Please try again."));
+    }
+  };
+  // Hand a child in a shared halaqa to one of its teachers ("" takes them back).
+  const [assignNote, setAssignNote] = useState<string | null>(null);
+  const assignStudent = async (h: DemoHalaqa, s: DemoStudent, teacherId: string) => {
+    setAssignNote(null);
+    try {
+      if (!isDemo) {
+        const { error } = await supabase.from("class_enrollments").update({ teacher_id: teacherId || null }).eq("class_id", h.id).eq("student_id", s.id);
+        if (error) throw error;
+      }
+      setStudents((now) => now.map((x) => (x.id === s.id ? { ...x, assignedTo: teacherId || null } : x)));
+    } catch {
+      setAssignNote(tr("That didn't save. Please try again."));
     }
   };
   const placed = isDemo ? students.length : students.filter((s) => s.halaqaId).length;
@@ -744,6 +767,44 @@ export default function AdminHalaqasPage() {
                 <p className="text-[11.5px] text-ink-muted">
                   {isProgramHalaqa(h.name) || graded ? tr("None yet. Add students below.") : tr("None yet. Put students in a halaqa from the Students page.")}
                 </p>
+              ) : !isProgramHalaqa(h.name) && graded && draftTeacherIds.length > 1 ? (
+                // Several teachers share this halaqa: each child goes to one of them.
+                <div className="space-y-3">
+                  {[...draftTeacherIds.map((id) => ({ id, name: teacherNameOf(id) })), { id: "", name: tr("Not given to a teacher yet") }].map((g) => {
+                    const mine = studentsOf(h).filter((s) => (s.assignedTo && draftTeacherIds.includes(s.assignedTo) ? s.assignedTo : "") === g.id);
+                    if (mine.length === 0 && g.id === "") return null;
+                    return (
+                      <div key={g.id || "none"}>
+                        <p className="text-[12px] font-semibold text-ink mb-1">
+                          {g.name} · {tr("{count} student|{count} students", { count: mine.length })}
+                        </p>
+                        {mine.length === 0 ? (
+                          <p className="text-[11.5px] text-ink-muted">{tr("No children yet.")}</p>
+                        ) : (
+                          <ul className="divide-y divide-surface-border rounded-xl border border-surface-border bg-surface-card">
+                            {mine.map((s) => (
+                              <li key={s.id} className="flex items-center gap-2 px-3 py-2">
+                                <span className={`flex-1 min-w-0 text-[12.5px] [overflow-wrap:anywhere] ${s.active === false ? "text-ink-muted line-through" : "text-ink"}`}>{s.name}</span>
+                                <select
+                                  value={g.id}
+                                  onChange={(e) => assignStudent(h, s, e.target.value)}
+                                  aria-label={tr("Teacher for {name}", { name: s.name })}
+                                  className="max-w-[48%] bg-surface-bg border border-surface-border rounded-lg px-2 py-1 text-[12px] text-ink"
+                                >
+                                  <option value="">{tr("Not given to a teacher yet")}</option>
+                                  {draftTeacherIds.map((id) => (
+                                    <option key={id} value={id}>{teacherNameOf(id)}</option>
+                                  ))}
+                                </select>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {assignNote && <p className="text-[11.5px] text-red-700 dark:text-red-300">{assignNote}</p>}
+                </div>
               ) : (
                 <ul className="flex flex-wrap gap-1.5">
                   {studentsOf(h).map((s) => (
@@ -778,6 +839,17 @@ export default function AdminHalaqasPage() {
                     className={smallField}
                   />
                   <p className="text-[11px] text-ink-muted mt-1.5">{isProgramHalaqa(h.name) ? tr("Choose the grades that go together, tick the children, then add them. They stay in their own halaqa too.") : tr("Tick the children to put in this halaqa. They move here from the halaqa they are in now.")}</p>
+                  {!isProgramHalaqa(h.name) && draftTeacherIds.length > 1 && (
+                    <label className="block mt-2">
+                      <span className="block text-[12px] font-semibold text-ink mb-1">{tr("Give them to")}</span>
+                      <select value={giveTo} onChange={(e) => setGiveTo(e.target.value)} className={smallField}>
+                        <option value="">{tr("Not given to a teacher yet")}</option>
+                        {draftTeacherIds.map((id) => (
+                          <option key={id} value={id}>{teacherNameOf(id)}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   {(() => {
                     const q = programSearch.trim().toLowerCase();
                     const candidates = students

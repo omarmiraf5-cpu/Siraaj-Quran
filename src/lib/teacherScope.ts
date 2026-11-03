@@ -2,7 +2,7 @@ import type { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { gradeLabel, gradesLabel } from "@/lib/grades";
 import { isProgramHalaqa } from "@/lib/programHalaqa";
-import { loadAlsoGrades, loadCampuses } from "@/lib/schoolStructure";
+import { loadAlsoGrades, loadAssignedTeachers, loadCampuses } from "@/lib/schoolStructure";
 
 type Db = ReturnType<typeof createClient>;
 
@@ -41,6 +41,24 @@ export interface MyHalaqa {
  * time. Empty for a teacher with no halaqa yet; null when nobody is signed in.
  */
 export async function myHalaqas(supabase: Db): Promise<MyHalaqa[] | null> {
+  const all = await myHalaqasAll(supabase);
+  if (!all || all.length === 0) return all;
+  // In a halaqa several teachers share, a child given to one of them is that
+  // teacher's; a child nobody has been given to is everyone's.
+  const user = await sessionUser(supabase);
+  if (!user) return all;
+  const assigned = await loadAssignedTeachers(supabase);
+  if (assigned.size === 0) return all;
+  return all.map((h) => ({
+    ...h,
+    studentIds: h.studentIds.filter((sid) => {
+      const who = assigned.get(`${h.id}:${sid}`);
+      return !who || who === user.id;
+    }),
+  }));
+}
+
+async function myHalaqasAll(supabase: Db): Promise<MyHalaqa[] | null> {
   const user = await sessionUser(supabase);
   if (!user) return null;
   // Everything in one round of requests side by side: their school (and
