@@ -2174,4 +2174,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Not given to a teacher yet": "لم يُسنَد إلى معلم بعد",
   "No children yet.": "لا أطفال بعد.",
   "Give them to": "أسندهم إلى",
+  "Tick all": "تحديد الكل",
+  "Couldn't delete them. Please try again.": "تعذّر حذفها. حاول مرة أخرى.",
+  "Delete these {count} halaqas: {names}? Their {students} students stay at the school but are no longer in them, and their past records are kept. This can't be undone.": "حذف هذه الحلقات ({count}): {names}؟ يبقى طلابها ({students}) في المدرسة لكنهم لن يكونوا فيها، وتبقى سجلاتهم السابقة. لا يمكن التراجع عن هذا.",
 };

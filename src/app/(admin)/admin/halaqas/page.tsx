@@ -428,6 +428,39 @@ export default function AdminHalaqasPage() {
 
   // Removes a halaqa. Its students stay on the school's list, just out of it;
   // their past attendance and lessons stay too, no longer tied to a halaqa.
+  // Several at once: tick the halaqas, then delete them together.
+  const [selecting, setSelecting] = useState(false);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkTyped, setBulkTyped] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkNote, setBulkNote] = useState<string | null>(null);
+  const leaveSelecting = () => {
+    setSelecting(false);
+    setTicked(new Set());
+    setBulkOpen(false);
+    setBulkTyped("");
+  };
+  const deleteTicked = async () => {
+    const ids = [...ticked];
+    setBulkBusy(true);
+    setBulkNote(null);
+    try {
+      const { error } = await supabase.from("classes").delete().in("id", ids);
+      if (error) throw error;
+      const [list, roster] = await Promise.all([loadRealHalaqas(), loadRealStudents()]);
+      setHalaqas(list);
+      setStudents(roster);
+      staffRolesChanged();
+      setBulkNote(tr("{count} deleted.", { count: ids.length }));
+      leaveSelecting();
+    } catch {
+      setBulkNote(tr("Couldn't delete them. Please try again."));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const deleteHalaqa = async (h: DemoHalaqa) => {
     if (isDemo) return;
     const n = studentsOf(h).length;
@@ -688,6 +721,35 @@ export default function AdminHalaqasPage() {
   const renderHalaqa = (h: DemoHalaqa) => {
     const isOpen = editingId === h.id;
     const count = countOf(h);
+    if (selecting) {
+      return (
+        <li key={h.id}>
+          <label className="flex items-center gap-3 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={ticked.has(h.id)}
+              disabled={bulkBusy}
+              onChange={() =>
+                setTicked((now) => {
+                  const next = new Set(now);
+                  if (next.has(h.id)) next.delete(h.id);
+                  else next.add(h.id);
+                  return next;
+                })
+              }
+              aria-label={h.name}
+              className="w-5 h-5 accent-red-700 flex-shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{h.name}</p>
+              <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">
+                {[graded && !isProgramHalaqa(h.name) ? gradesLabel(h.grade, h.alsoGrades) : null, graded ? campusName(h.campusId) : null, tr("{count} student|{count} students", { count })].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+          </label>
+        </li>
+      );
+    }
     return (
       <li key={h.id}>
         <button
@@ -1152,6 +1214,75 @@ export default function AdminHalaqasPage() {
             {saving ? tr("Adding…") : tr("Add halaqa")}
           </button>
         </form>
+      )}
+
+      {!isDemo && ready && halaqas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {!selecting ? (
+            <button
+              type="button"
+              onClick={() => { setSelecting(true); setEditingId(null); setBulkNote(null); }}
+              className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+            >
+              {tr("Select several")}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setTicked(ticked.size === halaqas.length ? new Set() : new Set(halaqas.map((x) => x.id)))}
+                className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+              >
+                {ticked.size === halaqas.length ? tr("Untick all") : tr("Tick all")}
+              </button>
+              <span className="text-[12.5px] text-ink-muted">{tr("{count} selected", { count: ticked.size })}</span>
+              <button
+                type="button"
+                disabled={ticked.size === 0}
+                onClick={() => { setBulkOpen(true); setBulkTyped(""); }}
+                className="text-[13px] font-semibold text-red-700 dark:text-red-300 hover:underline disabled:opacity-40 disabled:no-underline"
+              >
+                {tr("Delete selected…")}
+              </button>
+              <button type="button" onClick={leaveSelecting} className="text-[13px] font-semibold text-ink-muted hover:text-ink">
+                {tr("Cancel")}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {bulkNote && <p className="text-[12.5px] text-ink">{bulkNote}</p>}
+      {selecting && bulkOpen && ticked.size > 0 && (
+        <div className="rounded-2xl border border-red-300 dark:border-red-800/60 bg-surface-card p-4 space-y-2">
+          <p className="text-[12.5px] text-ink leading-relaxed">
+            {tr("Delete these {count} halaqas: {names}? Their {students} students stay at the school but are no longer in them, and their past records are kept. This can't be undone.", {
+              count: ticked.size,
+              names: halaqas.filter((x) => ticked.has(x.id)).map((x) => x.name).join(", "),
+              students: halaqas.filter((x) => ticked.has(x.id)).reduce((n, x) => n + countOf(x), 0),
+            })}
+          </p>
+          <p className="text-[12.5px] text-ink">{tr("Type DELETE to confirm.")}</p>
+          <input
+            value={bulkTyped}
+            onChange={(e) => setBulkTyped(e.target.value)}
+            placeholder="DELETE"
+            aria-label={tr("Type DELETE to confirm")}
+            className="w-full bg-surface-bg border border-red-300 dark:border-red-800/60 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={deleteTicked}
+              disabled={bulkBusy || bulkTyped.trim() !== "DELETE"}
+              className="bg-red-700 text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-xl disabled:opacity-40"
+            >
+              {bulkBusy ? tr("Working…") : tr("Delete {count}", { count: ticked.size })}
+            </button>
+            <button type="button" onClick={() => setBulkOpen(false)} className="text-[12.5px] font-semibold text-ink-muted hover:text-ink px-2">
+              {tr("Keep")}
+            </button>
+          </div>
+        </div>
       )}
 
       {!ready ? (
