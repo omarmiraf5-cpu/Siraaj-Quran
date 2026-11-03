@@ -737,6 +737,56 @@ export default function AdminHalaqasPage() {
       setRegroupBusy(false);
     }
   };
+  // Regroup shortcuts: show only children nobody has yet, search by name, or paste a teacher's list.
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
+  const [regroupSearch, setRegroupSearch] = useState("");
+  const [pasted, setPasted] = useState("");
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
+  const norm = (x: string) =>
+    x
+      .toLowerCase()
+      .replace(/[\u064B-\u065F]/g, "")
+      .replace(/^[\s\d.)\-•*]+/, "")
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  // Names pasted one to a line (from a class list, WhatsApp, a sheet) go to one teacher.
+  const givePasted = async (h: DemoHalaqa, teacherId: string) => {
+    setPasteNote(null);
+    const pool = studentsOf(h);
+    const hit = new Set<string>();
+    const missed: string[] = [];
+    const vague: string[] = [];
+    for (const raw of pasted.split(/\n|,|;|،/)) {
+      const line = norm(raw);
+      if (!line) continue;
+      const exact = pool.filter((x) => norm(x.name) === line);
+      const words = line.split(" ");
+      const loose = exact.length ? exact : pool.filter((x) => words.every((w) => norm(x.name).split(" ").some((p) => p.startsWith(w))));
+      if (loose.length === 1) hit.add(loose[0].id);
+      else if (loose.length === 0) missed.push(raw.trim());
+      else vague.push(raw.trim());
+    }
+    try {
+      setRegroupBusy(true);
+      await giveMany(h, [...hit], teacherId);
+      setPasteNote(
+        [
+          tr("{count} given to {name}.", { count: hit.size, name: teacherNameOf(teacherId) }),
+          missed.length ? `${tr("Couldn't find")}: ${missed.join(", ")}.` : "",
+          vague.length ? `${tr("More than one match, so skipped")}: ${vague.join(", ")}.` : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+      setPasted("");
+    } catch (err) {
+      const reason = (err as { message?: string } | null)?.message;
+      setPasteNote(reason ? `${tr("That didn't save. Please try again.")} (${reason})` : tr("That didn't save. Please try again."));
+    } finally {
+      setRegroupBusy(false);
+    }
+  };
   const placed = isDemo ? students.length : students.filter((s) => s.halaqaId).length;
 
   // An academic school's halaqas: by campus (when it has them), then grade.
@@ -937,13 +987,28 @@ export default function AdminHalaqasPage() {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       <button
                         type="button"
-                        onClick={() => setRegroupPick(regroupPick.size === studentsOf(h).length ? new Set() : new Set(studentsOf(h).map((x) => x.id)))}
+                        onClick={() => {
+                          const shown = studentsOf(h).filter(
+                            (x) => (!onlyUnassigned || !(x.assignedTo && draftTeacherIds.includes(x.assignedTo))) && (!regroupSearch.trim() || norm(x.name).includes(norm(regroupSearch)))
+                          );
+                          setRegroupPick(shown.length > 0 && shown.every((x) => regroupPick.has(x.id)) ? new Set() : new Set(shown.map((x) => x.id)));
+                        }}
                         className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
                       >
-                        {regroupPick.size === studentsOf(h).length ? tr("Untick all") : tr("Tick all")}
+                        {tr("Tick all shown")}
                       </button>
                       <span className="text-[12px] text-ink-muted">{tr("{count} selected", { count: regroupPick.size })}</span>
+                      <label className="inline-flex items-center gap-1.5 text-[12px] text-ink cursor-pointer">
+                        <input type="checkbox" checked={onlyUnassigned} onChange={(e) => setOnlyUnassigned(e.target.checked)} className="w-4 h-4 accent-emerald-700" />
+                        {tr("Only children not given to a teacher yet")}
+                      </label>
                     </div>
+                    <input
+                      value={regroupSearch}
+                      onChange={(e) => setRegroupSearch(e.target.value)}
+                      placeholder={tr("Search a student…")}
+                      className={smallField}
+                    />
                     <div className="flex flex-wrap items-center gap-2">
                       <select value={moveTo} onChange={(e) => setMoveTo(e.target.value)} aria-label={tr("Move to")} className={`${smallField} max-w-[16rem]`}>
                         <option value="">{tr("Not given to a teacher yet")}</option>
@@ -968,10 +1033,36 @@ export default function AdminHalaqasPage() {
                         {tr("Share evenly among all teachers")}
                       </button>
                     </div>
+                    <details className="pt-1">
+                      <summary className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold cursor-pointer">{tr("Paste a list of names for one teacher")}</summary>
+                      <div className="mt-2 space-y-2">
+                        <p className="text-[11.5px] text-ink-muted">{tr("Choose the teacher in the menu above, paste their children's names one to a line, then tap the button.")}</p>
+                        <textarea
+                          value={pasted}
+                          onChange={(e) => setPasted(e.target.value)}
+                          rows={5}
+                          placeholder={tr("One name to a line")}
+                          dir="auto"
+                          className={`${smallField} w-full`}
+                        />
+                        <button
+                          type="button"
+                          disabled={!moveTo || !pasted.trim() || regroupBusy}
+                          onClick={() => givePasted(h, moveTo)}
+                          className="rounded-full gradient-emerald text-white text-[12px] font-semibold px-3.5 py-1.5 disabled:opacity-40 active:scale-95 transition"
+                        >
+                          {moveTo ? tr("Give these names to {name}", { name: teacherNameOf(moveTo) }) : tr("Choose a teacher first")}
+                        </button>
+                        {pasteNote && <p className="text-[12px] text-ink leading-relaxed">{pasteNote}</p>}
+                      </div>
+                    </details>
                   </div>
                   {[...draftTeacherIds.map((id) => ({ id, name: teacherNameOf(id) })), { id: "", name: tr("Not given to a teacher yet") }].map((g) => {
-                    const mine = studentsOf(h).filter((s) => (s.assignedTo && draftTeacherIds.includes(s.assignedTo) ? s.assignedTo : "") === g.id);
+                    const mine = studentsOf(h)
+                      .filter((s) => (s.assignedTo && draftTeacherIds.includes(s.assignedTo) ? s.assignedTo : "") === g.id)
+                      .filter((s) => !regroupSearch.trim() || norm(s.name).includes(norm(regroupSearch)));
                     if (mine.length === 0 && g.id === "") return null;
+                    if (onlyUnassigned && g.id !== "") return null;
                     return (
                       <div key={g.id || "none"}>
                         <p className="text-[12px] font-semibold text-ink mb-1">

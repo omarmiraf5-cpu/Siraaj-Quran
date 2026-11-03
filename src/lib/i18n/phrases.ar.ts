@@ -2183,4 +2183,13 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Share evenly among all teachers": "توزيع بالتساوي على كل المعلمين",
   "in this halaqa": "في هذه الحلقة",
   "Edit this halaqa": "تعديل هذه الحلقة",
+  "{count} given to {name}.": "تم إسناد {count} إلى {name}.",
+  "Couldn't find": "لم يُعثر على",
+  "More than one match, so skipped": "أكثر من تطابق، فتم التجاوز",
+  "Only children not given to a teacher yet": "الأطفال غير المسنَدين لمعلم فقط",
+  "Paste a list of names for one teacher": "الصق قائمة أسماء لمعلم واحد",
+  "Choose the teacher in the menu above, paste their children's names one to a line, then tap the button.": "اختر المعلم من القائمة أعلاه، والصق أسماء أطفاله اسمًا في كل سطر، ثم اضغط الزر.",
+  "One name to a line": "اسم في كل سطر",
+  "Give these names to {name}": "أسند هذه الأسماء إلى {name}",
+  "Choose a teacher first": "اختر معلمًا أولًا",
 };
