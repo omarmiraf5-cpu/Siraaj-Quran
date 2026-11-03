@@ -2163,4 +2163,12 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   " The halaqa is called by its teacher, or by its grades when several teach it.": " وتُسمّى الحلقة باسم معلمها، أو بصفوفها إذا كان يدرّسها عدة معلمين.",
   "One teacher: the halaqa is called by their name. Tap more than one if they teach it together, and it is called by its grades.": "معلم واحد: تُسمّى الحلقة باسمه. اختر أكثر من معلم إن كانوا يدرّسونها معًا، فتُسمّى بصفوفها.",
   "Tick the children to put in this halaqa. They move here from the halaqa they are in now.": "علّم على الأطفال لإضافتهم إلى هذه الحلقة. ينتقلون إليها من حلقتهم الحالية.",
+  "Select several": "تحديد عدة",
+  "{count} selected": "{count} محدّد",
+  "Delete selected…": "حذف المحدّدين…",
+  "{count} deleted.": "تم حذف {count}.",
+  "{done} deleted. These couldn't be: {names}.": "تم حذف {done}. تعذّر حذف: {names}.",
+  "This deletes these {count} sign-ins for good: {names}. The register, lessons and messages they recorded stay with the school without their name, and a halaqa they teach alone will need another teacher. A teacher who also teaches at another school only leaves yours. To keep someone but stop them signing in, untick Active on their row instead.": "سيؤدي هذا إلى حذف {count} حسابات دخول نهائيًا: {names}. يبقى ما سجّلوه من حضور ودروس ورسائل لدى المدرسة بلا أسمائهم، وستحتاج أي حلقة يدرّسها أحدهم وحده إلى معلم آخر. المعلم الذي يدرّس أيضًا في مدرسة أخرى يغادر مدرستك فقط. وللإبقاء على أحدهم مع منعه من الدخول، ألغِ تحديد «نشط» في صفّه بدلًا من ذلك.",
+  "Delete {count}": "حذف {count}",
+  "An admin login can't be deleted from here.": "لا يمكن حذف حساب مدير من هنا.",
 };

@@ -104,6 +104,13 @@ export default function AdminTeachersPage() {
   const myHalaqaIds = (list: DemoHalaqa[]) => (me ? list.filter((h) => halaqaTeacherIds(h).includes(me.id)).map((h) => h.id) : []);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Several at once: tick the teachers, then delete them together.
+  const [selecting, setSelecting] = useState(false);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkTyped, setBulkTyped] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkNote, setBulkNote] = useState<string | null>(null);
   // Each halaqa's children, and whether the school keeps grades: for the
   // line under each teacher's name.
   const [kidsOf, setKidsOf] = useState<Map<string, string[]>>(new Map());
@@ -138,6 +145,37 @@ export default function AdminTeachersPage() {
       schedule: c.schedule ?? "",
       grade: c.grade,
     }));
+  };
+
+  const leaveSelecting = () => {
+    setSelecting(false);
+    setTicked(new Set());
+    setBulkOpen(false);
+    setBulkTyped("");
+  };
+  const deleteTicked = async () => {
+    const ids = [...ticked];
+    setBulkBusy(true);
+    setBulkNote(null);
+    const failed: string[] = [];
+    for (const id of ids) {
+      try {
+        await deleteAccount(id);
+      } catch {
+        failed.push(teachers.find((x) => x.id === id)?.name ?? id);
+      }
+    }
+    await loadRealTeachers();
+    setBulkBusy(false);
+    if (failed.length === 0) {
+      setBulkNote(tr("{count} deleted.", { count: ids.length }));
+      leaveSelecting();
+    } else {
+      setBulkNote(tr("{done} deleted. These couldn't be: {names}.", { done: ids.length - failed.length, names: failed.join(", ") }));
+      setTicked(new Set(ids.filter((id) => failed.includes(teachers.find((x) => x.id === id)?.name ?? id))));
+      setBulkOpen(false);
+      setBulkTyped("");
+    }
   };
 
   const loadRealTeachers = async () => {
@@ -538,10 +576,111 @@ export default function AdminTeachersPage() {
       />
 
       <SectionCard title={tr("All teachers")} note={tr("{count} total", { count: teachers.length })}>
+        {!isDemo && ready && teachers.length > 1 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3">
+            {!selecting ? (
+              <button
+                type="button"
+                onClick={() => { setSelecting(true); setEditingId(null); setBulkNote(null); }}
+                className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+              >
+                {tr("Select several")}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pickable = teachers.filter((t) => !t.admin && (!search.trim() || `${t.name} ${t.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())));
+                    setTicked(pickable.length > 0 && pickable.every((t) => ticked.has(t.id)) ? new Set() : new Set(pickable.map((t) => t.id)));
+                  }}
+                  className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                >
+                  {tr("Tick all shown")}
+                </button>
+                <span className="text-[12.5px] text-ink-muted">{tr("{count} selected", { count: ticked.size })}</span>
+                <button
+                  type="button"
+                  disabled={ticked.size === 0}
+                  onClick={() => { setBulkOpen(true); setBulkTyped(""); }}
+                  className="text-[13px] font-semibold text-red-700 dark:text-red-300 hover:underline disabled:opacity-40 disabled:no-underline"
+                >
+                  {tr("Delete selected…")}
+                </button>
+                <button type="button" onClick={leaveSelecting} className="text-[13px] font-semibold text-ink-muted hover:text-ink">
+                  {tr("Cancel")}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {bulkNote && <p className="text-[12.5px] text-ink mb-3">{bulkNote}</p>}
+        {selecting && bulkOpen && ticked.size > 0 && (
+          <div className="mb-3 rounded-2xl border border-red-300 dark:border-red-800/60 bg-surface-bg-warm p-4 space-y-2">
+            <p className="text-[12.5px] text-ink leading-relaxed">
+              {tr("This deletes these {count} sign-ins for good: {names}. The register, lessons and messages they recorded stay with the school without their name, and a halaqa they teach alone will need another teacher. A teacher who also teaches at another school only leaves yours. To keep someone but stop them signing in, untick Active on their row instead.", {
+                count: ticked.size,
+                names: teachers.filter((t) => ticked.has(t.id)).map((t) => t.name).join(", "),
+              })}
+            </p>
+            <p className="text-[12.5px] text-ink">{tr("Type DELETE to confirm.")}</p>
+            <input
+              value={bulkTyped}
+              onChange={(e) => setBulkTyped(e.target.value)}
+              placeholder="DELETE"
+              aria-label={tr("Type DELETE to confirm")}
+              className="w-full bg-surface-card border border-red-300 dark:border-red-800/60 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={deleteTicked}
+                disabled={bulkBusy || bulkTyped.trim() !== "DELETE"}
+                className="bg-red-700 text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-xl disabled:opacity-40"
+              >
+                {bulkBusy ? tr("Working…") : tr("Delete {count}", { count: ticked.size })}
+              </button>
+              <button type="button" onClick={() => setBulkOpen(false)} className="text-[12.5px] font-semibold text-ink-muted hover:text-ink px-2">
+                {tr("Keep")}
+              </button>
+            </div>
+          </div>
+        )}
         {!ready ? (
           <LoadingNote />
         ) : teachers.length === 0 ? (
           <EmptyNote>{tr("No teachers yet.")}</EmptyNote>
+        ) : selecting ? (
+          <ul className="divide-y divide-surface-border -my-1">
+            {teachers
+              .filter((t) => !search.trim() || `${t.name} ${t.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()))
+              .map((t) => (
+                <li key={t.id}>
+                  <label className={`flex items-center gap-3 py-3 ${t.admin ? "opacity-50" : "cursor-pointer"}`}>
+                    <input
+                      type="checkbox"
+                      checked={ticked.has(t.id)}
+                      disabled={Boolean(t.admin) || bulkBusy}
+                      onChange={() =>
+                        setTicked((now) => {
+                          const next = new Set(now);
+                          if (next.has(t.id)) next.delete(t.id);
+                          else next.add(t.id);
+                          return next;
+                        })
+                      }
+                      aria-label={t.name}
+                      className="w-5 h-5 accent-red-700 flex-shrink-0"
+                    />
+                    <Avatar name={t.name} muted={t.active === false} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{t.name}</p>
+                      <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">{t.admin ? tr("An admin login can't be deleted from here.") : t.email}</p>
+                    </div>
+                  </label>
+                </li>
+              ))}
+          </ul>
         ) : (
           <ul className="divide-y divide-surface-border -my-1">
             {teachers.filter((t) => !search.trim() || `${t.name} ${t.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())).map((t) => {
