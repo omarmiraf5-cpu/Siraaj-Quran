@@ -664,8 +664,9 @@ export default function AdminHalaqasPage() {
       );
       setProgramPick(new Set());
       setProgramSearch("");
-    } catch {
-      setProgramNote(tr("Couldn't add them. Please try again."));
+    } catch (err) {
+      const reason = (err as { message?: string } | null)?.message;
+      setProgramNote(reason ? `${tr("Couldn't add them. Please try again.")} (${reason})` : tr("Couldn't add them. Please try again."));
     } finally {
       setProgramBusy(false);
     }
@@ -729,8 +730,9 @@ export default function AdminHalaqasPage() {
         for (const [t, list] of byTeacher) await giveMany(h, list, t);
       }
       setRegroupPick(new Set());
-    } catch {
-      setAssignNote(tr("That didn't save. Please try again."));
+    } catch (err) {
+      const reason = (err as { message?: string } | null)?.message;
+      setAssignNote(reason ? `${tr("That didn't save. Please try again.")} (${reason})` : tr("That didn't save. Please try again."));
     } finally {
       setRegroupBusy(false);
     }
