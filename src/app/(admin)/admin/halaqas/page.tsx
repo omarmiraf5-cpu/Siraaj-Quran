@@ -695,6 +695,8 @@ export default function AdminHalaqasPage() {
   };
   // Regroup: tick children in a shared halaqa and move them to one teacher,
   // or share them out evenly among all its teachers.
+  // The teacher whose children are showing under a halaqa's row.
+  const [teacherDetail, setTeacherDetail] = useState<{ halaqa: string; teacher: string } | null>(null);
   const [regroupPick, setRegroupPick] = useState<Set<string>>(new Set());
   const [regroupBusy, setRegroupBusy] = useState(false);
   const [moveTo, setMoveTo] = useState("");
@@ -804,9 +806,6 @@ export default function AdminHalaqasPage() {
                 teacher shows only when it's someone else, then the campus,
                 the students and the schedule as chips. */}
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
-              {halaqaTeacherNames(h, teachers) && halaqaTeacherNames(h, teachers) !== h.name && (
-                <span className={isOpen ? "text-white/80" : "text-ink-muted"}>{halaqaTeacherNames(h, teachers)}</span>
-              )}
               {graded && !isProgramHalaqa(h.name) && gradesOf(h.grade, h.alsoGrades).length > 1 && (
                 <span className={`rounded-full px-2 py-0.5 ${isOpen ? "bg-white/15 text-white" : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"}`}>{gradesLabel(h.grade, h.alsoGrades)}</span>
               )}
@@ -828,6 +827,64 @@ export default function AdminHalaqasPage() {
           )}
           <RowChevron open={isOpen} />
         </button>
+        {halaqaTeacherNames(h, teachers) && halaqaTeacherNames(h, teachers) !== h.name && !isOpen && (
+          <div className="ps-[3.6rem] pb-2 -mt-1">
+            <ul className="flex flex-wrap gap-x-1 gap-y-1 text-[12px]">
+              {halaqaTeacherIds(h).map((tid, i, all) => {
+                const on = teacherDetail?.halaqa === h.id && teacherDetail.teacher === tid;
+                return (
+                  <li key={tid} className="inline-flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setTeacherDetail(on ? null : { halaqa: h.id, teacher: tid })}
+                      aria-expanded={on}
+                      className={`font-bold rounded-md px-1 py-0.5 transition-colors ${on ? "bg-brand-navy text-white" : "text-ink hover:bg-surface-bg-warm underline-offset-2 hover:underline"}`}
+                    >
+                      {teacherNameOf(tid)}
+                    </button>
+                    {i < all.length - 1 && <span className="text-ink-muted px-0.5" aria-hidden="true">&amp;</span>}
+                  </li>
+                );
+              })}
+            </ul>
+            {teacherDetail?.halaqa === h.id && (() => {
+              const tid = teacherDetail.teacher;
+              const shared = halaqaTeacherIds(h).length > 1;
+              const theirs = studentsOf(h).filter((x) => (shared ? x.assignedTo === tid : true));
+              const t = teachers.find((x) => x.id === tid);
+              return (
+                <div className="mt-2 rounded-xl border border-surface-border bg-surface-card p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-bold text-ink [overflow-wrap:anywhere]">{teacherNameOf(tid)}</p>
+                      {t?.email && <p className="text-[11px] text-ink-muted [overflow-wrap:anywhere]">{t.email}</p>}
+                    </div>
+                    <button type="button" onClick={() => setTeacherDetail(null)} aria-label={tr("Close")} className="text-ink-muted hover:text-ink text-[16px] leading-none px-1">×</button>
+                  </div>
+                  <p className="text-[12px] font-semibold text-ink">
+                    {tr("{count} student|{count} students", { count: theirs.length })}
+                    {shared && <span className="font-normal text-ink-muted"> · {tr("in this halaqa")}</span>}
+                  </p>
+                  {theirs.length === 0 ? (
+                    <p className="text-[12px] text-ink-muted">{tr("No children yet.")}</p>
+                  ) : (
+                    <ul className="flex flex-wrap gap-1.5">
+                      {theirs.map((x) => (
+                        <li key={x.id} className={`text-[12px] rounded-full border border-surface-border bg-surface-bg px-2.5 py-1 ${x.active === false ? "text-ink-muted line-through" : "text-ink"}`}>
+                          {x.name}
+                          {typeof x.grade === "number" && <span className="text-ink-muted"> · {gradeLabel(x.grade)}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <button type="button" onClick={() => startEditing(h)} className="text-[12px] font-semibold text-brand-navy dark:text-brand-gold hover:underline">
+                    {tr("Edit this halaqa")}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {isOpen && (
           <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">

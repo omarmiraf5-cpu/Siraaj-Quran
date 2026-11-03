@@ -2181,4 +2181,6 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Move to": "نقل إلى",
   "Move {count}": "نقل {count}",
   "Share evenly among all teachers": "توزيع بالتساوي على كل المعلمين",
+  "in this halaqa": "في هذه الحلقة",
+  "Edit this halaqa": "تعديل هذه الحلقة",
 };
