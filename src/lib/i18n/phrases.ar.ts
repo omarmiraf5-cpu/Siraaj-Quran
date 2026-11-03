@@ -2160,4 +2160,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Grades *": "الصفوف *",
   "Tap every grade it takes.": "اضغط على كل صفّ تقبله.",
   "Grade {grade} only": "الصف {grade} فقط",
+  " The halaqa is called by its teacher, or by its grades when several teach it.": " وتُسمّى الحلقة باسم معلمها، أو بصفوفها إذا كان يدرّسها عدة معلمين.",
+  "One teacher: the halaqa is called by their name. Tap more than one if they teach it together, and it is called by its grades.": "معلم واحد: تُسمّى الحلقة باسمه. اختر أكثر من معلم إن كانوا يدرّسونها معًا، فتُسمّى بصفوفها.",
+  "Tick the children to put in this halaqa. They move here from the halaqa they are in now.": "علّم على الأطفال لإضافتهم إلى هذه الحلقة. ينتقلون إليها من حلقتهم الحالية.",
 };

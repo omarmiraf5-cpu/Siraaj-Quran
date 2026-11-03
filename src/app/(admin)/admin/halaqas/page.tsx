@@ -336,8 +336,13 @@ export default function AdminHalaqasPage() {
   const placeMissing = (grade: string, campusId: string, program: ProgramKind = "") =>
     (graded && !program && grade === "") || (campuses.length > 0 && !campusId);
   // A graded school's halaqa is called after its teacher; a program's name says it is one.
-  const nameFor = (teacher: string, program: ProgramKind) =>
-    program && teacher ? `${program === "reading" ? "Reading and Writing" : "Hifd program"} · ${teacher}` : teacher;
+  // With one teacher the halaqa is that teacher; with several it is the
+  // grades they teach together, so it isn't named after whoever is ticked first.
+  const nameFor = (teacher: string, program: ProgramKind, grade = "", teachers = 1) => {
+    const picked = grade.split(",").filter(Boolean).map(Number);
+    if (!program && teachers > 1 && picked.length > 0) return gradesLabel(picked[0], picked.slice(1));
+    return program && teacher ? `${program === "reading" ? "Reading and Writing" : "Hifd program"} · ${teacher}` : teacher;
+  };
 
   // In an academic school the teacher is the halaqa: it's called by its
   // (first) teacher's name, and changes name when its teacher changes.
@@ -345,7 +350,7 @@ export default function AdminHalaqasPage() {
   const addHalaqa = async (e: React.FormEvent) => {
     e.preventDefault();
     const { lead, others } = splitTeachers(newTeacherIds, null);
-    const name = graded ? nameFor(teacherNameOf(lead), newProgram) : newName.trim();
+    const name = graded ? nameFor(teacherNameOf(lead), newProgram, newGrade, newTeacherIds.length) : newName.trim();
     if (!name || (!graded && !newSchedule.trim()) || placeMissing(newGrade, newCampusId, newProgram)) return;
 
     if (isDemo) {
@@ -446,7 +451,7 @@ export default function AdminHalaqasPage() {
   const saveEdit = async (h: DemoHalaqa) => {
     const { lead, others } = splitTeachers(draftTeacherIds, h.teacherId);
     // A graded school's halaqa follows its teacher's name.
-    const editedName = graded ? nameFor(teacherNameOf(lead), draftProgram) || h.name : draftName.trim() || h.name;
+    const editedName = graded ? nameFor(teacherNameOf(lead), draftProgram, draftGrade, draftTeacherIds.length) || h.name : draftName.trim() || h.name;
     if (isDemo) {
       const patch: HalaqaOverride = {
         name: editedName,
@@ -727,7 +732,7 @@ export default function AdminHalaqasPage() {
               <label className="block text-xs font-semibold text-ink mb-1">{tr("Teachers")}</label>
               <p className="text-[11px] text-ink-muted mb-2">
                 {tr("Tap to add or take off. Everyone ticked sees and teaches this halaqa's children.")}
-                {graded && tr(" The halaqa is called by the first teacher's name.")}
+                {graded && tr(" The halaqa is called by its teacher, or by its grades when several teach it.")}
               </p>
               <TeacherPicker teachers={teachers} selected={draftTeacherIds} onChange={setDraftTeacherIds} meId={meId} />
             </div>
@@ -1028,7 +1033,7 @@ export default function AdminHalaqasPage() {
             <div>
               <label className="block text-sm font-semibold text-ink mb-1">{tr("Teacher *")}</label>
               <p className="text-xs text-ink-muted mb-2">
-                {tr("The teacher is the halaqa: it's called by their name. Tap more than one if they teach it together.")}
+                {tr("One teacher: the halaqa is called by their name. Tap more than one if they teach it together, and it is called by its grades.")}
               </p>
               <TeacherPicker teachers={teachers} selected={newTeacherIds} onChange={setNewTeacherIds} meId={meId} />
             </div>
