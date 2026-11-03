@@ -405,7 +405,8 @@ export default function AdminHalaqasPage() {
       setNewTeacherIds([]);
       setShowForm(false);
     } catch (err) {
-      setFormError(err instanceof Error ? tr(err.message) : tr("Failed to add halaqa"));
+      const reason = (err as { message?: string } | null)?.message;
+      setFormError(err instanceof Error ? tr(err.message) : reason ? `${tr("Failed to add halaqa")} (${reason})` : tr("Failed to add halaqa"));
     } finally {
       setSaving(false);
     }
@@ -529,7 +530,9 @@ export default function AdminHalaqasPage() {
       if (meId && halaqaTeacherIds(h).includes(meId) !== draftTeacherIds.includes(meId)) staffRolesChanged();
       setEditingId(null);
     } catch (err) {
-      setEditError(err instanceof Error ? tr(err.message) : tr("That didn't save. Please try again."));
+      // A database refusal arrives as a plain object, not an Error: show its reason.
+      const reason = (err as { message?: string } | null)?.message;
+      setEditError(err instanceof Error ? tr(err.message) : reason ? `${tr("That didn't save. Please try again.")} (${reason})` : tr("That didn't save. Please try again."));
     } finally {
       setSavingEdit(false);
     }
