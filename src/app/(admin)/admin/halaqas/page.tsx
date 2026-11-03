@@ -232,7 +232,7 @@ export default function AdminHalaqasPage() {
   const loadRealStudents = async (): Promise<DemoStudent[]> => {
     const { data: studentRows } = await supabase
       .from("students")
-      .select("id, full_name, active")
+      .select("id, full_name, active, grade")
       .order("full_name");
     const { data: enrollments } = await supabase
       .from("class_enrollments")
@@ -253,6 +253,7 @@ export default function AdminHalaqasPage() {
       halaqaId: halaqaByStudent.get(s.id)?.id,
       programs: programsOf.get(s.id),
       active: s.active,
+      grade: typeof s.grade === "number" ? s.grade : undefined,
     }));
   };
 
@@ -554,6 +555,8 @@ export default function AdminHalaqasPage() {
   // Several at once: tick the children, then add them in one go.
   const [programPick, setProgramPick] = useState<Set<string>>(new Set());
   const [programBusy, setProgramBusy] = useState(false);
+  // Grades to show together, e.g. 8 and 9; empty shows everyone.
+  const [programGrades, setProgramGrades] = useState<Set<number>>(new Set());
   const addManyToProgram = async (h: DemoHalaqa, picked: DemoStudent[]) => {
     if (picked.length === 0) return;
     setProgramNote(null);
@@ -569,6 +572,7 @@ export default function AdminHalaqasPage() {
       setStudents((now) => now.map((x) => (ids.has(x.id) ? { ...x, programs: [...(x.programs ?? []).filter((p) => p.id !== h.id), { id: h.id, name: h.name }] } : x)));
       setProgramPick(new Set());
       setProgramSearch("");
+      setProgramGrades(new Set());
     } catch {
       setProgramNote(tr("Couldn't add them. Please try again."));
     } finally {
@@ -726,11 +730,17 @@ export default function AdminHalaqasPage() {
                     placeholder={tr("Search a student…")}
                     className={smallField}
                   />
-                  <p className="text-[11px] text-ink-muted mt-1.5">{tr("Tick as many as you like, then add them. They stay in their own halaqa too.")}</p>
+                  <p className="text-[11px] text-ink-muted mt-1.5">{tr("Choose the grades that go together, tick the children, then add them. They stay in their own halaqa too.")}</p>
                   {(() => {
                     const q = programSearch.trim().toLowerCase();
                     const candidates = students
-                      .filter((s) => s.active !== false && !studentsOf(h).some((x) => x.id === s.id) && (!q || s.name.toLowerCase().includes(q)))
+                      .filter(
+                        (s) =>
+                          s.active !== false &&
+                          !studentsOf(h).some((x) => x.id === s.id) &&
+                          (!q || s.name.toLowerCase().includes(q)) &&
+                          (programGrades.size === 0 || (typeof s.grade === "number" && programGrades.has(s.grade)))
+                      )
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .slice(0, 60);
                     const picked = candidates.filter((s) => programPick.has(s.id));
@@ -742,9 +752,45 @@ export default function AdminHalaqasPage() {
                         else next.add(id);
                         return next;
                       });
-                    if (candidates.length === 0) return <p className="text-xs text-ink-muted mt-2">{tr("No one to add.")}</p>;
+                    const gradesPresent = [...new Set(students.filter((s) => s.active !== false && typeof s.grade === "number").map((s) => s.grade as number))].sort((a, b) => a - b);
+                    const gradeChips =
+                      graded && gradesPresent.length > 1 ? (
+                        <div role="group" aria-label={tr("Grades")} className="flex flex-wrap gap-1.5 mt-2">
+                          {gradesPresent.map((g) => {
+                            const on = programGrades.has(g);
+                            return (
+                              <button
+                                key={g}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() =>
+                                  setProgramGrades((now) => {
+                                    const next = new Set(now);
+                                    if (next.has(g)) next.delete(g);
+                                    else next.add(g);
+                                    return next;
+                                  })
+                                }
+                                className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                                  on ? "bg-brand-navy text-white border-brand-navy" : "bg-surface-card text-ink border-surface-border hover:border-brand-navy/40"
+                                }`}
+                              >
+                                {gradeLabel(g)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null;
+                    if (candidates.length === 0)
+                      return (
+                        <>
+                          {gradeChips}
+                          <p className="text-xs text-ink-muted mt-2">{tr("No one to add.")}</p>
+                        </>
+                      );
                     return (
                       <>
+                        {gradeChips}
                         <div className="mt-2 flex items-center justify-between gap-3">
                           <button
                             type="button"

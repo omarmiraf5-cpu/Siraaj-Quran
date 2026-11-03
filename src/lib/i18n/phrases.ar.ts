@@ -2154,4 +2154,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Untick all": "إلغاء تحديد الكل",
   "Tick all shown": "تحديد كل الظاهر",
   "Add {count}": "إضافة {count}",
+  "Choose the grades that go together, tick the children, then add them. They stay in their own halaqa too.": "اختر الصفوف التي تجتمع معًا، وعلّم على الأطفال ثم أضفهم. يبقون في حلقتهم أيضًا.",
 };
