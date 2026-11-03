@@ -829,8 +829,8 @@ export default function AdminHalaqasPage() {
         </button>
         {halaqaTeacherNames(h, teachers) && halaqaTeacherNames(h, teachers) !== h.name && !isOpen && (
           <div className="ps-[3.6rem] pb-2 -mt-1">
-            <ul className="flex flex-wrap gap-x-1 gap-y-1 text-[12px]">
-              {halaqaTeacherIds(h).map((tid, i, all) => {
+            <ul className="flex flex-wrap gap-x-2 gap-y-1 text-[12px]">
+              {halaqaTeacherIds(h).map((tid) => {
                 const on = teacherDetail?.halaqa === h.id && teacherDetail.teacher === tid;
                 return (
                   <li key={tid} className="inline-flex items-center">
@@ -842,7 +842,6 @@ export default function AdminHalaqasPage() {
                     >
                       {teacherNameOf(tid)}
                     </button>
-                    {i < all.length - 1 && <span className="text-ink-muted px-0.5" aria-hidden="true">&amp;</span>}
                   </li>
                 );
               })}
