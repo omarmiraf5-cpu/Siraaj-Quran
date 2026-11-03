@@ -419,6 +419,8 @@ export default function AdminHalaqasPage() {
     setProgramPick(new Set());
     setProgramSearch("");
     setGiveTo("");
+    setRegroupPick(new Set());
+    setMoveTo("");
     setProgramGrades(isProgramHalaqa(h.name) ? new Set() : new Set(gradesOf(h.grade, h.alsoGrades)));
     setDraftGrade(isProgramHalaqa(h.name) ? (h.grade != null ? String(h.grade) : "") : gradesOf(h.grade, h.alsoGrades).join(","));
     setDraftProgram(programKind(h.name));
@@ -691,6 +693,43 @@ export default function AdminHalaqasPage() {
       setAssignNote(tr("That didn't save. Please try again."));
     }
   };
+  // Regroup: tick children in a shared halaqa and move them to one teacher,
+  // or share them out evenly among all its teachers.
+  const [regroupPick, setRegroupPick] = useState<Set<string>>(new Set());
+  const [regroupBusy, setRegroupBusy] = useState(false);
+  const [moveTo, setMoveTo] = useState("");
+  const giveMany = async (h: DemoHalaqa, ids: string[], teacherId: string) => {
+    if (ids.length === 0) return;
+    if (!isDemo) {
+      const { error } = await supabase.from("class_enrollments").update({ teacher_id: teacherId || null }).eq("class_id", h.id).in("student_id", ids);
+      if (error) throw error;
+    }
+    const set = new Set(ids);
+    setStudents((now) => now.map((x) => (set.has(x.id) ? { ...x, assignedTo: teacherId || null } : x)));
+  };
+  const regroup = async (h: DemoHalaqa, ids: string[], mode: "move" | "even", teacherIds: string[]) => {
+    setAssignNote(null);
+    setRegroupBusy(true);
+    try {
+      if (mode === "move") {
+        await giveMany(h, ids, moveTo);
+      } else {
+        // Round and round the teachers, children in name order, so batches are the same size.
+        const ordered = students.filter((x) => ids.includes(x.id)).sort((a, b) => a.name.localeCompare(b.name));
+        const byTeacher = new Map<string, string[]>();
+        ordered.forEach((x, i) => {
+          const t = teacherIds[i % teacherIds.length];
+          byTeacher.set(t, [...(byTeacher.get(t) ?? []), x.id]);
+        });
+        for (const [t, list] of byTeacher) await giveMany(h, list, t);
+      }
+      setRegroupPick(new Set());
+    } catch {
+      setAssignNote(tr("That didn't save. Please try again."));
+    } finally {
+      setRegroupBusy(false);
+    }
+  };
   const placed = isDemo ? students.length : students.filter((s) => s.halaqaId).length;
 
   // An academic school's halaqas: by campus (when it has them), then grade.
@@ -832,6 +871,43 @@ export default function AdminHalaqasPage() {
               ) : !isProgramHalaqa(h.name) && graded && draftTeacherIds.length > 1 ? (
                 // Several teachers share this halaqa: each child goes to one of them.
                 <div className="space-y-3">
+                  <div className="rounded-xl border border-surface-border bg-surface-card p-3 space-y-2">
+                    <p className="text-[12px] font-semibold text-ink">{tr("Regroup")}</p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setRegroupPick(regroupPick.size === studentsOf(h).length ? new Set() : new Set(studentsOf(h).map((x) => x.id)))}
+                        className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                      >
+                        {regroupPick.size === studentsOf(h).length ? tr("Untick all") : tr("Tick all")}
+                      </button>
+                      <span className="text-[12px] text-ink-muted">{tr("{count} selected", { count: regroupPick.size })}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select value={moveTo} onChange={(e) => setMoveTo(e.target.value)} aria-label={tr("Move to")} className={`${smallField} max-w-[16rem]`}>
+                        <option value="">{tr("Not given to a teacher yet")}</option>
+                        {draftTeacherIds.map((id) => (
+                          <option key={id} value={id}>{teacherNameOf(id)}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={regroupPick.size === 0 || regroupBusy}
+                        onClick={() => regroup(h, [...regroupPick], "move", draftTeacherIds)}
+                        className="rounded-full gradient-emerald text-white text-[12px] font-semibold px-3.5 py-1.5 disabled:opacity-40 active:scale-95 transition"
+                      >
+                        {regroupBusy ? tr("Working…") : tr("Move {count}", { count: regroupPick.size })}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={regroupPick.size === 0 || regroupBusy}
+                        onClick={() => regroup(h, [...regroupPick], "even", draftTeacherIds)}
+                        className="rounded-full border border-surface-border text-ink text-[12px] font-semibold px-3.5 py-1.5 disabled:opacity-40 active:scale-95 transition"
+                      >
+                        {tr("Share evenly among all teachers")}
+                      </button>
+                    </div>
+                  </div>
                   {[...draftTeacherIds.map((id) => ({ id, name: teacherNameOf(id) })), { id: "", name: tr("Not given to a teacher yet") }].map((g) => {
                     const mine = studentsOf(h).filter((s) => (s.assignedTo && draftTeacherIds.includes(s.assignedTo) ? s.assignedTo : "") === g.id);
                     if (mine.length === 0 && g.id === "") return null;
@@ -846,6 +922,20 @@ export default function AdminHalaqasPage() {
                           <ul className="divide-y divide-surface-border rounded-xl border border-surface-border bg-surface-card">
                             {mine.map((s) => (
                               <li key={s.id} className="flex items-center gap-2 px-3 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={regroupPick.has(s.id)}
+                                  onChange={() =>
+                                    setRegroupPick((now) => {
+                                      const next = new Set(now);
+                                      if (next.has(s.id)) next.delete(s.id);
+                                      else next.add(s.id);
+                                      return next;
+                                    })
+                                  }
+                                  aria-label={s.name}
+                                  className="w-5 h-5 accent-emerald-700 flex-shrink-0"
+                                />
                                 <span className={`flex-1 min-w-0 text-[12.5px] [overflow-wrap:anywhere] ${s.active === false ? "text-ink-muted line-through" : "text-ink"}`}>{s.name}</span>
                                 <select
                                   value={g.id}
