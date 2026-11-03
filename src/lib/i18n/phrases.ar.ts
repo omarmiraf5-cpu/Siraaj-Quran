@@ -2145,4 +2145,8 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Google sign-in didn't work. Please try again, or use your password.": "لم ينجح تسجيل الدخول عبر Google. حاول مجددًا أو استخدم كلمة المرور.",
   "or": "أو",
   "Continue with Google": "المتابعة عبر Google",
+  "Kind of halaqa": "نوع الحلقة",
+  "A grade's halaqa": "حلقة صفّ",
+  "Hifd program": "برنامج الحفظ",
+  "Reading and Writing": "القراءة والكتابة",
 };

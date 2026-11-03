@@ -21,7 +21,7 @@ import {
 import type { DemoHalaqa, DemoTeacher, DemoStudent } from "@/data/demo";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
-import { isProgramHalaqa } from "@/lib/programHalaqa";
+import { isProgramHalaqa, programKind, type ProgramKind } from "@/lib/programHalaqa";
 import { ColorTile } from "@/components/gem-icons";
 import { readDemoStore, writeDemoStore } from "@/lib/demoStore";
 import { createClient } from "@/lib/supabase/client";
@@ -103,9 +103,9 @@ function PlaceFields({
   campusId: string;
   onGrade: (grade: string) => void;
   onCampus: (campusId: string) => void;
-  /** A Hifd program sits beside a child's grade halaqa, so it has no grade of its own. */
-  program: boolean;
-  onProgram: (program: boolean) => void;
+  /** A program (Hifd, or Reading and Writing) sits beside a child's grade halaqa, so it has no grade of its own. */
+  program: ProgramKind;
+  onProgram: (program: ProgramKind) => void;
   small?: boolean;
 }) {
   const { tr } = useLanguage();
@@ -140,12 +140,16 @@ function PlaceFields({
         </label>
       )}
       {graded && (
-        <label className="col-span-2 flex items-start gap-2.5 text-[13px] text-ink">
-          <input type="checkbox" checked={program} onChange={(e) => onProgram(e.target.checked)} className="mt-0.5 w-4 h-4 accent-emerald-700 flex-shrink-0" />
-          <span>
-            <span className="font-semibold">{tr("This is a Hifd program")}</span>
-            <span className="block text-ink-muted text-[12px]">{tr("It isn't tied to a grade: a child stays in their own grade's halaqa and joins it as well.")}</span>
-          </span>
+        <label className="col-span-2 block">
+          <span className={label}>{tr("Kind of halaqa")}</span>
+          <select value={program} onChange={(e) => onProgram(e.target.value as ProgramKind)} className={small ? smallField : bigField}>
+            <option value="">{tr("A grade's halaqa")}</option>
+            <option value="hifd">{tr("Hifd program")}</option>
+            <option value="reading">{tr("Reading and Writing")}</option>
+          </select>
+          {program && (
+            <span className="block text-ink-muted text-[12px] mt-1.5">{tr("It isn't tied to a grade: a child stays in their own grade's halaqa and joins it as well.")}</span>
+          )}
         </label>
       )}
     </div>
@@ -174,7 +178,7 @@ export default function AdminHalaqasPage() {
   const [newSchedule, setNewSchedule] = useState("");
   const [newTeacherIds, setNewTeacherIds] = useState<string[]>([]);
   const [newGrade, setNewGrade] = useState("");
-  const [newProgram, setNewProgram] = useState(false);
+  const [newProgram, setNewProgram] = useState<ProgramKind>("");
   const [newCampusId, setNewCampusId] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -186,7 +190,7 @@ export default function AdminHalaqasPage() {
   const [draftSchedule, setDraftSchedule] = useState("");
   const [draftTeacherIds, setDraftTeacherIds] = useState<string[]>([]);
   const [draftGrade, setDraftGrade] = useState("");
-  const [draftProgram, setDraftProgram] = useState(false);
+  const [draftProgram, setDraftProgram] = useState<ProgramKind>("");
   const [draftCampusId, setDraftCampusId] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -303,14 +307,15 @@ export default function AdminHalaqasPage() {
   // A grade and campus, as the database keeps them, when the school has them.
   // A Hifd program has no grade of its own; the database wants one, so it keeps a placeholder.
   const PROGRAM_GRADE = 5;
-  const placeOf = (grade: string, campusId: string, program = false) => ({
+  const placeOf = (grade: string, campusId: string, program: ProgramKind = "") => ({
     ...(graded ? { grade: program ? PROGRAM_GRADE : Number(grade) } : {}),
     ...(campuses.length > 0 ? { campus_id: campusId || null } : {}),
   });
-  const placeMissing = (grade: string, campusId: string, program = false) =>
+  const placeMissing = (grade: string, campusId: string, program: ProgramKind = "") =>
     (graded && !program && grade === "") || (campuses.length > 0 && !campusId);
   // A graded school's halaqa is called after its teacher; a program's name says it is one.
-  const nameFor = (teacher: string, program: boolean) => (program && teacher ? `Hifd program · ${teacher}` : teacher);
+  const nameFor = (teacher: string, program: ProgramKind) =>
+    program && teacher ? `${program === "reading" ? "Reading and Writing" : "Hifd program"} · ${teacher}` : teacher;
 
   // In an academic school the teacher is the halaqa: it's called by its
   // (first) teacher's name, and changes name when its teacher changes.
@@ -382,7 +387,7 @@ export default function AdminHalaqasPage() {
     setDraftSchedule(h.schedule);
     setDraftTeacherIds(halaqaTeacherIds(h));
     setDraftGrade(h.grade != null ? String(h.grade) : "");
-    setDraftProgram(isProgramHalaqa(h.name));
+    setDraftProgram(programKind(h.name));
     setDraftCampusId(h.campusId ?? "");
     setEditError(null);
   };
