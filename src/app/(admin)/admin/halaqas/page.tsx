@@ -145,7 +145,7 @@ function PlaceFields({
           <select value={program} onChange={(e) => onProgram(e.target.value as ProgramKind)} className={small ? smallField : bigField}>
             <option value="">{tr("A grade's halaqa")}</option>
             <option value="hifd">{tr("Hifd program")}</option>
-            <option value="reading">{tr("Reading and Writing")}</option>
+            <option value="reading">{tr("Reading and Writing")} · القرائة والكتابة</option>
           </select>
           {program && (
             <span className="block text-ink-muted text-[12px] mt-1.5">{tr("It isn't tied to a grade: a child stays in their own grade's halaqa and joins it as well.")}</span>
