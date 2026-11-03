@@ -408,6 +408,9 @@ export default function AdminHalaqasPage() {
     setDraftName(h.name);
     setDraftSchedule(h.schedule);
     setDraftTeacherIds(halaqaTeacherIds(h));
+    setProgramPick(new Set());
+    setProgramSearch("");
+    setProgramGrades(isProgramHalaqa(h.name) ? new Set() : new Set(gradesOf(h.grade, h.alsoGrades)));
     setDraftGrade(isProgramHalaqa(h.name) ? (h.grade != null ? String(h.grade) : "") : gradesOf(h.grade, h.alsoGrades).join(","));
     setDraftProgram(programKind(h.name));
     setDraftCampusId(h.campusId ?? "");
@@ -583,17 +586,32 @@ export default function AdminHalaqasPage() {
     setProgramNote(null);
     setProgramBusy(true);
     try {
+      const ordinary = !isProgramHalaqa(h.name);
       if (!isDemo) {
+        if (ordinary) {
+          // A child has one halaqa of their own: leave the old one (never a program).
+          const programIds = halaqas.filter((x) => isProgramHalaqa(x.name)).map((x) => x.id);
+          const leave = supabase.from("class_enrollments").delete().in("student_id", picked.map((s) => s.id));
+          const { error: leaveError } = await (programIds.length > 0 ? leave.not("class_id", "in", `(${programIds.join(",")})`) : leave);
+          if (leaveError) throw leaveError;
+        }
         const { error } = await supabase
           .from("class_enrollments")
           .upsert(picked.map((s) => ({ class_id: h.id, student_id: s.id })), { onConflict: "class_id,student_id", ignoreDuplicates: true });
         if (error) throw error;
       }
       const ids = new Set(picked.map((s) => s.id));
-      setStudents((now) => now.map((x) => (ids.has(x.id) ? { ...x, programs: [...(x.programs ?? []).filter((p) => p.id !== h.id), { id: h.id, name: h.name }] } : x)));
+      setStudents((now) =>
+        now.map((x) =>
+          !ids.has(x.id)
+            ? x
+            : ordinary
+              ? { ...x, halaqa: h.name, halaqaId: h.id }
+              : { ...x, programs: [...(x.programs ?? []).filter((p) => p.id !== h.id), { id: h.id, name: h.name }] }
+        )
+      );
       setProgramPick(new Set());
       setProgramSearch("");
-      setProgramGrades(new Set());
     } catch {
       setProgramNote(tr("Couldn't add them. Please try again."));
     } finally {
@@ -719,7 +737,7 @@ export default function AdminHalaqasPage() {
               </p>
               {count === 0 ? (
                 <p className="text-[11.5px] text-ink-muted">
-                  {isProgramHalaqa(h.name) ? tr("None yet. Add students below.") : tr("None yet. Put students in a halaqa from the Students page.")}
+                  {isProgramHalaqa(h.name) || graded ? tr("None yet. Add students below.") : tr("None yet. Put students in a halaqa from the Students page.")}
                 </p>
               ) : (
                 <ul className="flex flex-wrap gap-1.5">
@@ -745,7 +763,7 @@ export default function AdminHalaqasPage() {
                   ))}
                 </ul>
               )}
-              {isProgramHalaqa(h.name) && (
+              {(isProgramHalaqa(h.name) || graded) && (
                 <div className="mt-3 rounded-xl border border-surface-border bg-surface-card p-3">
                   <p className="text-xs font-semibold text-ink mb-1.5">{tr("Add students")}</p>
                   <input
@@ -754,7 +772,7 @@ export default function AdminHalaqasPage() {
                     placeholder={tr("Search a student…")}
                     className={smallField}
                   />
-                  <p className="text-[11px] text-ink-muted mt-1.5">{tr("Choose the grades that go together, tick the children, then add them. They stay in their own halaqa too.")}</p>
+                  <p className="text-[11px] text-ink-muted mt-1.5">{isProgramHalaqa(h.name) ? tr("Choose the grades that go together, tick the children, then add them. They stay in their own halaqa too.") : tr("Tick the children to put in this halaqa. They move here from the halaqa they are in now.")}</p>
                   {(() => {
                     const q = programSearch.trim().toLowerCase();
                     const candidates = students
