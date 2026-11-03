@@ -551,6 +551,30 @@ export default function AdminHalaqasPage() {
       setProgramNote(tr("Couldn't add them. Please try again."));
     }
   };
+  // Several at once: tick the children, then add them in one go.
+  const [programPick, setProgramPick] = useState<Set<string>>(new Set());
+  const [programBusy, setProgramBusy] = useState(false);
+  const addManyToProgram = async (h: DemoHalaqa, picked: DemoStudent[]) => {
+    if (picked.length === 0) return;
+    setProgramNote(null);
+    setProgramBusy(true);
+    try {
+      if (!isDemo) {
+        const { error } = await supabase
+          .from("class_enrollments")
+          .upsert(picked.map((s) => ({ class_id: h.id, student_id: s.id })), { onConflict: "class_id,student_id", ignoreDuplicates: true });
+        if (error) throw error;
+      }
+      const ids = new Set(picked.map((s) => s.id));
+      setStudents((now) => now.map((x) => (ids.has(x.id) ? { ...x, programs: [...(x.programs ?? []).filter((p) => p.id !== h.id), { id: h.id, name: h.name }] } : x)));
+      setProgramPick(new Set());
+      setProgramSearch("");
+    } catch {
+      setProgramNote(tr("Couldn't add them. Please try again."));
+    } finally {
+      setProgramBusy(false);
+    }
+  };
   const removeFromProgram = async (h: DemoHalaqa, s: DemoStudent) => {
     setProgramNote(null);
     try {
@@ -702,34 +726,63 @@ export default function AdminHalaqasPage() {
                     placeholder={tr("Search a student…")}
                     className={smallField}
                   />
-                  <p className="text-[11px] text-ink-muted mt-1.5">{tr("They stay in their own halaqa too.")}</p>
-                  {programSearch.trim().length > 0 && (
-                    <ul className="mt-2 divide-y divide-surface-border max-h-60 overflow-y-auto">
-                      {students
-                        .filter(
-                          (s) =>
-                            s.active !== false &&
-                            !studentsOf(h).some((x) => x.id === s.id) &&
-                            s.name.toLowerCase().includes(programSearch.trim().toLowerCase())
-                        )
-                        .slice(0, 12)
-                        .map((s) => (
-                          <li key={s.id} className="flex items-center justify-between gap-3 py-2">
-                            <span className="min-w-0">
-                              <span className="block text-[13px] text-ink [overflow-wrap:anywhere]">{s.name}</span>
-                              {s.halaqa && <span className="block text-[11px] text-ink-muted [overflow-wrap:anywhere]">{s.halaqa}</span>}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => addToProgram(h, s)}
-                              className="flex-shrink-0 rounded-full gradient-emerald text-white text-[12px] font-semibold px-3.5 py-1.5 hover:opacity-90 active:scale-95 transition"
-                            >
-                              {tr("Add")}
-                            </button>
-                          </li>
-                        ))}
-                    </ul>
-                  )}
+                  <p className="text-[11px] text-ink-muted mt-1.5">{tr("Tick as many as you like, then add them. They stay in their own halaqa too.")}</p>
+                  {(() => {
+                    const q = programSearch.trim().toLowerCase();
+                    const candidates = students
+                      .filter((s) => s.active !== false && !studentsOf(h).some((x) => x.id === s.id) && (!q || s.name.toLowerCase().includes(q)))
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .slice(0, 60);
+                    const picked = candidates.filter((s) => programPick.has(s.id));
+                    const allTicked = candidates.length > 0 && picked.length === candidates.length;
+                    const toggle = (id: string) =>
+                      setProgramPick((now) => {
+                        const next = new Set(now);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                      });
+                    if (candidates.length === 0) return <p className="text-xs text-ink-muted mt-2">{tr("No one to add.")}</p>;
+                    return (
+                      <>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setProgramPick(allTicked ? new Set() : new Set(candidates.map((s) => s.id)))}
+                            className="text-[12px] font-semibold text-brand-navy dark:text-brand-gold underline-offset-2 hover:underline"
+                          >
+                            {allTicked ? tr("Untick all") : tr("Tick all shown")}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={picked.length === 0 || programBusy}
+                            onClick={() => addManyToProgram(h, picked)}
+                            className="rounded-full gradient-emerald text-white text-[12px] font-semibold px-3.5 py-1.5 hover:opacity-90 active:scale-95 transition disabled:opacity-40"
+                          >
+                            {programBusy ? tr("Adding…") : picked.length > 0 ? tr("Add {count}", { count: picked.length }) : tr("Add")}
+                          </button>
+                        </div>
+                        <ul className="mt-1 divide-y divide-surface-border max-h-64 overflow-y-auto overscroll-contain">
+                          {candidates.map((s) => (
+                            <li key={s.id}>
+                              <label className="flex items-center gap-3 py-2.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={programPick.has(s.id)}
+                                  onChange={() => toggle(s.id)}
+                                  className="w-5 h-5 accent-emerald-700 flex-shrink-0"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-[13px] text-ink [overflow-wrap:anywhere]">{s.name}</span>
+                                  {s.halaqa && <span className="block text-[11px] text-ink-muted [overflow-wrap:anywhere]">{s.halaqa}</span>}
+                                </span>
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    );
+                  })()}
                   {programNote && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{programNote}</p>}
                 </div>
               )}

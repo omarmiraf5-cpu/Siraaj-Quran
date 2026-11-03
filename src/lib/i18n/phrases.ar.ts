@@ -2149,4 +2149,9 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "A grade's halaqa": "حلقة صفّ",
   "Hifd program": "برنامج الحفظ",
   "Reading and Writing": "القراءة والكتابة",
+  "Tick as many as you like, then add them. They stay in their own halaqa too.": "علّم على من تشاء ثم أضفهم. يبقون في حلقتهم أيضًا.",
+  "No one to add.": "لا أحد للإضافة.",
+  "Untick all": "إلغاء تحديد الكل",
+  "Tick all shown": "تحديد كل الظاهر",
+  "Add {count}": "إضافة {count}",
 };

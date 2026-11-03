@@ -140,6 +140,17 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
     }
   };
 
+  // Tick several children, then add them together.
+  const [pick, setPick] = useState<Set<string>>(new Set());
+  const [addingMany, setAddingMany] = useState(false);
+  const addPicked = async (list: Candidate[]) => {
+    setAddingMany(true);
+    for (const c of list) await change("POST", c);
+    setPick(new Set());
+    setQuery("");
+    setAddingMany(false);
+  };
+
   const shown = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
     const narrow = typeof halaqa.grade === "number" && !allGrades && !needle;
@@ -243,7 +254,33 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
                     ))}
                   </div>
                 )}
-                <ul className="mt-2 divide-y divide-surface-border max-h-80 overflow-y-auto rounded-xl bg-surface-card border border-surface-border">
+                {(() => {
+                  const addable = shown.filter((c) => !c.elsewhere);
+                  const picked = addable.filter((c) => pick.has(c.id));
+                  const allTicked = addable.length > 0 && picked.length === addable.length;
+                  return (
+                    addable.length > 0 && (
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setPick(allTicked ? new Set() : new Set(addable.map((c) => c.id)))}
+                          className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold underline-offset-2 hover:underline"
+                        >
+                          {allTicked ? tr("Untick all") : tr("Tick all shown")}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={picked.length === 0 || addingMany || busy !== null}
+                          onClick={() => addPicked(picked)}
+                          className="rounded-xl bg-brand-navy text-white text-[12.5px] font-semibold px-4 py-2 disabled:opacity-40 active:scale-95 transition"
+                        >
+                          {addingMany ? tr("Adding…") : picked.length > 0 ? tr("Add {count}", { count: picked.length }) : tr("+ Add")}
+                        </button>
+                      </div>
+                    )
+                  );
+                })()}
+                <ul className="mt-2 divide-y divide-surface-border max-h-80 overflow-y-auto overscroll-contain rounded-xl bg-surface-card border border-surface-border">
                   {shown.length === 0 && (
                     <li className="px-3 py-3 text-[12.5px] text-ink-muted">
                       {gradeOnly ? tr("No one else in this grade. Tap \"All grades\", or search by name.") : tr("No one found.")}
@@ -251,17 +288,22 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
                   )}
                   {shown.map((c) => (
                     <li key={c.id}>
-                      {/* The whole row adds the child: tap the name, not just the button. */}
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await change("POST", c);
-                          setQuery("");
-                        }}
-                        disabled={Boolean(c.elsewhere) || busy !== null}
-                        aria-label={tr("Add {name}", { name: c.name })}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-start transition-colors hover:bg-surface-bg-warm active:bg-surface-bg-warm disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      >
+                      <label className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors ${c.elsewhere ? "opacity-50" : "cursor-pointer hover:bg-surface-bg-warm"}`}>
+                        <input
+                          type="checkbox"
+                          checked={pick.has(c.id)}
+                          disabled={Boolean(c.elsewhere) || addingMany}
+                          onChange={() =>
+                            setPick((now) => {
+                              const next = new Set(now);
+                              if (next.has(c.id)) next.delete(c.id);
+                              else next.add(c.id);
+                              return next;
+                            })
+                          }
+                          aria-label={tr("Add {name}", { name: c.name })}
+                          className="w-5 h-5 accent-emerald-700 flex-shrink-0"
+                        />
                         <Avatar name={c.name} />
                         <div className="min-w-0 flex-1">
                           <p className="text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{c.name}</p>
@@ -271,13 +313,7 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
                             </p>
                           )}
                         </div>
-                        <span
-                          aria-hidden="true"
-                          className={`flex-shrink-0 text-[12.5px] font-semibold px-3 py-1.5 rounded-xl bg-brand-navy text-white ${c.elsewhere ? "opacity-35" : ""}`}
-                        >
-                          {busy === c.id ? tr("Adding…") : tr("+ Add")}
-                        </span>
-                      </button>
+                      </label>
                     </li>
                   ))}
                 </ul>
