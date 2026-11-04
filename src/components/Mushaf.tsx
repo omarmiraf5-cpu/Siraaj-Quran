@@ -645,8 +645,7 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     }
   }, [quranText, tr]);
 
-  const handleAyahSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const runAyahSearch = async () => {
     setAyahError("");
     const q = ayahQuery.trim();
     if (!q) { setHits(null); return; }
@@ -680,6 +679,18 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
     setHitTotal(total);
     setHits(found);
   };
+  const handleAyahSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    void runAyahSearch();
+  };
+  // Choices appear as the words are typed — no need to press Search.
+  useEffect(() => {
+    const q = ayahQuery.trim();
+    if (q.length < 2 || /^\d/.test(q)) return;
+    const t = setTimeout(() => void runAyahSearch(), 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ayahQuery]);
 
   // A page number typed in goes there as soon as typing pauses — no Enter needed.
   useEffect(() => {
