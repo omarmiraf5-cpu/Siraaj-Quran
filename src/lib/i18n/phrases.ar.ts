@@ -2192,4 +2192,10 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "One name to a line": "اسم في كل سطر",
   "Give these names to {name}": "أسند هذه الأسماء إلى {name}",
   "Choose a teacher first": "اختر معلمًا أولًا",
+  "Type it like 2:255 (surah, then ayah).": "اكتبها هكذا 2:255 (السورة ثم الآية).",
+  "has": "فيها",
+  "ayahs": "آية",
+  "Find an ayah, e.g. 2:255": "ابحث عن آية، مثل 2:255",
+  "Find an ayah": "ابحث عن آية",
+  "Go": "اذهب",
 };
