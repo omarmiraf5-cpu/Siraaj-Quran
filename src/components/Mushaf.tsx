@@ -12,7 +12,7 @@ import {
 import { useLanguage } from "@/components/LanguageProvider";
 import { SurahPicker } from "@/components/SurahPicker";
 import { pageOfPosition } from "@/lib/mushafPlan";
-import { QcfMushafPage, usePageLayout } from "./QcfMushafPage";
+import { QcfMushafPage, usePageLayout, AyahInMushafFont } from "./QcfMushafPage";
 import { RECITERS, getAudioSources, type Reciter } from "@/lib/recitation";
 
 // Arabic with its marks removed and look-alike letters merged, so words match
@@ -25,6 +25,45 @@ function foldArabicText(s: string): string {
     .replace(/ة/g, "ه")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Which words of an ayah the search words fall on (0-based, marks-free words). */
+function matchedWords(text: string, needle: string): { marks: Set<number>; count: number } {
+  const words = text.split(/\s+/).map(foldArabicText).filter(Boolean);
+  const folded = words.join(" ");
+  const marks = new Set<number>();
+  let from = 0;
+  for (;;) {
+    const at = folded.indexOf(needle, from);
+    if (at < 0) break;
+    let pos = 0;
+    words.forEach((w, i) => {
+      const start = pos;
+      const end = pos + w.length;
+      if (start < at + needle.length && end > at) marks.add(i);
+      pos = end + 1;
+    });
+    from = at + Math.max(1, needle.length);
+  }
+  return { marks, count: words.length };
+}
+
+/** The ayah's own text, with the matched words marked, for when its Mushaf glyphs can't be used. */
+function MarkedText({ text, marks }: { text: string; marks: Set<number> }) {
+  const raw = text.split(/\s+/);
+  let n = -1;
+  return (
+    <>
+      {raw.map((w, i) => {
+        if (foldArabicText(w)) n++;
+        return (
+          <span key={i} className={marks.has(n) && foldArabicText(w) ? "bg-yellow-300/80 dark:bg-yellow-500/40 rounded" : ""}>
+            {w}{" "}
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 interface HighlightRange {
@@ -628,6 +667,8 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
   const [textLoading, setTextLoading] = useState(false);
   const [hits, setHits] = useState<{ surah: number; ayah: number; text: string }[] | null>(null);
   const [hitTotal, setHitTotal] = useState(0);
+  const [hitNeedle, setHitNeedle] = useState("");
+  const [shown, setShown] = useState(10);
 
   const loadQuranText = useCallback(async () => {
     if (quranText) return quranText;
@@ -677,6 +718,8 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
       });
     });
     setHitTotal(total);
+    setHitNeedle(needle);
+    setShown(10);
     setHits(found);
   };
   const handleAyahSearch = (e: React.FormEvent) => {
@@ -784,23 +827,45 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
             </button>
           </div>
           <ul className="max-h-72 overflow-y-auto divide-y divide-surface-border">
-            {hits.map((h) => (
-              <li key={`${h.surah}:${h.ayah}`}>
-                <button
-                  type="button"
-                  onClick={() => { goTo(pageOfPosition({ surah: h.surah, ayah: h.ayah })); setHits(null); }}
-                  className="w-full text-start px-3 py-2 hover:bg-surface-bg active:bg-surface-bg"
-                >
-                  <span className="block text-[10.5px] font-semibold text-emerald-700 tabular-nums">
-                    {getSurahById(h.surah)?.englishName} {h.surah}:{h.ayah}
-                  </span>
-                  <span dir="rtl" lang="ar" className="block text-[17px] leading-8 text-ink">
-                    {h.text}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {hits.slice(0, shown).map((h) => {
+              const page = pageOfPosition({ surah: h.surah, ayah: h.ayah });
+              const m = matchedWords(h.text, hitNeedle);
+              return (
+                <li key={`${h.surah}:${h.ayah}`}>
+                  <button
+                    type="button"
+                    onClick={() => { goTo(page); setHits(null); }}
+                    className="w-full text-start px-3 py-2 hover:bg-surface-bg active:bg-surface-bg"
+                  >
+                    <span className="block text-[10.5px] font-semibold text-emerald-700 tabular-nums">
+                      {getSurahById(h.surah)?.englishName} {h.surah}:{h.ayah} · {tr("page")} {page}
+                    </span>
+                    <AyahInMushafFont
+                      page={page}
+                      surah={h.surah}
+                      ayah={h.ayah}
+                      marks={m.marks}
+                      wordCount={m.count}
+                      fallback={
+                        <span dir="rtl" lang="ar" className="block text-[17px] leading-8 text-ink">
+                          <MarkedText text={h.text} marks={m.marks} />
+                        </span>
+                      }
+                    />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
+          {hits.length > shown && (
+            <button
+              type="button"
+              onClick={() => setShown((n) => n + 10)}
+              className="w-full py-2 text-[11px] font-semibold text-emerald-700 border-t border-surface-border"
+            >
+              {tr("Show more")}
+            </button>
+          )}
         </div>
       )}
 

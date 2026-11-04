@@ -26,7 +26,7 @@ const JOINED: Record<number, number> = { 262: 0xf641, 378: 0xf7b0, 441: 0xf633 }
 
 /** A word segment's glyphs as the units the line spreads between: one
  *  glyph each, or the two halves of a joined word together. */
-function glyphUnits(chars: string, page: number): string[][] {
+export function glyphUnits(chars: string, page: number): string[][] {
   const glyphs = Array.from(chars);
   const join = JOINED[page];
   const units: string[][] = [];
@@ -76,7 +76,7 @@ const PRINT_LINE = "#2b2b2b";
 const ROSETTE = { left: 0.13, width: 0.88, top: 1.195 - 0.77, height: 1.14 };
 
 /** The pink caps and blue bud of an ayah rosette, in the glyph's own ink box (441 × 570). */
-function RosetteColour() {
+export function RosetteColour() {
   return (
     <svg
       aria-hidden
@@ -520,5 +520,97 @@ export function QcfMushafPage({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * One ayah drawn the way the Mushaf page draws it — the page's own QCF4 face,
+ * the pink-capped rosette at its end — for the search results. `marks` lists
+ * the word positions (0-based) to highlight. Shows `fallback` if the ayah's words
+ * don't line up with the text.
+ */
+export function AyahInMushafFont({
+  page,
+  surah,
+  ayah,
+  marks,
+  wordCount,
+  fallback,
+  fontSize = 26,
+}: {
+  page: number;
+  surah: number;
+  ayah: number;
+  marks: Set<number>;
+  wordCount: number;
+  fallback: React.ReactNode;
+  fontSize?: number;
+}) {
+  const layout = usePageLayout(page);
+  const [ready, setReady] = useState(false);
+  const key = `${surah}:${ayah}`;
+
+  const parts = useMemo(() => {
+    if (!layout) return null;
+    const words: string[][] = [];
+    let end: string | null = null;
+    for (const line of layout.l) {
+      for (const [kind, k, chars] of line) {
+        if (k !== key || !chars) continue;
+        if (kind === KIND_WORD) words.push(...glyphUnits(chars, page));
+        else if (kind === KIND_END) end = chars;
+      }
+    }
+    return { words, end };
+  }, [layout, key, page]);
+
+  const face = layout ? `QCF4_${String(layout.f).padStart(2, "0")}` : "";
+  useEffect(() => {
+    if (!parts || !face) return;
+    let cancelled = false;
+    const sample = parts.words[0]?.join("") ?? parts.end ?? "";
+    const reveal = () => !cancelled && setReady(true);
+    if (typeof document === "undefined" || !document.fonts || !sample) {
+      reveal();
+      return;
+    }
+    const timer = setTimeout(reveal, 4000);
+    document.fonts.load(`1em '${face}'`, sample).catch(() => {}).then(reveal);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [parts, face]);
+
+  if (layout && parts && parts.words.length !== wordCount) return <>{fallback}</>;
+  if (!layout || !parts || !ready) {
+    return <span className="block h-10 animate-pulse rounded bg-surface-bg" aria-hidden />;
+  }
+  return (
+    <span
+      dir="rtl"
+      className="flex flex-wrap items-center gap-x-0 py-1 rounded-md px-2"
+      style={{ fontFamily: `'${face}', serif`, fontSize, lineHeight: 1.7, background: "var(--mushaf-page)" }}
+    >
+      {parts.words.map((unit, i) => (
+        <span
+          key={i}
+          className={`flex-none rounded ${marks.has(i) ? "bg-yellow-300/80 dark:bg-yellow-500/40" : ""}`}
+          style={{ whiteSpace: "nowrap" }}
+        >
+          {unit.length === 1 ? (
+            unit[0]
+          ) : (
+            <span className="inline-flex">{unit.map((g, gi) => <span key={gi}>{g}</span>)}</span>
+          )}
+        </span>
+      ))}
+      {parts.end && (
+        <span className="flex-none relative" style={{ whiteSpace: "nowrap" }}>
+          <RosetteColour />
+          <span className="relative">{parts.end}</span>
+        </span>
+      )}
+    </span>
   );
 }

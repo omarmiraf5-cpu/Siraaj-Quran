@@ -2206,4 +2206,6 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Showing": "عرض",
   "of": "من",
   "ayahs found": "آية وُجدت",
+  "page": "صفحة",
+  "Show more": "عرض المزيد",
 };
