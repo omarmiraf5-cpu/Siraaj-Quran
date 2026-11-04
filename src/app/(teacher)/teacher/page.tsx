@@ -406,7 +406,14 @@ export default function TeacherDashboard() {
                     <div className="min-w-0 flex-1 basis-48 flex items-start gap-3">
                       <ColorTile name="rehal" size={36} />
                       <div className="min-w-0">
-                      <p className="text-[14px]"><HalaqaTitle label={h.label} /></p>
+                      <p className="text-[14px] flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <HalaqaTitle label={h.label} />
+                        {h.schedule && (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200 px-2 py-0.5 text-[11px] font-semibold">
+                            {h.schedule}
+                          </span>
+                        )}
+                      </p>
                       <p className="text-[11px] text-ink-muted">
                         {countLabel("{count} student|{count} students", kids.length, `${kids.length} ${t("common.students")}`)} · {marked}/{kids.length} {countLabel("{count} marked|{count} marked", marked, t("teacher.attendance.marked"))}{" "}
                         {t("teacher.dashboard.today")}

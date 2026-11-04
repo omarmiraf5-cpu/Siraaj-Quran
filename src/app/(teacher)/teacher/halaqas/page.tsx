@@ -171,10 +171,16 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
         className={`w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${open ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
       >
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">{title}</p>
+          <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">
+            {title}
+            {halaqa.schedule && (
+              <span className={`ms-2 inline-flex align-middle items-center rounded-full ${open ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"} px-2 py-0.5 text-[11px] font-semibold`}>
+                {halaqa.schedule}
+              </span>
+            )}
+          </p>
           <p className={`text-[12px] ${open ? "text-white/80" : "text-ink-muted"}`}>
             {tr("{count} students", { count: detail ? detail.members.length : halaqa.studentIds.length })}
-            {halaqa.schedule ? ` · ${halaqa.schedule}` : ""}
           </p>
         </div>
         <RowChevron open={open} />
