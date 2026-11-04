@@ -36,7 +36,10 @@ async function authorise(classId: string) {
     mine = Boolean(link);
   }
   if (!mine) return { error: NextResponse.json({ error: "That isn't your halaqa" }, { status: 403 }) };
-  return { admin, schoolId: me.school_id as string, halaqa: halaqa as { id: string; name: string } };
+  // Whether other teachers share this halaqa: then each child belongs to one
+  // of them, and only that teacher's own children are listed as theirs.
+  const { count: sharers } = await admin.from("class_teachers").select("class_id", { count: "exact", head: true }).eq("class_id", classId);
+  return { admin, userId: user.id, shared: (sharers ?? 0) > 0, schoolId: me.school_id as string, halaqa: halaqa as { id: string; name: string } };
 }
 
 /** The non-program halaqa each of these students is in already, by student id. */
@@ -55,19 +58,23 @@ export async function GET(req: NextRequest) {
   const classId = req.nextUrl.searchParams.get("class_id") ?? "";
   const ok = await authorise(classId);
   if ("error" in ok) return ok.error;
-  const { admin, schoolId, halaqa } = ok;
+  const { admin, schoolId, halaqa, userId } = ok;
   try {
     const [{ data: students }, { data: members }, elsewhere] = await Promise.all([
       admin.from("students").select("id, full_name, grade").eq("school_id", schoolId).eq("active", true).order("full_name"),
-      admin.from("class_enrollments").select("student_id").eq("class_id", classId),
+      admin.from("class_enrollments").select("student_id, teacher_id").eq("class_id", classId),
       ownHalaqas(admin, schoolId),
     ]);
-    const inHere = new Set(((members ?? []) as Array<{ student_id: string }>).map((m) => m.student_id));
+    const rows = (members ?? []) as Array<{ student_id: string; teacher_id?: string | null }>;
+    const inHere = new Set(rows.map((m) => m.student_id));
+    // A child given to another teacher of this halaqa is theirs, not mine; one
+    // nobody has been given to is everyone's.
+    const mine = new Set(rows.filter((m) => !m.teacher_id || m.teacher_id === userId).map((m) => m.student_id));
     const program = isProgramHalaqa(halaqa.name);
     const all = (students ?? []) as Array<{ id: string; full_name: string; grade: number | null }>;
     return NextResponse.json({
       halaqa: { id: halaqa.id, name: halaqa.name, program },
-      members: all.filter((s) => inHere.has(s.id)).map((s) => ({ id: s.id, name: s.full_name })),
+      members: all.filter((s) => mine.has(s.id)).map((s) => ({ id: s.id, name: s.full_name })),
       candidates: all
         .filter((s) => !inHere.has(s.id))
         .map((s) => ({ id: s.id, name: s.full_name, grade: s.grade, elsewhere: program ? null : elsewhere.get(s.id) ?? null })),
@@ -83,7 +90,7 @@ export async function POST(req: NextRequest) {
   const { class_id, student_id } = (await req.json().catch(() => ({}))) as { class_id?: string; student_id?: string };
   const ok = await authorise(String(class_id ?? ""));
   if ("error" in ok) return ok.error;
-  const { admin, schoolId, halaqa } = ok;
+  const { admin, schoolId, halaqa, userId, shared } = ok;
   try {
     const { data: student } = await admin.from("students").select("id, school_id, active").eq("id", String(student_id ?? "")).maybeSingle();
     if (!student || student.school_id !== schoolId || student.active === false) {
@@ -95,7 +102,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Already in ${elsewhere}. The school office can move them.` }, { status: 409 });
       }
     }
-    const { error } = await admin.from("class_enrollments").upsert({ class_id: halaqa.id, student_id: student.id }, { onConflict: "class_id,student_id", ignoreDuplicates: true });
+    const { error } = await admin.from("class_enrollments").upsert({ class_id: halaqa.id, student_id: student.id, ...(shared ? { teacher_id: userId } : {}) }, { onConflict: "class_id,student_id", ignoreDuplicates: true });
     if (error) throw error;
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -91,7 +91,7 @@ async function myHalaqasAll(supabase: Db): Promise<MyHalaqa[] | null> {
     // Their halaqas at the school they're in now.
     if (h.school_id !== me.school_id || groups.has(h.id)) continue;
     const label = graded
-      ? [isProgramHalaqa(h.name) ? null : gradesLabel(h.grade as number, also.get(h.id)), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).join(" · ")
+      ? [isProgramHalaqa(h.name) ? null : gradesLabel(h.grade as number, also.get(h.id)), campuses.find((c) => c.id === h.campus_id)?.name, h.name].filter(Boolean).filter((x, i, a) => a.findIndex((y) => String(y).toLowerCase() === String(x).toLowerCase()) === i).join(" · ")
       : h.name;
     groups.set(h.id, {
       id: h.id,
@@ -139,7 +139,7 @@ async function myHalaqasStepByStep(supabase: Db, userId: string): Promise<MyHala
       id: h.id,
       name: h.name,
       // A Hifd program isn't for one grade, whatever grade it's stored under.
-      label: graded ? [isProgramHalaqa(h.name) ? null : gradeLabel(h.grade as number), campus, h.name].filter(Boolean).join(" · ") : h.name,
+      label: graded ? [isProgramHalaqa(h.name) ? null : gradeLabel(h.grade as number), campus, h.name].filter(Boolean).filter((x, i, a) => a.findIndex((y) => String(y).toLowerCase() === String(x).toLowerCase()) === i).join(" · ") : h.name,
       studentIds: [],
       grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
       campus,
