@@ -33,6 +33,7 @@ import { Mushaf } from "@/components/Mushaf";
 import { SurahPicker } from "@/components/SurahPicker";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
+import { ClassGrader } from "@/components/ClassGrader";
 import { PortalHero } from "@/components/PortalHero";
 import { Modal, SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
@@ -230,6 +231,8 @@ export default function QuranAssignmentsPage() {
   // one still loading.
   // Where each of the teacher's students sits — "Grade 3 · North · Halaqa A" — for grouping the list.
   const [placeOf, setPlaceOf] = useState<Record<string, string>>({});
+  // Each halaqa's class time, by the same name placeOf gives it.
+  const [schedules, setSchedules] = useState<Record<string, string>>({});
   const [listGroup, setListGroup] = useState("");
   const [planSummaries, setPlanSummaries] = useState<Record<string, PlanSummaryDto>>({});
   const [confirmingSurah, setConfirmingSurah] = useState<string | null>(null);
@@ -369,6 +372,7 @@ export default function QuranAssignmentsPage() {
         const studentData = mine ? (allStudentData ?? []).filter((s) => mine.has(s.id)) : allStudentData;
 
         if (mine) setPlaceOf(Object.fromEntries(mine));
+        if (myGroups) setSchedules(Object.fromEntries(myGroups.filter((h) => h.schedule).map((h) => [h.label, h.schedule as string])));
         if (studentData) {
           setStudents(studentData);
           // Real students weren't fed into `roster` at all here, which
@@ -1072,9 +1076,9 @@ export default function QuranAssignmentsPage() {
   };
 
   // `quick` grades a piece straight from its row — "Did not recite" — leaving its note alone.
-  const saveEdit = async (a: QuranicAssignment, quick?: DailyRating) => {
+  const saveEdit = async (a: QuranicAssignment, quick?: DailyRating | null, note?: string | null) => {
     const rating = quick !== undefined ? quick : draftRating;
-    const noteText = quick !== undefined ? a.teacher_notes ?? null : draftNotes.trim() || null;
+    const noteText = note !== undefined ? note : quick !== undefined ? a.teacher_notes ?? null : draftNotes.trim() || null;
     setSavingEdit(true);
     const patch: AssignmentOverride = {
       daily_rating: rating,
@@ -2006,6 +2010,22 @@ export default function QuranAssignmentsPage() {
           </div>
         );
       })}
+
+      {/* Grade a whole halaqa from one screen: tap a rating and it is saved. */}
+      {listReady && allAssignments.some((a) => a.status !== "completed") && (
+        <SectionCard title={tr("Grade today's class")} note={tr("Tap a rating — it saves at once.")}>
+          <ClassGrader
+            roster={roster}
+            groups={groupNames.map((g) => ({
+              name: g,
+              label: g === NO_PLACE ? tr("Other students") : g,
+              schedule: schedules[g] ?? null,
+              items: allAssignments.filter((a) => (placeOf[a.student_id] ?? NO_PLACE) === g),
+            }))}
+            onGrade={(a, rating, note) => saveEdit(a, rating, note)}
+          />
+        </SectionCard>
+      )}
 
       {/* What has already been set. Sample data until the school has its own
           records; the create form above writes real ones once a teacher is
