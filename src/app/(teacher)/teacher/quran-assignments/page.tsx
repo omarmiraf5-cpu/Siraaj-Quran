@@ -1934,7 +1934,7 @@ export default function QuranAssignmentsPage() {
             have to ask for it every time. It follows the fields live, so
             correcting an ayah number redraws it. */}
         {wide && (
-        <div className="lg:sticky lg:top-10 lg:self-start">
+        <div className="lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto">
           {canPreview ? (
             <div className="card-quiet p-5 overflow-hidden">
               <h2 className="page-title text-lg">{previewTitle}</h2>
