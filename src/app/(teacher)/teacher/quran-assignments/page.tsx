@@ -1235,55 +1235,6 @@ export default function QuranAssignmentsPage() {
         }
       />
 
-      {Object.entries(planSummaries).flatMap(([studentId, summary]) => {
-        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? tr("A student");
-        return summary.alerts.map((a) => (
-          <PlanAlertBanner
-            key={`${studentId}:${a.code}`}
-            level={a.level}
-            title={`${studentLabel}: ${translateAlert(a).title}`}
-            detail={translateAlert(a).detail}
-          />
-        ));
-      })}
-
-      {Object.entries(planSummaries).map(([studentId, summary]) => {
-        if (!summary.pending_confirmation) return null;
-        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? tr("A student");
-        const { surah } = summary.pending_confirmation;
-        const surah_name = getSurahById(surah)?.englishName ?? summary.pending_confirmation.surah_name;
-        const key = `${studentId}:${surah}`;
-        return (
-          <div
-            key={key}
-            role="alert"
-            className="rounded-[18px] border px-5 py-4 flex items-start gap-3.5"
-            style={{ borderColor: "#b8860b44", background: "#b8860b0f" }}
-          >
-            <span aria-hidden className="w-[3px] self-stretch rounded-full bg-amber-600" />
-            <AlertGlyph colour="#b8860b" />
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold tracking-tight text-amber-700">
-                {tr("{studentLabel} has reached the end of {surah_name} — test the whole surah", { studentLabel, surah_name })}
-              </p>
-              <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
-                {tr("Once {studentLabel} has recited all of {surah_name} to you, confirm it here. The next lesson won't be scheduled until you do.", { studentLabel, surah_name })}
-              </p>
-              {/* Under the words rather than beside them, so on a phone the
-                  message keeps the card's full width. */}
-              <button
-                type="button"
-                onClick={() => confirmSurah(studentId, surah)}
-                disabled={confirmingSurah === key}
-                className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 border border-amber-600/40 rounded-full px-3 py-1.5"
-              >
-                {confirmingSurah === key ? tr("Saving…") : tr("Confirm tested")}
-              </button>
-            </div>
-          </div>
-        );
-      })}
-
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         {/* Form */}
         <form onSubmit={handleSubmit} className="card-quiet p-5 space-y-5">
@@ -1764,7 +1715,7 @@ export default function QuranAssignmentsPage() {
                   setAyahEnd(e.target.value);
                   if (e.target.value) queuePreview();
                 }}
-                placeholder={maxAyahsEnd.toString()}
+                placeholder={maxAyahsEnd > 0 ? maxAyahsEnd.toString() : ""}
                 className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
               />
             </div>
@@ -1865,6 +1816,9 @@ export default function QuranAssignmentsPage() {
             </div>
           </div>
 
+          {/* The due date only matters for homework, so it stays out of the way
+              when the lesson is being done in class today. */}
+          {(forWhen === "homework" || dueDate) && (
           <div>
             <label className="block text-sm font-semibold text-ink mb-2">
               {forWhen === "homework" ? tr("Due Date") : tr("Due Date (optional)")}
@@ -1879,6 +1833,7 @@ export default function QuranAssignmentsPage() {
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             />
           </div>
+          )}
 
           {/* More work in the same save: homework, a recent revision, an old revision. */}
           <div className="space-y-3">
@@ -2000,6 +1955,57 @@ export default function QuranAssignmentsPage() {
         </div>
         )}
       </div>
+
+      {/* Notices about a child's plan sit below the form, so setting a lesson
+          is the first thing on the page. */}
+      {Object.entries(planSummaries).flatMap(([studentId, summary]) => {
+        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? tr("A student");
+        return summary.alerts.map((a) => (
+          <PlanAlertBanner
+            key={`${studentId}:${a.code}`}
+            level={a.level}
+            title={`${studentLabel}: ${translateAlert(a).title}`}
+            detail={translateAlert(a).detail}
+          />
+        ));
+      })}
+
+      {Object.entries(planSummaries).map(([studentId, summary]) => {
+        if (!summary.pending_confirmation) return null;
+        const studentLabel = students.find((s) => s.id === studentId)?.full_name ?? tr("A student");
+        const { surah } = summary.pending_confirmation;
+        const surah_name = getSurahById(surah)?.englishName ?? summary.pending_confirmation.surah_name;
+        const key = `${studentId}:${surah}`;
+        return (
+          <div
+            key={key}
+            role="alert"
+            className="rounded-[18px] border px-5 py-4 flex items-start gap-3.5"
+            style={{ borderColor: "#b8860b44", background: "#b8860b0f" }}
+          >
+            <span aria-hidden className="w-[3px] self-stretch rounded-full bg-amber-600" />
+            <AlertGlyph colour="#b8860b" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold tracking-tight text-amber-700">
+                {tr("{studentLabel} has reached the end of {surah_name} — test the whole surah", { studentLabel, surah_name })}
+              </p>
+              <p className="text-[13px] text-ink-body mt-1 leading-relaxed">
+                {tr("Once {studentLabel} has recited all of {surah_name} to you, confirm it here. The next lesson won't be scheduled until you do.", { studentLabel, surah_name })}
+              </p>
+              {/* Under the words rather than beside them, so on a phone the
+                  message keeps the card's full width. */}
+              <button
+                type="button"
+                onClick={() => confirmSurah(studentId, surah)}
+                disabled={confirmingSurah === key}
+                className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 hover:text-amber-900 disabled:opacity-40 border border-amber-600/40 rounded-full px-3 py-1.5"
+              >
+                {confirmingSurah === key ? tr("Saving…") : tr("Confirm tested")}
+              </button>
+            </div>
+          </div>
+        );
+      })}
 
       {/* What has already been set. Sample data until the school has its own
           records; the create form above writes real ones once a teacher is
