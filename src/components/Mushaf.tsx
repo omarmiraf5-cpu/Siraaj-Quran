@@ -15,6 +15,18 @@ import { pageOfPosition } from "@/lib/mushafPlan";
 import { QcfMushafPage, usePageLayout } from "./QcfMushafPage";
 import { RECITERS, getAudioSources, type Reciter } from "@/lib/recitation";
 
+// Arabic with its marks removed and look-alike letters merged, so words match
+// however they are typed: "إِنَّ ٱلَّذِينَ" and "ان الذين" are the same.
+function foldArabicText(s: string): string {
+  return s
+    .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, "")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 interface HighlightRange {
   surah: number;
   start: number;
@@ -607,24 +619,66 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
   const atStart = (isSpread ? rightPage : currentPage) <= 1;
   const atEnd = (isSpread ? leftPageNum : currentPage) >= TOTAL_PAGES;
 
-  // Find an ayah: "2:255", "2 255" or "18:10". Jumps to the page it is on.
+  // Find an ayah by its words ("ان الذين", with or without the marks) or by
+  // its number ("2:255"). Every ayah containing the words is listed; tapping
+  // one opens its page.
   const [ayahQuery, setAyahQuery] = useState("");
   const [ayahError, setAyahError] = useState("");
-  const handleAyahSearch = (e: React.FormEvent) => {
+  const [quranText, setQuranText] = useState<string[][] | null>(null);
+  const [textLoading, setTextLoading] = useState(false);
+  const [hits, setHits] = useState<{ surah: number; ayah: number; text: string }[] | null>(null);
+  const [hitTotal, setHitTotal] = useState(0);
+
+  const loadQuranText = useCallback(async () => {
+    if (quranText) return quranText;
+    setTextLoading(true);
+    try {
+      const r = await fetch("/mushaf/search.json");
+      const data = (await r.json()) as string[][];
+      setQuranText(data);
+      return data;
+    } catch {
+      setAyahError(tr("Could not load the Quran text. Check your connection."));
+      return null;
+    } finally {
+      setTextLoading(false);
+    }
+  }, [quranText, tr]);
+
+  const handleAyahSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const m = ayahQuery.trim().match(/^(\d{1,3})\s*[:.\-\s/]\s*(\d{1,3})$/);
-    const surah = m ? getSurahById(parseInt(m[1])) : undefined;
-    const ayah = m ? parseInt(m[2]) : 0;
-    if (!m || !surah) {
-      setAyahError(tr("Type it like 2:255 (surah, then ayah)."));
-      return;
-    }
-    if (ayah < 1 || ayah > surah.ayahs) {
-      setAyahError(`${surah.englishName} ${tr("has")} ${surah.ayahs} ${tr("ayahs")}.`);
-      return;
-    }
     setAyahError("");
-    goTo(pageOfPosition({ surah: surah.id, ayah }));
+    const q = ayahQuery.trim();
+    if (!q) { setHits(null); return; }
+    const m = q.match(/^(\d{1,3})\s*[:.\-\s/]\s*(\d{1,3})$/);
+    if (m) {
+      const surah = getSurahById(parseInt(m[1]));
+      const ayah = parseInt(m[2]);
+      if (!surah) { setAyahError(tr("There are only 114 surahs.")); return; }
+      if (ayah < 1 || ayah > surah.ayahs) {
+        setAyahError(`${surah.englishName} ${tr("has")} ${surah.ayahs} ${tr("ayahs")}.`);
+        return;
+      }
+      setHits(null);
+      goTo(pageOfPosition({ surah: surah.id, ayah }));
+      return;
+    }
+    const needle = foldArabicText(q);
+    if (!needle) { setAyahError(tr("Type Arabic words, or a number like 2:255.")); return; }
+    const data = await loadQuranText();
+    if (!data) return;
+    const found: { surah: number; ayah: number; text: string }[] = [];
+    let total = 0;
+    data.forEach((verses, si) => {
+      verses.forEach((text, ai) => {
+        if (foldArabicText(text).includes(needle)) {
+          total++;
+          if (found.length < 60) found.push({ surah: si + 1, ayah: ai + 1, text });
+        }
+      });
+    });
+    setHitTotal(total);
+    setHits(found);
   };
 
   // A page number typed in goes there as soon as typing pauses — no Enter needed.
@@ -689,20 +743,55 @@ export function Mushaf({ initialPage = 1, highlightedRange }: MushafProps) {
         </form>
       </div>
 
-      {/* Find an ayah */}
+      {/* Find an ayah — by its words or by its number */}
       <form onSubmit={handleAyahSearch} className="flex items-center gap-1.5">
         <input
           value={ayahQuery}
-          onChange={(e) => { setAyahQuery(e.target.value); setAyahError(""); }}
-          placeholder={tr("Find an ayah, e.g. 2:255")}
+          onChange={(e) => { setAyahQuery(e.target.value); setAyahError(""); if (!e.target.value.trim()) setHits(null); }}
+          placeholder={tr("Search an ayah: type words or 2:255")}
           aria-label={tr("Find an ayah")}
+          enterKeyHint="search"
           className="flex-1 min-w-0 bg-surface-card border border-surface-border rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
         />
-        <button type="submit" className="px-3 py-1 rounded-md bg-emerald-600 text-white text-[11px] font-semibold active:scale-95">
-          {tr("Go")}
+        <button type="submit" disabled={textLoading} className="px-3 py-1 rounded-md bg-emerald-600 text-white text-[11px] font-semibold active:scale-95 disabled:opacity-60">
+          {textLoading ? tr("Searching…") : tr("Search")}
         </button>
       </form>
       {ayahError && <p className="text-[11px] text-red-600">{ayahError}</p>}
+      {hits && (
+        <div className="rounded-lg border border-surface-border bg-surface-card">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-surface-border">
+            <span className="text-[11px] font-semibold text-ink">
+              {hitTotal === 0
+                ? tr("No ayah found")
+                : hitTotal > hits.length
+                  ? `${tr("Showing")} ${hits.length} ${tr("of")} ${hitTotal}`
+                  : `${hitTotal} ${tr("ayahs found")}`}
+            </span>
+            <button type="button" onClick={() => setHits(null)} className="text-[11px] text-ink-muted underline">
+              {tr("Close")}
+            </button>
+          </div>
+          <ul className="max-h-72 overflow-y-auto divide-y divide-surface-border">
+            {hits.map((h) => (
+              <li key={`${h.surah}:${h.ayah}`}>
+                <button
+                  type="button"
+                  onClick={() => { goTo(pageOfPosition({ surah: h.surah, ayah: h.ayah })); setHits(null); }}
+                  className="w-full text-start px-3 py-2 hover:bg-surface-bg active:bg-surface-bg"
+                >
+                  <span className="block text-[10.5px] font-semibold text-emerald-700 tabular-nums">
+                    {getSurahById(h.surah)?.englishName} {h.surah}:{h.ayah}
+                  </span>
+                  <span dir="rtl" lang="ar" className="block text-[17px] leading-8 text-ink">
+                    {h.text}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Playback controls — apply to a tapped ayah, a page, a surah name or
           a chosen section. Picking a qari here means playback never has to

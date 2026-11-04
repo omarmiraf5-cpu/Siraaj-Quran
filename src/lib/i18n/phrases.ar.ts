@@ -2198,4 +2198,12 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Find an ayah, e.g. 2:255": "ابحث عن آية، مثل 2:255",
   "Find an ayah": "ابحث عن آية",
   "Go": "اذهب",
+  "Could not load the Quran text. Check your connection.": "تعذّر تحميل نص القرآن. تحقق من اتصالك.",
+  "There are only 114 surahs.": "عدد السور 114 سورة فقط.",
+  "Type Arabic words, or a number like 2:255.": "اكتب كلمات عربية، أو رقمًا مثل 2:255.",
+  "Search an ayah: type words or 2:255": "ابحث عن آية: اكتب كلمات أو 2:255",
+  "No ayah found": "لم يُعثر على آية",
+  "Showing": "عرض",
+  "of": "من",
+  "ayahs found": "آية وُجدت",
 };
