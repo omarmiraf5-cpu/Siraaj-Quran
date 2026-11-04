@@ -174,6 +174,7 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
           <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">{title}</p>
           <p className={`text-[12px] ${open ? "text-white/80" : "text-ink-muted"}`}>
             {tr("{count} students", { count: detail ? detail.members.length : halaqa.studentIds.length })}
+            {halaqa.schedule ? ` · ${halaqa.schedule}` : ""}
           </p>
         </div>
         <RowChevron open={open} />

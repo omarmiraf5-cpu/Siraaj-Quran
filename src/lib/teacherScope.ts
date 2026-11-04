@@ -33,6 +33,8 @@ export interface MyHalaqa {
   /** Other grades it takes as well (a halaqa of Grades 8 and 9). */
   alsoGrades?: number[];
   campus?: string | null;
+  /** When it meets, as the office wrote it ("9:30–10:30 am"). */
+  schedule?: string | null;
 }
 
 /**
@@ -65,8 +67,8 @@ async function myHalaqasAll(supabase: Db): Promise<MyHalaqa[] | null> {
   // whether it keeps grades), the halaqas they lead and share, each with its
   // children. Asked step by step instead, as below, that was four round
   // trips one after another before a teacher's dashboard could show.
-  const COLS = "id, name, grade, campus_id, school_id, class_enrollments(student_id)";
-  type Row = { id: string; name: string; grade?: number; campus_id?: string | null; school_id: string; class_enrollments?: { student_id: string }[] };
+  const COLS = "id, name, grade, campus_id, school_id, schedule, class_enrollments(student_id)";
+  type Row = { id: string; name: string; grade?: number; campus_id?: string | null; school_id: string; schedule?: string | null; class_enrollments?: { student_id: string }[] };
   const [meRes, leadRes, shareRes, campuses, also] = await Promise.all([
     supabase.from("profiles").select("school_id, schools!profiles_school_id_fkey(organised_by_grade)").eq("id", user.id).maybeSingle(),
     supabase.from("classes").select(COLS).eq("teacher_id", user.id),
@@ -98,6 +100,7 @@ async function myHalaqasAll(supabase: Db): Promise<MyHalaqa[] | null> {
       studentIds: [...new Set((h.class_enrollments ?? []).map((e) => e.student_id))],
       grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
       alsoGrades: graded && !isProgramHalaqa(h.name) ? also.get(h.id) ?? [] : [],
+      schedule: h.schedule ?? null,
       campus: graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null,
     });
   }
@@ -123,13 +126,13 @@ async function myHalaqasStepByStep(supabase: Db, userId: string): Promise<MyHala
 
   const [{ data: halaqas }, { data: enrolments }, campuses] = await Promise.all([
     graded
-      ? supabase.from("classes").select("id, name, grade, campus_id, school_id").in("id", ids)
-      : supabase.from("classes").select("id, name, school_id").in("id", ids),
+      ? supabase.from("classes").select("id, name, grade, campus_id, school_id, schedule").in("id", ids)
+      : supabase.from("classes").select("id, name, school_id, schedule").in("id", ids),
     supabase.from("class_enrollments").select("class_id, student_id").in("class_id", ids),
     graded ? loadCampuses(supabase) : Promise.resolve([]),
   ]);
   const groups = new Map<string, MyHalaqa>();
-  for (const h of (halaqas ?? []) as Array<{ id: string; name: string; grade?: number; campus_id?: string | null; school_id: string }>) {
+  for (const h of (halaqas ?? []) as Array<{ id: string; name: string; grade?: number; campus_id?: string | null; school_id: string; schedule?: string | null }>) {
     if (h.school_id !== me.school_id) continue;
     const campus = graded ? campuses.find((c) => c.id === h.campus_id)?.name ?? null : null;
     groups.set(h.id, {
@@ -140,6 +143,7 @@ async function myHalaqasStepByStep(supabase: Db, userId: string): Promise<MyHala
       studentIds: [],
       grade: graded && !isProgramHalaqa(h.name) ? h.grade ?? null : null,
       campus,
+      schedule: h.schedule ?? null,
     });
   }
   for (const e of enrolments ?? []) {
