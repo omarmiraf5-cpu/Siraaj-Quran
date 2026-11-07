@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/adminAccounts";
@@ -133,12 +133,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Each new parent's welcome, naming their children — after the answer.
+    // Each new parent's welcome, naming their children. Waited for, so that
+    // if the email service refuses them the office is told why instead of
+    // being told they were sent.
+    let email: { sent: number; problem?: string } = { sent: 0 };
     if (parents.welcomes.length > 0) {
       const { data: school } = await admin.from("schools").select("name").eq("id", schoolId).maybeSingle();
-      after(() => sendAccountWelcomes(parents.welcomes, { name: school?.name ?? "Your school", replyTo: user.email }));
+      const told = await sendAccountWelcomes(parents.welcomes, { name: school?.name ?? "Your school", replyTo: user.email });
+      email = told.ok ? { sent: parents.welcomes.length } : { sent: 0, problem: told.reason };
     }
-    return NextResponse.json({ results });
+    return NextResponse.json({ results, email });
   } catch (error) {
     console.error("Parents import failed", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "The import failed" }, { status: 500 });

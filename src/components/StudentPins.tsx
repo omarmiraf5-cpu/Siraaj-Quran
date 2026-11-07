@@ -43,6 +43,62 @@ export default function StudentPins({
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
+  // "Repair sign-ins": students who have a PIN that still doesn't work.
+  const [repair, setRepair] = useState<{ running: boolean; checked: number; fixed: Array<{ name: string; what: string }>; failed: Array<{ name: string; error: string }>; done: boolean; error?: string } | null>(null);
+
+  const repairAll = async () => {
+    setRepair({ running: true, checked: 0, fixed: [], failed: [], done: false });
+    let after = "";
+    let checked = 0;
+    const fixed: Array<{ name: string; what: string }> = [];
+    const failedList: Array<{ name: string; error: string }> = [];
+    for (let round = 0; round < 200; round++) {
+      try {
+        const res = await fetch("/api/admin/student-repair", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ after }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { checked?: number; repaired?: Array<{ name: string; what: string }>; failed?: Array<{ name: string; error: string }>; next?: string | null; error?: string };
+        if (!res.ok) throw new Error(body.error ?? "That didn't go through");
+        checked += body.checked ?? 0;
+        fixed.push(...(body.repaired ?? []));
+        failedList.push(...(body.failed ?? []));
+        setRepair({ running: true, checked, fixed: [...fixed], failed: [...failedList], done: false });
+        if (!body.next) break;
+        after = body.next;
+      } catch (e) {
+        setRepair({ running: false, checked, fixed, failed: failedList, done: true, error: e instanceof Error ? e.message : "That didn't go through" });
+        return;
+      }
+    }
+    setRepair({ running: false, checked, fixed, failed: failedList, done: true });
+  };
+
+  const repairBox = repair && (
+    <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5 text-[12.5px] space-y-1.5">
+      {repair.running ? (
+        <p className="font-semibold text-ink">{tr("Checking sign-ins… {count} checked", { count: repair.checked })}</p>
+      ) : (
+        <p className="font-semibold text-ink">
+          {tr("Checked {checked} sign-ins. {fixed} put right.", { checked: repair.checked, fixed: repair.fixed.length })}
+        </p>
+      )}
+      {repair.fixed.length > 0 && (
+        <p className="text-ink-muted">
+          {repair.fixed.slice(0, 8).map((f) => `${f.name} (${f.what})`).join("; ")}
+          {repair.fixed.length > 8 ? "…" : ""}
+        </p>
+      )}
+      {repair.failed.length > 0 && (
+        <p className="text-status-error-text">
+          {tr("Couldn't repair {count}:", { count: repair.failed.length })} {repair.failed.slice(0, 5).map((f) => f.name).join(", ")} — {repair.failed[0].error}
+        </p>
+      )}
+      {repair.error && <p className="text-status-error-text">{repair.error}</p>}
+      {repair.done && <p className="text-ink-muted">{tr("Nobody's PIN was changed.")}</p>}
+    </div>
+  );
 
   useEffect(() => {
     supabase
@@ -109,7 +165,11 @@ export default function StudentPins({
         {tr("Every student has a sign-in PIN.")}{" "}
         <button type="button" onClick={printEveryone} disabled={printing} className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
           {printing ? tr("Getting them…") : tr("Print everyone's PINs")}
+        </button>{" "}·{" "}
+        <button type="button" onClick={repairAll} disabled={repair?.running} className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
+          {tr("A PIN doesn't work? Repair sign-ins")}
         </button>
+        {repairBox && <span className="block mt-2">{repairBox}</span>}
       </p>
     );
   }
@@ -124,11 +184,17 @@ export default function StudentPins({
             </p>
             <p className="text-[12px] text-ink-muted">{tr("They have no PIN. Give them all one at once, then print the list to hand out.")}</p>
           </div>
-          <button type="button" onClick={giveAll} className={primary}>
-            {tr("Give them PINs")}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={giveAll} className={primary}>
+              {tr("Give them PINs")}
+            </button>
+            <button type="button" onClick={repairAll} disabled={repair?.running} className={ghost}>
+              {tr("Repair sign-ins")}
+            </button>
+          </div>
         </div>
       )}
+      {phase === "idle" && repairBox}
 
       {phase === "giving" && (
         <div>

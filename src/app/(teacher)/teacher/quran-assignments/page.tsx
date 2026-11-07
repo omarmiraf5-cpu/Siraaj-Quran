@@ -34,6 +34,7 @@ import { SurahPicker } from "@/components/SurahPicker";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
 import { ClassGrader } from "@/components/ClassGrader";
+import { pagesToRange } from "@/lib/pageRange";
 import { PortalHero } from "@/components/PortalHero";
 import { Modal, SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
 import { PlanAlertBanner, AlertGlyph } from "@/components/yearly-plan-ui";
@@ -135,25 +136,6 @@ interface ExtraPiece {
   due: string;
 }
 
-/** Mushaf pages to the surah and ayahs they cover — from the first ayah of the first page to the last of the last. */
-function pagesToRange(from: number, to: number) {
-  const first = Math.max(1, Math.min(TOTAL_PAGES, from));
-  const last = Math.max(first, Math.min(TOTAL_PAGES, to || first));
-  const [s1, a1] = PAGE_STARTS[first - 1];
-  let sEnd = 114;
-  let aEnd = getSurahById(114)?.ayahs ?? 6;
-  if (last < TOTAL_PAGES) {
-    const [ns, na] = PAGE_STARTS[last];
-    if (na > 1) {
-      sEnd = ns;
-      aEnd = na - 1;
-    } else {
-      sEnd = ns - 1;
-      aEnd = getSurahById(sEnd)?.ayahs ?? 1;
-    }
-  }
-  return { first, last, surah: s1, ayahStart: a1, surahEnd: sEnd, ayahEnd: aEnd };
-}
 const EXTRA_KINDS: ExtraKind[] = ["homework", "recent", "old"];
 // The student picker's "everyone in this group" choice.
 const EVERYONE = "__everyone__";
@@ -1196,6 +1178,65 @@ export default function QuranAssignmentsPage() {
     }
   };
 
+  // A child recited something nobody had set for them: it is recorded as
+  // given and graded in one go — a new lesson or a revision, by surah and
+  // ayahs or by pages — so the record is complete without setting it first.
+  const recordNow = async (
+    studentId: string,
+    piece: { portion: HifzPortion; surah: number; ayah_start: number; surah_end: number; ayah_end: number },
+    rating: DailyRating,
+    note: string | null
+  ) => {
+    if (isDemo) {
+      const row: QuranicAssignment = {
+        id: `local-rec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        student_id: studentId,
+        teacher_id: "t1",
+        ...piece,
+        assigned_at: DEMO_TODAY,
+        due_date: null,
+        status: statusForRating(rating),
+        memorization_level: 0,
+        daily_rating: rating,
+        teacher_notes: note,
+        student_notes: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      const next = [row, ...demoCreated];
+      setDemoCreated(next);
+      writeDemoStore(DEMO_CREATED_KEY, next);
+      const nextLog = [
+        ...log,
+        { id: `local-log-${row.id}`, student_id: studentId, portion: piece.portion, surah: piece.surah, ayah_start: piece.ayah_start, surah_end: piece.surah_end, ayah_end: piece.ayah_end, rating, notes: note, date: DEMO_TODAY },
+      ];
+      setLog(nextLog);
+      writeDemoStore(LOG_KEY, nextLog);
+      return;
+    }
+    const res = await fetch("/api/quranic-assignments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ student_id: studentId, ...piece, due_date: null, teacher_notes: note }),
+    });
+    const made = res.ok ? await res.json().catch(() => null) : null;
+    if (!res.ok || !made?.id) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.error || phrase("Couldn't save that. Please try again."));
+    }
+    await fetch(`/api/quranic-assignments/${made.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ daily_rating: rating, teacher_notes: note }),
+    });
+    await fetch("/api/recitation-log", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ student_id: studentId, ...piece, rating, notes: note }),
+    });
+    await Promise.all([refreshAssignments(), syncOneStudent(studentId), loadRealLog()]);
+  };
+
   // The grades among this teacher's students, lowest first — the chips
   // above the student list, shown only when there's more than one.
   const grades = graded
@@ -2093,7 +2134,7 @@ export default function QuranAssignmentsPage() {
       })}
 
       {/* Grade a whole halaqa from one screen: tap a rating and it is saved. */}
-      {listReady && allAssignments.some((a) => a.status !== "completed") && (
+      {listReady && (allAssignments.some((a) => a.status !== "completed") || students.length > 0) && (
         <SectionCard title={tr("Grade today's class")} note={tr("Tap a rating — it saves at once.")}>
           <ClassGrader
             roster={roster}
@@ -2102,8 +2143,12 @@ export default function QuranAssignmentsPage() {
               label: g === NO_PLACE ? tr("Other students") : g,
               schedule: schedules[g] ?? null,
               items: allAssignments.filter((a) => (placeOf[a.student_id] ?? NO_PLACE) === g),
+              members: students
+                .filter((st) => (placeOf[st.id] ?? NO_PLACE) === g)
+                .map((st) => ({ id: st.id, name: st.full_name })),
             }))}
             onGrade={(a, rating, note) => saveEdit(a, rating, note)}
+            onRecord={recordNow}
           />
         </SectionCard>
       )}

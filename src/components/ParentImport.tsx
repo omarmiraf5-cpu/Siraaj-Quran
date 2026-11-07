@@ -61,6 +61,8 @@ export default function ParentImport({
   const [reading, setReading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<RowResult[]>([]);
+  // Whether the welcome emails really went out, as the server found.
+  const [mail, setMail] = useState<{ sent: number; problem?: string }>({ sent: 0 });
 
   useEffect(() => {
     mySchool<{ name: string }>(supabase, "name").then((data) => setSchoolName(data?.name ?? ""));
@@ -152,6 +154,8 @@ export default function ParentImport({
     if (current.length > 0) batches.push(current);
 
     let sent = 0;
+    let mailSent = 0;
+    let mailProblem = "";
     for (const batch of batches) {
       let answer: RowResult[] | null = null;
       for (let attempt = 0; attempt < 2 && !answer; attempt++) {
@@ -162,7 +166,14 @@ export default function ParentImport({
             body: JSON.stringify({ rows: batch }),
           });
           const body = await res.json().catch(() => ({}));
-          if (res.ok && Array.isArray(body.results)) answer = body.results;
+          if (res.ok && Array.isArray(body.results)) {
+            answer = body.results;
+            const e = body.email as { sent?: number; problem?: string } | undefined;
+            if (e) {
+              mailSent += e.sent ?? 0;
+              if (e.problem && !mailProblem) mailProblem = e.problem;
+            }
+          }
           else if (res.status < 500) answer = batch.map((r) => ({ child: r.child, status: "failed" as const, reason: body.error ?? phrase("Not linked") }));
         } catch {
           // Tried again.
@@ -181,6 +192,7 @@ export default function ParentImport({
       setResults([...out]);
     }
     setResults([...out]);
+    setMail({ sent: mailSent, ...(mailProblem ? { problem: mailProblem } : {}) });
     setPhase("done");
     onDone();
   };
@@ -297,11 +309,18 @@ export default function ParentImport({
             })}
             {newParents.length > 0 && (
               <>
-                {tr(", ")}<strong>{tr("{count} new login|{count} new logins", { count: newParents.length })}</strong>{" "}{tr("emailed")}
+                {tr(", ")}<strong>{tr("{count} new login|{count} new logins", { count: newParents.length })}</strong>{" "}{mail.problem ? tr("made") : tr("emailed")}
               </>
             )}
             .{already.length > 0 && <span className="text-ink-muted"> {tr("{count} were linked already.", { count: already.length })}</span>}
           </p>
+          {mail.problem && newParents.length > 0 && (
+            <div className="rounded-2xl border border-status-error-text/30 bg-status-error-bg p-3 text-[12.5px] text-ink space-y-1">
+              <p className="font-semibold">{tr("The welcome emails did NOT send.")}</p>
+              <p>{mail.problem}</p>
+              <p>{tr("Their logins were made. Print the logins below and hand them to the parents, or fix the email setup and use “Email a reset link” on each parent (Parents page).")}</p>
+            </div>
+          )}
           {failed.length > 0 && (
             <div className="rounded-2xl border border-status-error-text/30 bg-status-error-bg p-3 text-[12.5px] text-ink space-y-0.5">
               <p className="font-semibold">{tr("{count} not linked:", { count: failed.length })}</p>
