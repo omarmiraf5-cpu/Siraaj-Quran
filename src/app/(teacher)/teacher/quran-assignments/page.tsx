@@ -122,6 +122,8 @@ const LOG_KEY = "demo_recitation_log_v1";
 
 type ExtraKind = "homework" | "recent" | "old";
 interface ExtraPiece {
+  /** Several revision surahs can be given at once, so a piece has its own id. */
+  id: string;
   kind: ExtraKind;
   surah: string;
   start: string;
@@ -243,8 +245,8 @@ export default function QuranAssignmentsPage() {
   // revision — each with its own surah, ayahs and due date. A hifz day is
   // usually the three portions together.
   const [extras, setExtras] = useState<ExtraPiece[]>([]);
-  const updateExtra = (kind: ExtraKind, patch: Partial<ExtraPiece>) =>
-    setExtras((list) => list.map((x) => (x.kind === kind ? { ...x, ...patch } : x)));
+  const updateExtra = (id: string, patch: Partial<ExtraPiece>) =>
+    setExtras((list) => list.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -491,7 +493,7 @@ export default function QuranAssignmentsPage() {
       const createdIds: string[] = [];
       // One child, or everyone under the chip that's on.
       const inGroup = students.filter((s) => inFilter(s, gradeFilter));
-      const everyone = selectedStudent === EVERYONE && !gradeFilter.startsWith("p:");
+      const everyone = selectedStudent === EVERYONE;
       const targets = everyone ? inGroup.map((s) => s.id) : [selectedStudent];
       if (targets.length === 0) throw new Error(phrase("There's no one in this group yet."));
       const groupName = chips.find((c) => c.key === gradeFilter)?.label ?? "";
@@ -975,11 +977,12 @@ export default function QuranAssignmentsPage() {
     const next = parseInt(ayahEnd) + 1;
     const sameSurah = selectedSurah && !spansSurah;
     setExtras((list) =>
-      list.some((x) => x.kind === k)
+      k === "homework" && list.some((x) => x.kind === "homework")
         ? list
         : [
             ...list,
             {
+              id: `${k}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               kind: k,
               surah: k === "homework" ? selectedSurah : "",
               start: k === "homework" && sameSurah && next && next <= (selectedSurahData?.ayahs ?? 0) ? String(next) : "",
@@ -1279,9 +1282,9 @@ export default function QuranAssignmentsPage() {
               className="w-full bg-surface-card border border-surface-border rounded-2xl px-4 py-3 text-ink focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/40 transition"
             >
               <option value="">{tr("Select a student")}</option>
-              {/* Only for a grade, where the class learns the same surah together —
-                  never a Hifd class, where every child is at their own place. */}
-              {gradeFilter && !gradeFilter.startsWith("p:") && students.some((s) => inFilter(s, gradeFilter)) && (
+              {/* The whole group at once — a class learning the same surah, or a
+                  Hifd class given the same review surahs. */}
+              {gradeFilter && students.some((s) => inFilter(s, gradeFilter)) && (
                 <option value={EVERYONE}>
                   {tr("Everyone in {group} ({count})", {
                     group: chips.find((c) => c.key === gradeFilter)?.label ?? "",
@@ -1842,46 +1845,50 @@ export default function QuranAssignmentsPage() {
           {/* More work in the same save: homework, a recent revision, an old revision. */}
           <div className="space-y-3">
             {extras.map((x) => (
-              <div key={x.kind} className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
+              <div key={x.id} className="rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-ink">
                     {x.kind === "homework" ? tr("Homework") : x.kind === "recent" ? tr("Recent revision") : tr("Old revision")}
                   </p>
-                  <button type="button" onClick={() => setExtras((l) => l.filter((y) => y.kind !== x.kind))} className="text-[12.5px] font-semibold text-ink-muted hover:text-ink">
+                  <button type="button" onClick={() => setExtras((l) => l.filter((y) => y.id !== x.id))} className="text-[12.5px] font-semibold text-ink-muted hover:text-ink">
                     {tr("Remove")}
                   </button>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Surah *")}</label>
-                  <SurahPicker value={x.surah} onChange={(id) => updateExtra(x.kind, { surah: id })} placeholder={tr("Choose…")} />
+                  <SurahPicker value={x.surah} onChange={(id) => updateExtra(x.id, { surah: id })} placeholder={tr("Choose…")} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah Start *")}</label>
-                    <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.start} onChange={(e) => updateExtra(x.kind, { start: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                    <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.start} onChange={(e) => updateExtra(x.id, { start: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Ayah End *")}</label>
-                    <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.end} onChange={(e) => updateExtra(x.kind, { end: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                    <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.end} onChange={(e) => updateExtra(x.id, { end: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Due Date")} *</label>
-                  <input type="date" min={todayStr} value={x.due} onChange={(e) => updateExtra(x.kind, { due: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
+                  <input type="date" min={todayStr} value={x.due} onChange={(e) => updateExtra(x.id, { due: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
                 </div>
               </div>
             ))}
-            {EXTRA_KINDS.some((k) => !extras.some((x) => x.kind === k)) && (
+            {EXTRA_KINDS.some((k) => k !== "homework" || (!extras.some((x) => x.kind === "homework") && forWhen !== "homework")) && (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="text-[12.5px] text-ink-muted">{tr("Also give:")}</span>
-                {EXTRA_KINDS.filter((k) => !extras.some((x) => x.kind === k) && !(k === "homework" && forWhen === "homework")).map((k) => (
+                {EXTRA_KINDS.filter((k) => k !== "homework" || (!extras.some((x) => x.kind === "homework") && forWhen !== "homework")).map((k) => (
                   <button
                     key={k}
                     type="button"
                     onClick={() => addExtra(k)}
                     className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
                   >
-                    {k === "homework" ? tr("+ Homework") : k === "recent" ? tr("+ Recent revision") : tr("+ Old revision")}
+                    {k === "homework"
+                      ? tr("+ Homework")
+                      : k === "recent"
+                        ? extras.some((x) => x.kind === "recent") ? tr("+ Another recent revision surah") : tr("+ Recent revision")
+                        : extras.some((x) => x.kind === "old") ? tr("+ Another old revision surah") : tr("+ Old revision")}
                   </button>
                 ))}
               </div>

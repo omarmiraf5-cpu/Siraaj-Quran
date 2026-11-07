@@ -2242,4 +2242,6 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Remaining balance": "الرصيد المتبقي",
   "Total": "المجموع",
   "Tap a student to see their charges below.": "اضغط على طالب لعرض رسومه أدناه.",
+  "+ Another recent revision surah": "+ سورة أخرى للمراجعة القريبة",
+  "+ Another old revision surah": "+ سورة أخرى للمراجعة البعيدة",
 };
