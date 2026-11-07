@@ -27,6 +27,7 @@ import { sessionUser } from "@/lib/supabase/sessionUser";
 import { SalariesPanel } from "@/components/SalariesPanel";
 import { ExpensesPanel } from "@/components/ExpensesPanel";
 import { FinanceOverview } from "@/components/FinanceOverview";
+import { PaymentsSheet } from "@/components/PaymentsSheet";
 import { balanceFor } from "@/lib/balances";
 import { monthOf, todayIso } from "@/lib/finance";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -415,6 +416,21 @@ export default function AdminPaymentsPage() {
             </form>
           )}
 
+          {ready && fees.length > 0 && (
+            <SectionCard title={tr("Payments by student")} note={tr("Old balance + this month's fee − paid = remaining")}>
+              <PaymentsSheet
+                fees={fees}
+                studentName={studentName}
+                onPick={(name) => {
+                  setQuery(name);
+                  setShow("all");
+                  document.getElementById("all-charges")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              />
+            </SectionCard>
+          )}
+
+          <div id="all-charges" className="scroll-mt-4" />
           <SectionCard
             title={tr("All charges")}
             note={sorted.length === fees.length ? tr("{count} total", { count: fees.length }) : tr("{shown} of {count}", { shown: sorted.length, count: fees.length })}
