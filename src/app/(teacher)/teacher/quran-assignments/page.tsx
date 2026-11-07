@@ -125,10 +125,34 @@ interface ExtraPiece {
   /** Several revision surahs can be given at once, so a piece has its own id. */
   id: string;
   kind: ExtraKind;
+  /** How the piece is given: a surah and its ayahs, or a range of Mushaf pages. */
+  by: "ayah" | "pages";
+  pFrom: string;
+  pTo: string;
   surah: string;
   start: string;
   end: string;
   due: string;
+}
+
+/** Mushaf pages to the surah and ayahs they cover — from the first ayah of the first page to the last of the last. */
+function pagesToRange(from: number, to: number) {
+  const first = Math.max(1, Math.min(TOTAL_PAGES, from));
+  const last = Math.max(first, Math.min(TOTAL_PAGES, to || first));
+  const [s1, a1] = PAGE_STARTS[first - 1];
+  let sEnd = 114;
+  let aEnd = getSurahById(114)?.ayahs ?? 6;
+  if (last < TOTAL_PAGES) {
+    const [ns, na] = PAGE_STARTS[last];
+    if (na > 1) {
+      sEnd = ns;
+      aEnd = na - 1;
+    } else {
+      sEnd = ns - 1;
+      aEnd = getSurahById(sEnd)?.ayahs ?? 1;
+    }
+  }
+  return { first, last, surah: s1, ayahStart: a1, surahEnd: sEnd, ayahEnd: aEnd };
 }
 const EXTRA_KINDS: ExtraKind[] = ["homework", "recent", "old"];
 // The student picker's "everyone in this group" choice.
@@ -476,19 +500,26 @@ export default function QuranAssignmentsPage() {
       // lesson is due today when others go with it.
       const extraLabel: Record<ExtraKind, string> = { homework: phrase("homework"), recent: phrase("recent revision"), old: phrase("old revision") };
       for (const x of extras) {
-        const need = [!x.surah && phrase("surah"), !x.start && phrase("starting ayah"), !x.end && phrase("ending ayah"), !x.due && phrase("due date")].filter(Boolean) as string[];
-        if (need.length > 0) throw new Error(phrase("Still needed for the {piece}: {fields}.", { piece: extraLabel[x.kind], fields: need.join(", ") }));
-        if (parseInt(x.end) < parseInt(x.start)) throw new Error(phrase("The {piece}'s last ayah comes before its first.", { piece: extraLabel[x.kind] }));
+        const need =
+          x.by === "pages"
+            ? [!parseInt(x.pFrom) && phrase("first page"), !x.due && phrase("due date")]
+            : [!x.surah && phrase("surah"), !x.start && phrase("starting ayah"), !x.end && phrase("ending ayah"), !x.due && phrase("due date")];
+        const missingBits = need.filter(Boolean) as string[];
+        if (missingBits.length > 0) throw new Error(phrase("Still needed for the {piece}: {fields}.", { piece: extraLabel[x.kind], fields: missingBits.join(", ") }));
+        if (x.by === "ayah" && parseInt(x.end) < parseInt(x.start)) throw new Error(phrase("The {piece}'s last ayah comes before its first.", { piece: extraLabel[x.kind] }));
       }
       const lessonDue = extras.length > 0 ? dueDate || todayStr : dueDate;
-      const extraPieces = extras.map((x) => ({
-        portion: x.kind === "homework" ? portion : (x.kind as "recent" | "old"),
-        surah: parseInt(x.surah),
-        ayah_start: parseInt(x.start),
-        surah_end: parseInt(x.surah),
-        ayah_end: parseInt(x.end),
-        due_date: x.due,
-      }));
+      const extraPieces = extras.map((x) => {
+        const r = x.by === "pages" ? pagesToRange(parseInt(x.pFrom), parseInt(x.pTo)) : null;
+        return {
+          portion: x.kind === "homework" ? portion : (x.kind as "recent" | "old"),
+          surah: r ? r.surah : parseInt(x.surah),
+          ayah_start: r ? r.ayahStart : parseInt(x.start),
+          surah_end: r ? r.surahEnd : parseInt(x.surah),
+          ayah_end: r ? r.ayahEnd : parseInt(x.end),
+          due_date: x.due,
+        };
+      });
 
       const createdIds: string[] = [];
       // One child, or everyone under the chip that's on.
@@ -984,6 +1015,9 @@ export default function QuranAssignmentsPage() {
             {
               id: `${k}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               kind: k,
+              by: "ayah" as const,
+              pFrom: "",
+              pTo: "",
               surah: k === "homework" ? selectedSurah : "",
               start: k === "homework" && sameSurah && next && next <= (selectedSurahData?.ayahs ?? 0) ? String(next) : "",
               end: "",
@@ -1854,6 +1888,44 @@ export default function QuranAssignmentsPage() {
                     {tr("Remove")}
                   </button>
                 </div>
+                <div role="group" aria-label={tr("Give it by")} className="inline-flex rounded-full border border-surface-border bg-surface-card p-0.5 text-[12.5px] font-semibold">
+                  {(["ayah", "pages"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      aria-pressed={x.by === m}
+                      onClick={() => updateExtra(x.id, { by: m })}
+                      className={`rounded-full px-3 py-1.5 transition-colors ${x.by === m ? "bg-brand-navy text-white" : "text-ink-muted hover:text-ink"}`}
+                    >
+                      {m === "ayah" ? tr("Surah & ayahs") : tr("Mushaf pages")}
+                    </button>
+                  ))}
+                </div>
+                {x.by === "pages" ? (
+                  <div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-ink mb-1.5">{tr("From page")} *</label>
+                        <input type="number" min={1} max={TOTAL_PAGES} value={x.pFrom} onChange={(e) => updateExtra(x.id, { pFrom: e.target.value })} placeholder="562" className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink tabular-nums focus:outline-none focus:border-emerald-600" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-ink mb-1.5">{tr("To page")}</label>
+                        <input type="number" min={1} max={TOTAL_PAGES} value={x.pTo} onChange={(e) => updateExtra(x.id, { pTo: e.target.value })} placeholder={x.pFrom || "566"} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink tabular-nums focus:outline-none focus:border-emerald-600" />
+                      </div>
+                    </div>
+                    {parseInt(x.pFrom) > 0 && (() => {
+                      const r = pagesToRange(parseInt(x.pFrom), parseInt(x.pTo));
+                      const n1 = getSurahById(r.surah)?.englishName ?? "";
+                      const n2 = getSurahById(r.surahEnd)?.englishName ?? "";
+                      return (
+                        <p className="text-[12px] text-ink-muted mt-2">
+                          {r.first === r.last ? tr("Page {a}", { a: r.first }) : tr("Pages {a}–{b}", { a: r.first, b: r.last })} · {n1} {r.ayahStart} – {r.surahEnd !== r.surah ? `${n2} ` : ""}{r.ayahEnd}
+                        </p>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <>
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Surah *")}</label>
                   <SurahPicker value={x.surah} onChange={(id) => updateExtra(x.id, { surah: id })} placeholder={tr("Choose…")} />
@@ -1868,6 +1940,8 @@ export default function QuranAssignmentsPage() {
                     <input type="number" min={1} max={getSurahById(parseInt(x.surah) || 0)?.ayahs} value={x.end} onChange={(e) => updateExtra(x.id, { end: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />
                   </div>
                 </div>
+                  </>
+                )}
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1.5">{tr("Due Date")} *</label>
                   <input type="date" min={todayStr} value={x.due} onChange={(e) => updateExtra(x.id, { due: e.target.value })} className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[14px] text-ink focus:outline-none focus:border-emerald-600" />

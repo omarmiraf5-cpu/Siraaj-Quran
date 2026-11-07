@@ -2244,4 +2244,10 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Tap a student to see their charges below.": "اضغط على طالب لعرض رسومه أدناه.",
   "+ Another recent revision surah": "+ سورة أخرى للمراجعة القريبة",
   "+ Another old revision surah": "+ سورة أخرى للمراجعة البعيدة",
+  "first page": "الصفحة الأولى",
+  "Give it by": "أعطِها بحسب",
+  "Surah & ayahs": "سورة وآيات",
+  "Mushaf pages": "صفحات المصحف",
+  "Page {a}": "صفحة {a}",
+  "Pages {a}–{b}": "الصفحات {a}–{b}",
 };
