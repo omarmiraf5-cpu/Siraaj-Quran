@@ -1,5 +1,6 @@
 "use client";
 
+import { IconBookOpen } from "@/components/icons";
 import { useEffect, useMemo, useState } from "react";
 import { PortalHero } from "@/components/PortalHero";
 import { SectionCard, EmptyNote, LoadingNote, Avatar, OPEN_ROW, RowChevron } from "@/components/portal-ui";
@@ -200,9 +201,10 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
                     <span className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
                       <Link
                         href={`/teacher/quran-assignments?halaqa=${encodeURIComponent(halaqa.label)}#grade`}
-                        className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-[#e0b84f] hover:bg-[#d4a93a] text-[#0e2347] font-bold shadow-sm ring-1 ring-[#b8932f]/40 transition-all active:scale-95 px-4 py-2 text-[13px]"
                       >
-                        {tr("Record Qur'an →")}
+                        <IconBookOpen size={14} />
+                        {tr("Record Qur'an")}
                       </Link>
                       <Link
                         href={`/teacher/quran-assignments?group=${encodeURIComponent(detail.halaqa.program || typeof halaqa.grade !== "number" ? `p:${halaqa.id}` : String(halaqa.grade))}`}

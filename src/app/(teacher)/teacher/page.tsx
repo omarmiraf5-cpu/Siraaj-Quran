@@ -28,7 +28,7 @@ import {
   HalaqaTitle,
   avatarTone,
 } from "@/components/portal-ui";
-import { IconCalendar, IconArrow } from "@/components/icons";
+import { IconCalendar, IconArrow, IconBookOpen } from "@/components/icons";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
@@ -433,8 +433,9 @@ export default function TeacherDashboard() {
                     </Link>
                     <Link
                       href={`/teacher/quran-assignments?halaqa=${encodeURIComponent(h.label)}#grade`}
-                      className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-full border border-surface-border px-3.5 py-2 text-[12.5px] font-semibold text-ink hover:bg-surface-bg-warm transition-all active:scale-95"
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#e0b84f] hover:bg-[#d4a93a] text-[#0e2347] font-bold shadow-sm ring-1 ring-[#b8932f]/40 transition-all active:scale-95 px-3.5 py-2 text-[12.5px]"
                     >
+                      <IconBookOpen size={14} />
                       {tr("Record Qur'an")}
                     </Link>
                   </div>
