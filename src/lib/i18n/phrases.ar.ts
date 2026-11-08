@@ -2317,4 +2317,7 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Homework for later ({count})": "واجبات لوقت لاحق ({count})",
   "Heard in class on its due day.": "يُسمَّع في الحصة يوم استحقاقه.",
   "Hear it now": "اسمعه الآن",
+  "How did it go?": "كيف كانت؟",
+  "Optional — grades it as you set it.": "اختياري — يقيّمها أثناء تحديدها.",
+  "Create and grade": "أنشئ وقيّم",
 };

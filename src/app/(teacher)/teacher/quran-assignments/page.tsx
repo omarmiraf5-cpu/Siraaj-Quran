@@ -33,7 +33,8 @@ import { Mushaf } from "@/components/Mushaf";
 import { SurahPicker } from "@/components/SurahPicker";
 import { createClient } from "@/lib/supabase/client";
 import { sessionUser } from "@/lib/supabase/sessionUser";
-import { ClassGrader } from "@/components/ClassGrader";
+import { ClassGrader, COMMON_COMMENTS } from "@/components/ClassGrader";
+import { RATING_COLOUR } from "@/lib/progressStats";
 import { pagesToRange } from "@/lib/pageRange";
 import { PortalHero } from "@/components/PortalHero";
 import { Modal, SectionCard, ProgressBar, RatingPill, RecitationHistory, EmptyNote, OPEN_ROW, RowChevron } from "@/components/portal-ui";
@@ -247,6 +248,8 @@ export default function QuranAssignmentsPage() {
   const [dueDate, setDueDate] = useState("");
   // Whether it's for today's lesson, in class, or homework to do at home.
   const [forWhen, setForWhen] = useState<"today" | "homework" | "not_recited">("today");
+  // Grading today's lesson as it is set: how it went, saved with the assignment in one go.
+  const [gradeNow, setGradeNow] = useState<DailyRating | null>(null);
   // More work given in the same save: homework, a recent revision, an old
   // revision — each with its own surah, ayahs and due date. A hifz day is
   // usually the three portions together.
@@ -521,6 +524,8 @@ export default function QuranAssignmentsPage() {
       const handPicked = multi.length > 0;
       const targets = handPicked ? multi : everyone ? inGroup.map((s) => s.id) : [selectedStudent];
       if (targets.length === 0) throw new Error(phrase("There's no one in this group yet."));
+      // Today's lesson for one child can be graded as it is set; "Did not recite" always is.
+      const rateNow: DailyRating | null = forWhen === "not_recited" ? "not_recited" : forWhen === "today" && targets.length === 1 ? gradeNow : null;
       const groupName = chips.find((c) => c.key === gradeFilter)?.label ?? "";
       const who = handPicked
         ? phrase("{count} students", { count: targets.length })
@@ -531,8 +536,9 @@ export default function QuranAssignmentsPage() {
       const endName = surahEndValue !== parseInt(selectedSurah) ? `${getSurahById(surahEndValue)?.englishName ?? ""} ` : "";
       const savedText =
         phrase("{what} for {who}", { what: `${surahName} ${ayahStart}–${endName}${ayahEnd}`, who }) +
-        (extras.length ? ` ${phrase("+ {count} more", { count: extras.length })}` : "");
-      const undoable = forWhen !== "not_recited";
+        (extras.length ? ` ${phrase("+ {count} more", { count: extras.length })}` : "") +
+        (rateNow && rateNow !== "not_recited" ? ` · ${phrase(DAILY_RATING_LABELS[rateNow])}` : "");
+      const undoable = !rateNow;
 
       for (const sid of targets) {
       if (isDemo) {
@@ -566,10 +572,19 @@ export default function QuranAssignmentsPage() {
           updated_at: new Date().toISOString(),
         });
         const created = [
-          demoRow({ rating: forWhen === "not_recited" ? "not_recited" : undefined, surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue }),
+          demoRow({ rating: rateNow ?? undefined, surah: parseInt(selectedSurah), ayah_start: parseInt(ayahStart), surah_end: surahEndValue, ayah_end: parseInt(ayahEnd), due_date: lessonDue }),
           ...extraPieces.map(demoRow),
         ];
         createdIds.push(...created.map((c) => c.id));
+        if (rateNow) {
+          created[0] = { ...created[0], status: statusForRating(rateNow) };
+          const nextLog = [
+            ...log,
+            { id: `local-log-${created[0].id}`, student_id: sid, portion: created[0].portion, surah: created[0].surah, ayah_start: created[0].ayah_start, surah_end: created[0].surah_end, ayah_end: created[0].ayah_end, rating: rateNow, notes: notes || null, date: DEMO_TODAY },
+          ];
+          setLog(nextLog);
+          writeDemoStore(LOG_KEY, nextLog);
+        }
         const next = [...created, ...demoCreated];
         setDemoCreated(next);
         try {
@@ -597,18 +612,18 @@ export default function QuranAssignmentsPage() {
           });
           const made = res.ok ? await res.json().catch(() => null) : null;
           if (made?.id) createdIds.push(made.id);
-          if (res.ok && i === 0 && forWhen === "not_recited") {
-            // Set, but the child didn't recite it: graded straight away, so it is heard another day.
+          if (res.ok && i === 0 && rateNow) {
+            // Graded straight away: either it was set but not recited (so it is heard another day), or today's lesson was graded as it was set.
             if (made?.id) {
               await fetch(`/api/quranic-assignments/${made.id}`, {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ daily_rating: "not_recited", teacher_notes: notes || null }),
+                body: JSON.stringify({ daily_rating: rateNow, teacher_notes: notes || null }),
               });
               await fetch("/api/recitation-log", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ student_id: sid, ...piece, rating: "not_recited", notes: notes || null }),
+                body: JSON.stringify({ student_id: sid, ...piece, rating: rateNow, notes: notes || null }),
               });
             }
           }
@@ -662,6 +677,7 @@ export default function QuranAssignmentsPage() {
       setEndSurah("");
       setDueDate("");
       setForWhen("today");
+      setGradeNow(null);
       setExtras([]);
       setNotes("");
 
@@ -1976,6 +1992,46 @@ export default function QuranAssignmentsPage() {
             </div>
           </div>
 
+          {/* Grade today's lesson as it is set, for one child: how it went, and a comment. */}
+          {forWhen === "today" && selectedStudent && selectedStudent !== EVERYONE && multi.length === 0 && (
+            <div className="rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5 space-y-2.5">
+              <p className="text-sm font-semibold text-ink">
+                {tr("How did it go?")} <span className="font-normal text-ink-muted text-[12.5px]">{tr("Optional — grades it as you set it.")}</span>
+              </p>
+              <div className="grid grid-cols-2 min-[560px]:grid-cols-5 gap-2">
+                {DAILY_RATING_ORDER.map((r) => {
+                  const on = gradeNow === r;
+                  const c = RATING_COLOUR[r];
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setGradeNow(on ? null : r)}
+                      className="min-h-[46px] rounded-[14px] border-2 px-1 py-2.5 text-[13.5px] font-bold transition-all active:scale-[.97]"
+                      style={{ color: on ? "#fff" : c, background: on ? c : "transparent", borderColor: on ? c : `color-mix(in srgb, ${c} 35%, transparent)` }}
+                    >
+                      {tr(DAILY_RATING_LABELS[r])}
+                    </button>
+                  );
+                })}
+              </div>
+              {gradeNow && gradeNow !== "not_recited" && (
+                <select
+                  aria-label={tr("Comment for the parent")}
+                  value={COMMON_COMMENTS.includes(notes) ? notes : ""}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="">{tr("Add a comment…")}</option>
+                  {COMMON_COMMENTS.map((c) => (
+                    <option key={c} value={c}>{tr(c)}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* The due date only matters for homework, so it stays out of the way
               when the lesson is being done in class today. */}
           {(forWhen === "homework" || dueDate) && (
@@ -2127,7 +2183,7 @@ export default function QuranAssignmentsPage() {
             disabled={loading}
             className="w-full gradient-emerald hover:opacity-90 disabled:opacity-50 text-white font-semibold py-3 rounded-2xl transition-all active:scale-95"
           >
-            {loading ? tr("Creating...") : tr("Create Assignment")}
+            {loading ? tr("Creating...") : forWhen === "today" && gradeNow && selectedStudent && selectedStudent !== EVERYONE && multi.length === 0 ? tr("Create and grade") : tr("Create Assignment")}
           </button>
         </form>
 
