@@ -29,6 +29,9 @@ export function ayahsIn(e: Pick<RecitationLogEntry, "surah" | "ayah_start" | "su
   return n + e.ayah_end;
 }
 
+export type Period = "week" | "month";
+
+/** One stretch of the chart: a week, or a month for a school that meets at weekends. */
 export interface WeekBucket {
   start: string;
   label: string;
@@ -40,6 +43,8 @@ export interface WeekBucket {
 }
 
 export interface ProgressStats {
+  period: Period;
+  /** The buckets, oldest first — weeks, or months. */
   weeks: WeekBucket[];
   sessionsThisMonth: number;
   ayahsThisMonth: number;
@@ -53,16 +58,20 @@ export interface ProgressStats {
   total: number;
 }
 
-export function progressStats(entries: RecitationLogEntry[], today: string, weeksBack = 8): ProgressStats {
+export function progressStats(entries: RecitationLogEntry[], today: string, period: Period = "week", locale = "en"): ProgressStats {
+  const weeksBack = period === "month" ? 6 : 8;
   const now = utc(today);
   const thisWeek = weekStart(now);
   const weeks: WeekBucket[] = [];
+  const nowD = new Date(now);
+  const monthNo = (t: number) => new Date(t).getUTCFullYear() * 12 + new Date(t).getUTCMonth();
+  const firstMonthNo = nowD.getUTCFullYear() * 12 + nowD.getUTCMonth() - (weeksBack - 1);
   for (let i = weeksBack - 1; i >= 0; i--) {
-    const s = thisWeek - i * 7 * DAY;
+    const s = period === "month" ? Date.UTC(nowD.getUTCFullYear(), nowD.getUTCMonth() - i, 1) : thisWeek - i * 7 * DAY;
     const d = new Date(s);
     weeks.push({
       start: d.toISOString().slice(0, 10),
-      label: `${d.getUTCDate()}/${d.getUTCMonth() + 1}`,
+      label: period === "month" ? d.toLocaleString(locale, { month: "short", timeZone: "UTC" }) : `${d.getUTCDate()}/${d.getUTCMonth() + 1}`,
       counts: { excellent: 0, very_good: 0, good: 0, weak: 0, not_recited: 0 },
       sessions: 0,
       ayahs: 0,
@@ -80,7 +89,7 @@ export function progressStats(entries: RecitationLogEntry[], today: string, week
 
   for (const e of sorted) {
     const t = utc(e.date);
-    const idx = Math.floor((weekStart(t) - (thisWeek - (weeksBack - 1) * 7 * DAY)) / (7 * DAY));
+    const idx = period === "month" ? monthNo(t) - firstMonthNo : Math.floor((weekStart(t) - (thisWeek - (weeksBack - 1) * 7 * DAY)) / (7 * DAY));
     const recited = e.rating !== "not_recited";
     if (idx >= 0 && idx < weeks.length) {
       const w = weeks[idx];
@@ -118,12 +127,14 @@ export function progressStats(entries: RecitationLogEntry[], today: string, week
     const q = ws.map((w) => w.quality).filter((x): x is number => x !== null);
     return q.length ? q.reduce((a, b) => a + b, 0) / q.length : null;
   };
-  const recent = avg(weeks.slice(-4));
-  const before = avg(weeks.slice(0, -4));
+  const half = period === "month" ? 3 : 4;
+  const recent = avg(weeks.slice(-half));
+  const before = avg(weeks.slice(0, -half));
   const trend = recent === null || before === null ? null : recent - before > 0.25 ? "up" : before - recent > 0.25 ? "down" : "steady";
   const all = sorted.filter((e) => e.rating !== "not_recited");
 
   return {
+    period,
     weeks,
     sessionsThisMonth,
     ayahsThisMonth,

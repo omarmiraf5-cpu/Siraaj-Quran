@@ -2295,4 +2295,12 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Select all shown": "اختر كل المعروضين",
   "{count} chosen. The same work goes to each of them, as their own assignment.": "تم اختيار {count}. يصل العمل نفسه إلى كل واحد منهم كواجب خاص به.",
   "Record Qur'an": "تسجيل القرآن",
+  "Show by": "اعرض حسب",
+  "Weekly": "أسبوعيًا",
+  "Monthly": "شهريًا",
+  "Months in a row": "أشهر متتالية",
+  "How each month went": "كيف مرّ كل شهر",
+  "Sessions each month, coloured by rating": "الجلسات كل شهر، ملوّنة بحسب التقدير",
+  "Ayahs recited each month": "الآيات المتلوّة كل شهر",
+  "Getting stronger — recent months are better than before.": "يتحسّن — الأشهر الأخيرة أفضل من السابقة.",
 };

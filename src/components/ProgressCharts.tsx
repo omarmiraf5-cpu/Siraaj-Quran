@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { RecitationLogEntry } from "@/data/demo";
 import { DAILY_RATING_LABELS, DAILY_RATING_ORDER } from "@/data/demo";
-import { progressStats, RATING_COLOUR } from "@/lib/progressStats";
+import { progressStats, RATING_COLOUR, type Period } from "@/lib/progressStats";
+import { useSchoolRhythm } from "@/hooks/useSchoolRhythm";
 import { useLanguage } from "@/components/LanguageProvider";
 import { StatTile } from "@/components/portal-ui";
 
@@ -13,8 +14,12 @@ import { StatTile } from "@/components/portal-ui";
  * recited so far and how each last went. Drawn from the graded sessions.
  */
 export function ProgressCharts({ entries, today, name }: { entries: RecitationLogEntry[]; today: string; name: string }) {
-  const { tr } = useLanguage();
-  const st = useMemo(() => progressStats(entries, today), [entries, today]);
+  const { tr, language } = useLanguage();
+  // Weekly, or monthly for a school that meets at weekends — until someone picks.
+  const auto = useSchoolRhythm();
+  const [chosen, setChosen] = useState<Period | null>(null);
+  const period: Period = chosen ?? auto;
+  const st = useMemo(() => progressStats(entries, today, period, language), [entries, today, period, language]);
   const first = name.split(" ")[0];
 
   if (st.total === 0) {
@@ -30,24 +35,37 @@ export function ProgressCharts({ entries, today, name }: { entries: RecitationLo
   const bw = Math.min(34, cw * 0.62);
   const y = (v: number, max: number) => pad.t + (H - pad.t - pad.b) * (1 - v / max);
   const trendText =
-    st.trend === "up" ? tr("Getting stronger — recent weeks are better than before.")
+    st.trend === "up" ? (period === "month" ? tr("Getting stronger — recent months are better than before.") : tr("Getting stronger — recent weeks are better than before."))
     : st.trend === "down" ? tr("A little more practice at home would help.")
     : st.trend === "steady" ? tr("Steady — keep it going.")
     : tr("Keep reciting — a trend appears after a few weeks.");
 
   return (
     <div className="space-y-5">
+      <div role="group" aria-label={tr("Show by")} className="inline-flex rounded-full border border-surface-border bg-surface-card p-0.5 text-[12.5px] font-semibold">
+        {(["week", "month"] as const).map((p) => (
+          <button
+            key={p}
+            type="button"
+            aria-pressed={period === p}
+            onClick={() => setChosen(p)}
+            className={`rounded-full px-3.5 py-1.5 transition-colors ${period === p ? "bg-brand-navy text-white" : "text-ink-muted hover:text-ink"}`}
+          >
+            {p === "week" ? tr("Weekly") : tr("Monthly")}
+          </button>
+        ))}
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile value={st.sessionsThisMonth} label={tr("Sessions this month")} sub={tr("{days} days of practice", { days: st.daysPracticedThisMonth })} />
         <StatTile value={st.ayahsThisMonth} label={tr("Ayahs this month")} sub={tr("recited and graded")} />
         <StatTile value={st.quality === null ? "—" : `${st.quality.toFixed(1)}/4`} label={tr("Average quality")} sub={tr("all sessions")} />
-        <StatTile value={st.weeksInARow} label={tr("Weeks in a row")} sub={tr("with a session")} />
+        <StatTile value={st.weeksInARow} label={period === "month" ? tr("Months in a row") : tr("Weeks in a row")} sub={tr("with a session")} />
       </div>
       <p className="text-[13.5px] font-semibold text-ink">{trendText}</p>
 
       <div>
-        <p className="eyebrow mb-2">{tr("How each week went")}</p>
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr("Sessions each week, coloured by rating")} className="w-full h-auto">
+        <p className="eyebrow mb-2">{period === "month" ? tr("How each month went") : tr("How each week went")}</p>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={period === "month" ? tr("Sessions each month, coloured by rating") : tr("Sessions each week, coloured by rating")} className="w-full h-auto">
           {[0, 0.5, 1].map((f) => (
             <g key={f}>
               <line x1={pad.l} x2={W - pad.r} y1={y(maxSessions * f, maxSessions)} y2={y(maxSessions * f, maxSessions)} stroke="currentColor" strokeOpacity={0.12} />
@@ -83,8 +101,8 @@ export function ProgressCharts({ entries, today, name }: { entries: RecitationLo
       </div>
 
       <div>
-        <p className="eyebrow mb-2">{tr("Ayahs recited each week")}</p>
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr("Ayahs recited each week")} className="w-full h-auto">
+        <p className="eyebrow mb-2">{period === "month" ? tr("Ayahs recited each month") : tr("Ayahs recited each week")}</p>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={period === "month" ? tr("Ayahs recited each month") : tr("Ayahs recited each week")} className="w-full h-auto">
           {[0, 0.5, 1].map((f) => (
             <g key={f}>
               <line x1={pad.l} x2={W - pad.r} y1={y(maxAyahs * f, maxAyahs)} y2={y(maxAyahs * f, maxAyahs)} stroke="currentColor" strokeOpacity={0.12} />
