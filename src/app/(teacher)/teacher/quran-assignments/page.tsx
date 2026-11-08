@@ -2216,6 +2216,7 @@ export default function QuranAssignmentsPage() {
         <div id="grade" className="scroll-mt-24">
         <SectionCard title={tr("Grade today's class")} note={tr("Tap a rating — it saves at once.")}>
           <ClassGrader
+            today={todayStr}
             initialGroup={typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("halaqa") ?? undefined : undefined}
             roster={roster}
             groups={groupNames.map((g) => ({

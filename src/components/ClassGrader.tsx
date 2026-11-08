@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { getSurahById, TOTAL_PAGES } from "@/data/mushaf-index";
 import { SurahPicker } from "@/components/SurahPicker";
 import { pagesToRange } from "@/lib/pageRange";
-import { DAILY_RATING_LABELS, DAILY_RATING_ORDER, PORTION_LABELS, studentName, type DemoStudent } from "@/data/demo";
+import { DAILY_RATING_LABELS, DAILY_RATING_ORDER, PORTION_LABELS, studentName, formatDay, type DemoStudent } from "@/data/demo";
 import type { QuranicAssignment, DailyRating, HifzPortion } from "@/hooks/useQuranicAssignments";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -190,6 +190,7 @@ export function ClassGrader({
   onGrade,
   onRecord,
   initialGroup,
+  today,
 }: {
   groups: GraderGroup[];
   roster: DemoStudent[];
@@ -197,6 +198,8 @@ export function ClassGrader({
   onRecord?: (studentId: string, piece: RecordedPiece, rating: DailyRating, note: string | null) => Promise<void>;
   /** The halaqa to open on, e.g. from the dashboard's "Record Qur'an" button. */
   initialGroup?: string;
+  /** Today's date (YYYY-MM-DD) where the school is: homework due after it waits, and is heard in class on its day. */
+  today: string;
 }) {
   const { tr } = useLanguage();
   // Opens on the halaqa asked for, else the one used last on this device, else the first.
@@ -223,19 +226,37 @@ export function ClassGrader({
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [own, setOwn] = useState<string | null>(null);
   const [ownText, setOwnText] = useState("");
+  // Homework due later that the teacher chose to hear today anyway.
+  const [early, setEarly] = useState<Set<string>>(new Set());
   // The child whose "what did they recite?" panel is open, and what has been recorded this visit.
   const [recFor, setRecFor] = useState<string | null>(null);
   const [recorded, setRecorded] = useState<Array<{ id: string; name: string; text: string; rating: DailyRating }>>([]);
   const group = groups.find((g) => g.name === pick) ?? groups[0];
 
+  // Today's homework is tomorrow's class work: a piece is heard in class on its due day
+  // (or after, if it was missed). Until then it is homework, and waits below.
+  const isLater = (a: QuranicAssignment) => Boolean(a.due_date) && (a.due_date as string).slice(0, 10) > today;
+  const open = useMemo(
+    () => (group?.items ?? []).filter((a) => a.status !== "completed" || touched.has(a.id)),
+    [group, touched]
+  );
   const rows = useMemo(() => {
-    const list = (group?.items ?? []).filter((a) => a.status !== "completed" || touched.has(a.id));
+    const list = open.filter((a) => !isLater(a) || early.has(a.id) || touched.has(a.id) || Boolean(a.daily_rating));
     return list.sort(
       (a, b) =>
         Number(Boolean(a.daily_rating)) - Number(Boolean(b.daily_rating)) ||
         studentName(a.student_id, roster).localeCompare(studentName(b.student_id, roster))
     );
-  }, [group, touched, roster]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, early, touched, roster, today]);
+  const homework = useMemo(
+    () =>
+      open
+        .filter((a) => isLater(a) && !early.has(a.id) && !touched.has(a.id) && !a.daily_rating)
+        .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)) || studentName(a.student_id, roster).localeCompare(studentName(b.student_id, roster))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open, early, touched, roster, today]
+  );
 
   if (!group) return null;
   const withWork = new Set(rows.map((a) => a.student_id));
@@ -305,7 +326,9 @@ export function ClassGrader({
       )}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-ink-muted py-3">{tr("Nothing to grade in this halaqa right now.")}</p>
+        <p className="text-sm text-ink-muted py-3">
+          {homework.length > 0 ? tr("Nothing is due in class today.") : tr("Nothing to grade in this halaqa right now.")}
+        </p>
       ) : (
         <>
           <div className="flex items-center gap-3 mb-2">
@@ -334,6 +357,16 @@ export function ClassGrader({
                     <p className="text-[15px] font-bold">
                       {studentName(a.student_id, roster)}
                       {done && <span className="ms-2 text-[12px] font-bold text-emerald-700">{isBusy ? tr("Saving…") : `✓ ${tr("Saved")}`}</span>}
+                      {(() => {
+                        const due = a.due_date ? a.due_date.slice(0, 10) : "";
+                        const setOn = (a.assigned_at ?? "").slice(0, 10);
+                        const tag =
+                          due && due < today ? { t: tr("Overdue"), c: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200" }
+                          : isLater(a) ? { t: tr("Homework, heard early"), c: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200" }
+                          : due && setOn && setOn < today ? { t: tr("Homework from {day}", { day: formatDay(setOn) }), c: "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200" }
+                          : null;
+                        return tag ? <span className={`ms-2 align-middle rounded-full px-2 py-0.5 text-[11px] font-semibold ${tag.c}`}>{tag.t}</span> : null;
+                      })()}
                     </p>
                     <p className="text-[12.5px] text-ink-muted">
                       <b className="font-semibold text-ink">{range(a)}</b> · {PORTION_LABELS[a.portion]}
@@ -431,6 +464,34 @@ export function ClassGrader({
             {next ? tr("Up next: {name}", { name: studentName(next.student_id, roster) }) : tr("All graded — well done")}
           </div>
         </>
+      )}
+
+      {homework.length > 0 && (
+        <details className="mt-5 rounded-2xl border border-surface-border bg-surface-bg-warm">
+          <summary className="cursor-pointer px-4 py-3 text-[13.5px] font-bold text-ink">
+            {tr("Homework for later ({count})", { count: homework.length })}
+            <span className="ms-2 text-[12px] font-normal text-ink-muted">{tr("Heard in class on its due day.")}</span>
+          </summary>
+          <ul className="divide-y divide-surface-border px-4 pb-2">
+            {homework.map((a) => (
+              <li key={a.id} className="py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold">{studentName(a.student_id, roster)}</p>
+                  <p className="text-[12px] text-ink-muted">
+                    {range(a)} · {PORTION_LABELS[a.portion]} · {tr("due {day}", { day: formatDay((a.due_date as string).slice(0, 10)) })}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEarly((e) => new Set(e).add(a.id))}
+                  className="rounded-xl border border-surface-border bg-surface-card px-3 py-1.5 text-[12.5px] font-semibold active:scale-95"
+                >
+                  {tr("Hear it now")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {onRecord && (recorded.length > 0 || others.length > 0) && (
