@@ -2320,4 +2320,6 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "How did it go?": "كيف كانت؟",
   "Optional — grades it as you set it.": "اختياري — يقيّمها أثناء تحديدها.",
   "Create and grade": "أنشئ وقيّم",
+  "Month fee": "رسوم الشهر",
+  "Remaining": "المتبقي",
 };

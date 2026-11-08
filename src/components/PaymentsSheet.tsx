@@ -46,8 +46,8 @@ export function PaymentsSheet({
     URL.revokeObjectURL(a.href);
   };
 
-  const head = "px-3 py-2.5 text-start text-[12.5px] font-bold text-[#4a1d3a] bg-[#e8bfd6] border border-[#2b2b2b]/70 whitespace-nowrap";
-  const cellCls = "px-3 py-2 text-[13px] tabular-nums text-end border border-[#2b2b2b]/40";
+  const head = "px-1 sm:px-3 py-2 sm:py-2.5 text-start text-[10.5px] sm:text-[12.5px] leading-tight font-bold text-[#4a1d3a] bg-[#e8bfd6] border border-[#2b2b2b]/70 sm:whitespace-nowrap";
+  const cellCls = "px-1 sm:px-3 py-2 text-[11px] sm:text-[13px] tabular-nums text-end border border-[#2b2b2b]/40";
 
   return (
     <div>
@@ -65,20 +65,20 @@ export function PaymentsSheet({
         <p className="text-sm text-ink-muted py-3">{tr("Nothing billed or owed in this month.")}</p>
       ) : (
         <div className="overflow-x-auto -mx-1 px-1">
-          <table className="w-full border-collapse min-w-[34rem]">
+          <table className="w-full border-collapse sm:min-w-[34rem]">
             <thead>
               <tr>
-                <th className={head}>{tr("Student's name")}</th>
-                <th className={`${head} text-end`}>{tr("Outstanding balance")}</th>
-                <th className={`${head} text-end`}>{tr("Current month fee")}</th>
+                <th className={head}><span className="sm:hidden">{tr("Name")}</span><span className="hidden sm:inline">{tr("Student's name")}</span></th>
+                <th className={`${head} text-end`}><span className="sm:hidden">{tr("Old balance")}</span><span className="hidden sm:inline">{tr("Outstanding balance")}</span></th>
+                <th className={`${head} text-end`}><span className="sm:hidden">{tr("Month fee")}</span><span className="hidden sm:inline">{tr("Current month fee")}</span></th>
                 <th className={`${head} text-end`}>{tr("Amount paid")}</th>
-                <th className={`${head} text-end`}>{tr("Remaining balance")}</th>
+                <th className={`${head} text-end`}><span className="sm:hidden">{tr("Remaining")}</span><span className="hidden sm:inline">{tr("Remaining balance")}</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className={onPick ? "cursor-pointer hover:bg-surface-bg-warm" : ""} onClick={() => onPick?.(r.name)}>
-                  <td className="px-3 py-2 text-[13px] font-semibold border border-[#2b2b2b]/40">{r.name}</td>
+                  <td className="px-1 sm:px-3 py-2 text-[11.5px] sm:text-[13px] font-semibold border border-[#2b2b2b]/40">{r.name}</td>
                   <td className={cellCls}>{money(r.old)}</td>
                   <td className={cellCls}>{money(r.fee)}</td>
                   <td className={cellCls}>{money(r.paid)}</td>
@@ -88,7 +88,7 @@ export function PaymentsSheet({
             </tbody>
             <tfoot>
               <tr className="bg-surface-bg-warm">
-                <td className="px-3 py-2.5 text-[13px] font-bold border border-[#2b2b2b]/70">{tr("Total")}</td>
+                <td className="px-1 sm:px-3 py-2.5 text-[11.5px] sm:text-[13px] font-bold border border-[#2b2b2b]/70">{tr("Total")}</td>
                 <td className={`${cellCls} font-bold border-[#2b2b2b]/70`}>{money(total.old)}</td>
                 <td className={`${cellCls} font-bold border-[#2b2b2b]/70`}>{money(total.fee)}</td>
                 <td className={`${cellCls} font-bold border-[#2b2b2b]/70`}>{money(total.paid)}</td>
