@@ -11,12 +11,15 @@ import {
   PORTION_ARABIC,
   withOverride,
   recitationLogFor,
+  DEMO_TODAY,
   type AssignmentOverride,
   type RecitationLogEntry,
 } from "@/data/demo";
 import { useChosenChild } from "@/hooks/useChosenChild";
 import { usePortalRoster, useStudentRecord } from "@/hooks/usePortalRoster";
 import { PortalHero } from "@/components/PortalHero";
+import { ProgressCharts } from "@/components/ProgressCharts";
+import { todayIso } from "@/lib/finance";
 import {
   SectionCard,
   StatTile,
@@ -302,6 +305,10 @@ export default function ParentQuranProgressPage() {
             })}
           </ul>
         )}
+      </SectionCard>
+
+      <SectionCard title={tr("Progress over time")} note={tr("From every graded session")}>
+        <ProgressCharts entries={recitationLogFor(child.id, log)} today={mode === "demo" ? DEMO_TODAY : todayIso()} name={child.name} />
       </SectionCard>
 
       <SectionCard

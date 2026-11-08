@@ -306,6 +306,20 @@ export default function StudentDashboard() {
         </Link>
       </div>
 
+      {/* My progress — the charts of how recitation is going. */}
+      <Link
+        href="/student/progress"
+        className="flex items-center gap-3 bg-surface-card rounded-3xl border border-surface-border shadow-card p-4 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all animate-rise"
+        style={{ animationDelay: "280ms" }}
+      >
+        <span className="text-2xl" aria-hidden>📈</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-bold text-ink">{tr("My progress")}</p>
+          <p className="text-xs text-ink-muted">{tr("See how your recitation is growing, week by week.")}</p>
+        </div>
+        <span className="text-ink-muted" aria-hidden>›</span>
+      </Link>
+
       {/* My badges — four figures, tap-friendly cards. */}
       <div className="animate-rise" style={{ animationDelay: "300ms" }}>
         <h2 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-3 px-1">🏅 {tr("My badges")}</h2>

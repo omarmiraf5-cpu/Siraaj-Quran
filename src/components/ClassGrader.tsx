@@ -189,14 +189,36 @@ export function ClassGrader({
   roster,
   onGrade,
   onRecord,
+  initialGroup,
 }: {
   groups: GraderGroup[];
   roster: DemoStudent[];
   onGrade: (a: QuranicAssignment, rating: DailyRating | null, note: string | null) => Promise<void>;
   onRecord?: (studentId: string, piece: RecordedPiece, rating: DailyRating, note: string | null) => Promise<void>;
+  /** The halaqa to open on, e.g. from the dashboard's "Record Qur'an" button. */
+  initialGroup?: string;
 }) {
   const { tr } = useLanguage();
-  const [pick, setPick] = useState(groups[0]?.name ?? "");
+  // Opens on the halaqa asked for, else the one used last on this device, else the first.
+  const [pick, setPickState] = useState(() => {
+    const names = groups.map((g) => g.name);
+    let last = "";
+    try {
+      last = localStorage.getItem("grader_group") ?? "";
+    } catch {
+      /* private mode */
+    }
+    const wanted = initialGroup && names.includes(initialGroup) ? initialGroup : names.includes(last) ? last : names[0] ?? "";
+    return wanted;
+  });
+  const setPick = (name: string) => {
+    setPickState(name);
+    try {
+      localStorage.setItem("grader_group", name);
+    } catch {
+      /* private mode */
+    }
+  };
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [own, setOwn] = useState<string | null>(null);

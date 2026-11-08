@@ -431,6 +431,12 @@ export default function TeacherDashboard() {
                       <IconCalendar size={14} />
                       {marked === kids.length && kids.length > 0 ? t("teacher.attendance.everyoneMarked") : t("teacher.dashboard.takeRegister")}
                     </Link>
+                    <Link
+                      href={`/teacher/quran-assignments?halaqa=${encodeURIComponent(h.label)}#grade`}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-full border border-surface-border px-3.5 py-2 text-[12.5px] font-semibold text-ink hover:bg-surface-bg-warm transition-all active:scale-95"
+                    >
+                      {tr("Record Qur'an")}
+                    </Link>
                   </div>
                   {kids.length === 0 ? (
                     <p className="mt-3 text-[12px] text-ink-muted">{t("teacher.dashboard.noChildrenYet")}</p>

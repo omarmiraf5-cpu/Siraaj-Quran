@@ -251,6 +251,10 @@ export default function QuranAssignmentsPage() {
   // revision — each with its own surah, ayahs and due date. A hifz day is
   // usually the three portions together.
   const [extras, setExtras] = useState<ExtraPiece[]>([]);
+  // A group picked by hand: several children who get the same work at once.
+  const [multi, setMulti] = useState<string[]>([]);
+  const [multiOpen, setMultiOpen] = useState(false);
+  const [multiQuery, setMultiQuery] = useState("");
   const updateExtra = (id: string, patch: Partial<ExtraPiece>) =>
     setExtras((list) => list.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const [notes, setNotes] = useState("");
@@ -448,6 +452,13 @@ export default function QuranAssignmentsPage() {
     loadStudents();
   }, []);
 
+  // Coming from the dashboard's "Record Qur'an": land on the grading card.
+  useEffect(() => {
+    if (!listReady || typeof window === "undefined" || window.location.hash !== "#grade") return;
+    const t = setTimeout(() => document.getElementById("grade")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+    return () => clearTimeout(t);
+  }, [listReady]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     cancelPreview();
     e.preventDefault();
@@ -461,13 +472,13 @@ export default function QuranAssignmentsPage() {
       // actually missing is usually scrolled out of view by the time the
       // message appears.
       const missing = [
-        !selectedStudent && (students.length === 0 ? null : "a student"),
+        !selectedStudent && multi.length === 0 && (students.length === 0 ? null : "a student"),
         !selectedSurah && "a surah",
         !ayahStart && "the starting ayah",
         !ayahEnd && "the ending ayah",
       ].filter(Boolean) as string[];
 
-      if (!selectedStudent && students.length === 0) {
+      if (!selectedStudent && multi.length === 0 && students.length === 0) {
         throw new Error(
           phrase("There are no students to assign to yet — add them in the admin portal first.")
         );
@@ -507,10 +518,13 @@ export default function QuranAssignmentsPage() {
       // One child, or everyone under the chip that's on.
       const inGroup = students.filter((s) => inFilter(s, gradeFilter));
       const everyone = selectedStudent === EVERYONE;
-      const targets = everyone ? inGroup.map((s) => s.id) : [selectedStudent];
+      const handPicked = multi.length > 0;
+      const targets = handPicked ? multi : everyone ? inGroup.map((s) => s.id) : [selectedStudent];
       if (targets.length === 0) throw new Error(phrase("There's no one in this group yet."));
       const groupName = chips.find((c) => c.key === gradeFilter)?.label ?? "";
-      const who = everyone
+      const who = handPicked
+        ? phrase("{count} students", { count: targets.length })
+        : everyone
         ? phrase("everyone in {group} ({count})", { group: groupName, count: targets.length })
         : students.find((s) => s.id === selectedStudent)?.full_name ?? "";
       const surahName = getSurahById(parseInt(selectedSurah))?.englishName ?? "";
@@ -622,7 +636,7 @@ export default function QuranAssignmentsPage() {
       // Going through a class: with a group chosen, the next child in it is
       // picked straight away, so the teacher moves down the list.
       const order = inGroup.map((s) => s.id);
-      const after = everyone ? null : order[order.indexOf(selectedStudent) + 1] ?? null;
+      const after = everyone || handPicked ? null : order[order.indexOf(selectedStudent) + 1] ?? null;
       const nextName = after ? students.find((s) => s.id === after)?.full_name : null;
 
       setSuccess(true);
@@ -637,6 +651,9 @@ export default function QuranAssignmentsPage() {
       setShowNote(false);
       setAutoFilledFor(null);
       setSelectedStudent(gradeFilter && after ? after : "");
+      setMulti([]);
+      setMultiOpen(false);
+      setMultiQuery("");
       setPortion("new");
       setSelectedSurah("");
       setAyahStart("");
@@ -1424,6 +1441,67 @@ export default function QuranAssignmentsPage() {
             )}
           </div>
 
+          {/* A group chosen by hand: tick several children, and each gets the same work as their own assignment. */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setMultiOpen((v) => !v)}
+              aria-expanded={multiOpen}
+              className="text-[13px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+            >
+              {multi.length > 0 ? tr("Group: {count} students chosen — change", { count: multi.length }) : tr("+ Choose several students (a group)")}
+            </button>
+            {multiOpen && (
+              <div className="mt-2 rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5 space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="search"
+                    value={multiQuery}
+                    onChange={(e) => setMultiQuery(e.target.value)}
+                    placeholder={tr("Search students")}
+                    aria-label={tr("Search students")}
+                    className="flex-1 min-w-[10rem] bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shown = students.filter((st) => inFilter(st, gradeFilter) && st.full_name.toLowerCase().includes(multiQuery.trim().toLowerCase())).map((st) => st.id);
+                      setMulti((m) => [...new Set([...m, ...shown])]);
+                    }}
+                    className="rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-[13px] font-semibold"
+                  >
+                    {tr("Select all shown")}
+                  </button>
+                  <button type="button" onClick={() => setMulti([])} className="rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-[13px] font-semibold">
+                    {tr("Clear")}
+                  </button>
+                </div>
+                <ul className="max-h-64 overflow-y-auto divide-y divide-surface-border rounded-xl bg-surface-card border border-surface-border">
+                  {students
+                    .filter((st) => inFilter(st, gradeFilter) && st.full_name.toLowerCase().includes(multiQuery.trim().toLowerCase()))
+                    .map((st) => {
+                      const on = multi.includes(st.id);
+                      return (
+                        <li key={st.id}>
+                          <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={on}
+                              onChange={() => setMulti((m) => (on ? m.filter((x) => x !== st.id) : [...m, st.id]))}
+                              className="h-5 w-5 accent-emerald-700"
+                            />
+                            <span className="text-[14px] font-semibold flex-1">{st.full_name}</span>
+                            {placeOf[st.id] && <span className="text-[11.5px] text-ink-muted">{placeOf[st.id]}</span>}
+                          </label>
+                        </li>
+                      );
+                    })}
+                </ul>
+                <p className="text-[12px] text-ink-muted">{tr("{count} chosen. The same work goes to each of them, as their own assignment.", { count: multi.length })}</p>
+              </div>
+            )}
+          </div>
+
           {/* Which of the three daily portions. Defaults to the new lesson,
               which is the one most often being set. */}
           <div>
@@ -2135,8 +2213,10 @@ export default function QuranAssignmentsPage() {
 
       {/* Grade a whole halaqa from one screen: tap a rating and it is saved. */}
       {listReady && (allAssignments.some((a) => a.status !== "completed") || students.length > 0) && (
+        <div id="grade" className="scroll-mt-4">
         <SectionCard title={tr("Grade today's class")} note={tr("Tap a rating — it saves at once.")}>
           <ClassGrader
+            initialGroup={typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("halaqa") ?? undefined : undefined}
             roster={roster}
             groups={groupNames.map((g) => ({
               name: g,
@@ -2151,6 +2231,7 @@ export default function QuranAssignmentsPage() {
             onRecord={recordNow}
           />
         </SectionCard>
+        </div>
       )}
 
       {/* What has already been set. Sample data until the school has its own
