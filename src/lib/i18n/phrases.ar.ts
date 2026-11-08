@@ -2303,4 +2303,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Sessions each month, coloured by rating": "الجلسات كل شهر، ملوّنة بحسب التقدير",
   "Ayahs recited each month": "الآيات المتلوّة كل شهر",
   "Getting stronger — recent months are better than before.": "يتحسّن — الأشهر الأخيرة أفضل من السابقة.",
+  "Record Qur'an →": "تسجيل القرآن ←",
 };

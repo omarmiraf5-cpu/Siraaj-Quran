@@ -197,12 +197,20 @@ function HalaqaRow({ halaqa, title, open, onToggle, onCount }: { halaqa: MyHalaq
                   <p className="text-xs font-semibold text-ink">{tr("In this halaqa")}</p>
                   {detail.members.length > 0 && (
                     // Today's work for the whole halaqa, one child after another.
-                    <Link
-                      href={`/teacher/quran-assignments?group=${encodeURIComponent(detail.halaqa.program || typeof halaqa.grade !== "number" ? `p:${halaqa.id}` : String(halaqa.grade))}`}
-                      className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
-                    >
-                      {tr("Set today's work →")}
-                    </Link>
+                    <span className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+                      <Link
+                        href={`/teacher/quran-assignments?halaqa=${encodeURIComponent(halaqa.label)}#grade`}
+                        className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                      >
+                        {tr("Record Qur'an →")}
+                      </Link>
+                      <Link
+                        href={`/teacher/quran-assignments?group=${encodeURIComponent(detail.halaqa.program || typeof halaqa.grade !== "number" ? `p:${halaqa.id}` : String(halaqa.grade))}`}
+                        className="text-[12.5px] font-semibold text-brand-navy dark:text-brand-gold hover:underline"
+                      >
+                        {tr("Set today's work →")}
+                      </Link>
+                    </span>
                   )}
                 </div>
                 {detail.members.length === 0 ? (

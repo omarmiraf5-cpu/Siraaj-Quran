@@ -2213,7 +2213,7 @@ export default function QuranAssignmentsPage() {
 
       {/* Grade a whole halaqa from one screen: tap a rating and it is saved. */}
       {listReady && (allAssignments.some((a) => a.status !== "completed") || students.length > 0) && (
-        <div id="grade" className="scroll-mt-4">
+        <div id="grade" className="scroll-mt-24">
         <SectionCard title={tr("Grade today's class")} note={tr("Tap a rating — it saves at once.")}>
           <ClassGrader
             initialGroup={typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("halaqa") ?? undefined : undefined}
