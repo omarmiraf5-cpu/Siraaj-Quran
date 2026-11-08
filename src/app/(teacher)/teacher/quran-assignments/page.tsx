@@ -1468,15 +1468,16 @@ export default function QuranAssignmentsPage() {
               {multi.length > 0 ? tr("Group: {count} students chosen — change", { count: multi.length }) : tr("+ Choose several students (a group)")}
             </button>
             {multiOpen && (
-              <div className="mt-2 rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5 space-y-2.5">
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="mt-2 min-w-0 max-w-full rounded-2xl border border-surface-border bg-surface-bg-warm p-3.5 space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <input
                     type="search"
                     value={multiQuery}
                     onChange={(e) => setMultiQuery(e.target.value)}
                     placeholder={tr("Search students")}
                     aria-label={tr("Search students")}
-                    className="flex-1 min-w-[10rem] bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
+                    size={1}
+                    className="flex-1 min-w-0 basis-40 w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
                   />
                   <button
                     type="button"
@@ -1492,7 +1493,7 @@ export default function QuranAssignmentsPage() {
                     {tr("Clear")}
                   </button>
                 </div>
-                <ul className="max-h-64 overflow-y-auto divide-y divide-surface-border rounded-xl bg-surface-card border border-surface-border">
+                <ul className="max-h-64 min-w-0 overflow-y-auto overflow-x-hidden divide-y divide-surface-border rounded-xl bg-surface-card border border-surface-border">
                   {students
                     .filter((st) => inFilter(st, gradeFilter) && st.full_name.toLowerCase().includes(multiQuery.trim().toLowerCase()))
                     .map((st) => {
@@ -1506,8 +1507,8 @@ export default function QuranAssignmentsPage() {
                               onChange={() => setMulti((m) => (on ? m.filter((x) => x !== st.id) : [...m, st.id]))}
                               className="h-5 w-5 accent-emerald-700"
                             />
-                            <span className="text-[14px] font-semibold flex-1">{st.full_name}</span>
-                            {placeOf[st.id] && <span className="text-[11.5px] text-ink-muted">{placeOf[st.id]}</span>}
+                            <span className="text-[14px] font-semibold flex-1 min-w-0 break-words">{st.full_name}</span>
+                            {placeOf[st.id] && <span className="text-[11.5px] text-ink-muted flex-shrink-0 max-w-[40%] truncate">{placeOf[st.id]}</span>}
                           </label>
                         </li>
                       );
@@ -1998,7 +1999,7 @@ export default function QuranAssignmentsPage() {
               <p className="text-sm font-semibold text-ink">
                 {tr("How did it go?")} <span className="font-normal text-ink-muted text-[12.5px]">{tr("Optional — grades it as you set it.")}</span>
               </p>
-              <div className="grid grid-cols-2 min-[560px]:grid-cols-5 gap-2">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(7.25rem,1fr))] gap-2">
                 {DAILY_RATING_ORDER.map((r) => {
                   const on = gradeNow === r;
                   const c = RATING_COLOUR[r];
@@ -2008,7 +2009,7 @@ export default function QuranAssignmentsPage() {
                       type="button"
                       aria-pressed={on}
                       onClick={() => setGradeNow(on ? null : r)}
-                      className="min-h-[46px] rounded-[14px] border-2 px-1 py-2.5 text-[13.5px] font-bold transition-all active:scale-[.97]"
+                      className="min-h-[46px] rounded-[14px] border-2 px-2 py-2.5 text-[13.5px] leading-tight break-words font-bold transition-all active:scale-[.97]"
                       style={{ color: on ? "#fff" : c, background: on ? c : "transparent", borderColor: on ? c : `color-mix(in srgb, ${c} 35%, transparent)` }}
                     >
                       {tr(DAILY_RATING_LABELS[r])}

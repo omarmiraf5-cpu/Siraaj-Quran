@@ -213,9 +213,9 @@ export function StatTile({
       >
         <bdi dir="ltr">{value}</bdi>
       </p>
-      <p className="eyebrow mt-2 flex items-center gap-1.5">
+      <p className="eyebrow mt-2 flex items-center gap-1.5 max-[380px]:tracking-[0.08em]">
         {status && <span aria-hidden className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[status]}`} />}
-        {label}
+        <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
       </p>
       {sub && <p className="text-[11px] text-ink-muted mt-1.5 leading-snug">{sub}</p>}
     </>

@@ -114,7 +114,7 @@ export function MetricCard({
       >
         <bdi dir="ltr">{value}</bdi>
       </span>
-      <span className="eyebrow block mt-2">{label}</span>
+      <span className="eyebrow block mt-2 [overflow-wrap:anywhere] max-[380px]:tracking-[0.08em]">{label}</span>
       {pill && (
         <span className="mt-2 max-w-full self-start rounded-[11px] bg-surface-bg px-2.5 py-1 text-[11px] font-medium leading-snug text-ink-muted">
           {pill}

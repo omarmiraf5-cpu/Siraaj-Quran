@@ -139,7 +139,7 @@ function QuickRecord({ name, onSave, onCancel }: { name: string; onSave: (piece:
         </div>
       )}
       {summary && <p className="text-[12px] text-ink-muted">{summary}</p>}
-      <div className="grid grid-cols-2 min-[520px]:grid-cols-5 gap-2">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(7.25rem,1fr))] gap-2">
         {DAILY_RATING_ORDER.map((r) => {
           const on = rating === r;
           const c = RATING_COLOUR[r];
@@ -149,7 +149,7 @@ function QuickRecord({ name, onSave, onCancel }: { name: string; onSave: (piece:
               type="button"
               aria-pressed={on}
               onClick={() => setRating(on ? null : r)}
-              className="min-h-[44px] rounded-[14px] border-2 px-1 py-2.5 text-[13.5px] font-bold transition-all active:scale-[.97]"
+              className="min-h-[44px] rounded-[14px] border-2 px-2 py-2.5 text-[13.5px] leading-tight break-words font-bold transition-all active:scale-[.97]"
               style={{ color: on ? "#fff" : c, background: on ? c : "transparent", borderColor: on ? c : `color-mix(in srgb, ${c} 35%, transparent)` }}
             >
               {tr(DAILY_RATING_LABELS[r])}
@@ -373,7 +373,7 @@ export function ClassGrader({
                     </p>
                   </div>
 
-                  <div className="mt-2.5 grid grid-cols-2 min-[520px]:grid-cols-5 gap-2">
+                  <div className="mt-2.5 grid grid-cols-[repeat(auto-fit,minmax(7.25rem,1fr))] gap-2">
                     {DAILY_RATING_ORDER.map((r) => {
                       const on = a.daily_rating === r;
                       const c = RATING_COLOUR[r];
@@ -384,7 +384,7 @@ export function ClassGrader({
                           disabled={isBusy}
                           aria-pressed={on}
                           onClick={() => save(a, on ? null : r, a.teacher_notes ?? null)}
-                          className="min-h-[48px] rounded-[14px] border-2 px-1 py-3 text-[14px] font-bold transition-all active:scale-[.97] disabled:opacity-60"
+                          className="min-h-[48px] rounded-[14px] border-2 px-2 py-3 text-[14px] leading-tight break-words font-bold transition-all active:scale-[.97] disabled:opacity-60"
                           style={{
                             color: on ? "#fff" : c,
                             background: on ? c : "transparent",

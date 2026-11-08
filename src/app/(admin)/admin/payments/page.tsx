@@ -507,16 +507,16 @@ export default function AdminPaymentsPage() {
                           setPayError(null);
                         }}
                         aria-expanded={isOpen}
-                        className={`group w-full flex items-center gap-3 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
+                        className={`group w-full flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 py-3 text-start rounded-xl -mx-2 px-2 transition-colors ${isOpen ? OPEN_ROW : "hover:bg-surface-bg-warm"}`}
                       >
                         <Avatar name={studentName(f.studentId)} onDark={isOpen} />
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-[7rem] sm:min-w-0">
                           <p className={`text-[13px] font-semibold [overflow-wrap:anywhere] ${isOpen ? "text-white" : "text-ink"}`}>{studentName(f.studentId)}</p>
                           <p className={`text-[11px] [overflow-wrap:anywhere] ${isOpen ? "text-white/75" : "text-ink-muted"}`}>
                             {tr("{description} · due {dueDate}", { description: f.description, dueDate: f.dueDate })}
                           </p>
                         </div>
-                        <div className="text-end flex-shrink-0">
+                        <div className="text-end flex-shrink-0 ms-auto">
                           <p className={`text-[13px] font-semibold ${isOpen ? "text-white" : "text-ink"}`}>
                             {money(f.amountPaid)} <span className={`font-normal ${isOpen ? "text-white/75" : "text-ink-muted"}`}>/ {money(f.amountDue)}</span>
                           </p>
