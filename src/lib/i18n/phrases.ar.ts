@@ -2322,4 +2322,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Create and grade": "أنشئ وقيّم",
   "Month fee": "رسوم الشهر",
   "Remaining": "المتبقي",
+  "Save assignment for today's lesson": "احفظ واجب درس اليوم",
 };

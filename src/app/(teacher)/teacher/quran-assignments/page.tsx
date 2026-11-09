@@ -2184,7 +2184,7 @@ export default function QuranAssignmentsPage() {
             disabled={loading}
             className="w-full gradient-emerald hover:opacity-90 disabled:opacity-50 text-white font-semibold py-3 rounded-2xl transition-all active:scale-95"
           >
-            {loading ? tr("Creating...") : forWhen === "today" && gradeNow && selectedStudent && selectedStudent !== EVERYONE && multi.length === 0 ? tr("Create and grade") : tr("Create Assignment")}
+            {loading ? tr("Creating...") : forWhen === "today" && gradeNow && selectedStudent && selectedStudent !== EVERYONE && multi.length === 0 ? tr("Create and grade") : forWhen === "today" ? tr("Save assignment for today's lesson") : tr("Create Assignment")}
           </button>
         </form>
 
