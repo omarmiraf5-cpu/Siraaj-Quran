@@ -8,8 +8,9 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * deployed to the site reaches the app at the same moment, with no store
  * resubmission. What the shell adds, beyond a browser tab, is native: the
  * location check behind staff sign-in, the splash screen and icon, system
- * bars, pull-to-refresh, Android back navigation, and an offline screen
- * instead of a browser error. See docs/app-store-release.md.
+ * bars, pull-to-refresh, a native offline screen, Android back navigation,
+ * and the local offline page when the site itself cannot be reached.
+ * See docs/ios-app-store-release.md.
  *
  * Links to anywhere other than mydiiwaan.com (WhatsApp, email, a school's
  * own website) open in the phone's browser, not inside the app.
@@ -19,6 +20,8 @@ const config: CapacitorConfig = {
   appName: "MyDiiwaan",
   // Only the offline screen and a hand-off page live in the app itself.
   webDir: "mobile/www",
+  // Android splash artwork is still charcoal, so the shared fallback stays
+  // that colour. iOS overrides it below, and the splash plugin uses navy.
   backgroundColor: "#24272b",
   // Lets the site recognise the app (e.g. in request logs) without sniffing.
   appendUserAgent: "MyDiiwaanApp",
@@ -36,6 +39,7 @@ const config: CapacitorConfig = {
     // The page draws edge to edge and pads itself with
     // env(safe-area-inset-*), which the viewport's viewport-fit=cover enables.
     contentInset: "never",
+    backgroundColor: "#0e2347",
   },
   android: {
     // Remote content only over HTTPS.
@@ -46,7 +50,7 @@ const config: CapacitorConfig = {
       launchShowDuration: 1200,
       launchAutoHide: true,
       launchFadeOutDuration: 300,
-      backgroundColor: "#24272b",
+      backgroundColor: "#0e2347",
       showSpinner: false,
       androidScaleType: "CENTER_CROP",
     },

@@ -1,11 +1,15 @@
 # Putting MyDiiwaan on the App Store and Google Play
 
+For the iPhone and iPad app, follow `docs/ios-app-store-release.md`. It is the
+list to use. The iOS build runs in GitHub (Actions → **iOS → TestFlight**) and
+does not submit the app for review. The iOS parts below are the older notes.
+
 This is the list of things only you can do. The app project is already set up
 (name **MyDiiwaan**, id **com.mydiiwaan.app**, version **1.0.0**, build **1**).
-You create the store accounts, sign the apps, and fill in the forms. A Mac
-with Xcode is required for the Apple upload. Building the Android file can be
-done on any computer with Android Studio, or from GitHub (see
-`docs/PUBLISHING.md` if you would rather not install those tools).
+You create the store accounts, sign the apps, and fill in the forms. The
+Apple upload does not need a Mac: GitHub builds it (Actions → **iOS →
+TestFlight**). Building the Android file can be done on any computer with
+Android Studio, or from GitHub (see `docs/PUBLISHING.md`).
 
 The phone apps show the live website. A change to the website appears in the
 apps straight away. You only submit a new app version when something in the
@@ -124,10 +128,8 @@ build number.
 This project was prepared on a machine that is not a Mac, so the archive
 itself was not built here. The Xcode project is ready for you to archive.
 
-If you do not have a Mac, `docs/PUBLISHING.md` explains a GitHub build that
-uploads to TestFlight for you. That path needs an App Store Connect API key
-instead of Xcode. Use one path, not both, for the first upload, so you do not
-create two build numbers by accident.
+If you do not have a Mac, use `docs/ios-app-store-release.md`. The build runs
+in GitHub and uploads to TestFlight. It does not submit the app for review.
 
 ---
 

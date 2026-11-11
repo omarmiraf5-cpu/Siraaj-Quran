@@ -1,15 +1,9 @@
 # Release builds, run by hand: GitHub → Actions → "Mobile apps — release"
 # → Run workflow. Enter the version people will see (1.0.0, 1.0.1, …).
 #
-# iOS: archives, signs with Apple's cloud-managed certificates (no Mac or
-# certificate files needed) and uploads straight to TestFlight in App Store
-# Connect. Needs these repository secrets:
-#   APPLE_TEAM_ID   — 10-character Team ID (developer.apple.com → Membership)
-#   ASC_KEY_ID      — App Store Connect API key ID
-#   ASC_ISSUER_ID   — the key's Issuer ID
-#   ASC_KEY_P8      — the whole contents of the downloaded AuthKey_….p8 file
-# The key needs the Admin role, so it may create the distribution
-# certificate and the App Store provisioning profile on the first run.
+# iOS uploads moved to .github/workflows/ios-release.yml. That workflow
+# reuses the existing distribution certificate. This file's iOS job only
+# points there, so a run here cannot create another certificate.
 #
 # Android: builds the signed app bundle (.aab) for Google Play and leaves
 # it on the run page to download and upload in Play Console. Needs:
@@ -18,8 +12,8 @@
 #   ANDROID_KEY_ALIAS         — the key's alias
 #   ANDROID_KEY_PASSWORD      — the key's password
 #
-# Each run's number becomes the build number on both stores, so every
-# upload is higher than the last, as both require.
+# The Android run number becomes that app's build number, so every upload
+# is higher than the last. iOS build numbers are chosen by the other workflow.
 name: Mobile apps — release
 
 on:
@@ -39,81 +33,12 @@ jobs:
   ios:
     name: iOS → TestFlight
     if: inputs.platform != 'android'
-    runs-on: macos-latest
-    env:
-      TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Check the secrets are set
+      - name: Use the iOS TestFlight workflow
         run: |
-          missing=""
-          for v in TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
-            [ -n "${!v}" ] || missing="$missing $v"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::Missing repository secrets for:$missing (see the top of mobile-release.yml)"
-            exit 1
-          fi
-      - uses: actions/checkout@v4
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx cap sync ios
-      - name: App Store Connect key
-        run: |
-          mkdir -p "$RUNNER_TEMP/keys"
-          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
-          echo "KEY_PATH=$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" >> "$GITHUB_ENV"
-      - name: Archive
-        run: |
-          set -o pipefail
-          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/MyDiiwaan.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
-            MARKETING_VERSION="${{ inputs.version }}" \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-            archive | tail -60
-      - name: Upload to TestFlight
-        run: |
-          set -o pipefail
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
-            <key>teamID</key><string>$TEAM_ID</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>uploadSymbols</key><true/>
-            <key>manageAppVersionAndBuildNumber</key><false/>
-          </dict>
-          </plist>
-          EOF
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/MyDiiwaan.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" | tail -40
-          echo "Uploaded build ${{ github.run_number }} (version ${{ inputs.version }}). It appears in App Store Connect → TestFlight after Apple finishes processing, usually 10–30 minutes." >> "$GITHUB_STEP_SUMMARY"
-      - name: Remove the key
-        if: always()
-        run: rm -rf "$RUNNER_TEMP/keys"
+          echo "::error::iOS builds moved to Actions → iOS → TestFlight (.github/workflows/ios-release.yml). That workflow reuses distribution certificate M6TPLDDU24. This job does not upload, so it cannot create another certificate. See docs/ios-app-store-release.md."
+          exit 1
 
   android:
     name: Android → app bundle for Google Play

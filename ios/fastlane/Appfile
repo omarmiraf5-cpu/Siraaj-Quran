@@ -1,0 +1,4 @@
+# The Apple account is an individual team. Both portal IDs are the same.
+app_identifier("com.mydiiwaan.app")
+team_id(ENV["APPLE_TEAM_ID"])
+itc_team_id(ENV["APPLE_TEAM_ID"])
