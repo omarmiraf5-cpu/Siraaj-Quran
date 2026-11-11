@@ -55,6 +55,7 @@ captures/
 # Keystore files — never commit the Play upload key.
 *.jks
 *.keystore
+keystore.properties
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild
