@@ -16,6 +16,7 @@ import { safeNextPath } from "@/lib/safeNextPath";
 import { ByLanguage } from "@/components/ByLanguage";
 import { Capacitor } from "@capacitor/core";
 import { gradeLabel } from "@/lib/grades";
+import { ColorTile } from "@/components/gem-icons";
 
 // Shown once Google has been switched on in Supabase and this is set on the
 // deployment, so the button never appears before it can work.
@@ -128,8 +129,6 @@ const NO_HALAQA = "none";
 
 // Past this many names, the first screen also offers to type one.
 const SEARCH_FROM = 20;
-
-const HALAQA_COLOURS = ["bg-subject-teal", "bg-subject-purple", "bg-subject-orange", "bg-subject-blue", "bg-subject-pink"];
 
 /** "Aisha" from "Aisha M.", for saying hello. */
 const firstWord = (name: string) => name.trim().split(/\s+/)[0] ?? name;
@@ -777,7 +776,7 @@ export default function LoginPage() {
                       ) : halaqas.length > 0 ? (
                         // Each halaqa as a card: its name, teacher, time and size.
                         <div className="space-y-2.5">
-                          {[...halaqas, ...(unplaced.length > 0 ? [null] : [])].map((h, i) => {
+                          {[...halaqas, ...(unplaced.length > 0 ? [null] : [])].map((h) => {
                             const id = h?.id ?? NO_HALAQA;
                             const details = h ? halaqaDetails(h) : "";
                             const count = childrenOf(id).length;
@@ -788,9 +787,8 @@ export default function LoginPage() {
                                 onClick={() => { setHalaqaId(id); setNameQuery(""); }}
                                 className="w-full flex items-center gap-3.5 text-start rounded-card-lg bg-white/[0.08] border border-white/15 px-4 py-3.5 hover:bg-white/15 active:scale-[.98] transition-all"
                               >
-                                <span className={`w-12 h-12 shrink-0 rounded-2xl ${h ? HALAQA_COLOURS[i % HALAQA_COLOURS.length] : "bg-white/20"} text-white flex items-center justify-center shadow-dark`} aria-hidden>
-                                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>
-                                </span>
+                                {/* The halaqa's tile from the portals: the rehal. */}
+                                <ColorTile name="rehal" size={48} muted={!h} />
                                 <span className="flex-1 min-w-0">
                                   <span className="block text-white font-semibold text-[16px] leading-snug">{h ? halaqaHeading(h) : tr("Other students")}</span>
                                   {details && <span className="block text-white/65 text-[13px] leading-snug mt-0.5">{details}</span>}
