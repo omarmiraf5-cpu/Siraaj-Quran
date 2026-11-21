@@ -134,6 +134,10 @@ export default function LoginPage() {
       try { slug = localStorage.getItem(SCHOOL_KEY); } catch { /* private mode */ }
     }
     if (!slug) return;
+    // A school's link is the one handed to its students, and a device only
+    // remembers a school once a student has signed in on it: either way it's
+    // a child who's here, so open on the Student tab with their names.
+    setRole("student");
     loadRoster(slug).catch(() => {
       /* No roster: the student tab explains how to find the school. */
     });
