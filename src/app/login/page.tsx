@@ -15,6 +15,7 @@ import { homeOf, mayOpen } from "@/lib/portalAccess";
 import { safeNextPath } from "@/lib/safeNextPath";
 import { ByLanguage } from "@/components/ByLanguage";
 import { Capacitor } from "@capacitor/core";
+import { gradeLabel } from "@/lib/grades";
 
 // Shown once Google has been switched on in Supabase and this is set on the
 // deployment, so the button never appears before it can work.
@@ -80,12 +81,68 @@ const SCHOOL_KEY = "mydiiwaan_school";
 // The email typed here, handed to /forgot-password (which reads the same key).
 const RESET_EMAIL_KEY = "mydiiwaan_reset_email";
 
+// The children who've signed in on this device, most recent first, so a
+// child's own tablet offers "Continue as Aisha" next time. Only their ids
+// are kept, with the school they're at: the names come from the roster.
+const RECENT_KEY = "mydiiwaan_recent_students";
+const RECENT_MAX = 3;
+
+function readRecent(slug: string): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "null");
+    return saved?.school === slug && Array.isArray(saved.ids)
+      ? saved.ids.filter((id: unknown): id is string => typeof id === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRecent(slug: string, id: string) {
+  try {
+    const ids = [id, ...readRecent(slug).filter((x) => x !== id)].slice(0, RECENT_MAX);
+    localStorage.setItem(RECENT_KEY, JSON.stringify({ school: slug, ids }));
+  } catch { /* private mode */ }
+}
+
 interface RosterStudent {
   id: string;
   first_name: string;
   initials: string;
   colour: string;
+  /** The halaqas they're in; none when the school hasn't placed them. */
+  halaqas?: string[];
 }
+
+interface RosterHalaqa {
+  id: string;
+  name: string;
+  grade: number | null;
+  campus: string | null;
+  teacher: string | null;
+  schedule: string | null;
+}
+
+// Children in no halaqa yet, gathered under a card of their own.
+const NO_HALAQA = "none";
+
+// Past this many names, the first screen also offers to type one.
+const SEARCH_FROM = 20;
+
+const HALAQA_COLOURS = ["bg-subject-teal", "bg-subject-purple", "bg-subject-orange", "bg-subject-blue", "bg-subject-pink"];
+
+/** "Aisha" from "Aisha M.", for saying hello. */
+const firstWord = (name: string) => name.trim().split(/\s+/)[0] ?? name;
+
+/** A name without accents or capitals, to match what a child types. */
+const fold = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/** "Grade 3 · Halaqa A", or just "Halaqa A" in a Qur'an school. */
+const halaqaHeading = (h: RosterHalaqa) =>
+  [h.campus, h.grade !== null ? gradeLabel(h.grade) : null, h.name].filter(Boolean).join(" · ");
+
+/** Who teaches it and when: "Ms. Farah · Sat–Sun 10:00". */
+const halaqaDetails = (h: RosterHalaqa) => [h.teacher, h.schedule].filter(Boolean).join(" · ");
 
 export default function LoginPage() {
   const { tr } = useLanguage();
@@ -114,6 +171,14 @@ export default function LoginPage() {
   // The school whose names are showing. Remembered on this device only
   // once a student has signed in from it (see the PIN pad below).
   const [rosterSlug,      setRosterSlug]      = useState<string | null>(null);
+  // A big school's names come a halaqa at a time: the child picks their
+  // class first, or types their name.
+  const [halaqas,         setHalaqas]         = useState<RosterHalaqa[]>([]);
+  const [halaqaId,        setHalaqaId]        = useState<string | null>(null);
+  const [nameQuery,       setNameQuery]       = useState("");
+  const [recent,          setRecent]          = useState<RosterStudent[]>([]);
+  // Bumped by each PIN that doesn't work, to give the dots a little shake.
+  const [shake,           setShake]           = useState(0);
   const [schoolCode,      setSchoolCode]      = useState("");
   const [schoolLookup,    setSchoolLookup]    = useState<"idle" | "loading" | "notFound">("idle");
 
@@ -121,9 +186,19 @@ export default function LoginPage() {
     const r = await fetch(`/api/student-roster?school=${encodeURIComponent(slug)}`);
     if (!r.ok) return false;
     const data = await r.json();
-    setRoster(data.students ?? []);
+    const students: RosterStudent[] = data.students ?? [];
+    setRoster(students);
+    setHalaqas(data.halaqas ?? []);
+    setHalaqaId(null);
+    setNameQuery("");
     setSchoolName(data.school?.name ?? null);
     setRosterSlug(slug);
+    // Whoever has signed in on this device before, if they're still here.
+    setRecent(
+      readRecent(slug)
+        .map((id) => students.find((st) => st.id === id))
+        .filter((st): st is RosterStudent => !!st)
+    );
     return true;
   }, []);
 
@@ -196,6 +271,10 @@ export default function LoginPage() {
   const forgetSchool = () => {
     try { localStorage.removeItem(SCHOOL_KEY); } catch { /* private mode */ }
     setRoster(null);
+    setHalaqas([]);
+    setHalaqaId(null);
+    setNameQuery("");
+    setRecent([]);
     setSchoolName(null);
     setStudentId(null);
     setSelectedAvatar(null);
@@ -210,9 +289,27 @@ export default function LoginPage() {
   const rememberSchool = () => {
     if (!rosterSlug) return;
     try { localStorage.setItem(SCHOOL_KEY, rosterSlug); } catch { /* private mode */ }
+    if (studentId) writeRecent(rosterSlug, studentId);
   };
   const forgetRememberedSchool = () => {
-    try { localStorage.removeItem(SCHOOL_KEY); } catch { /* private mode */ }
+    try {
+      localStorage.removeItem(SCHOOL_KEY);
+      localStorage.removeItem(RECENT_KEY);
+    } catch { /* private mode */ }
+  };
+
+  // A name tapped opens the PIN screen for that child; "Not you?" closes it.
+  const chooseStudent = (id: string) => {
+    setStudentId(id);
+    setSelectedAvatar(id);
+    setPin("");
+    setError(null);
+  };
+  const closePin = () => {
+    setStudentId(null);
+    setSelectedAvatar(null);
+    setPin("");
+    setError(null);
   };
 
   const googleSignIn = async () => {
@@ -324,6 +421,7 @@ export default function LoginPage() {
                       ? t("login.pinTriesLeft").replace("{n}", String(body.tries_left))
                       : t("login.pinDidntWork")
           );
+          setShake((n) => n + 1);
           setPin("");
           return;
         }
@@ -340,6 +438,7 @@ export default function LoginPage() {
         if (error) {
           console.error("Student sign-in failed after a right PIN:", error.status, error.message);
           setError(error.status === 429 ? t("login.pinBusy") : error.status === undefined ? t("login.pinOffline") : t("login.pinNotReady"));
+          setShake((n) => n + 1);
           setPin("");
           return;
         }
@@ -357,9 +456,64 @@ export default function LoginPage() {
     }
 
     setError(t("login.wrongPin"));
+    setShake((n) => n + 1);
     setPin("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin, roster, studentId]);
+
+  // The PIN screen covers the page: it doesn't scroll behind it, and a
+  // keyboard can type the PIN, rub out a digit, or go back with Escape.
+  const pinOpen = role === "student" && selectedAvatar !== null;
+  useEffect(() => {
+    if (!pinOpen) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (/^[0-9]$/.test(e.key)) handlePin(e.key);
+      else if (e.key === "Backspace") setPin((p) => p.slice(0, -1));
+      else if (e.key === "Escape") closePin();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = before;
+      window.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinOpen]);
+
+  // The student tab's lists.
+  const unplaced = (roster ?? []).filter((st) => !st.halaqas || st.halaqas.length === 0);
+  // One halaqa with everyone in it leaves nothing to choose: its names show straight away.
+  const onlyHalaqa = halaqas.length === 1 && unplaced.length === 0 ? halaqas[0].id : null;
+  const openHalaqa = halaqaId ?? onlyHalaqa;
+  const halaqaById = new Map(halaqas.map((h) => [h.id, h]));
+  const childrenOf = (id: string) =>
+    (roster ?? []).filter((st) => (id === NO_HALAQA ? !st.halaqas?.length : st.halaqas?.includes(id)));
+  const query = fold(nameQuery.trim());
+  const found = query
+    ? (roster ?? [])
+        .filter((st) => fold(st.first_name).includes(query))
+        .sort((a, b) => Number(!fold(a.first_name).startsWith(query)) - Number(!fold(b.first_name).startsWith(query)))
+    : [];
+  const halaqaOfChild = (st: RosterStudent) => {
+    const h = st.halaqas?.length ? halaqaById.get(st.halaqas[0]) : undefined;
+    return h ? halaqaHeading(h) : null;
+  };
+
+  const nameButton = (st: RosterStudent, note?: string | null) => (
+    <button
+      key={st.id}
+      type="button"
+      onClick={() => chooseStudent(st.id)}
+      className="flex flex-col items-center gap-2 rounded-card bg-white/[0.08] border border-white/10 px-1.5 py-3 hover:bg-white/15 active:scale-95 transition-all"
+    >
+      <span className={`w-14 h-14 rounded-full ${st.colour} text-white font-bold text-lg flex items-center justify-center shadow-dark`}>
+        {st.initials}
+      </span>
+      <span className="w-full text-center text-[14px] leading-tight font-semibold text-white break-words">{st.first_name}</span>
+      {note && <span className="w-full text-center text-[11px] leading-tight text-white/55 truncate">{note}</span>}
+    </button>
+  );
 
   return (
     <div className="relative min-h-screen login-navy flex items-center justify-center overflow-hidden">
@@ -444,7 +598,19 @@ export default function LoginPage() {
       {/* ── RIGHT PANEL — Login Form ── */}
       <div className="flex flex-col items-center justify-center w-full md:w-1/2 px-2 md:ps-10 py-4">
 
-        {/* Mobile-only compact header */}
+        {/* Mobile-only compact header — smaller still on the student tab,
+            where a child's halaqa or name should be the first thing seen */}
+        {role === "student" ? (
+          <div className="flex md:hidden items-center gap-2.5 mb-4 mt-1">
+            <div className="w-11 h-11 rounded-xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark">
+              <Image src="/crest.jpg" alt="MyDiiwaan" width={44} height={44} className="object-cover w-full h-full" />
+            </div>
+            <p className="font-display text-xl font-bold tracking-tight">
+              <span className="text-white">My</span>
+              <span className="gold-foil">Diiwaan</span>
+            </p>
+          </div>
+        ) : (
         <div className="flex md:hidden flex-col items-center mb-6">
           <div className="w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-brand-gold/60 shadow-dark mb-2">
             <Image src="/crest.jpg" alt="MyDiiwaan" width={80} height={80} className="object-cover w-full h-full" />
@@ -455,9 +621,11 @@ export default function LoginPage() {
           </h1>
           <p className="font-calligraphy text-2xl text-brand-gold-light leading-none mt-1.5" dir="rtl" lang="ar">ديواني</p>
         </div>
+        )}
 
-        {/* Daily reflection */}
-        {(() => {
+        {/* Daily reflection — not on the student tab, where a child's
+            names come first */}
+        {role !== "student" && (() => {
           const r = DAILY_REFLECTIONS[new Date().getDay()];
           return (
             <div className="w-full max-w-sm mb-6 text-center space-y-2">
@@ -500,53 +668,162 @@ export default function LoginPage() {
           ))}
         </div>
 
-        <div className="w-full max-w-sm">
+        <div className={`w-full ${role === "student" ? "max-w-md" : "max-w-sm"}`}>
           {role === "student" ? (
             <div className="space-y-5">
-              {schoolName && (
-                <p className="text-center text-white/70 text-sm">
-                  {schoolName} — {t("login.tapNameThenPin")}
-                </p>
-              )}
-
               {roster && roster.length > 0 ? (
-                <div className="flex flex-wrap justify-center gap-3">
-                  {roster.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => { setStudentId(s.id); setSelectedAvatar(s.id); setPin(""); setError(null); }}
-                      className={`flex flex-col items-center gap-1 transition-all ${
-                        selectedAvatar === s.id ? "scale-105" : "opacity-70 hover:opacity-100"
-                      }`}
-                    >
-                      <span
-                        className={`w-12 h-12 rounded-full ${s.colour} text-white font-bold text-sm flex items-center justify-center ${
-                          selectedAvatar === s.id
-                            ? "ring-2 ring-white ring-offset-2 ring-offset-transparent"
-                            : ""
-                        }`}
-                      >
-                        {s.initials}
-                      </span>
-                      <span className="text-[11px] font-semibold text-white/80">{s.first_name}</span>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  {schoolName && (
+                    <p className="text-center font-display text-white text-lg font-bold leading-snug">{schoolName}</p>
+                  )}
+
+                  {openHalaqa ? (
+                    // One halaqa's children, in big buttons.
+                    <div className="space-y-4">
+                      {!onlyHalaqa && (
+                        <button
+                          type="button"
+                          onClick={() => setHalaqaId(null)}
+                          className="inline-flex items-center gap-1.5 rounded-pill bg-white/10 hover:bg-white/20 px-3.5 py-2 text-white/85 text-[14px] font-semibold transition-colors"
+                        >
+                          <span aria-hidden className="rtl:rotate-180">‹</span>
+                          {tr("All halaqas")}
+                        </button>
+                      )}
+                      {(() => {
+                        const h = halaqaById.get(openHalaqa);
+                        const details = h ? halaqaDetails(h) : "";
+                        return (
+                          <div className="text-center">
+                            <p className="font-display text-white text-xl font-bold leading-snug">{h ? halaqaHeading(h) : tr("Other students")}</p>
+                            {details && <p className="text-white/65 text-[13px] mt-0.5">{details}</p>}
+                            <p className="text-brand-gold-light text-[15px] font-semibold mt-3">{tr("Tap your name")}</p>
+                          </div>
+                        );
+                      })()}
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {childrenOf(openHalaqa).map((st) => nameButton(st))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Someone who's signed in on this device before. */}
+                      {recent.length > 0 && !query && (
+                        <div className="space-y-2">
+                          {recent.map((st) => {
+                            const where = halaqaOfChild(st);
+                            return (
+                              <button
+                                key={st.id}
+                                type="button"
+                                onClick={() => chooseStudent(st.id)}
+                                className="w-full flex items-center gap-3.5 text-start rounded-card-lg bg-brand-gold/15 border border-brand-gold/50 px-4 py-3 hover:bg-brand-gold/25 active:scale-[.98] transition-all"
+                              >
+                                <span className={`w-12 h-12 shrink-0 rounded-full ${st.colour} text-white font-bold flex items-center justify-center shadow-dark`}>
+                                  {st.initials}
+                                </span>
+                                <span className="flex-1 min-w-0">
+                                  <span className="block text-white font-semibold text-[17px] leading-snug">
+                                    {tr("Continue as {name}", { name: firstWord(st.first_name) })}
+                                  </span>
+                                  <span className="block text-white/60 text-[12.5px] truncate">
+                                    {[st.first_name !== firstWord(st.first_name) ? st.first_name : null, where].filter(Boolean).join(" · ") || st.first_name}
+                                  </span>
+                                </span>
+                                <span aria-hidden className="text-brand-gold-light text-2xl rtl:rotate-180">›</span>
+                              </button>
+                            );
+                          })}
+                          <p className="text-center text-white/55 text-[12.5px] pt-1">
+                            {halaqas.length > 0 ? tr("Someone else? Find your halaqa below.") : tr("Someone else? Find your name below.")}
+                          </p>
+                        </div>
+                      )}
+
+                      <p className="text-center text-brand-gold-light text-[15px] font-semibold">
+                        {halaqas.length > 0 ? tr("Find your halaqa") : tr("Tap your name")}
+                      </p>
+
+                      {roster.length > SEARCH_FROM && (
+                        <div className="relative">
+                          <span className="absolute start-4 top-1/2 -translate-y-1/2 text-white/50" aria-hidden>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                          </span>
+                          <input
+                            type="search"
+                            value={nameQuery}
+                            onChange={(e) => setNameQuery(e.target.value)}
+                            placeholder={tr("Type your name")}
+                            aria-label={tr("Type your name")}
+                            autoCapitalize="words"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            enterKeyHint="search"
+                            className="w-full rounded-card bg-white/[0.08] border border-white/20 ps-11 pe-4 py-3 text-white text-[15px] placeholder-white/45 focus:outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 transition-all"
+                          />
+                        </div>
+                      )}
+
+                      {query ? (
+                        found.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-2.5">
+                            {found.map((st) => nameButton(st, halaqaOfChild(st)))}
+                          </div>
+                        ) : (
+                          <p className="text-center text-white/70 text-[14px] leading-relaxed px-4">
+                            {halaqas.length > 0 ? tr("No one by that name here. Try finding your halaqa instead.") : tr("No one by that name here. Check the spelling, or ask your teacher.")}
+                          </p>
+                        )
+                      ) : halaqas.length > 0 ? (
+                        // Each halaqa as a card: its name, teacher, time and size.
+                        <div className="space-y-2.5">
+                          {[...halaqas, ...(unplaced.length > 0 ? [null] : [])].map((h, i) => {
+                            const id = h?.id ?? NO_HALAQA;
+                            const details = h ? halaqaDetails(h) : "";
+                            const count = childrenOf(id).length;
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => { setHalaqaId(id); setNameQuery(""); }}
+                                className="w-full flex items-center gap-3.5 text-start rounded-card-lg bg-white/[0.08] border border-white/15 px-4 py-3.5 hover:bg-white/15 active:scale-[.98] transition-all"
+                              >
+                                <span className={`w-12 h-12 shrink-0 rounded-2xl ${h ? HALAQA_COLOURS[i % HALAQA_COLOURS.length] : "bg-white/20"} text-white flex items-center justify-center shadow-dark`} aria-hidden>
+                                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>
+                                </span>
+                                <span className="flex-1 min-w-0">
+                                  <span className="block text-white font-semibold text-[16px] leading-snug">{h ? halaqaHeading(h) : tr("Other students")}</span>
+                                  {details && <span className="block text-white/65 text-[13px] leading-snug mt-0.5">{details}</span>}
+                                  <span className="block text-brand-gold-light/80 text-[12px] mt-1">{tr("{count} student|{count} students", { count })}</span>
+                                </span>
+                                <span aria-hidden className="text-white/40 text-2xl rtl:rotate-180">›</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {roster.map((st) => nameButton(st))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
               ) : SHOW_DEMO_LOGINS ? (
-                <div className="flex justify-center gap-3">
-                  {STUDENT_AVATARS.map((av) => (
-                    <button
-                      key={av.id}
-                      onClick={() => { setSelectedAvatar(av.id); setPin(""); }}
-                      className={`w-12 h-12 rounded-full ${av.color} text-white font-bold text-lg flex items-center justify-center transition-all ${
-                        selectedAvatar === av.id
-                          ? "ring-2 ring-white ring-offset-2 ring-offset-transparent scale-110"
-                          : "opacity-70 hover:opacity-100"
-                      }`}
-                    >
-                      {av.id}
-                    </button>
-                  ))}
+                <div className="space-y-4">
+                  <p className="text-center text-brand-gold-light text-[15px] font-semibold">{tr("Tap your name")}</p>
+                  <div className="flex justify-center gap-3">
+                    {STUDENT_AVATARS.map((av) => (
+                      <button
+                        key={av.id}
+                        type="button"
+                        onClick={() => { setSelectedAvatar(av.id); setPin(""); setError(null); }}
+                        className={`w-14 h-14 rounded-full ${av.color} text-white font-bold text-lg flex items-center justify-center shadow-dark hover:scale-105 active:scale-95 transition-all`}
+                      >
+                        {av.id}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 // A child's roster only loads from the ?school= link their
@@ -587,53 +864,6 @@ export default function LoginPage() {
                     {t("login.notYourSchool")}
                   </button>
                 </p>
-              )}
-
-              {selectedAvatar && (
-                <>
-                  <div className="flex justify-center gap-4">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`w-4 h-4 rounded-full transition-all ${
-                          i < pin.length ? "bg-brand-gold scale-110" : "bg-white/25"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  {/* A wrong PIN, or the pad resting after too many: said
-                      here, by the dots — the email form's message box is
-                      not on this screen. */}
-                  {error && (
-                    <p role="alert" className="text-center text-[13px] font-semibold text-red-200 -mt-1">
-                      {error}
-                    </p>
-                  )}
-                  <div className="grid grid-cols-3 gap-3">
-                    {[1,2,3,4,5,6,7,8,9].map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => handlePin(String(d))}
-                        className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl font-semibold hover:bg-white/20 active:scale-95 transition-all"
-                      >
-                        {d}
-                      </button>
-                    ))}
-                    <div />
-                    <button
-                      onClick={() => handlePin("0")}
-                      className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl font-semibold hover:bg-white/20 active:scale-95 transition-all"
-                    >
-                      0
-                    </button>
-                    <button
-                      onClick={() => setPin((p) => p.slice(0, -1))}
-                      className="h-14 rounded-card backdrop-blur-sm bg-white/10 border border-white/10 text-white text-xl hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center"
-                    >
-                      ⌫
-                    </button>
-                  </div>
-                </>
               )}
             </div>
           ) : (
@@ -735,6 +965,78 @@ export default function LoginPage() {
         </div>
       </div>
       </div>
+
+      {/* The PIN screen: the whole screen for the one child who tapped
+          their name, so there's nothing to scroll past to reach it. */}
+      {pinOpen && (() => {
+        const who = roster?.find((st) => st.id === selectedAvatar);
+        const sample = STUDENT_AVATARS.find((av) => av.id === selectedAvatar);
+        const name = who ? firstWord(who.first_name) : null;
+        const key = "h-[3.75rem] [@media(max-height:700px)]:h-14 [@media(max-height:600px)]:h-12 md:h-20 rounded-card backdrop-blur-sm bg-white/10 border border-white/15 text-white text-2xl md:text-3xl font-semibold hover:bg-white/20 active:scale-95 active:bg-white/25 transition-all disabled:opacity-50 flex items-center justify-center";
+        return (
+          <div role="dialog" aria-modal="true" aria-labelledby="pin-hello" className="fixed inset-0 z-[60] login-navy overflow-y-auto">
+            <div className="absolute inset-0 pattern-lattice pointer-events-none" />
+            <button
+              type="button"
+              onClick={closePin}
+              className="absolute top-3 start-3 z-10 inline-flex items-center gap-1.5 rounded-pill bg-white/10 hover:bg-white/20 px-3.5 py-2 text-white/85 text-[14px] font-semibold transition-colors"
+            >
+              <span aria-hidden className="rtl:rotate-180">‹</span>
+              {tr("Not you? Go back")}
+            </button>
+            <div className="relative min-h-full flex flex-col items-center justify-center px-6 pt-16 pb-6 [@media(max-height:600px)]:pt-14 [@media(max-height:600px)]:pb-3">
+              <div className="w-full max-w-[19rem] md:max-w-xl flex flex-col items-center">
+                <span className={`w-20 h-20 [@media(max-height:700px)]:w-16 [@media(max-height:700px)]:h-16 [@media(max-height:600px)]:w-12 [@media(max-height:600px)]:h-12 [@media(max-height:600px)]:text-lg md:w-28 md:h-28 md:text-4xl rounded-full ${who?.colour ?? sample?.color ?? "bg-subject-purple"} text-white font-bold text-2xl flex items-center justify-center ring-4 ring-white/15 shadow-dark`}>
+                  {who?.initials ?? sample?.id}
+                </span>
+                <h2 id="pin-hello" className="mt-3 md:mt-5 font-display text-white text-2xl md:text-4xl font-bold text-center leading-snug">
+                  {name ? tr("Assalamu alaikum, {name}!", { name }) : tr("Assalamu alaikum!")}
+                </h2>
+                <p className="mt-1 md:mt-2 text-white/70 text-[15px] md:text-lg text-center">{tr("Type your 4-number PIN")}</p>
+
+                <div key={shake} className={`flex justify-center gap-4 mt-5 [@media(max-height:600px)]:mt-3 ${shake ? "animate-pin-shake" : ""}`} aria-hidden>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-5 h-5 md:w-6 md:h-6 rounded-full transition-all ${
+                        i < pin.length ? "bg-brand-gold scale-110" : error ? "bg-red-300/40" : "bg-white/25"
+                      }`}
+                    />
+                  ))}
+                </div>
+                {/* A PIN that didn't work, or the pad resting after too
+                    many: said here, by the dots. */}
+                <div className="min-h-[2.75rem] [@media(max-height:600px)]:min-h-[2.25rem] mt-2 flex items-center justify-center">
+                  {error ? (
+                    <p role="alert" className="text-center text-[14px] md:text-base font-semibold text-red-200 leading-snug">{error}</p>
+                  ) : loading ? (
+                    <p className="text-center text-[14px] text-white/70">{tr("Opening your page…")}</p>
+                  ) : null}
+                </div>
+
+                {/* Laid out like a phone's keypad in every language: 1 2 3
+                    along the top, even when the page reads right to left. */}
+                <div dir="ltr" className="grid grid-cols-3 gap-3 w-full md:max-w-[25rem]">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
+                    <button key={d} type="button" disabled={loading} onClick={() => handlePin(String(d))} className={key}>
+                      {d}
+                    </button>
+                  ))}
+                  <div />
+                  <button type="button" disabled={loading} onClick={() => handlePin("0")} className={key}>
+                    0
+                  </button>
+                  <button type="button" disabled={loading} onClick={() => setPin((p) => p.slice(0, -1))} aria-label={tr("Delete")} className={key}>
+                    ⌫
+                  </button>
+                </div>
+
+                <p className="mt-5 [@media(max-height:600px)]:mt-3 text-center text-white/60 text-[13px] md:text-[15px]">{tr("Forgot your PIN? Ask your teacher.")}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
