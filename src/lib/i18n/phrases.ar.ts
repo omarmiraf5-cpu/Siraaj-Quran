@@ -2338,4 +2338,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Opening your page…": "جارٍ فتح صفحتك…",
   "Forgot your PIN? Ask your teacher.": "نسيت رمز الدخول؟ اسأل معلمك.",
   "Finding your school…": "جارٍ البحث عن مدرستك…",
+  "Your own account was signed out on this device, so a student can sign in here.": "سُجِّل خروج حسابك من هذا الجهاز، ليتمكن الطالب من الدخول هنا.",
 };

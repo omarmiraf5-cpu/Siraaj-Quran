@@ -15,6 +15,7 @@ import { homeOf, mayOpen } from "@/lib/portalAccess";
 import { safeNextPath } from "@/lib/safeNextPath";
 import { ByLanguage } from "@/components/ByLanguage";
 import { Capacitor } from "@capacitor/core";
+import { forgetPushToken } from "@/components/NativeBridge";
 import { gradeLabel } from "@/lib/grades";
 import { ColorTile } from "@/components/gem-icons";
 
@@ -188,6 +189,8 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ sc
   // While a school's names are on their way: placeholders, not the
   // school-code box, which would flash up and vanish again.
   const [rosterLoading,   setRosterLoading]   = useState(!!linkSchool);
+  // A grown-up's account signed out because they opened a school's link.
+  const [adultSignedOut,  setAdultSignedOut]  = useState(false);
 
   const loadRoster = useCallback(async (slug: string) => {
     const r = await fetch(`/api/student-roster?school=${encodeURIComponent(slug)}`);
@@ -262,6 +265,16 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ sc
         return;
       }
       if (profile?.role && profile.role !== "student") forgetRememberedSchool();
+      // A school's link is for its children. A teacher, parent or admin who
+      // opens it is signed out on this device only (their other devices stay
+      // signed in), so the page stays on the children's sign-in instead of
+      // opening their own portal. A child already signed in goes on to theirs.
+      if (linkSchool && profile?.role && profile.role !== "student") {
+        await forgetPushToken().catch(() => {});
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        if (!cancelled) setAdultSignedOut(true);
+        return;
+      }
       if (user.user_metadata?.must_change_password) { router.replace("/change-password"); return; }
       if (!cancelled && profile?.role) router.replace(destination(profile.role));
     }).catch(() => {});
@@ -683,6 +696,11 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ sc
             <div className="space-y-5">
               {roster && roster.length > 0 ? (
                 <>
+                  {adultSignedOut && (
+                    <p role="status" className="text-center text-white/60 text-[12.5px] leading-relaxed px-2">
+                      {tr("Your own account was signed out on this device, so a student can sign in here.")}
+                    </p>
+                  )}
                   {schoolName && (
                     <p className="text-center font-display text-white text-lg font-bold leading-snug">{schoolName}</p>
                   )}
