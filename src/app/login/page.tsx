@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { use, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -143,7 +143,12 @@ const halaqaHeading = (h: RosterHalaqa) =>
 /** Who teaches it and when: "Ms. Farah · Sat–Sun 10:00". */
 const halaqaDetails = (h: RosterHalaqa) => [h.teacher, h.schedule].filter(Boolean).join(" · ");
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }: { searchParams: Promise<{ school?: string | string[] }> }) {
+  // A school's link (/login?school=their-slug) is the one handed to its
+  // children, so the page opens on the Student tab from its very first
+  // paint, waiting for their names rather than asking for a school code.
+  const linkParam = use(searchParams).school;
+  const linkSchool = (Array.isArray(linkParam) ? linkParam[0] : linkParam)?.trim() || null;
   const { tr } = useLanguage();
   const router   = useRouter();
   const supabase = createClient();
@@ -152,7 +157,7 @@ export default function LoginPage() {
   const [native, setNative] = useState(false);
   useEffect(() => { setNative(Capacitor.isNativePlatform()); }, []);
 
-  const [role,            setRole]            = useState<Role>("parent");
+  const [role,            setRole]            = useState<Role>(linkSchool ? "student" : "parent");
   const [email,           setEmail]           = useState("");
   const [password,        setPassword]        = useState("");
   const [error,           setError]           = useState<string | null>(null);
@@ -180,6 +185,9 @@ export default function LoginPage() {
   const [shake,           setShake]           = useState(0);
   const [schoolCode,      setSchoolCode]      = useState("");
   const [schoolLookup,    setSchoolLookup]    = useState<"idle" | "loading" | "notFound">("idle");
+  // While a school's names are on their way: placeholders, not the
+  // school-code box, which would flash up and vanish again.
+  const [rosterLoading,   setRosterLoading]   = useState(!!linkSchool);
 
   const loadRoster = useCallback(async (slug: string) => {
     const r = await fetch(`/api/student-roster?school=${encodeURIComponent(slug)}`);
@@ -212,9 +220,12 @@ export default function LoginPage() {
     // remembers a school once a student has signed in on it: either way it's
     // a child who's here, so open on the Student tab with their names.
     setRole("student");
-    loadRoster(slug).catch(() => {
-      /* No roster: the student tab explains how to find the school. */
-    });
+    setRosterLoading(true);
+    loadRoster(slug)
+      .catch(() => {
+        /* No roster: the student tab explains how to find the school. */
+      })
+      .finally(() => setRosterLoading(false));
   }, [loadRoster]);
 
   // Where to go once signed in: the page a link asked to come back to (the
@@ -807,6 +818,21 @@ export default function LoginPage() {
                     </>
                   )}
                 </>
+              ) : rosterLoading ? (
+                <div className="space-y-2.5" aria-busy="true">
+                  <p className="sr-only">{tr("Finding your school…")}</p>
+                  <div className="h-6 w-52 mx-auto rounded-full bg-white/10 animate-pulse" />
+                  <div className="h-4 w-32 mx-auto rounded-full bg-white/10 animate-pulse !mt-4 !mb-5" />
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3.5 rounded-card-lg bg-white/[0.06] border border-white/10 px-4 py-3.5">
+                      <div className="w-12 h-12 rounded-[14px] bg-white/10 animate-pulse" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-28 rounded-full bg-white/10 animate-pulse" />
+                        <div className="h-3 w-40 rounded-full bg-white/[0.07] animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : SHOW_DEMO_LOGINS ? (
                 <div className="space-y-4">
                   <p className="text-center text-brand-gold-light text-[15px] font-semibold">{tr("Tap your name")}</p>

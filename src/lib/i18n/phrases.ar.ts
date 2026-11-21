@@ -2337,4 +2337,5 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Type your 4-number PIN": "اكتب رمز الدخول المكوّن من ٤ أرقام",
   "Opening your page…": "جارٍ فتح صفحتك…",
   "Forgot your PIN? Ask your teacher.": "نسيت رمز الدخول؟ اسأل معلمك.",
+  "Finding your school…": "جارٍ البحث عن مدرستك…",
 };
