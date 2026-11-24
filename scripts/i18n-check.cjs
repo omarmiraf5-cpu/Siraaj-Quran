@@ -54,24 +54,32 @@ for (const file of files) {
   visit(sf);
 }
 
-// The Arabic dictionary, read as data.
-const arSrc = fs.readFileSync(path.join(root, "lib", "i18n", "phrases.ar.ts"), "utf8");
-const arSf = ts.createSourceFile("ar.ts", arSrc, ts.ScriptTarget.Latest, true);
-const have = new Set();
-arSf.forEachChild(function find(n) {
-  if (ts.isPropertyAssignment(n) && n.parent && ts.isObjectLiteralExpression(n.parent) && ts.isVariableDeclaration(n.parent.parent)) {
-    have.add(ts.isStringLiteral(n.name) || ts.isNoSubstitutionTemplateLiteral(n.name) ? n.name.text : n.name.getText());
-  }
-  ts.forEachChild(n, find);
-});
+// Each phrase dictionary, read as data.
+function dictionaryKeys(file) {
+  const full = path.join(root, "lib", "i18n", file);
+  const have = new Set();
+  if (!fs.existsSync(full)) return have;
+  const sf = ts.createSourceFile(file, fs.readFileSync(full, "utf8"), ts.ScriptTarget.Latest, true);
+  sf.forEachChild(function find(n) {
+    if (ts.isPropertyAssignment(n) && n.parent && ts.isObjectLiteralExpression(n.parent) && ts.isVariableDeclaration(n.parent.parent)) {
+      have.add(ts.isStringLiteral(n.name) || ts.isNoSubstitutionTemplateLiteral(n.name) ? n.name.text : n.name.getText());
+    }
+    ts.forEachChild(n, find);
+  });
+  return have;
+}
+const have = dictionaryKeys("phrases.ar.ts");
+const haveFr = dictionaryKeys("phrases.fr.ts");
 
 const missing = [...keys].filter(([k]) => !have.has(k));
+const missingFr = [...keys].filter(([k]) => !haveFr.has(k));
 const unused = [...have].filter((k) => !keys.has(k));
 if (process.argv.includes("--json")) {
-  console.log(JSON.stringify(missing.map(([k]) => k), null, 1));
+  console.log(JSON.stringify(process.argv.includes("--fr") ? missingFr.map(([k]) => k) : missing.map(([k]) => k), null, 1));
 } else {
   for (const [k, where] of missing) console.log(`${where}\t${k}`);
-  console.error(`\n${keys.size} phrases, ${missing.length} without Arabic, ${unused.length} Arabic entries not written as literals here (data, labels() or retired).`);
+  for (const [k, where] of missingFr) console.log(`${where}\t[fr]\t${k}`);
+  console.error(`\n${keys.size} phrases, ${missing.length} without Arabic, ${missingFr.length} without French, ${unused.length} Arabic entries not written as literals here (data, labels() or retired).`);
   if (process.argv.includes("--unused")) unused.forEach((k) => console.error(`unused\t${k}`));
 }
-process.exitCode = missing.length ? 1 : 0;
+process.exitCode = missing.length || missingFr.length ? 1 : 0;

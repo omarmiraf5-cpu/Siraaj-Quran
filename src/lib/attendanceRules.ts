@@ -121,6 +121,8 @@ export function formatClock(time: string): string {
   const mins = minutesOf(time);
   const h = Math.floor(mins / 60);
   const m = mins % 60;
+  // French reads the 24-hour clock: 9 h 00, 13 h 30.
+  if (currentLanguage() === "fr") return `${h} h ${String(m).padStart(2, "0")}`;
   const half = currentLanguage() === "ar" ? (h < 12 ? "ص" : "م") : h < 12 ? "am" : "pm";
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${half}`;
 }

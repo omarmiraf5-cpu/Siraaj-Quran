@@ -348,7 +348,7 @@ function TeacherDays({
   today: string;
   api: ReturnType<typeof useAttendanceApi>["api"];
   onSaved: () => void;
-  language: "en" | "so" | "ar";
+  language: "en" | "so" | "ar" | "fr";
 }) {
   const { tr } = useLanguage();
   const [editing, setEditing] = useState<string | null>(null);

@@ -13,14 +13,18 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS_AR = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+const WEEKDAYS_FR = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+const MONTHS_FR = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 
 /** "Sat 26 Sep", as the server writes a date, in the reader's language. */
 function day(text: string): string {
   const m = text.match(/^(\w{3}) (\d{1,2}) (\w{3})$/);
-  if (!m || currentLanguage() !== "ar") return text;
+  const language = currentLanguage();
+  if (!m || (language !== "ar" && language !== "fr")) return text;
   const w = WEEKDAYS.indexOf(m[1]);
   const mo = MONTHS.indexOf(m[3]);
-  return w < 0 || mo < 0 ? text : `${WEEKDAYS_AR[w]} ${m[2]} ${MONTHS_AR[mo]}`;
+  if (w < 0 || mo < 0) return text;
+  return language === "fr" ? `${WEEKDAYS_FR[w]} ${m[2]} ${MONTHS_FR[mo]}` : `${WEEKDAYS_AR[w]} ${m[2]} ${MONTHS_AR[mo]}`;
 }
 
 const REASONS = ["Sick", "Family matter", "Travelling", "Other"];
@@ -51,9 +55,10 @@ export function translateNotice<N extends { title: string; body: string }>(n: N)
     });
   } else if ((m = n.body.match(/^Marked absent from (.+) to (.+?)\. (.+)$/))) {
     body = `${phrase("Marked absent from {from} to {to}.", { from: day(m[1]), to: day(m[2]) })} ${phrase(m[3])}`;
-  } else if ((m = n.body.match(/^(\w{3} \d{1,2} \w{3})(?: – (\w{3} \d{1,2} \w{3}))? · ([^—]+?)(?: — (.*))?$/)) && REASONS.includes(m[3])) {
+  } else if ((m = n.body.match(/^(\w{3} \d{1,2} \w{3})(?: – (\w{3} \d{1,2} \w{3}))? · ([^—]+?)(?: — (.*))?$/)) && REASONS.some((r) => r === m![3] || phrase(r) === m![3])) {
+    // The sample school writes the reason already in the reader's language.
     const when = m[2] ? `${day(m[1])} – ${day(m[2])}` : day(m[1]);
-    body = `${when} · ${phrase(m[3])}${m[4] ? ` — ${m[4]}` : ""}`;
+    body = `${when} · ${REASONS.includes(m[3]) ? phrase(m[3]) : m[3]}${m[4] ? ` — ${m[4]}` : ""}`;
   }
   const kind = (n as { kind?: string }).kind;
   if (kind === "milestone") body = phrase(n.body);

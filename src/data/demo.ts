@@ -539,6 +539,10 @@ const WEEKDAYS_SO = ["Axad", "Isniin", "Talaado", "Arbaco", "Khamiis", "Jimco", 
 const MONTHS_SO = ["Jannaayo", "Febraayo", "Maarso", "Abriil", "Maayo", "Juun",
                 "Luuliyo", "Agoosto", "Sebtembar", "Oktoobar", "Nofembar", "Diisembar"];
 
+const WEEKDAYS_FR = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+const MONTHS_FR = ["janv.", "févr.", "mars", "avr.", "mai", "juin",
+                "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
 const WEEKDAYS_AR = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
                 "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -549,13 +553,14 @@ const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "ما
 // mismatch. Reading the parts in UTC keeps it stable everywhere. `lang`
 // defaults to English so the ~20 call sites that haven't been threaded
 // through with the current language yet keep working unchanged.
-export function formatDay(iso: string, lang: "en" | "so" | "ar" = currentLanguage()): string {
+export function formatDay(iso: string, lang: "en" | "so" | "ar" | "fr" = currentLanguage()): string {
   const d = new Date(iso + "T00:00:00Z");
   const day = d.getUTCDay();
   const date = d.getUTCDate();
   const month = d.getUTCMonth();
   if (lang === "so") return `${WEEKDAYS_SO[day]}, ${date} ${MONTHS_SO[month]}`;
   if (lang === "ar") return `${WEEKDAYS_AR[day]}، ${date} ${MONTHS_AR[month]}`;
+  if (lang === "fr") return `${WEEKDAYS_FR[day]} ${date} ${MONTHS_FR[month]}`;
   return `${WEEKDAYS[day]} ${date} ${MONTHS[month]}`;
 }
 

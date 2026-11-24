@@ -18,8 +18,11 @@ export function currentLanguage(): Language {
 }
 
 /** The locale for Intl date formatting: Arabic month names, but the same
- *  0–9 digits the rest of the page uses. `en` is the caller's own English
- *  locale, so English output stays exactly as it was. */
+ *  0–9 digits the rest of the page uses; French month names in French.
+ *  `en` is the caller's own English locale, so English output stays exactly
+ *  as it was. */
 export function dateLocale(en: string): string {
-  return current === "ar" ? "ar-u-nu-latn" : en;
+  if (current === "ar") return "ar-u-nu-latn";
+  if (current === "fr") return "fr-FR";
+  return en;
 }

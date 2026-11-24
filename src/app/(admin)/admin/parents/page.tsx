@@ -424,7 +424,12 @@ export default function AdminParentsPage() {
                     // Teachers page. Here, only their link to their children.
                     <div className="mb-3 rounded-2xl border border-surface-border bg-surface-bg-warm p-4 space-y-3">
                       <p className="text-[13px] text-ink leading-relaxed">
-                        {tr("This is {replace}'s own", { replace: p.name.replace(/ \((teacher|office)\)$/, "") })}{" "}{p.staffRole === "admin" ? "office" : "teacher"}{" "}{tr("login — they see their children under")}{" "}<strong>{tr("Parent mode")}</strong>{" "}{tr("in their menu. Their login is looked after on the Teachers page.")}
+                        {tr(
+                          p.staffRole === "admin"
+                            ? "This is {name}'s own office login — they see their children under {mode} in their menu. Their login is looked after on the Teachers page."
+                            : "This is {name}'s own teacher login — they see their children under {mode} in their menu. Their login is looked after on the Teachers page.",
+                          { name: p.name.replace(/ \((teacher|office)\)$/, ""), mode: <strong>{tr("Parent mode")}</strong> }
+                        )}
                       </p>
                       <button
                         type="button"

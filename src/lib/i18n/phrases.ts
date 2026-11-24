@@ -20,13 +20,14 @@ import { currentLanguage } from "@/lib/i18n/current";
 export type PhraseVars = Record<string, ReactNode>;
 export type Translated<V> = V extends Record<string, string | number | null | undefined> | undefined ? string : ReactNode;
 
-// Filled when Arabic is chosen: the dictionary is the biggest part of the
-// app's text, and most readers never need it downloaded.
+// Filled when Arabic or French is chosen: the dictionary is the biggest part
+// of the app's text, and most readers never need it downloaded.
 const DICTS: Partial<Record<Language, Record<string, string | Plural>>> = {};
 
 /** Makes a language's phrases ready before it's shown. */
 export async function loadPhrases(language: Language): Promise<void> {
   if (language === "ar" && !DICTS.ar) DICTS.ar = (await import("@/lib/i18n/phrases.ar")).AR_PHRASES;
+  if (language === "fr" && !DICTS.fr) DICTS.fr = (await import("@/lib/i18n/phrases.fr")).FR_PHRASES;
 }
 
 const rules = new Map<Language, Intl.PluralRules>();
@@ -81,13 +82,16 @@ export function phrase<V extends PhraseVars | undefined = undefined>(text: strin
 }
 
 /**
- * A counted phrase. Arabic selects one / two / few / many / other from the
- * phrase dictionary. English and Somali keep `fallback`, which the caller
- * already builds from the keyed dictionary.
+ * A counted phrase. Arabic and French pick the form for the count from the
+ * phrase dictionary (Arabic: one / two / few / many / other; French: one /
+ * other). English and Somali keep `fallback`, which the caller already
+ * builds from the keyed dictionary.
  */
 export function countLabel(phrase: string, count: number, fallback: string, vars?: Record<string, string | number>): string {
-  if (currentLanguage() !== "ar") return fallback;
-  return translatePhrase("ar", phrase, { ...vars, count }) as string;
+  const language = currentLanguage();
+  if (language !== "ar" && language !== "fr") return fallback;
+  if (DICTS[language]?.[phrase] === undefined) return fallback;
+  return translatePhrase(language, phrase, { ...vars, count }) as string;
 }
 
 /**

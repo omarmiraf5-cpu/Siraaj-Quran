@@ -2339,4 +2339,6 @@ export const AR_PHRASES: Record<string, string | Plural> = {
   "Forgot your PIN? Ask your teacher.": "نسيت رمز الدخول؟ اسأل معلمك.",
   "Finding your school…": "جارٍ البحث عن مدرستك…",
   "Your own account was signed out on this device, so a student can sign in here.": "سُجِّل خروج حسابك من هذا الجهاز، ليتمكن الطالب من الدخول هنا.",
+  "This is {name}'s own office login — they see their children under {mode} in their menu. Their login is looked after on the Teachers page.": "هذا حساب الدخول الخاص بـ{name} في الإدارة — يرى أبناءه ضمن {mode} في قائمته. ويُدار حسابه من صفحة المعلمين.",
+  "This is {name}'s own teacher login — they see their children under {mode} in their menu. Their login is looked after on the Teachers page.": "هذا حساب الدخول الخاص بـ{name} كمعلم — يرى أبناءه ضمن {mode} في قائمته. ويُدار حسابه من صفحة المعلمين.",
 };

@@ -112,7 +112,7 @@ export default function ParentDashboard() {
               ? { text: t("common.noAttendanceYet"), tone: "plain" as const }
               : {
                   text: `${child.name.split(" ")[0]} ${t("common.was")} ${
-                    todayStatus ? t(`common.${todayStatus}`) : t("common.notMarked")
+                    todayStatus ? (language === "fr" ? t(`common.${todayStatus}`).toLowerCase() : t(`common.${todayStatus}`)) : t("common.notMarked")
                   } ${t("common.today")}`,
                   tone: todayStatus === "present" ? ("green" as const) : todayStatus === "late" ? ("amber" as const) : todayStatus === "absent" ? ("red" as const) : ("plain" as const),
                 },

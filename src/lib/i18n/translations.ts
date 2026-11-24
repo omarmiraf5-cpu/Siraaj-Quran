@@ -1,9 +1,10 @@
-export type Language = "en" | "so" | "ar";
+export type Language = "en" | "so" | "ar" | "fr";
 
 export const LANGUAGES: { code: Language; nativeLabel: string }[] = [
   { code: "en", nativeLabel: "English" },
   { code: "so", nativeLabel: "Soomaali" },
   { code: "ar", nativeLabel: "العربية" },
+  { code: "fr", nativeLabel: "Français" },
 ];
 
 // The only language that reads right-to-left. Everything else about the
@@ -580,4 +581,5 @@ export async function loadTranslations(language: Language): Promise<void> {
   if (translations[language]) return;
   if (language === "so") translations.so = (await import("@/lib/i18n/translations.so")).SO;
   if (language === "ar") translations.ar = (await import("@/lib/i18n/translations.ar")).AR;
+  if (language === "fr") translations.fr = (await import("@/lib/i18n/translations.fr")).FR;
 }
