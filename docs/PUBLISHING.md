@@ -30,58 +30,29 @@ Builds run on GitHub — no Mac needed. You do everything below from a browser.
    `/platform` page, set up a school called e.g. *MyDiiwaan Review School*
    with a few students, one teacher, one parent (linked to a child) and
    yourself as admin, and give a student a PIN. Keep these logins for
-   step A7 and B6. Set the school's location to your real school, so a
-   reviewer sees the "not on the premises" message on staff sign-in rather
-   than being able to sign in from anywhere.
+   step A7 and B6. Signing in with email and password must work from
+   anywhere. The location check runs only when a teacher taps attendance
+   Sign in or Sign out, so a reviewer away from the school will see "not on
+   the premises" on that button. That message is the feature. See
+   `docs/ios-app-store-release.md`.
 
 ---
 
 ## A. Apple — App Store
 
-### A1. Register the app's ID
-developer.apple.com → Account → **Certificates, IDs & Profiles** →
-Identifiers → **+** → App IDs → App → Continue.
-- Description: `MyDiiwaan`
-- Bundle ID: **Explicit**, `com.mydiiwaan.app`
-- Capabilities: leave the defaults → Continue → Register.
+The steps for the iPhone and iPad app, including the cloud build, are in
+`docs/ios-app-store-release.md`. Use **Actions → iOS → TestFlight**
+(`.github/workflows/ios-release.yml`). Do not use **Mobile apps — release**
+for iOS: that job no longer uploads, so it cannot create an extra signing
+certificate.
 
-### A2. Create the app in App Store Connect
-appstoreconnect.apple.com → **Apps** → **+** → New App.
-- Platforms: iOS
-- Name: `MyDiiwaan` (if taken: `MyDiiwaan – Qur'an School`)
-- Primary language: English (U.S.) or English (Canada)
-- Bundle ID: `com.mydiiwaan.app`
-- SKU: `mydiiwaan-ios`
-- User access: Full access
+### A1–A5. Register, sign, and upload
 
-### A3. Create the key GitHub uses to upload builds
-App Store Connect → **Users and Access** → **Integrations** →
-App Store Connect API → **Team Keys** → **+**.
-- Name: `GitHub builds`, Access: **Admin** → Generate.
-- **Download** the key file (`AuthKey_XXXXXXXX.p8`) — you can only download
-  it once. Note the **Key ID** (next to the key) and the **Issuer ID** (above
-  the list).
+Do these from `docs/ios-app-store-release.md`. Short version:
 
-Your **Team ID**: developer.apple.com → Account → Membership details.
-
-### A4. Give GitHub the key
-github.com/omarmiraf5-cpu/Siraaj-Quran → **Settings** → **Secrets and
-variables** → **Actions** → **New repository secret**, four times:
-
-| Name | Secret |
-|---|---|
-| `APPLE_TEAM_ID` | your Team ID |
-| `ASC_KEY_ID` | the Key ID |
-| `ASC_ISSUER_ID` | the Issuer ID |
-| `ASC_KEY_P8` | open the `.p8` file (Files app → Quick Look, or any text editor) and paste **everything**, including the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines |
-
-### A5. Build and upload
-GitHub → **Actions** → **Mobile apps — release** → **Run workflow**:
-version `1.0.0`, platform `ios` → Run. It takes about 15–25 minutes. When it
-finishes green, the build appears in App Store Connect → your app →
-**TestFlight** after Apple processes it (10–30 minutes more).
-
-If it fails, open the red step and send Claude the error.
+- GitHub secrets: `APPLE_TEAM_ID` (`T6L2L5B4QH`), `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64`, plus `IOS_DIST_CERT_P12_BASE64` and `IOS_DIST_CERT_PASSWORD` for the certificate the team already has (`M6TPLDDU24`). A new certificate is only created if you turn that switch on once, because the private key is lost.
+- The workflow creates bundle id `com.mydiiwaan.app` and the App Store Connect app **MyDiiwaan** (English, SKU `mydiiwaan-ios`) if they are missing. Fastlane's `produce` command still asks for an Apple ID password, so the lane uses the API key directly.
+- **Actions → iOS → TestFlight** uploads to TestFlight. It does not submit for review. The build number is one higher than the latest TestFlight build.
 
 ### A6. Try it on your iPhone first
 TestFlight tab → **Internal Testing** → + → add yourself → install the
@@ -100,17 +71,9 @@ App Store Connect → your app → **1.0 Prepare for Submission**.
 - **Marketing URL**: `https://www.mydiiwaan.com`
 - **Build**: choose the one from TestFlight.
 - **App Review Information** → Sign-in required: yes → give the **teacher**
-  login from step 0.4, and paste into Notes:
-
-  > MyDiiwaan is a portal for Qur'an schools; accounts are created by the
-  > school. Demo logins on our review school — Teacher: *email / password*.
-  > Parent: *email / password*. Admin: *email / password*. Student: on the
-  > sign-in screen tap Student, enter school code *code*, tap a name, PIN
-  > *1234*.
-  > Staff sign-in (teacher dashboard) only works within 150 m of the school,
-  > so from elsewhere it explains the teacher is not on the premises — this
-  > is intended. Location is only requested when a teacher taps Sign in.
-  > Delete account: menu → Account → Delete account.
+  login from step 0.4. Paste the notes from `store/ios/review-notes.md`
+  with the blanks filled in. Signing in works from anywhere. The location
+  check is only the attendance Sign in / Sign out button.
 
 **App Information** (left menu):
 - Category: **Education**; secondary **Productivity**
@@ -278,9 +241,11 @@ MyDiiwaan is for schools that use the MyDiiwaan portal: your school gives you yo
 ## D. Later updates
 
 - **Website changes** go live in the apps straight away — nothing to do.
-- **New app version** (icon, permissions, native features): run
-  *Mobile apps — release* again with a higher version (1.0.1, 1.1.0 …), then
-  in App Store Connect create a new version and pick the new build; in Play
-  Console create a new release with the new .aab.
+- **New app version** (icon, permissions, native features): for iOS, run
+  **Actions → iOS → TestFlight** (it picks the next build number and does
+  not submit for review). For Android, run *Mobile apps — release* with a
+  higher version (1.0.1, 1.1.0 …). Then in App Store Connect create a new
+  version and pick the new build; in Play Console create a new release with
+  the new .aab.
 - **Test builds**: every change to the app projects runs *Mobile apps — build
   check*; its Android run has a test APK you can install on an Android phone.

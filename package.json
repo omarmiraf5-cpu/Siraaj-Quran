@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "assets:generate": "capacitor-assets generate --ios --android --iconBackgroundColor '#24272b' --iconBackgroundColorDark '#24272b' --splashBackgroundColor '#24272b' --splashBackgroundColorDark '#24272b'",
+    "assets:generate": "capacitor-assets generate --ios --android --iconBackgroundColor '#24272b' --iconBackgroundColorDark '#24272b' --splashBackgroundColor '#0e2347' --splashBackgroundColorDark '#0e2347'",
     "cap:sync": "cap sync",
     "i18n:check": "node scripts/i18n-check.cjs"
   },

@@ -1,0 +1,9 @@
+report.xml
+README.md
+test_output
+certs-out/
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+*.dSYM.zip
