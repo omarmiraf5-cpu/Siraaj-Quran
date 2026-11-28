@@ -6,6 +6,7 @@ import { useSignInGuard } from "@/hooks/useSignInGuard";
 import { useRequirePasswordChange } from "@/hooks/useRequirePasswordChange";
 import { useStaffRoles } from "@/hooks/useStaffRoles";
 import { useMyChildren } from "@/hooks/useMyChildren";
+import { useJuzAccess } from "@/hooks/useJuzTests";
 
 // Grouped under short headings — Today, Students, Plans, Library — so the
 // sidebar reads as four short lists. The four a teacher opens every day come
@@ -101,6 +102,25 @@ const NAV = [
   },
 ];
 
+// Juz tests, for a school that runs them: booking for every teacher, and the
+// day's tests for those the office made examiners. Just after the halaqas.
+const JUZ_TESTS = {
+  href: "/teacher/juz-tests",
+  section: "Students",
+  labelKey: "nav.juzTests",
+  art: "check" as const,
+  // An open book with a tick: a Juz heard and passed.
+  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6.5C10.5 5 8.5 4.4 4 4.4v13.2c4.5 0 6.5.6 8 2.1 1.5-1.5 3.5-2.1 8-2.1V4.4c-4.5 0-6.5.6-8 2.1Z"/><path d="m8.5 11 2 2 4-4"/></svg>,
+};
+const EXAMINE = {
+  href: "/teacher/examine",
+  section: "Students",
+  labelKey: "nav.examine",
+  art: "pen" as const,
+  // A list with a pen: marking the day's tests.
+  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h10M4 11h7M4 16h5"/><path d="m14.5 19.5 6-6-2-2-6 6-.5 2.5z"/></svg>,
+};
+
 // For the school's admin, teaching a halaqa here: back to running the school.
 const SCHOOL_OFFICE = {
   href: "/admin",
@@ -124,8 +144,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const { blocked } = useSignInGuard();
   // Just before their own account, at the end.
   const { hasChildren } = useMyChildren();
+  const juz = useJuzAccess("teacher");
   const extras = [...(admin ? [SCHOOL_OFFICE] : []), ...(hasChildren ? [PARENT_MODE] : [])];
-  const items = [...NAV.slice(0, -1), ...extras, NAV[NAV.length - 1]];
+  const tests = juz.enabled ? [JUZ_TESTS, ...(juz.examiner ? [EXAMINE] : [])] : [];
+  const afterHalaqas = NAV.findIndex((n) => n.href === "/teacher/halaqas") + 1;
+  const nav = [...NAV.slice(0, afterHalaqas), ...tests, ...NAV.slice(afterHalaqas)];
+  const items = [...nav.slice(0, -1), ...extras, nav[nav.length - 1]];
 
   return (
     <div className="flex min-h-screen bg-surface-bg">

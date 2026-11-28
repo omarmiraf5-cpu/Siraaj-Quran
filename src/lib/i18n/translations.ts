@@ -75,6 +75,8 @@ export const translations: Partial<Record<Language, Record<string, string>>> & {
     "nav.office": "School office",
     "nav.hadith": "Forty Hadith",
     "nav.awards": "Stars & badges",
+    "nav.juzTests": "Juz tests",
+    "nav.examine": "Examine",
     "nav.changePassword": "Change Password",
     "nav.account": "Account",
     "common.terms": "Terms",

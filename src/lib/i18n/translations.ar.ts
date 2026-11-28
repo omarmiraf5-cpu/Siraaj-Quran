@@ -38,6 +38,8 @@ export const AR: Record<string, string> = {
   "nav.office": "إدارة المدرسة",
   "nav.hadith": "الأربعون النووية",
   "nav.awards": "النجوم والأوسمة",
+  "nav.juzTests": "اختبارات الأجزاء",
+  "nav.examine": "التسميع",
   "nav.changePassword": "تغيير كلمة المرور",
   "nav.account": "الحساب",
   "common.terms": "الشروط",

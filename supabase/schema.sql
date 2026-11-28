@@ -2520,3 +2520,123 @@ alter table classes add column if not exists also_grades int[] not null default 
 -- In a halaqa several teachers share, which of them has each child. Empty
 -- means nobody yet, and then every teacher of the halaqa sees the child.
 alter table class_enrollments add column if not exists teacher_id uuid references profiles(id) on delete set null;
+
+-- ══════════════════════════════════════
+-- Juz tests
+-- ══════════════════════════════════════
+-- A school that tests each Juz a child memorises books the test ahead, a
+-- set number a day, numbered in the order they were booked. An examiner
+-- hears it with the Mushaf open, marks each mistake on the word itself
+-- (tajweed or memorization), and passes or fails it; the child's teacher
+-- and parent see the result, the comment and where each mistake was.
+-- Off until the office switches it on.
+alter table schools add column if not exists juz_tests_enabled boolean not null default false;
+alter table schools add column if not exists juz_test_slots int not null default 10;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'schools_juz_test_slots_range') then
+    alter table schools add constraint schools_juz_test_slots_range check (juz_test_slots between 1 and 50);
+  end if;
+end $$;
+
+-- Who hears tests at a school, as its office chose: any of its teachers, or
+-- an admin (who can always). Kept here rather than as a flag on profiles,
+-- which people may update for themselves; only the server writes this.
+create table if not exists juz_test_examiners (
+  school_id   uuid not null references schools(id) on delete cascade,
+  user_id     uuid not null references profiles(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  primary key (school_id, user_id)
+);
+alter table juz_test_examiners enable row level security;
+
+create or replace function am_examiner()
+returns boolean
+language sql security definer stable set search_path = public
+as $$
+  select am_active() and (
+    my_role() = 'admin'
+    or exists (select 1 from juz_test_examiners where user_id = auth.uid() and school_id = my_school_id())
+  )
+$$;
+
+-- Which days take tests, where they differ from the school's own week: a
+-- weekday closed to tests, or a Saturday or Sunday opened for them.
+create table if not exists juz_test_days (
+  school_id   uuid not null references schools(id) on delete cascade,
+  date        date not null,
+  open        boolean not null,
+  primary key (school_id, date)
+);
+alter table juz_test_days enable row level security;
+
+create table if not exists juz_tests (
+  id            uuid primary key default gen_random_uuid(),
+  school_id     uuid not null references schools(id) on delete cascade,
+  student_id    uuid not null references students(id) on delete cascade,
+  juz           int not null check (juz between 1 and 30),
+  test_date     date not null,
+  -- Its number on the day, 1 to the school's daily count; above it only
+  -- when the office books an extra one.
+  slot          int not null check (slot between 1 and 99),
+  booked_by     uuid references profiles(id) on delete set null,
+  result        text check (result in ('pass', 'fail')),
+  comment       text check (char_length(comment) <= 1000),
+  examiner_id   uuid references profiles(id) on delete set null,
+  tested_at     timestamptz,
+  cancelled_at  timestamptz,
+  created_at    timestamptz not null default now()
+);
+alter table juz_tests enable row level security;
+create index if not exists idx_juz_tests_student on juz_tests(student_id);
+create index if not exists idx_juz_tests_day on juz_tests(school_id, test_date);
+-- One test to a number on a day; one booking waiting per Juz; a Juz passed once.
+create unique index if not exists juz_tests_one_per_slot
+  on juz_tests(school_id, test_date, slot) where cancelled_at is null;
+create unique index if not exists juz_tests_one_waiting
+  on juz_tests(student_id, juz) where cancelled_at is null and result is null;
+create unique index if not exists juz_tests_one_pass
+  on juz_tests(student_id, juz) where cancelled_at is null and result = 'pass';
+
+-- Each mistake, on the word: its surah, ayah and place in the ayah (from 1),
+-- and the Mushaf page it was marked on.
+create table if not exists juz_test_mistakes (
+  id          uuid primary key default gen_random_uuid(),
+  test_id     uuid not null references juz_tests(id) on delete cascade,
+  school_id   uuid not null references schools(id) on delete cascade,
+  kind        text not null check (kind in ('tajweed', 'memorization')),
+  page        int not null check (page between 1 and 604),
+  surah       int not null check (surah between 1 and 114),
+  ayah        int not null check (ayah >= 1),
+  word        int not null check (word >= 1),
+  note        text check (char_length(note) <= 300),
+  marked_by   uuid references profiles(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  unique (test_id, surah, ayah, word)
+);
+alter table juz_test_mistakes enable row level security;
+create index if not exists idx_juz_test_mistakes_test on juz_test_mistakes(test_id);
+
+-- Written by the server alone, after it has checked who is asking; read
+-- by the office and examiners (the whole school), a teacher (their own
+-- students) and a parent (their own children).
+drop policy if exists "Staff read their school's examiners" on juz_test_examiners;
+create policy "Staff read their school's examiners" on juz_test_examiners
+  for select using (school_id = my_school_id() and my_role() in ('admin', 'teacher'));
+drop policy if exists "Members read their school's test days" on juz_test_days;
+create policy "Members read their school's test days" on juz_test_days
+  for select using (school_id = my_school_id());
+drop policy if exists "Staff read juz tests" on juz_tests;
+create policy "Staff read juz tests" on juz_tests
+  for select using (
+    school_id = my_school_id()
+    and (am_examiner() or student_id in (select my_taught_student_ids()))
+  );
+drop policy if exists "Parents read their children's juz tests" on juz_tests;
+create policy "Parents read their children's juz tests" on juz_tests
+  for select using (student_id in (select my_children_student_ids()));
+drop policy if exists "Readers of a test read its mistakes" on juz_test_mistakes;
+create policy "Readers of a test read its mistakes" on juz_test_mistakes
+  for select using (test_id in (select id from juz_tests));
+grant all on public.juz_test_examiners, public.juz_test_days, public.juz_tests, public.juz_test_mistakes to service_role;
+grant select on public.juz_test_examiners, public.juz_test_days, public.juz_tests, public.juz_test_mistakes to authenticated;

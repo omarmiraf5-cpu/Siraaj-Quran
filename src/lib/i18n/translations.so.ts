@@ -38,6 +38,8 @@ export const SO: Record<string, string> = {
   "nav.office": "Xafiiska dugsiga",
   "nav.hadith": "Afartanka Xadiith",
   "nav.awards": "Xiddigaha iyo Sumadaha",
+  "nav.juzTests": "Imtixaanka Juzka",
+  "nav.examine": "Imtixaan qaad",
   "nav.changePassword": "Beddel Furaha Sirta ah",
   "nav.account": "Koontada",
   "common.terms": "Shuruudaha",

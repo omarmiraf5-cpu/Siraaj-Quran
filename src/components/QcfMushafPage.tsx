@@ -231,20 +231,81 @@ export function usePageLayout(pageNum: number) {
   return layout;
 }
 
+/** A word's place in the Qur'an: its surah, ayah, and place in the ayah from 1. */
+export interface WordPlace {
+  surah: number;
+  ayah: number;
+  word: number;
+}
+
+/** The key a marked word goes by: "surah:ayah:word". */
+export const wordKey = (w: WordPlace) => `${w.surah}:${w.ayah}:${w.word}`;
+
+/**
+ * How many words of the page's first ayah sit on the page before it: 0
+ * when the ayah opens on this page. An examiner's mark is kept by the
+ * word's place in its ayah, so an ayah carried over from the previous page
+ * has to count on from there.
+ */
+export function useCarriedWords(pageNum: number, layout: PageLayout | null): number | null {
+  const previous = usePageLayout(Math.max(1, pageNum - 1));
+  return useMemo(() => {
+    if (!layout) return null;
+    const first = layout.l.flat().find((s) => s[0] === KIND_WORD)?.[1];
+    if (pageNum === 1 || typeof first !== "string") return 0;
+    if (!previous) return null;
+    let n = 0;
+    for (const line of previous.l) for (const [kind, key, chars] of line) if (kind === KIND_WORD && key === first) n += glyphUnits(chars, pageNum - 1).length;
+    return n;
+  }, [layout, previous, pageNum]);
+}
+
 export function QcfMushafPage({
   pageNum,
   layout,
   highlightedRange,
   playingKey,
   onAyahClick,
+  onWordClick,
+  wordMarks,
+  carriedWords = 0,
 }: {
   pageNum: number;
   layout: PageLayout | null;
   highlightedRange?: { surah: number; start: number; end: number; surahEnd?: number };
   playingKey: string | null;
   onAyahClick: (surah: number, ayah: number) => void;
+  /** Word by word, for an examiner marking mistakes: a tap gives the word rather than its ayah. */
+  onWordClick?: (word: WordPlace) => void;
+  /** Words marked as mistakes, by wordKey: tajweed in amber, memorization in red. */
+  wordMarks?: Record<string, "tajweed" | "memorization">;
+  /** See useCarriedWords. */
+  carriedWords?: number;
 }) {
   const pageFont = layout ? `QCF4_${String(layout.f).padStart(2, "0")}` : "";
+
+  // Each word glyph's place in its ayah, by line, segment and glyph, when
+  // the page is being marked word by word.
+  const places = useMemo(() => {
+    const out = new Map<string, WordPlace>();
+    if (!layout || !onWordClick) return out;
+    const count = new Map<string, number>();
+    let first = true;
+    layout.l.forEach((line, li) =>
+      line.forEach(([kind, key, chars], si) => {
+        if (kind !== KIND_WORD || typeof key !== "string") return;
+        if (first && !count.has(key)) count.set(key, carriedWords);
+        first = false;
+        const [surah, ayah] = key.split(":").map(Number);
+        glyphUnits(chars, pageNum).forEach((_, ci) => {
+          const word = (count.get(key) ?? 0) + 1;
+          count.set(key, word);
+          out.set(`${li}:${si}:${ci}`, { surah, ayah, word });
+        });
+      })
+    );
+    return out;
+  }, [layout, onWordClick, carriedWords, pageNum]);
 
   // Every face this page draws with, paired with a real glyph taken from it.
   // Memoised on the layout so that playing an ayah, which re-renders this
@@ -329,11 +390,17 @@ export function QcfMushafPage({
         // (a modal opening) scales both alike, then into em of the font size.
         return ((drawn / areaWidth) * area.clientWidth) / fontPx;
       });
+      // A line's width in em shifts a hair with the size it's drawn at
+      // (glyph advances round to the pixel), so refitting it can measure it
+      // differently again: at some page widths the two sizes took turns,
+      // thousands of times a second. A change under 0.05em — about a third
+      // of a percent of a line, well inside the 1% FIT leaves — is that,
+      // not a new width, and is left alone.
       setMeasured((prev) =>
         prev &&
         prev.layout === layout &&
         prev.widths.length === widths.length &&
-        prev.widths.every((w, i) => Math.abs(w - widths[i]) < 0.01)
+        prev.widths.every((w, i) => Math.abs(w - widths[i]) < 0.05)
           ? prev
           : { layout, widths }
       );
@@ -462,24 +529,35 @@ export function QcfMushafPage({
               // flex row can stretch the line edge to edge like the print.
               // None may shrink below its own width: squeezed, a word would
               // draw over its neighbour.
-              return (kind === KIND_WORD ? glyphUnits(chars, pageNum) : Array.from(chars).map((c) => [c])).map((unit, ci) => (
+              return (kind === KIND_WORD ? glyphUnits(chars, pageNum) : Array.from(chars).map((c) => [c])).map((unit, ci) => {
+                // Marking word by word: only the words themselves answer a tap.
+                const place = onWordClick ? places.get(`${li}:${si}:${ci}`) : undefined;
+                const mark = place ? wordMarks?.[wordKey(place)] : undefined;
+                const tappable = onWordClick ? !!place : clickable;
+                const tap = () => (place ? onWordClick?.(place) : onWordClick ? undefined : handle());
+                return (
                 <span
                   key={`${si}-${ci}`}
                   data-glyph=""
-                  role={clickable ? "button" : undefined}
-                  tabIndex={clickable ? 0 : undefined}
-                  onClick={handle}
+                  data-word={place ? wordKey(place) : undefined}
+                  role={tappable ? "button" : undefined}
+                  tabIndex={tappable ? 0 : undefined}
+                  onClick={tap}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handle();
+                    if (e.key === "Enter") tap();
                   }}
-                  className={`flex-none ${isRosette ? "relative" : ""} ${clickable ? "cursor-pointer" : ""} ${
-                    playing
-                      ? "bg-emerald-200/70 dark:bg-emerald-900/50 rounded"
-                      : hl
-                        ? "bg-red-200/70 dark:bg-red-900/50 rounded"
-                        : clickable
-                          ? "hover:bg-[#c4a95a]/20 rounded"
-                          : ""
+                  className={`flex-none ${isRosette ? "relative" : ""} ${tappable ? "cursor-pointer" : ""} ${
+                    mark === "tajweed"
+                      ? "bg-amber-300/80 dark:bg-amber-600/50 rounded"
+                      : mark === "memorization"
+                        ? "bg-red-300/80 dark:bg-red-700/50 rounded"
+                        : playing
+                          ? "bg-emerald-200/70 dark:bg-emerald-900/50 rounded"
+                          : hl
+                            ? "bg-red-200/70 dark:bg-red-900/50 rounded"
+                            : tappable
+                              ? "hover:bg-[#c4a95a]/20 rounded"
+                              : ""
                   }`}
                   style={{
                     // The Bismillah glyph lives only in Hafs_01 — the upstream
@@ -514,7 +592,8 @@ export function QcfMushafPage({
                     </span>
                   )}
                 </span>
-              ));
+                );
+              });
             })}
           </div>
         );

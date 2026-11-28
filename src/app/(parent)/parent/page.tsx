@@ -39,6 +39,7 @@ import { NoticesPanel, useAttendanceApi } from "@/components/attendance-ui";
 import { FeesDueLine } from "@/components/FeesDueLine";
 import { MilestoneBanner } from "@/components/MilestoneBanner";
 import { ChildPinCard } from "@/components/ChildPinCard";
+import { JuzChildCard } from "@/components/juz-tests/JuzChildCard";
 import { autoStars } from "@/lib/progress";
 import { ByLanguage } from "@/components/ByLanguage";
 import { CalendarCheck, BookOpen, ClipboardList, Award } from "lucide-react";
@@ -217,6 +218,9 @@ export default function ParentDashboard() {
         childName={child.name.split(" ")[0]}
         recordings={qaidahRecordings}
       />
+
+      {/* Only for a school that runs Juz tests. */}
+      <JuzChildCard key={`juz-${child.id}`} studentId={child.id} firstName={child.name.split(" ")[0]} />
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
         {/* The work itself, not a link to it. */}

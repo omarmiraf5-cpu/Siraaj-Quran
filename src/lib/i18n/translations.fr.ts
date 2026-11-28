@@ -38,6 +38,8 @@ export const FR: Record<string, string> = {
   "nav.office": "Secrétariat",
   "nav.hadith": "Les quarante hadiths",
   "nav.awards": "Étoiles et badges",
+  "nav.juzTests": "Tests de juz",
+  "nav.examine": "Examiner",
   "nav.changePassword": "Changer le mot de passe",
   "nav.account": "Compte",
   "common.terms": "Conditions",
